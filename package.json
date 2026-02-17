@@ -180,14 +180,14 @@
 		}
 	},
 	"scripts": {
-		"vscode:prepublish": "npm run compile",
+		"vscode:prepublish": "pnpm run compile",
 		"clean": "node ./.vscode/clean.js",
-		"compile": "npm run clean && npm run compile-src && npm run compile-web",
+		"compile": "pnpm run clean && pnpm run compile-src && pnpm run compile-web",
 		"compile-src": "tsc -p ./src",
 		"compile-web": "tsc -p ./web && node ./.vscode/package-web.js",
 		"compile-web-debug": "tsc -p ./web && node ./.vscode/package-web.js debug",
-		"package": "npm run clean && vsce package",
-		"package-and-install": "npm run clean && vsce package && node ./.vscode/install-package.js",
+		"package": "pnpm run clean && vsce package",
+		"package-and-install": "pnpm run clean && vsce package && node ./.vscode/install-package.js",
 		"postinstall": "node ./node_modules/vscode/bin/install"
 	},
 	"devDependencies": {

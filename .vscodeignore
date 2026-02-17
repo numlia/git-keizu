@@ -1,10 +1,13 @@
-.github/
-.vscode/
-out/*.d.ts
-out/*.js.map
-resources/demo.gif
-src/
-web/
-.gitignore
-azure-pipelines.yml
-tslint.json
+# Ignore everything
+*
+*/**
+
+# Whitelist files
+!LICENSE
+!resources/demo.gif
+!resources/icon.png
+!out/extension.js
+# !CHANGELOG.md
+# !icon.png
+# !language/*
+# !out/*
