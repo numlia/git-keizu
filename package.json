@@ -1,6 +1,17 @@
 {
 	"name": "neo-git-graph",
 	"displayName": "(neo) Git Graph",
+	"description": "View your Git history as a graph, and do common Git actions directly from it.",
+	"keywords": [
+		"git",
+		"graph",
+		"visualise",
+		"diff",
+		"action"
+	],
+	"categories": [
+		"Other"
+	],
 	"version": "0.0.0",
 	"publisher": "asispts",
 	"author": {
@@ -12,17 +23,6 @@
 			"name": "Michael Hutchison",
 			"url": "https://github.com/mhutchie"
 		}
-	],
-	"description": "View a Git Graph of your repository, and perform Git actions from the graph.",
-	"keywords": [
-		"git",
-		"graph",
-		"visualise",
-		"diff",
-		"action"
-	],
-	"categories": [
-		"Other"
 	],
 	"homepage": "https://github.com/asispts/neo-git-graph",
 	"repository": {
