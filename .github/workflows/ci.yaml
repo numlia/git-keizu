@@ -35,3 +35,6 @@ jobs:
 
       - name: Type check
         run: pnpm run typecheck
+
+      - name: Test package
+        uses: HaaLeo/publish-vscode-extension@v2
