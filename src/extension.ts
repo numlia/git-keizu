@@ -8,6 +8,7 @@ import { RepoManager } from './repoManager';
 import { StatusBarItem } from './statusBarItem';
 
 export function activate(context: vscode.ExtensionContext) {
+	const outputChannel = vscode.window.createOutputChannel('(neo) Git Graph');
 	const extensionState = new ExtensionState(context);
 	const dataSource = new DataSource();
 	const avatarManager = new AvatarManager(dataSource, extensionState);
@@ -15,6 +16,7 @@ export function activate(context: vscode.ExtensionContext) {
 	const repoManager = new RepoManager(dataSource, extensionState, statusBarItem);
 
 	context.subscriptions.push(
+		outputChannel,
 		vscode.commands.registerCommand('neo-git-graph.view', () => {
 			GitGraphView.createOrShow(context.extensionPath, dataSource, extensionState, avatarManager, repoManager);
 		}),
@@ -35,6 +37,10 @@ export function activate(context: vscode.ExtensionContext) {
 		}),
 		repoManager
 	);
+
+
+	outputChannel.appendLine('Extension activated successfully');
+	vscode.window.showInformationMessage('(neo) Git Graph extension loaded');
 }
 
 export function deactivate() { }
