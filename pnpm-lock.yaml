@@ -7,13 +7,14 @@ settings:
 importers:
 
   .:
-    devDependencies:
+    dependencies:
       '@types/node':
         specifier: ^8.10.25
         version: 8.10.66
       '@types/vscode':
         specifier: ^1.39.0
         version: 1.39.0
+    devDependencies:
       tslint:
         specifier: ^5.12.1
         version: 5.20.1(typescript@3.9.10)
