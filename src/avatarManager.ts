@@ -1,8 +1,9 @@
-import * as crypto from "crypto";
-import * as fs from "fs";
-import * as http from "http";
-import * as https from "https";
-import * as url from "url";
+import * as crypto from "node:crypto";
+import * as fs from "node:fs";
+import * as http from "node:http";
+import * as https from "node:https";
+import * as url from "node:url";
+
 import { DataSource } from "./dataSource";
 import { ExtensionState } from "./extensionState";
 import { GitGraphView } from "./gitGraphView";
@@ -166,7 +167,7 @@ export class AvatarManager {
 
             if (res.statusCode === 200) {
               // Sucess
-              let commit: any = JSON.parse(respBody);
+              let commit = JSON.parse(respBody) as { author?: { avatar_url?: string } };
               if (commit.author && commit.author.avatar_url) {
                 // Avatar url found
                 let img = await this.downloadAvatarImage(
@@ -235,7 +236,7 @@ export class AvatarManager {
 
             if (res.statusCode === 200) {
               // Sucess
-              let users: any = JSON.parse(respBody);
+              let users = JSON.parse(respBody) as { avatar_url?: string }[];
               if (users.length > 0 && users[0].avatar_url) {
                 // Avatar url found
                 let img = await this.downloadAvatarImage(avatarRequest.email, users[0].avatar_url);
@@ -412,7 +413,7 @@ class AvatarRequestQueue {
 
   // Binary insertion of avatar request item, ordered by checkAfter
   private insertItem(item: AvatarRequestItem) {
-    var l = 0,
+    let l = 0,
       r = this.queue.length - 1,
       c,
       prevLength = this.queue.length;
