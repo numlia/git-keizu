@@ -30,5 +30,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Compile source
+        run: pnpm run compile-src
+
       - name: Type check
         run: pnpm run typecheck
