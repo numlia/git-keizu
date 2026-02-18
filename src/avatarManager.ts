@@ -16,7 +16,7 @@ export class AvatarManager {
 	private avatars: AvatarCache;
 	private queue: AvatarRequestQueue;
 	private remoteSourceCache: { [repo: string]: RemoteSource } = {};
-	private interval: NodeJS.Timer | null = null;
+	private interval: NodeJS.Timeout | null = null;
 
 	private githubTimeout: number = 0;
 	private gitLabTimeout: number = 0;
@@ -260,7 +260,7 @@ export class AvatarManager {
 	}
 
 	private saveAvatar(email: string, image: string, identicon: boolean) {
-		if (typeof this.avatars[email] === 'string') {
+		if (typeof this.avatars[email] !== 'undefined') {
 			if (!identicon || this.avatars[email].identicon) {
 				this.avatars[email].image = image;
 				this.avatars[email].identicon = identicon;
