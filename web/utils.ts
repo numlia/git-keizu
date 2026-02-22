@@ -63,7 +63,7 @@ export function arraysEqual<T>(a: T[], b: T[], equalElements: (a: T, b: T) => bo
   return true;
 }
 export function pad2(i: number) {
-  return i > 9 ? i : "0" + i;
+  return i > 9 ? i : `0${i}`;
 }
 
 export function escapeHtml(str: string) {

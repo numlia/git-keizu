@@ -33,7 +33,7 @@ export class Dropdown {
     filter.className = "dropdownFilter";
     this.filterInput = document.createElement("input");
     this.filterInput.className = "dropdownFilterInput";
-    this.filterInput.placeholder = "Filter " + dropdownType + "...";
+    this.filterInput.placeholder = `Filter ${dropdownType}...`;
     filter.appendChild(this.filterInput);
     this.menuElem = document.createElement("div");
     this.menuElem.className = "dropdownMenu";
@@ -118,34 +118,23 @@ export class Dropdown {
     this.currentValueElem.innerHTML = this.options[this.selectedOption].name;
     let html = "";
     for (let i = 0; i < this.options.length; i++) {
-      html +=
-        '<div class="dropdownOption' +
-        (this.selectedOption === i ? " selected" : "") +
-        '" data-id="' +
-        i +
-        '">' +
-        escapeHtml(this.options[i].name) +
-        (this.showInfo
-          ? '<div class="dropdownOptionInfo" title="' +
-            escapeHtml(this.options[i].value) +
-            '">' +
-            svgIcons.info +
-            "</div>"
-          : "") +
-        "</div>";
+      const selectedClass = this.selectedOption === i ? " selected" : "";
+      const infoHtml = this.showInfo
+        ? `<div class="dropdownOptionInfo" title="${escapeHtml(this.options[i].value)}">${svgIcons.info}</div>`
+        : "";
+      html += `<div class="dropdownOption${selectedClass}" data-id="${i}">${escapeHtml(this.options[i].name)}${infoHtml}</div>`;
     }
-    this.optionsElem.className = "dropdownOptions" + (this.showInfo ? " showInfo" : "");
+    this.optionsElem.className = `dropdownOptions${this.showInfo ? " showInfo" : ""}`;
     this.optionsElem.innerHTML = html;
     this.filterInput.style.display = "none";
     this.noResultsElem.style.display = "none";
     this.menuElem.style.cssText = "opacity:0; display:block;";
     // Width must be at least 130px for the filter elements. Max height for the dropdown is [filter (31px) + 9.5 * dropdown item (28px) = 297px]
     // Don't need to add 12px if showing info icons and scrollbar isn't needed. The scrollbar isn't needed if: menuElem height + filter input (25px) < 297px
-    this.currentValueElem.style.width =
-      Math.max(
-        this.menuElem.offsetWidth + (this.showInfo && this.menuElem.offsetHeight < 272 ? 0 : 12),
-        130
-      ) + "px";
+    this.currentValueElem.style.width = `${Math.max(
+      this.menuElem.offsetWidth + (this.showInfo && this.menuElem.offsetHeight < 272 ? 0 : 12),
+      130
+    )}px`;
     this.menuElem.style.cssText = "right:0; overflow-y:auto; max-height:297px;";
     if (this.dropdownVisible) this.filter();
   }

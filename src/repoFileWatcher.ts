@@ -23,7 +23,7 @@ export class RepoFileWatcher {
     }
 
     this.repo = repo;
-    this.fsWatcher = vscode.workspace.createFileSystemWatcher(repo + "/**");
+    this.fsWatcher = vscode.workspace.createFileSystemWatcher(`${repo}/**`);
     this.fsWatcher.onDidCreate((uri) => this.refresh(uri));
     this.fsWatcher.onDidChange((uri) => this.refresh(uri));
     this.fsWatcher.onDidDelete((uri) => this.refresh(uri));
@@ -49,7 +49,7 @@ export class RepoFileWatcher {
     if (this.muted) return;
     if (
       !getPathFromUri(uri)
-        .replace(this.repo + "/", "")
+        .replace(`${this.repo}/`, "")
         .match(fileChangeRegex)
     )
       return;

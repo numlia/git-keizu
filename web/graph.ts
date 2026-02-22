@@ -130,40 +130,22 @@ class Branch {
 
       // If the path hasn't been started or the new point belongs to a different path, move to p1
       if (curPath === "" || (i > 0 && (x1 !== lines[i - 1].p2.x || y1 !== lines[i - 1].p2.y)))
-        curPath += "M" + x1.toFixed(0) + "," + y1.toFixed(1);
+        curPath += `M${x1.toFixed(0)},${y1.toFixed(1)}`;
 
       // If the path hasn't been assigned a colour, assign it
       if (curColour === "") curColour = lines[i].isCommitted ? colour : "#808080";
 
       if (x1 === x2) {
         // If the path is vertical, draw a straight line
-        curPath += "L" + x2.toFixed(0) + "," + y2.toFixed(1);
+        curPath += `L${x2.toFixed(0)},${y2.toFixed(1)}`;
       } else {
         // If the path moves horizontal, draw the appropriate transition
         if (config.graphStyle === "angular") {
-          curPath +=
-            "L" +
-            (lines[i].lockedFirst
-              ? x2.toFixed(0) + "," + (y2 - d).toFixed(1)
-              : x1.toFixed(0) + "," + (y1 + d).toFixed(1)) +
-            "L" +
-            x2.toFixed(0) +
-            "," +
-            y2.toFixed(1);
+          curPath += lines[i].lockedFirst
+            ? `L${x2.toFixed(0)},${(y2 - d).toFixed(1)}L${x2.toFixed(0)},${y2.toFixed(1)}`
+            : `L${x1.toFixed(0)},${(y1 + d).toFixed(1)}L${x2.toFixed(0)},${y2.toFixed(1)}`;
         } else {
-          curPath +=
-            "C" +
-            x1.toFixed(0) +
-            "," +
-            (y1 + d).toFixed(1) +
-            " " +
-            x2.toFixed(0) +
-            "," +
-            (y2 - d).toFixed(1) +
-            " " +
-            x2.toFixed(0) +
-            "," +
-            y2.toFixed(1);
+          curPath += `C${x1.toFixed(0)},${(y1 + d).toFixed(1)} ${x2.toFixed(0)},${(y2 - d).toFixed(1)} ${x2.toFixed(0)},${y2.toFixed(1)}`;
         }
       }
     }
@@ -275,14 +257,10 @@ class Vertex {
     let colour = this.isCommitted
       ? config.graphColours[this.onBranch.getColour() % config.graphColours.length]
       : "#808080";
-    circle.setAttribute("cx", (this.x * config.grid.x + config.grid.offsetX).toString());
+    circle.setAttribute("cx", `${this.x * config.grid.x + config.grid.offsetX}`);
     circle.setAttribute(
       "cy",
-      (
-        this.y * config.grid.y +
-        config.grid.offsetY +
-        (expandOffset ? config.grid.expandY : 0)
-      ).toString()
+      `${this.y * config.grid.y + config.grid.offsetY + (expandOffset ? config.grid.expandY : 0)}`
     );
     circle.setAttribute("r", "4");
     if (this.isCurrent) {
@@ -430,17 +408,17 @@ export class Graph {
   }
 
   private setDimensions(width: number, height: number) {
-    this.svg.setAttribute("width", width.toString());
-    this.svg.setAttribute("height", height.toString());
-    this.svgMaskRect.setAttribute("width", width.toString());
-    this.svgMaskRect.setAttribute("height", height.toString());
+    this.svg.setAttribute("width", `${width}`);
+    this.svg.setAttribute("height", `${height}`);
+    this.svgMaskRect.setAttribute("width", `${width}`);
+    this.svgMaskRect.setAttribute("height", `${height}`);
   }
 
   private applyMaxWidth(width: number) {
     let offset1 = this.maxWidth > -1 ? (this.maxWidth - 12) / width : 1;
     let offset2 = this.maxWidth > -1 ? this.maxWidth / width : 1;
-    this.svgGradientStop1.setAttribute("offset", offset1.toString());
-    this.svgGradientStop2.setAttribute("offset", offset2.toString());
+    this.svgGradientStop1.setAttribute("offset", `${offset1}`);
+    this.svgGradientStop2.setAttribute("offset", `${offset2}`);
   }
 
   private determinePath(startAt: number) {
