@@ -275,7 +275,7 @@ class GitGraphView {
       escapedEmail = escapeHtml(email);
     for (let i = 0; i < avatarsElems.length; i++) {
       if (avatarsElems[i].dataset.email === escapedEmail) {
-        avatarsElems[i].innerHTML = '<img class="avatarImg" src="' + image + '">';
+        avatarsElems[i].innerHTML = '<img class="avatarImg" src="' + escapeHtml(image) + '">';
       }
     }
   }
@@ -441,7 +441,7 @@ class GitGraphView {
             escapeHtml(this.commits[i].email) +
             '">' +
             (typeof this.avatars[this.commits[i].email] === "string"
-              ? '<img class="avatarImg" src="' + this.avatars[this.commits[i].email] + '">'
+              ? '<img class="avatarImg" src="' + escapeHtml(this.avatars[this.commits[i].email]) + '">'
               : "") +
             "</span>"
           : "") +
@@ -449,7 +449,7 @@ class GitGraphView {
         '</td><td title="' +
         escapeHtml(this.commits[i].hash) +
         '">' +
-        abbrevCommit(this.commits[i].hash) +
+        escapeHtml(abbrevCommit(this.commits[i].hash)) +
         "</td></tr>";
     }
     this.tableElem.innerHTML = "<table>" + html + "</table>";
@@ -482,7 +482,7 @@ class GitGraphView {
         this.expandedCommit = null;
         this.saveState();
       } else {
-        this.expandedCommit.id = parseInt(elem.dataset.id!);
+        this.expandedCommit.id = parseInt(elem.dataset.id!, 10);
         this.expandedCommit.srcElem = elem;
         this.saveState();
         if (this.expandedCommit.commitDetails !== null && this.expandedCommit.fileTree !== null) {
@@ -619,7 +619,7 @@ class GitGraphView {
                       command: "cherrypickCommit",
                       repo: this.currentRepo!,
                       commitHash: hash,
-                      parentIndex: parseInt(parentIndex)
+                      parentIndex: parseInt(parentIndex, 10)
                     });
                   },
                   sourceElem
@@ -668,7 +668,7 @@ class GitGraphView {
                       command: "revertCommit",
                       repo: this.currentRepo!,
                       commitHash: hash,
-                      parentIndex: parseInt(parentIndex)
+                      parentIndex: parseInt(parentIndex, 10)
                     });
                   },
                   sourceElem
@@ -977,7 +977,7 @@ class GitGraphView {
     }
 
     addListenerToClass("resizeCol", "mousedown", (e) => {
-      col = parseInt((<HTMLElement>e.target).dataset.col!);
+      col = parseInt((<HTMLElement>e.target).dataset.col!, 10);
       mouseX = (<MouseEvent>e).clientX;
       if (columnWidths === null) {
         columnWidths = [
@@ -1062,7 +1062,7 @@ class GitGraphView {
   private loadCommitDetails(sourceElem: HTMLElement) {
     this.hideCommitDetails();
     this.expandedCommit = {
-      id: parseInt(sourceElem.dataset.id!),
+      id: parseInt(sourceElem.dataset.id!, 10),
       hash: sourceElem.dataset.hash!,
       srcElem: sourceElem,
       commitDetails: null,
@@ -1108,7 +1108,7 @@ class GitGraphView {
       (typeof this.avatars[commitDetails.email] === "string" ? " withAvatar" : "") +
       '"><span class="commitDetailsSummaryTopRow"><span class="commitDetailsSummaryKeyValues">';
     html += "<b>Commit: </b>" + escapeHtml(commitDetails.hash) + "<br>";
-    html += "<b>Parents: </b>" + commitDetails.parents.join(", ") + "<br>";
+    html += "<b>Parents: </b>" + commitDetails.parents.map(escapeHtml).join(", ") + "<br>";
     html +=
       "<b>Author: </b>" +
       escapeHtml(commitDetails.author) +
@@ -1122,7 +1122,7 @@ class GitGraphView {
     if (typeof this.avatars[commitDetails.email] === "string")
       html +=
         '<span class="commitDetailsSummaryAvatar"><img src="' +
-        this.avatars[commitDetails.email] +
+        escapeHtml(this.avatars[commitDetails.email]) +
         '"></span>';
     html += "</span></span><br><br>";
     html += escapeHtml(commitDetails.body).replace(/\n/g, "<br>") + "</div>";
@@ -1514,7 +1514,7 @@ function showContextMenu(e: MouseEvent, items: ContextMenuElement[], sourceElem:
   addListenerToClass("contextMenuItem", "click", (e) => {
     e.stopPropagation();
     hideContextMenu();
-    items[parseInt((<HTMLElement>e.target).dataset.index!)]!.onClick();
+    items[parseInt((<HTMLElement>e.target).dataset.index!, 10)]!.onClick();
   });
 
   contextMenuSource = sourceElem;
