@@ -103,3 +103,7 @@ They communicate via a typed message protocol defined in `src/types.ts` (Request
 ## Settings namespace
 
 All user-facing settings are under `git-keizu.*` (defined in `package.json` contributes.configuration). The `src/config.ts` wrapper reads these via `vscode.workspace.getConfiguration('git-keizu')`.
+
+## Commit settings
+
+commit-language: en
