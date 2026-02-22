@@ -45,31 +45,31 @@ They communicate via a typed message protocol defined in `src/types.ts` (Request
 
 ### Extension backend (`src/`)
 
-| File | Role |
-|---|---|
-| `extension.ts` | Activation entry point. Wires managers together, registers commands. |
-| `dataSource.ts` | Git CLI wrapper. All commands use `child_process.spawn()` (no shell). Contains commit hash validation, git path validation, and reset mode validation. |
-| `gitGraphView.ts` | Manages the VS Code Webview panel. Routes messages between webview and DataSource/AvatarManager. |
-| `repoManager.ts` | Auto-discovers Git repos in workspace via glob patterns. Watches for changes. |
-| `avatarManager.ts` | Fetches author avatars from GitHub/GitLab/Gravatar public APIs. Caches to disk. |
-| `extensionState.ts` | Persists state (repo column widths, last active repo, avatar cache) using `node:fs/promises`. |
-| `config.ts` | Typed wrapper around `vscode.workspace.getConfiguration('git-keizu')`. |
-| `types.ts` | All TypeScript interfaces: git data types, message protocol, config enums. |
+| File                | Role                                                                                                                                                   |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `extension.ts`      | Activation entry point. Wires managers together, registers commands.                                                                                   |
+| `dataSource.ts`     | Git CLI wrapper. All commands use `child_process.spawn()` (no shell). Contains commit hash validation, git path validation, and reset mode validation. |
+| `gitGraphView.ts`   | Manages the VS Code Webview panel. Routes messages between webview and DataSource/AvatarManager.                                                       |
+| `repoManager.ts`    | Auto-discovers Git repos in workspace via glob patterns. Watches for changes.                                                                          |
+| `avatarManager.ts`  | Fetches author avatars from GitHub/GitLab/Gravatar public APIs. Caches to disk.                                                                        |
+| `extensionState.ts` | Persists state (repo column widths, last active repo, avatar cache) using `node:fs/promises`.                                                          |
+| `config.ts`         | Typed wrapper around `vscode.workspace.getConfiguration('git-keizu')`.                                                                                 |
+| `types.ts`          | All TypeScript interfaces: git data types, message protocol, config enums.                                                                             |
 
 ### Webview frontend (`web/`)
 
-| File | Role |
-|---|---|
-| `main.ts` | Main `GitGraphView` class — renders commit table, handles user interactions. |
-| `graph.ts` | SVG graph rendering engine (commit positions, branch colors, rounded/angular styles). |
-| `dropdown.ts` | Reusable dropdown component with filtering. |
-| `dialogs.ts` | Confirmation, form, and error dialogs. |
-| `fileTree.ts` | Nested file tree from commit file changes. |
-| `contextMenu.ts` | Right-click context menu. |
-| `dates.ts` | Date formatting (Date & Time / Date Only / Relative). |
-| `branchLabels.ts` | Branch/tag label rendering on commits. |
-| `utils.ts` | `escapeHtml`, `sendMessage`, SVG icons. |
-| `global.d.ts` | Global type definitions (`acquireVsCodeApi`, `viewState`, component interfaces). |
+| File              | Role                                                                                  |
+| ----------------- | ------------------------------------------------------------------------------------- |
+| `main.ts`         | Main `GitGraphView` class — renders commit table, handles user interactions.          |
+| `graph.ts`        | SVG graph rendering engine (commit positions, branch colors, rounded/angular styles). |
+| `dropdown.ts`     | Reusable dropdown component with filtering.                                           |
+| `dialogs.ts`      | Confirmation, form, and error dialogs.                                                |
+| `fileTree.ts`     | Nested file tree from commit file changes.                                            |
+| `contextMenu.ts`  | Right-click context menu.                                                             |
+| `dates.ts`        | Date formatting (Date & Time / Date Only / Relative).                                 |
+| `branchLabels.ts` | Branch/tag label rendering on commits.                                                |
+| `utils.ts`        | `escapeHtml`, `sendMessage`, SVG icons.                                               |
+| `global.d.ts`     | Global type definitions (`acquireVsCodeApi`, `viewState`, component interfaces).      |
 
 ### Message flow
 

@@ -14,6 +14,7 @@ Git Keizu is a VS Code extension composed of two independent TypeScript projects
 ## Root Directory Layout
 
 <!-- AUTO-GENERATED:root-structure START -->
+
 ```
 neo-git-graph/
 ├── .github/              # CI/CD workflows, Dependabot config
@@ -32,11 +33,13 @@ neo-git-graph/
 ├── tsconfig.json         # (none: managed separately in src/ and web/)
 └── vitest.config.ts      # Test config
 ```
+
 <!-- AUTO-GENERATED:root-structure END -->
 
 ## src/ Directory (Extension Backend)
 
 <!-- AUTO-GENERATED:src-structure START -->
+
 ```
 src/
 ├── extension.ts          # Entry point (activate/deactivate)
@@ -53,6 +56,7 @@ src/
 ├── utils.ts              # Utility functions
 └── tsconfig.json         # TypeScript config (ES6 target, CommonJS)
 ```
+
 <!-- AUTO-GENERATED:src-structure END -->
 
 - **Runtime**: Node.js (VS Code Extension Host)
@@ -62,6 +66,7 @@ src/
 ## web/ Directory (Webview Frontend)
 
 <!-- AUTO-GENERATED:web-structure START -->
+
 ```
 web/
 ├── main.ts               # Main GitGraphView class (commit table & UI interactions)
@@ -76,6 +81,7 @@ web/
 ├── global.d.ts           # Global type definitions (acquireVsCodeApi, etc.)
 └── tsconfig.json         # TypeScript config (ES2020 target, DOM lib)
 ```
+
 <!-- AUTO-GENERATED:web-structure END -->
 
 - **Runtime**: Browser (VS Code Webview / Chromium)
@@ -85,6 +91,7 @@ web/
 ## tests/ Directory
 
 <!-- AUTO-GENERATED:tests-structure START -->
+
 ```
 tests/
 ├── src/
@@ -93,6 +100,7 @@ tests/
     ├── setup.ts           # Test environment setup (acquireVsCodeApi mock)
     └── utils.test.ts      # Tests for web/utils.ts
 ```
+
 <!-- AUTO-GENERATED:tests-structure END -->
 
 - **Framework**: Vitest
@@ -102,12 +110,14 @@ tests/
 ## notes/ Directory
 
 <!-- AUTO-GENERATED:notes-structure START -->
+
 ```
 notes/
 ├── modernization-plan.md         # 6-phase modernization plan (completed)
 ├── security-audit-2026-02-22.md  # Security audit record
 └── plan-combine-branch-labels.md # Branch label consolidation plan
 ```
+
 <!-- AUTO-GENERATED:notes-structure END -->
 
 - Stores design notes, plans, and audit records
@@ -116,6 +126,7 @@ notes/
 ## .github/ Directory
 
 <!-- AUTO-GENERATED:github-structure START -->
+
 ```
 .github/
 ├── workflows/
@@ -123,14 +134,15 @@ notes/
 │   └── publish.yml       # Extension publishing workflow
 └── dependabot.yml         # Dependency auto-update config
 ```
+
 <!-- AUTO-GENERATED:github-structure END -->
 
 ## Build Output (out/)
 
-| File | Source | Format |
-|------|--------|--------|
+| File               | Source             | Format                  |
+| ------------------ | ------------------ | ----------------------- |
 | `out/extension.js` | `src/extension.ts` | CommonJS, ES6, minified |
-| `out/web.min.js` | `web/main.ts` | IIFE, ES2020, minified |
+| `out/web.min.js`   | `web/main.ts`      | IIFE, ES2020, minified  |
 
 The `out/` directory is removed by `pnpm run clean`.
 
