@@ -9,6 +9,15 @@ import { ExtensionState } from "./extensionState";
 import { GitGraphView } from "./gitGraphView";
 import { AvatarCache } from "./types";
 
+const ALLOWED_AVATAR_HOSTNAMES = new Set([
+  "api.github.com",
+  "avatars.githubusercontent.com",
+  "gitlab.com",
+  "secure.gravatar.com"
+]);
+
+const ALLOWED_IMAGE_FORMATS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg+xml"]);
+
 export class AvatarManager {
   private readonly dataSource: DataSource;
   private readonly extensionState: ExtensionState;
@@ -218,7 +227,7 @@ export class AvatarManager {
       .get(
         {
           hostname: "gitlab.com",
-          path: "/api/v4/users?search=" + avatarRequest.email,
+          path: "/api/v4/users?search=" + encodeURIComponent(avatarRequest.email),
           headers: { "User-Agent": "git-keizu" },
           agent: false,
           timeout: 15000
@@ -284,6 +293,11 @@ export class AvatarManager {
   private async downloadAvatarImage(email: string, imageUrl: string): Promise<string | null> {
     let hash: string = crypto.createHash("md5").update(email).digest("hex"),
       imgUrl = url.parse(imageUrl);
+
+    if (!imgUrl.hostname || !ALLOWED_AVATAR_HOSTNAMES.has(imgUrl.hostname)) {
+      return null;
+    }
+
     return new Promise((resolve) => {
       https
         .get(
@@ -301,8 +315,16 @@ export class AvatarManager {
             });
             res.on("end", () => {
               if (res.statusCode === 200) {
-                // If success response, save the image to the avatar folder
-                let format = res.headers["content-type"]!.split("/")[1];
+                let contentType = res.headers["content-type"];
+                if (!contentType || !contentType.startsWith("image/")) {
+                  resolve(null);
+                  return;
+                }
+                let format = contentType.split("/")[1];
+                if (!ALLOWED_IMAGE_FORMATS.has(format)) {
+                  resolve(null);
+                  return;
+                }
                 fs.writeFile(
                   this.avatarStorageFolder + "/" + hash + "." + format,
                   Buffer.concat(imageBufferArray),

@@ -16,6 +16,13 @@ import { getPathFromStr } from "./utils";
 const eolRegex = /\r\n|\r|\n/g;
 const headRegex = /^\(HEAD detached at [0-9A-Za-z]+\)/g;
 const gitLogSeparator = "XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb";
+const COMMIT_HASH_PATTERN = /^[0-9a-f]{4,40}$/i;
+
+function isValidCommitHash(hash: string): boolean {
+  return COMMIT_HASH_PATTERN.test(hash);
+}
+
+const INVALID_COMMIT_HASH_MESSAGE = "Invalid commit hash.";
 
 export class DataSource {
   private gitPath!: string;
@@ -139,6 +146,9 @@ export class DataSource {
   }
 
   public commitDetails(repo: string, commitHash: string) {
+    if (!isValidCommitHash(commitHash)) {
+      return Promise.resolve(null);
+    }
     return new Promise<GitCommitDetails | null>((resolve) => {
       Promise.all([
         new Promise<GitCommitDetails>((resolve, reject) =>
@@ -268,6 +278,9 @@ export class DataSource {
   }
 
   public createBranch(repo: string, branchName: string, commitHash: string) {
+    if (!isValidCommitHash(commitHash)) {
+      return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
+    }
     return this.runGitCommand("branch " + escapeRefName(branchName) + " " + commitHash, repo);
   }
 
@@ -282,6 +295,9 @@ export class DataSource {
   }
 
   public checkoutCommit(repo: string, commitHash: string) {
+    if (!isValidCommitHash(commitHash)) {
+      return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
+    }
     return this.runGitCommand("checkout " + commitHash, repo);
   }
 
@@ -307,10 +323,19 @@ export class DataSource {
   }
 
   public mergeCommit(repo: string, commitHash: string, createNewCommit: boolean) {
+    if (!isValidCommitHash(commitHash)) {
+      return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
+    }
     return this.runGitCommand("merge " + commitHash + (createNewCommit ? " --no-ff" : ""), repo);
   }
 
   public cherrypickCommit(repo: string, commitHash: string, parentIndex: number) {
+    if (!isValidCommitHash(commitHash)) {
+      return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
+    }
+    if (!Number.isInteger(parentIndex) || parentIndex < 0) {
+      return Promise.resolve("Invalid parent index.");
+    }
     return this.runGitCommand(
       "cherry-pick " + commitHash + (parentIndex > 0 ? " -m " + parentIndex : ""),
       repo
@@ -318,6 +343,12 @@ export class DataSource {
   }
 
   public revertCommit(repo: string, commitHash: string, parentIndex: number) {
+    if (!isValidCommitHash(commitHash)) {
+      return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
+    }
+    if (!Number.isInteger(parentIndex) || parentIndex < 0) {
+      return Promise.resolve("Invalid parent index.");
+    }
     return this.runGitCommand(
       "revert --no-edit " + commitHash + (parentIndex > 0 ? " -m " + parentIndex : ""),
       repo
@@ -325,6 +356,9 @@ export class DataSource {
   }
 
   public resetToCommit(repo: string, commitHash: string, resetMode: GitResetMode) {
+    if (!isValidCommitHash(commitHash)) {
+      return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
+    }
     return this.runGitCommand("reset --" + resetMode + " " + commitHash, repo);
   }
 
