@@ -2,3 +2,5 @@ media/*.js
 node_modules
 out
 *.vsix
+notes/*
+!notes/.gitkeep
