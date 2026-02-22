@@ -4,7 +4,7 @@ import { DataSource } from "./dataSource";
 import { getPathFromStr } from "./utils";
 
 export class DiffDocProvider implements vscode.TextDocumentContentProvider {
-  public static scheme = "neo-git-graph";
+  public static scheme = "git-keizu";
   private dataSource: DataSource;
   private onDidChangeEventEmitter = new vscode.EventEmitter<vscode.Uri>();
   private docs = new Map<string, DiffDocument>();

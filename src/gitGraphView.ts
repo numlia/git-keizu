@@ -50,8 +50,8 @@ export class GitGraphView {
     }
 
     const panel = vscode.window.createWebviewPanel(
-      "neo-git-graph",
-      "(neo) Git Graph",
+      "git-keizu",
+      "Git Keizu",
       column || vscode.ViewColumn.One,
       {
         enableScripts: true,
@@ -392,7 +392,7 @@ export class GitGraphView {
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
 				<link rel="stylesheet" type="text/css" href="${this.getMediaUri("main.css")}">
 				<link rel="stylesheet" type="text/css" href="${this.getMediaUri("dropdown.css")}">
-				<title>(neo) Git Graph</title>
+				<title>Git Keizu</title>
 				<style>${colorParams}"</style>
 			</head>
 			${body}

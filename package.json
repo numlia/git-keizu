@@ -1,6 +1,6 @@
 {
-  "name": "neo-git-graph",
-  "displayName": "(neo) Git Graph",
+  "name": "git-keizu",
+  "displayName": "Git Keizu",
   "version": "0.1.0",
   "description": "View your Git history as a graph, and do common Git actions directly from it.",
   "categories": [
@@ -13,14 +13,14 @@
     "graph",
     "visualise"
   ],
-  "homepage": "https://github.com/asispts/neo-git-graph",
+  "homepage": "https://github.com/numlia/git-keizu",
   "bugs": {
-    "url": "https://github.com/asispts/neo-git-graph/issues"
+    "url": "https://github.com/numlia/git-keizu/issues"
   },
   "license": "MIT",
   "author": {
-    "name": "Asis Pattisahusiwa",
-    "email": "asispts@gmail.com"
+    "name": "numlia",
+    "email": "43361508+numlia@users.noreply.github.com"
   },
   "contributors": [
     {
@@ -30,9 +30,9 @@
   ],
   "repository": {
     "type": "git",
-    "url": "https://github.com/asispts/neo-git-graph.git"
+    "url": "https://github.com/numlia/git-keizu.git"
   },
-  "publisher": "asispts",
+  "publisher": "numlia",
   "main": "./out/extension.js",
   "scripts": {
     "typecheck": "tsc -p ./src --noEmit && tsc -p ./web --noEmit",
@@ -60,26 +60,26 @@
   "contributes": {
     "commands": [
       {
-        "category": "(neo) Git Graph",
-        "command": "neo-git-graph.view",
+        "category": "Git Keizu",
+        "command": "git-keizu.view",
         "title": "View Git Graph (git log)"
       },
       {
-        "category": "(neo) Git Graph",
-        "command": "neo-git-graph.clearAvatarCache",
+        "category": "Git Keizu",
+        "command": "git-keizu.clearAvatarCache",
         "title": "Clear Avatar Cache"
       }
     ],
     "configuration": {
       "type": "object",
-      "title": "(neo) Git Graph",
+      "title": "Git Keizu",
       "properties": {
-        "neo-git-graph.autoCenterCommitDetailsView": {
+        "git-keizu.autoCenterCommitDetailsView": {
           "type": "boolean",
           "default": true,
           "description": "Automatically center the commit details view when it is opened."
         },
-        "neo-git-graph.dateFormat": {
+        "git-keizu.dateFormat": {
           "type": "string",
           "enum": [
             "Date & Time",
@@ -94,7 +94,7 @@
           "default": "Date & Time",
           "description": "Specifies the date format to be used in the date column of Git Graph."
         },
-        "neo-git-graph.dateType": {
+        "git-keizu.dateType": {
           "type": "string",
           "enum": [
             "Author Date",
@@ -107,12 +107,12 @@
           "default": "Author Date",
           "description": "Specifies the date type to be displayed throughout Git Graph."
         },
-        "neo-git-graph.fetchAvatars": {
+        "git-keizu.fetchAvatars": {
           "type": "boolean",
           "default": false,
           "description": "Fetch avatars of commit authors and committers. By enabling this setting, you consent to commit author and committer email addresses being sent GitHub, GitLab or Gravatar, depending on the repositories remote origin."
         },
-        "neo-git-graph.graphColours": {
+        "git-keizu.graphColours": {
           "type": "array",
           "items": {
             "type": "string",
@@ -135,7 +135,7 @@
           ],
           "description": "Specifies the colours used on the graph."
         },
-        "neo-git-graph.graphStyle": {
+        "git-keizu.graphStyle": {
           "type": "string",
           "enum": [
             "rounded",
@@ -148,37 +148,37 @@
           "default": "rounded",
           "description": "Specifies the style of the graph."
         },
-        "neo-git-graph.initialLoadCommits": {
+        "git-keizu.initialLoadCommits": {
           "type": "number",
           "default": 300,
           "description": "Specifies the number of commits to initially load."
         },
-        "neo-git-graph.loadMoreCommits": {
+        "git-keizu.loadMoreCommits": {
           "type": "number",
           "default": 100,
           "description": "Specifies the number of commits to load when the \"Load More Commits\" button is pressed (only shown when more commits are available)."
         },
-        "neo-git-graph.maxDepthOfRepoSearch": {
+        "git-keizu.maxDepthOfRepoSearch": {
           "type": "number",
           "default": 0,
           "description": "Specifies the maximum depth of subfolders to search when discovering repositories in the workspace."
         },
-        "neo-git-graph.showCurrentBranchByDefault": {
+        "git-keizu.showCurrentBranchByDefault": {
           "type": "boolean",
           "default": false,
           "description": "Show the current branch by default when Git Graph is opened. Default: false (show all branches)"
         },
-        "neo-git-graph.showStatusBarItem": {
+        "git-keizu.showStatusBarItem": {
           "type": "boolean",
           "default": true,
           "description": "Show a Status Bar item which opens Git Graph when clicked."
         },
-        "neo-git-graph.showUncommittedChanges": {
+        "git-keizu.showUncommittedChanges": {
           "type": "boolean",
           "default": true,
           "description": "Show uncommitted changes (set to false to decrease load time on large repositories)."
         },
-        "neo-git-graph.tabIconColourTheme": {
+        "git-keizu.tabIconColourTheme": {
           "type": "string",
           "enum": [
             "colour",

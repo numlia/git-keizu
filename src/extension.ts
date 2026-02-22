@@ -9,7 +9,7 @@ import { RepoManager } from "./repoManager";
 import { StatusBarItem } from "./statusBarItem";
 
 export function activate(context: vscode.ExtensionContext) {
-  const outputChannel = vscode.window.createOutputChannel("(neo) Git Graph");
+  const outputChannel = vscode.window.createOutputChannel("Git Keizu");
   const extensionState = new ExtensionState(context);
   const dataSource = new DataSource();
   const avatarManager = new AvatarManager(dataSource, extensionState);
@@ -18,7 +18,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     outputChannel,
-    vscode.commands.registerCommand("neo-git-graph.view", () => {
+    vscode.commands.registerCommand("git-keizu.view", () => {
       GitGraphView.createOrShow(
         context.extensionPath,
         dataSource,
@@ -27,7 +27,7 @@ export function activate(context: vscode.ExtensionContext) {
         repoManager
       );
     }),
-    vscode.commands.registerCommand("neo-git-graph.clearAvatarCache", () => {
+    vscode.commands.registerCommand("git-keizu.clearAvatarCache", () => {
       avatarManager.clearCache();
     }),
     vscode.workspace.registerTextDocumentContentProvider(
@@ -35,11 +35,11 @@ export function activate(context: vscode.ExtensionContext) {
       new DiffDocProvider(dataSource)
     ),
     vscode.workspace.onDidChangeConfiguration((e) => {
-      if (e.affectsConfiguration("neo-git-graph.showStatusBarItem")) {
+      if (e.affectsConfiguration("git-keizu.showStatusBarItem")) {
         statusBarItem.refresh();
-      } else if (e.affectsConfiguration("neo-git-graph.dateType")) {
+      } else if (e.affectsConfiguration("git-keizu.dateType")) {
         dataSource.generateGitCommandFormats();
-      } else if (e.affectsConfiguration("neo-git-graph.maxDepthOfRepoSearch")) {
+      } else if (e.affectsConfiguration("git-keizu.maxDepthOfRepoSearch")) {
         repoManager.maxDepthOfRepoSearchChanged();
       } else if (e.affectsConfiguration("git.path")) {
         dataSource.registerGitPath();
@@ -49,7 +49,7 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   outputChannel.appendLine("Extension activated successfully");
-  vscode.window.showInformationMessage("(neo) Git Graph extension loaded");
+  vscode.window.showInformationMessage("Git Keizu extension loaded");
 }
 
 export function deactivate() {}
