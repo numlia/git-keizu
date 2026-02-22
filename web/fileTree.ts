@@ -1,5 +1,4 @@
 import * as GG from "../src/types";
-
 import { escapeHtml, svgIcons } from "./utils";
 
 export function generateGitFileTree(gitFiles: GG.GitFileChange[]) {
