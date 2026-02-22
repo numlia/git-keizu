@@ -1,7 +1,8 @@
 import * as crypto from "node:crypto";
-import * as fs from "node:fs";
+import * as fs from "node:fs/promises";
 import * as http from "node:http";
 import * as https from "node:https";
+import * as path from "node:path";
 
 import { DataSource } from "./dataSource";
 import { ExtensionState } from "./extensionState";
@@ -157,7 +158,7 @@ export class AvatarManager {
       .get(
         {
           hostname: "api.github.com",
-          path: "/repos/" + owner + "/" + repo + "/commits/" + avatarRequest.commits[commitIndex],
+          path: `/repos/${owner}/${repo}/commits/${avatarRequest.commits[commitIndex]}`,
           headers: { "User-Agent": "git-keizu" },
           agent: false,
           timeout: 15000
@@ -181,7 +182,7 @@ export class AvatarManager {
                 // Avatar url found
                 let img = await this.downloadAvatarImage(
                   avatarRequest.email,
-                  commit.author.avatar_url + "&size=54"
+                  `${commit.author.avatar_url}&size=54`
                 );
                 if (img !== null) this.saveAvatar(avatarRequest.email, img, false);
                 return;
@@ -227,7 +228,7 @@ export class AvatarManager {
       .get(
         {
           hostname: "gitlab.com",
-          path: "/api/v4/users?search=" + encodeURIComponent(avatarRequest.email),
+          path: `/api/v4/users?search=${encodeURIComponent(avatarRequest.email)}`,
           headers: { "User-Agent": "git-keizu" },
           agent: false,
           timeout: 15000
@@ -278,13 +279,13 @@ export class AvatarManager {
     let gravatarHash: string = crypto.createHash("md5").update(avatarRequest.email).digest("hex");
     let img = await this.downloadAvatarImage(
         avatarRequest.email,
-        "https://secure.gravatar.com/avatar/" + gravatarHash + "?s=54&d=404"
+        `https://secure.gravatar.com/avatar/${gravatarHash}?s=54&d=404`
       ),
       identicon = false;
     if (img === null) {
       img = await this.downloadAvatarImage(
         avatarRequest.email,
-        "https://secure.gravatar.com/avatar/" + gravatarHash + "?s=54&d=identicon"
+        `https://secure.gravatar.com/avatar/${gravatarHash}?s=54&d=identicon`
       );
       identicon = true;
     }
@@ -319,7 +320,7 @@ export class AvatarManager {
             res.on("data", (chunk: Buffer) => {
               imageBufferArray.push(chunk);
             });
-            res.on("end", () => {
+            res.on("end", async () => {
               if (res.statusCode === 200) {
                 let contentType = res.headers["content-type"];
                 if (!contentType || !contentType.startsWith("image/")) {
@@ -331,13 +332,16 @@ export class AvatarManager {
                   resolve(null);
                   return;
                 }
-                fs.writeFile(
-                  this.avatarStorageFolder + "/" + hash + "." + format,
-                  Buffer.concat(imageBufferArray),
-                  (err) => {
-                    resolve(err ? null : hash + "." + format);
-                  }
-                );
+                const filename = `${hash}.${format}`;
+                try {
+                  await fs.writeFile(
+                    path.join(this.avatarStorageFolder, filename),
+                    Buffer.concat(imageBufferArray)
+                  );
+                  resolve(filename);
+                } catch {
+                  resolve(null);
+                }
               } else {
                 resolve(null);
               }
@@ -364,26 +368,22 @@ export class AvatarManager {
     this.sendAvatarToWebView(email, () => {});
   }
 
-  private sendAvatarToWebView(email: string, onError: () => void) {
-    if (this.view !== null) {
-      let avatarImage = this.avatars[email]?.image;
-      if (!avatarImage) return;
-      fs.readFile(this.avatarStorageFolder + "/" + avatarImage, (err, data) => {
-        if (err) {
-          onError();
-        } else if (this.view !== null) {
-          // Send avatar to the webview as a base64 encoded data uri
-          this.view.sendMessage({
-            command: "fetchAvatar",
-            email: email,
-            image:
-              "data:image/" +
-              avatarImage!.split(".")[1] +
-              ";base64," +
-              data.toString("base64")
-          });
-        }
-      });
+  private async sendAvatarToWebView(email: string, onError: () => void) {
+    if (this.view === null) return;
+    const avatarImage = this.avatars[email]?.image;
+    if (!avatarImage) return;
+    try {
+      const data = await fs.readFile(path.join(this.avatarStorageFolder, avatarImage));
+      if (this.view !== null) {
+        const ext = avatarImage.split(".")[1];
+        this.view.sendMessage({
+          command: "fetchAvatar",
+          email: email,
+          image: `data:image/${ext};base64,${data.toString("base64")}`
+        });
+      }
+    } catch {
+      onError();
     }
   }
 }

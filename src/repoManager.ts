@@ -1,4 +1,4 @@
-import * as fs from "node:fs";
+import * as fs from "node:fs/promises";
 
 import * as vscode from "vscode";
 
@@ -106,7 +106,7 @@ export class RepoManager {
       for (let i = 0; i < workspaceFolders.length; i++) {
         path = getPathFromUri(workspaceFolders[i].uri);
         rootsExact.push(path);
-        rootsFolder.push(path + "/");
+        rootsFolder.push(`${path}/`);
       }
     }
     for (let i = 0; i < repoPaths.length; i++) {
@@ -136,7 +136,7 @@ export class RepoManager {
     this.extensionState.saveRepos(this.repos);
   }
   private removeReposWithinFolder(path: string) {
-    let pathFolder = path + "/",
+    let pathFolder = `${path}/`,
       repoPaths = Object.keys(this.repos),
       changes = false;
     for (let i = 0; i < repoPaths.length; i++) {
@@ -150,7 +150,7 @@ export class RepoManager {
   private isDirectoryWithinRepos(path: string) {
     let repoPaths = Object.keys(this.repos);
     for (let i = 0; i < repoPaths.length; i++) {
-      if (path === repoPaths[i] || path.startsWith(repoPaths[i] + "/")) return true;
+      if (path === repoPaths[i] || path.startsWith(`${repoPaths[i]}/`)) return true;
     }
     return false;
   }
@@ -160,23 +160,18 @@ export class RepoManager {
     this.statusBarItem.setNumRepos(numRepos);
     if (this.viewCallback !== null) this.viewCallback(repos, numRepos);
   }
-  public checkReposExist() {
-    return new Promise<boolean>((resolve) => {
-      let repoPaths = Object.keys(this.repos),
-        changes = false;
-      evalPromises(repoPaths, 3, (path) => this.dataSource.isGitRepository(path)).then(
-        (results) => {
-          for (let i = 0; i < repoPaths.length; i++) {
-            if (!results[i]) {
-              this.removeRepo(repoPaths[i]);
-              changes = true;
-            }
-          }
-          if (changes) this.sendRepos();
-          resolve(changes);
-        }
-      );
-    });
+  public async checkReposExist(): Promise<boolean> {
+    const repoPaths = Object.keys(this.repos);
+    const results = await evalPromises(repoPaths, 3, (p) => this.dataSource.isGitRepository(p));
+    let changes = false;
+    for (let i = 0; i < repoPaths.length; i++) {
+      if (!results[i]) {
+        this.removeRepo(repoPaths[i]);
+        changes = true;
+      }
+    }
+    if (changes) this.sendRepos();
+    return changes;
   }
   public setRepoState(repo: string, state: GitRepoState) {
     if (repo === "__proto__" || repo === "constructor" || repo === "prototype") {
@@ -203,49 +198,39 @@ export class RepoManager {
     }
     if (changes) this.sendRepos();
   }
-  private searchDirectoryForRepos(directory: string, maxDepth: number) {
-    // Returns a promise resolving to a boolean, that indicates if new repositories were found.
-    return new Promise<boolean>((resolve) => {
-      if (this.isDirectoryWithinRepos(directory)) {
-        resolve(false);
-        return;
-      }
+  private async searchDirectoryForRepos(directory: string, maxDepth: number): Promise<boolean> {
+    if (this.isDirectoryWithinRepos(directory)) {
+      return false;
+    }
 
-      this.dataSource
-        .isGitRepository(directory)
-        .then((isRepo) => {
-          if (isRepo) {
-            this.addRepo(directory);
-            resolve(true);
-          } else if (maxDepth > 0) {
-            fs.readdir(directory, async (err, dirContents) => {
-              if (err) {
-                resolve(false);
-              } else {
-                let dirs = [];
-                for (let i = 0; i < dirContents.length; i++) {
-                  if (
-                    dirContents[i] !== ".git" &&
-                    (await isDirectory(directory + "/" + dirContents[i]))
-                  ) {
-                    dirs.push(directory + "/" + dirContents[i]);
-                  }
-                }
-                resolve(
-                  (
-                    await evalPromises(dirs, 2, (dir) =>
-                      this.searchDirectoryForRepos(dir, maxDepth - 1)
-                    )
-                  ).indexOf(true) > -1
-                );
-              }
-            });
-          } else {
-            resolve(false);
+    try {
+      const isRepo = await this.dataSource.isGitRepository(directory);
+      if (isRepo) {
+        this.addRepo(directory);
+        return true;
+      }
+      if (maxDepth > 0) {
+        let dirContents: string[];
+        try {
+          dirContents = await fs.readdir(directory);
+        } catch {
+          return false;
+        }
+        const dirs: string[] = [];
+        for (const entry of dirContents) {
+          if (entry !== ".git" && (await isDirectory(`${directory}/${entry}`))) {
+            dirs.push(`${directory}/${entry}`);
           }
-        })
-        .catch(() => resolve(false));
-    });
+        }
+        const results = await evalPromises(dirs, 2, (dir) =>
+          this.searchDirectoryForRepos(dir, maxDepth - 1)
+        );
+        return results.indexOf(true) > -1;
+      }
+      return false;
+    } catch {
+      return false;
+    }
   }
 
   /* Workspace Folder Watching */
@@ -258,7 +243,7 @@ export class RepoManager {
     }
   }
   private startWatchingFolder(path: string) {
-    let watcher = vscode.workspace.createFileSystemWatcher(path + "/**");
+    let watcher = vscode.workspace.createFileSystemWatcher(`${path}/**`);
     watcher.onDidCreate((uri) => this.onWatcherCreate(uri));
     watcher.onDidChange((uri) => this.onWatcherChange(uri));
     watcher.onDidDelete((uri) => this.onWatcherDelete(uri));
@@ -318,16 +303,20 @@ export class RepoManager {
   }
 }
 
-function isDirectory(path: string) {
-  return new Promise<boolean>((resolve) => {
-    fs.stat(path, (err, stats) => {
-      resolve(err ? false : stats.isDirectory());
-    });
-  });
+async function isDirectory(path: string): Promise<boolean> {
+  try {
+    const stats = await fs.stat(path);
+    return stats.isDirectory();
+  } catch {
+    return false;
+  }
 }
 
-function doesPathExist(path: string) {
-  return new Promise<boolean>((resolve) => {
-    fs.stat(path, (err) => resolve(!err));
-  });
+async function doesPathExist(path: string): Promise<boolean> {
+  try {
+    await fs.stat(path);
+    return true;
+  } catch {
+    return false;
+  }
 }

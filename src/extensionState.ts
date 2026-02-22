@@ -1,11 +1,12 @@
-import * as fs from "node:fs";
+import * as fs from "node:fs/promises";
+import * as path from "node:path";
 
 import { ExtensionContext, Memento } from "vscode";
 
 import { Avatar, AvatarCache, GitRepoSet } from "./types";
 import { getPathFromStr } from "./utils";
 
-const AVATAR_STORAGE_FOLDER = "/avatars";
+const AVATAR_STORAGE_FOLDER = "avatars";
 const AVATAR_CACHE = "avatarCache";
 const LAST_ACTIVE_REPO = "lastActiveRepo";
 const REPO_STATES = "repoStates";
@@ -21,17 +22,22 @@ export class ExtensionState {
     this.workspaceState = context.workspaceState;
 
     this.globalStoragePath = getPathFromStr(context.globalStoragePath);
-    fs.stat(this.globalStoragePath + AVATAR_STORAGE_FOLDER, (err) => {
-      if (!err) {
+    this.initAvatarStorage();
+  }
+
+  private async initAvatarStorage() {
+    const avatarDir = path.join(this.globalStoragePath, AVATAR_STORAGE_FOLDER);
+    try {
+      await fs.stat(avatarDir);
+      this.avatarStorageAvailable = true;
+    } catch {
+      try {
+        await fs.mkdir(avatarDir, { recursive: true });
         this.avatarStorageAvailable = true;
-      } else {
-        fs.mkdir(this.globalStoragePath, () => {
-          fs.mkdir(this.globalStoragePath + AVATAR_STORAGE_FOLDER, (err) => {
-            if (!err) this.avatarStorageAvailable = true;
-          });
-        });
+      } catch {
+        // Avatar storage initialization failed; avatars will be unavailable
       }
-    });
+    }
   }
 
   /* Discovered Repos */
@@ -55,7 +61,7 @@ export class ExtensionState {
     return this.avatarStorageAvailable;
   }
   public getAvatarStoragePath() {
-    return this.globalStoragePath + AVATAR_STORAGE_FOLDER;
+    return path.join(this.globalStoragePath, AVATAR_STORAGE_FOLDER);
   }
   public getAvatarCache() {
     return this.globalState.get<AvatarCache>(AVATAR_CACHE, {});
@@ -70,13 +76,16 @@ export class ExtensionState {
     delete avatars[email];
     this.globalState.update(AVATAR_CACHE, avatars);
   }
-  public clearAvatarCache() {
+  public async clearAvatarCache() {
     this.globalState.update(AVATAR_CACHE, {});
-    fs.readdir(this.globalStoragePath + AVATAR_STORAGE_FOLDER, (err, files) => {
-      if (err) return;
-      for (let i = 0; i < files.length; i++) {
-        fs.unlink(this.globalStoragePath + AVATAR_STORAGE_FOLDER + "/" + files[i], () => {});
-      }
-    });
+    const avatarDir = path.join(this.globalStoragePath, AVATAR_STORAGE_FOLDER);
+    try {
+      const files = await fs.readdir(avatarDir);
+      await Promise.all(
+        files.map((file) => fs.unlink(path.join(avatarDir, file)).catch(() => {}))
+      );
+    } catch {
+      // Directory may not exist; nothing to clean up
+    }
   }
 }
