@@ -47,7 +47,7 @@ export class AvatarManager {
   }
 
   public fetchAvatarImage(email: string, repo: string, commits: string[]) {
-    if (typeof this.avatars[email] !== "undefined") {
+    if (this.avatars[email] !== undefined) {
       // Avatar exists in the cache
       let t = new Date().getTime();
       if (
@@ -355,7 +355,7 @@ export class AvatarManager {
   }
 
   private saveAvatar(email: string, image: string, identicon: boolean) {
-    if (typeof this.avatars[email] !== "undefined") {
+    if (this.avatars[email] !== undefined) {
       if (!identicon || this.avatars[email].identicon) {
         this.avatars[email].image = image;
         this.avatars[email].identicon = identicon;

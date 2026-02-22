@@ -19,7 +19,7 @@ export function generateGitFileTree(gitFiles: GG.GitFileChange[]) {
     path = gitFiles[i].newFilePath.split("/");
     for (j = 0; j < path.length; j++) {
       if (j < path.length - 1) {
-        if (typeof cur.contents[path[j]] === "undefined") {
+        if (cur.contents[path[j]] === undefined) {
           contents = {};
           cur.contents[path[j]] = {
             type: "folder",
@@ -85,7 +85,7 @@ export function alterGitFileTree(folder: GitFolder, folderPath: string, open: bo
     i,
     cur = folder;
   for (i = 0; i < path.length; i++) {
-    if (typeof cur.contents[path[i]] !== "undefined") {
+    if (cur.contents[path[i]] !== undefined) {
       cur = <GitFolder>cur.contents[path[i]];
       if (i === path.length - 1) {
         cur.open = open;

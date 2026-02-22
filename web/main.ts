@@ -110,7 +110,7 @@ class GitGraphView {
       this.currentBranch = prevState.currentBranch;
       this.showRemoteBranches = prevState.showRemoteBranches;
       this.showRemoteBranchesElem.checked = this.showRemoteBranches;
-      if (typeof this.gitRepos[prevState.currentRepo] !== "undefined") {
+      if (this.gitRepos[prevState.currentRepo] !== undefined) {
         this.currentRepo = prevState.currentRepo;
         this.maxCommits = prevState.maxCommits;
         this.expandedCommit = prevState.expandedCommit;
@@ -135,9 +135,9 @@ class GitGraphView {
 
     let repoPaths = Object.keys(repos),
       changedRepo = false;
-    if (typeof repos[this.currentRepo] === "undefined") {
+    if (repos[this.currentRepo] === undefined) {
       this.currentRepo =
-        lastActiveRepo !== null && typeof repos[lastActiveRepo] !== "undefined"
+        lastActiveRepo !== null && repos[lastActiveRepo] !== undefined
           ? lastActiveRepo
           : repoPaths[0];
       this.saveState();
@@ -183,7 +183,7 @@ class GitGraphView {
     this.gitBranchHead = branchHead;
     if (
       this.currentBranch === null ||
-      (this.currentBranch !== "" && this.gitBranches.indexOf(this.currentBranch) === -1)
+      (this.currentBranch !== "" && !this.gitBranches.includes(this.currentBranch))
     ) {
       this.currentBranch =
         this.config.showCurrentBranchByDefault && this.gitBranchHead !== null
@@ -196,7 +196,7 @@ class GitGraphView {
     for (let i = 0; i < this.gitBranches.length; i++) {
       options.push({
         name:
-          this.gitBranches[i].indexOf("remotes/") === 0
+          this.gitBranches[i].startsWith("remotes/")
             ? this.gitBranches[i].substring(8)
             : this.gitBranches[i],
         value: this.gitBranches[i]
@@ -259,7 +259,7 @@ class GitGraphView {
         typeof this.avatars[this.commits[i].email] !== "string" &&
         this.commits[i].email !== ""
       ) {
-        if (typeof avatarsNeeded[this.commits[i].email] === "undefined") {
+        if (avatarsNeeded[this.commits[i].email] === undefined) {
           avatarsNeeded[this.commits[i].email] = [this.commits[i].hash];
         } else {
           avatarsNeeded[this.commits[i].email].push(this.commits[i].hash);

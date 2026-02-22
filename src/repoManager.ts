@@ -102,7 +102,7 @@ export class RepoManager {
       workspaceFolders = vscode.workspace.workspaceFolders,
       repoPaths = Object.keys(this.repos),
       path;
-    if (typeof workspaceFolders !== "undefined") {
+    if (workspaceFolders !== undefined) {
       for (let i = 0; i < workspaceFolders.length; i++) {
         path = getPathFromUri(workspaceFolders[i].uri);
         rootsExact.push(path);
@@ -111,7 +111,7 @@ export class RepoManager {
     }
     for (let i = 0; i < repoPaths.length; i++) {
       if (
-        rootsExact.indexOf(repoPaths[i]) === -1 &&
+        !rootsExact.includes(repoPaths[i]) &&
         !rootsFolder.find((x) => repoPaths[i].startsWith(x))
       )
         this.removeRepo(repoPaths[i]);
@@ -185,7 +185,7 @@ export class RepoManager {
   private async searchWorkspaceForRepos() {
     let rootFolders = vscode.workspace.workspaceFolders,
       changes = false;
-    if (typeof rootFolders !== "undefined") {
+    if (rootFolders !== undefined) {
       for (let i = 0; i < rootFolders.length; i++) {
         if (
           await this.searchDirectoryForRepos(
@@ -225,7 +225,7 @@ export class RepoManager {
         const results = await evalPromises(dirs, 2, (dir) =>
           this.searchDirectoryForRepos(dir, maxDepth - 1)
         );
-        return results.indexOf(true) > -1;
+        return results.includes(true);
       }
       return false;
     } catch {
@@ -236,7 +236,7 @@ export class RepoManager {
   /* Workspace Folder Watching */
   private startWatchingFolders() {
     let rootFolders = vscode.workspace.workspaceFolders;
-    if (typeof rootFolders !== "undefined") {
+    if (rootFolders !== undefined) {
       for (let i = 0; i < rootFolders.length; i++) {
         this.startWatchingFolder(getPathFromUri(rootFolders[i].uri));
       }
@@ -255,9 +255,9 @@ export class RepoManager {
   }
   private async onWatcherCreate(uri: vscode.Uri) {
     let path = getPathFromUri(uri);
-    if (path.indexOf("/.git/") > -1) return;
+    if (path.includes("/.git/")) return;
     if (path.endsWith("/.git")) path = path.slice(0, -5);
-    if (this.createEventPaths.indexOf(path) > -1) return;
+    if (this.createEventPaths.includes(path)) return;
 
     this.createEventPaths.push(path);
     if (this.processCreateEventsTimeout !== null) clearTimeout(this.processCreateEventsTimeout);
@@ -265,9 +265,9 @@ export class RepoManager {
   }
   private onWatcherChange(uri: vscode.Uri) {
     let path = getPathFromUri(uri);
-    if (path.indexOf("/.git/") > -1) return;
+    if (path.includes("/.git/")) return;
     if (path.endsWith("/.git")) path = path.slice(0, -5);
-    if (this.changeEventPaths.indexOf(path) > -1) return;
+    if (this.changeEventPaths.includes(path)) return;
 
     this.changeEventPaths.push(path);
     if (this.processChangeEventsTimeout !== null) clearTimeout(this.processChangeEventsTimeout);
@@ -275,7 +275,7 @@ export class RepoManager {
   }
   private onWatcherDelete(uri: vscode.Uri) {
     let path = getPathFromUri(uri);
-    if (path.indexOf("/.git/") > -1) return;
+    if (path.includes("/.git/")) return;
     if (path.endsWith("/.git")) path = path.slice(0, -5);
     if (this.removeReposWithinFolder(path)) this.sendRepos();
   }

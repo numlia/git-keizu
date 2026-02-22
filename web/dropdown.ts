@@ -70,7 +70,7 @@ export class Dropdown {
             if (
               option !== null &&
               option.parentNode === this.optionsElem &&
-              typeof option.dataset.id !== "undefined"
+              option.dataset.id !== undefined
             ) {
               let selectedOption = parseInt(option.dataset.id!);
               this.close();
@@ -144,7 +144,7 @@ export class Dropdown {
       match,
       matches = false;
     for (let i = 0; i < this.options.length; i++) {
-      match = this.options[i].name.toLowerCase().indexOf(val) > -1;
+      match = this.options[i].name.toLowerCase().includes(val);
       (<HTMLElement>this.optionsElem.children[i]).style.display = match ? "block" : "none";
       if (match) matches = true;
     }
