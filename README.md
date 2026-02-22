@@ -1,17 +1,14 @@
 <div align="center">
   <img src="./resources/icon.png" height="128"/>
   <samp>
-    <h1>(neo) Git Graph for Visual Studio Code</h1>
+    <h1>Git Keizu for Visual Studio Code</h1>
     <h3>View your Git history as a graph, and do common Git actions directly from it</h3>
   </samp>
 </div>
 
-![](https://img.shields.io/github/license/asispts/neo-git-graph)
-[![](https://img.shields.io/visual-studio-marketplace/v/asispts.neo-git-graph?label=marketplace)](https://marketplace.visualstudio.com/items?itemName=asispts.neo-git-graph)
-[![](https://img.shields.io/visual-studio-marketplace/i/asispts.neo-git-graph)](https://marketplace.visualstudio.com/items?itemName=asispts.neo-git-graph)
-[![open-vsx](https://img.shields.io/open-vsx/v/asispts/neo-git-graph)](https://open-vsx.org/extension/asispts/neo-git-graph)
+![](https://img.shields.io/github/license/numlia/git-keizu)
 
-A fork of [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, based on commit [4af8583](https://github.com/mhutchie/vscode-git-graph/commit/4af8583a42082b2c230d2c0187d4eaff4b69c665) (May 9, 2019) — the last version released under the MIT license.
+A fork of [neo-git-graph](https://github.com/asispts/neo-git-graph) by asispts, which is itself a fork of [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, based on commit [4af8583](https://github.com/mhutchie/vscode-git-graph/commit/4af8583a42082b2c230d2c0187d4eaff4b69c665) (May 9, 2019) — the last version released under the MIT license.
 
 <p>&nbsp;</p>
 
@@ -30,7 +27,7 @@ A fork of [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie,
 
 ## Installation
 
-Search for `neo-git-graph` in the Extensions panel, or install from the [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=asispts.neo-git-graph) or [Open VSX Registry](https://open-vsx.org/extension/asispts/neo-git-graph).
+Search for `git-keizu` in the Extensions panel.
 
 ## Roadmap
 
@@ -43,4 +40,4 @@ Search for `neo-git-graph` in the Extensions panel, or install from the [VS Code
 
 MIT — see [LICENSE](LICENSE).
 
-> Not affiliated with or endorsed by the original Git Graph project.
+> Not affiliated with or endorsed by the original Git Graph or neo-git-graph projects.
