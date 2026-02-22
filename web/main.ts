@@ -195,10 +195,9 @@ class GitGraphView {
     let options = [{ name: "Show All", value: "" }];
     for (let i = 0; i < this.gitBranches.length; i++) {
       options.push({
-        name:
-          this.gitBranches[i].startsWith("remotes/")
-            ? this.gitBranches[i].substring(8)
-            : this.gitBranches[i],
+        name: this.gitBranches[i].startsWith("remotes/")
+          ? this.gitBranches[i].substring(8)
+          : this.gitBranches[i],
         value: this.gitBranches[i]
       });
     }
