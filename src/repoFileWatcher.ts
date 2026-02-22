@@ -47,12 +47,7 @@ export class RepoFileWatcher {
 
   private async refresh(uri: vscode.Uri) {
     if (this.muted) return;
-    if (
-      !getPathFromUri(uri)
-        .replace(`${this.repo}/`, "")
-        .match(fileChangeRegex)
-    )
-      return;
+    if (!getPathFromUri(uri).replace(`${this.repo}/`, "").match(fileChangeRegex)) return;
     if (new Date().getTime() < this.resumeAt) return;
 
     if (this.refreshTimeout !== null) {

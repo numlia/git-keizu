@@ -1,5 +1,10 @@
 import { getBranchLabels } from "./branchLabels";
-import { hideContextMenu, hideContextMenuListener, isContextMenuActive, showContextMenu } from "./contextMenu";
+import {
+  hideContextMenu,
+  hideContextMenuListener,
+  isContextMenuActive,
+  showContextMenu
+} from "./contextMenu";
 import { getCommitDate } from "./dates";
 import {
   hideDialog,
@@ -420,7 +425,7 @@ class GitGraphView {
           let remoteName = escapeHtml(branchLabels.heads[j].remotes[k]);
           refHtml += `<span class="gitRefHeadRemote" data-remote="${remoteName}" data-name="${escapeHtml(`${branchLabels.heads[j].remotes[k]}/${branchLabels.heads[j].name}`)}">${remoteName}</span>`;
         }
-        refHtml += '</span>';
+        refHtml += "</span>";
         refs = refActive ? refHtml + refs : refs + refHtml;
       }
       for (j = 0; j < branchLabels.remotes.length; j++) {
@@ -431,14 +436,19 @@ class GitGraphView {
         refName = escapeHtml(branchLabels.tags[j].name);
         refs += `<span class="gitRef tag" data-name="${refName}">${svgIcons.tag}${refName}</span>`;
       }
-      html +=
-        `<tr ${this.commits[i].hash !== "*"
+      html += `<tr ${
+        this.commits[i].hash !== "*"
           ? `class="commit" data-hash="${this.commits[i].hash}"`
-          : 'class="unsavedChanges"'} data-id="${i}" data-color="${this.graph.getVertexColour(i)}"><td></td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${this.config.fetchAvatars
-          ? `<span class="avatar" data-email="${escapeHtml(this.commits[i].email)}">${typeof this.avatars[this.commits[i].email] === "string"
-              ? `<img class="avatarImg" src="${escapeHtml(this.avatars[this.commits[i].email])}">`
-              : ""}</span>`
-          : ""}${escapeHtml(this.commits[i].author)}</td><td title="${escapeHtml(this.commits[i].hash)}">${escapeHtml(abbrevCommit(this.commits[i].hash))}</td></tr>`;
+          : 'class="unsavedChanges"'
+      } data-id="${i}" data-color="${this.graph.getVertexColour(i)}"><td></td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${
+        this.config.fetchAvatars
+          ? `<span class="avatar" data-email="${escapeHtml(this.commits[i].email)}">${
+              typeof this.avatars[this.commits[i].email] === "string"
+                ? `<img class="avatarImg" src="${escapeHtml(this.avatars[this.commits[i].email])}">`
+                : ""
+            }</span>`
+          : ""
+      }${escapeHtml(this.commits[i].author)}</td><td title="${escapeHtml(this.commits[i].hash)}">${escapeHtml(abbrevCommit(this.commits[i].hash))}</td></tr>`;
     }
     this.tableElem.innerHTML = `<table>${html}</table>`;
     this.footerElem.innerHTML = this.moreCommitsAvailable
@@ -448,8 +458,9 @@ class GitGraphView {
 
     if (this.moreCommitsAvailable) {
       document.getElementById("loadMoreCommitsBtn")!.addEventListener("click", () => {
-        (<HTMLElement>document.getElementById("loadMoreCommitsBtn")!.parentNode!).innerHTML =
-          `<h2 id="loadingHeader">${svgIcons.loading}Loading ...</h2>`;
+        (<HTMLElement>(
+          document.getElementById("loadMoreCommitsBtn")!.parentNode!
+        )).innerHTML = `<h2 id="loadingHeader">${svgIcons.loading}Loading ...</h2>`;
         this.maxCommits += this.config.loadMoreCommits;
         this.hideCommitDetails();
         this.saveState();
@@ -581,10 +592,11 @@ class GitGraphView {
               } else {
                 let options = this.commits[this.commitLookup[hash]].parentHashes.map(
                   (hash, index) => ({
-                    name:
-                      `${abbrevCommit(hash)}${typeof this.commitLookup[hash] === "number"
+                    name: `${abbrevCommit(hash)}${
+                      typeof this.commitLookup[hash] === "number"
                         ? `: ${this.commits[this.commitLookup[hash]].message}`
-                        : ""}`,
+                        : ""
+                    }`,
                     value: (index + 1).toString()
                   })
                 );
@@ -625,10 +637,11 @@ class GitGraphView {
               } else {
                 let options = this.commits[this.commitLookup[hash]].parentHashes.map(
                   (hash, index) => ({
-                    name:
-                      `${abbrevCommit(hash)}${typeof this.commitLookup[hash] === "number"
+                    name: `${abbrevCommit(hash)}${
+                      typeof this.commitLookup[hash] === "number"
                         ? `: ${this.commits[this.commitLookup[hash]].message}`
-                        : ""}`,
+                        : ""
+                    }`,
                     value: (index + 1).toString()
                   })
                 );
@@ -720,8 +733,8 @@ class GitGraphView {
       let sourceElem = <HTMLElement>target.closest(".gitRef")!;
       let isRemoteCombined = target.classList.contains("gitRefHeadRemote");
       let refName = isRemoteCombined
-        ? unescapeHtml(target.dataset.name!)
-        : unescapeHtml(sourceElem.dataset.name!),
+          ? unescapeHtml(target.dataset.name!)
+          : unescapeHtml(sourceElem.dataset.name!),
         menu: ContextMenuElement[],
         copyType: string;
       if (sourceElem.classList.contains("tag")) {
@@ -867,7 +880,11 @@ class GitGraphView {
     this.tableElem.innerHTML = `<h2 id="loadingHeader">${svgIcons.loading}Loading ...</h2>`;
     this.footerElem.innerHTML = "";
   }
-  private checkoutBranchAction(sourceElem: HTMLElement, refName: string, isRemoteCombined?: boolean) {
+  private checkoutBranchAction(
+    sourceElem: HTMLElement,
+    refName: string,
+    isRemoteCombined?: boolean
+  ) {
     if (!isRemoteCombined && sourceElem.classList.contains("head")) {
       sendMessage({
         command: "checkoutBranch",
@@ -935,8 +952,7 @@ class GitGraphView {
     } else {
       this.tableElem.className = "autoLayout";
       this.graph.limitMaxWidth(-1);
-      cols[0].style.padding =
-        `0 ${Math.round((Math.max(this.graph.getWidth() + 16, 64) - (cols[0].offsetWidth - 24)) / 2)}px`;
+      cols[0].style.padding = `0 ${Math.round((Math.max(this.graph.getWidth() + 16, 64) - (cols[0].offsetWidth - 24)) / 2)}px`;
     }
 
     addListenerToClass("resizeCol", "mousedown", (e) => {

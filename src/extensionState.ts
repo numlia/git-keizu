@@ -81,9 +81,7 @@ export class ExtensionState {
     const avatarDir = path.join(this.globalStoragePath, AVATAR_STORAGE_FOLDER);
     try {
       const files = await fs.readdir(avatarDir);
-      await Promise.all(
-        files.map((file) => fs.unlink(path.join(avatarDir, file)).catch(() => {}))
-      );
+      await Promise.all(files.map((file) => fs.unlink(path.join(avatarDir, file)).catch(() => {})));
     } catch {
       // Directory may not exist; nothing to clean up
     }

@@ -52,8 +52,7 @@ export class DataSource {
   public generateGitCommandFormats() {
     let dateType = getConfig().dateType() === "Author Date" ? "%at" : "%ct";
     this.gitLogFormat = ["%H", "%P", "%an", "%ae", dateType, "%s"].join(gitLogSeparator);
-    this.gitCommitDetailsFormat =
-      `${["%H", "%P", "%an", "%ae", dateType, "%cn"].join(gitLogSeparator)}%n%B`;
+    this.gitCommitDetailsFormat = `${["%H", "%P", "%an", "%ae", dateType, "%cn"].join(gitLogSeparator)}%n%B`;
   }
 
   public getBranches(repo: string, showRemoteBranches: boolean) {
@@ -147,10 +146,7 @@ export class DataSource {
     };
   }
 
-  public async commitDetails(
-    repo: string,
-    commitHash: string
-  ): Promise<GitCommitDetails | null> {
+  public async commitDetails(repo: string, commitHash: string): Promise<GitCommitDetails | null> {
     if (!isValidCommitHash(commitHash)) {
       return null;
     }

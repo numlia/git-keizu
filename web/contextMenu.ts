@@ -26,11 +26,13 @@ export function showContextMenu(
   contextMenu.style.left = `${
     event.pageX - window.pageXOffset + bounds.width < window.innerWidth
       ? event.pageX - 2
-      : event.pageX - bounds.width + 2}px`;
+      : event.pageX - bounds.width + 2
+  }px`;
   contextMenu.style.top = `${
     event.pageY - window.pageYOffset + bounds.height < window.innerHeight
       ? event.pageY - 2
-      : event.pageY - bounds.height + 2}px`;
+      : event.pageY - bounds.height + 2
+  }px`;
   contextMenu.style.opacity = "1";
 
   addListenerToClass("contextMenuItem", "click", (e) => {

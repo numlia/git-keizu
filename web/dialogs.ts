@@ -93,9 +93,10 @@ export function showFormDialog(
     } else if (input.type === "checkbox") {
       html += `<span class="dialogFormCheckbox"><label><input id="dialogInput${i}" type="checkbox"${input.value ? " checked" : ""}/>${multiElementForm ? "" : input.name}</label></span>`;
     } else {
-      let placeholder = input.type === "text" && input.placeholder !== null
-        ? ` placeholder="${input.placeholder}"`
-        : "";
+      let placeholder =
+        input.type === "text" && input.placeholder !== null
+          ? ` placeholder="${input.placeholder}"`
+          : "";
       html += `<input id="dialogInput${i}" type="text" value="${input.default}"${placeholder}/>`;
       if (input.type === "text-ref") textRefInput = i;
     }

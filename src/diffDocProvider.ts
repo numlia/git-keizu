@@ -32,7 +32,11 @@ export class DiffDocProvider implements vscode.TextDocumentContentProvider {
     if (existing) return existing.value;
 
     let request = decodeDiffDocUri(uri);
-    const data = await this.dataSource.getCommitFile(request.repo, request.commit, request.filePath);
+    const data = await this.dataSource.getCommitFile(
+      request.repo,
+      request.commit,
+      request.filePath
+    );
     let document = new DiffDocument(data);
     this.docs.set(uri.toString(), document);
     return document.value;

@@ -41,10 +41,7 @@ export async function evalPromises<X, Y>(
     }
   }
 
-  const workers = Array.from(
-    { length: Math.min(maxParallel, data.length) },
-    () => worker()
-  );
+  const workers = Array.from({ length: Math.min(maxParallel, data.length) }, () => worker());
   await Promise.all(workers);
   return results;
 }

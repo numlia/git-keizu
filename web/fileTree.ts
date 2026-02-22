@@ -43,8 +43,7 @@ export function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GG.GitFileC
   let html =
       (folder.name !== ""
         ? `<span class="gitFolder" data-folderpath="${encodeURIComponent(folder.folderPath)}"><span class="gitFolderIcon">${folder.open ? svgIcons.openFolder : svgIcons.closedFolder}</span><span class="gitFolderName">${folder.name}</span></span>`
-        : "") +
-      `<ul class="gitFolderContents${!folder.open ? " hidden" : ""}">`,
+        : "") + `<ul class="gitFolderContents${!folder.open ? " hidden" : ""}">`,
     keys = Object.keys(folder.contents),
     i,
     gitFile,
@@ -68,12 +67,14 @@ export function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GG.GitFileC
       gitFile = gitFiles[(<GitFile>folder.contents[keys[i]]).index];
       let diffPossible = gitFile.additions !== null && gitFile.deletions !== null;
       let binaryTitle = !diffPossible ? ' title="This is a binary file, unable to view diff."' : "";
-      let renameHtml = gitFile.type === "R"
-        ? ` <span class="gitFileRename" title="${escapeHtml(`${gitFile.oldFilePath} was renamed to ${gitFile.newFilePath}`)}">R</span>`
-        : "";
-      let addDelHtml = gitFile.type !== "A" && gitFile.type !== "D" && diffPossible
-        ? `<span class="gitFileAddDel">(<span class="gitFileAdditions" title="${gitFile.additions} addition${gitFile.additions !== 1 ? "s" : ""}">+${gitFile.additions}</span>|<span class="gitFileDeletions" title="${gitFile.deletions} deletion${gitFile.deletions !== 1 ? "s" : ""}">-${gitFile.deletions}</span>)</span>`
-        : "";
+      let renameHtml =
+        gitFile.type === "R"
+          ? ` <span class="gitFileRename" title="${escapeHtml(`${gitFile.oldFilePath} was renamed to ${gitFile.newFilePath}`)}">R</span>`
+          : "";
+      let addDelHtml =
+        gitFile.type !== "A" && gitFile.type !== "D" && diffPossible
+          ? `<span class="gitFileAddDel">(<span class="gitFileAdditions" title="${gitFile.additions} addition${gitFile.additions !== 1 ? "s" : ""}">+${gitFile.additions}</span>|<span class="gitFileDeletions" title="${gitFile.deletions} deletion${gitFile.deletions !== 1 ? "s" : ""}">-${gitFile.deletions}</span>)</span>`
+          : "";
       html += `<li class="gitFile ${gitFile.type}${diffPossible ? " gitDiffPossible" : ""}" data-oldfilepath="${encodeURIComponent(gitFile.oldFilePath)}" data-newfilepath="${encodeURIComponent(gitFile.newFilePath)}" data-type="${gitFile.type}"${binaryTitle}><span class="gitFileIcon">${svgIcons.file}</span>${folder.contents[keys[i]].name}${renameHtml}${addDelHtml}</li>`;
     }
   }
