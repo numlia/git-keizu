@@ -27,18 +27,15 @@ export class DiffDocProvider implements vscode.TextDocumentContentProvider {
     return this.onDidChangeEventEmitter.event;
   }
 
-  public provideTextDocumentContent(uri: vscode.Uri): string | Thenable<string> {
-    let document = this.docs.get(uri.toString());
-    if (document) return document.value;
+  public async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
+    let existing = this.docs.get(uri.toString());
+    if (existing) return existing.value;
 
     let request = decodeDiffDocUri(uri);
-    return this.dataSource
-      .getCommitFile(request.repo, request.commit, request.filePath)
-      .then((data) => {
-        let document = new DiffDocument(data);
-        this.docs.set(uri.toString(), document);
-        return document.value;
-      });
+    const data = await this.dataSource.getCommitFile(request.repo, request.commit, request.filePath);
+    let document = new DiffDocument(data);
+    this.docs.set(uri.toString(), document);
+    return document.value;
   }
 }
 
@@ -54,15 +51,9 @@ class DiffDocument {
   }
 }
 
-export function encodeDiffDocUri(repo: string, path: string, commit: string): vscode.Uri {
+export function encodeDiffDocUri(repo: string, filePath: string, commit: string): vscode.Uri {
   return vscode.Uri.parse(
-    DiffDocProvider.scheme +
-      ":" +
-      getPathFromStr(path) +
-      "?commit=" +
-      encodeURIComponent(commit) +
-      "&repo=" +
-      encodeURIComponent(repo)
+    `${DiffDocProvider.scheme}:${getPathFromStr(filePath)}?commit=${encodeURIComponent(commit)}&repo=${encodeURIComponent(repo)}`
   );
 }
 

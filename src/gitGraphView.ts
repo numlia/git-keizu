@@ -360,9 +360,8 @@ export class GitGraphView {
       colorVars = "",
       colorParams = "";
     for (let i = 0; i < viewState.graphColours.length; i++) {
-      colorVars += "--git-graph-color" + i + ":" + viewState.graphColours[i] + "; ";
-      colorParams +=
-        '[data-color="' + i + '"]{--git-graph-color:var(--git-graph-color' + i + ");} ";
+      colorVars += `--git-graph-color${i}:${viewState.graphColours[i]}; `;
+      colorParams += `[data-color="${i}"]{--git-graph-color:var(--git-graph-color${i});} `;
     }
     if (numRepos > 0) {
       body = `<body style="${colorVars}">
@@ -428,36 +427,36 @@ export class GitGraphView {
     });
   }
 
-  private viewDiff(
+  private async viewDiff(
     repo: string,
     commitHash: string,
     oldFilePath: string,
     newFilePath: string,
     type: GitFileChangeType
-  ) {
-    let abbrevHash = abbrevCommit(commitHash);
-    let pathComponents = newFilePath.split("/");
-    let title =
-      pathComponents[pathComponents.length - 1] +
-      " (" +
-      (type === "A"
-        ? "Added in " + abbrevHash
+  ): Promise<boolean> {
+    const abbrevHash = abbrevCommit(commitHash);
+    const pathComponents = newFilePath.split("/");
+    const fileName = pathComponents[pathComponents.length - 1];
+    const changeDescription =
+      type === "A"
+        ? `Added in ${abbrevHash}`
         : type === "D"
-          ? "Deleted in " + abbrevHash
-          : abbrevCommit(commitHash) + "^ ↔ " + abbrevCommit(commitHash)) +
-      ")";
-    return new Promise<boolean>((resolve) => {
-      vscode.commands
-        .executeCommand(
-          "vscode.diff",
-          encodeDiffDocUri(repo, oldFilePath, commitHash + "^"),
-          encodeDiffDocUri(repo, newFilePath, commitHash),
-          title,
-          { preview: true }
-        )
-        .then(() => resolve(true))
-        .then(() => resolve(false));
-    });
+          ? `Deleted in ${abbrevHash}`
+          : `${abbrevHash}^ ↔ ${abbrevHash}`;
+    const title = `${fileName} (${changeDescription})`;
+
+    try {
+      await vscode.commands.executeCommand(
+        "vscode.diff",
+        encodeDiffDocUri(repo, oldFilePath, `${commitHash}^`),
+        encodeDiffDocUri(repo, newFilePath, commitHash),
+        title,
+        { preview: true }
+      );
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 

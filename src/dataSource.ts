@@ -53,7 +53,7 @@ export class DataSource {
     let dateType = getConfig().dateType() === "Author Date" ? "%at" : "%ct";
     this.gitLogFormat = ["%H", "%P", "%an", "%ae", dateType, "%s"].join(gitLogSeparator);
     this.gitCommitDetailsFormat =
-      ["%H", "%P", "%an", "%ae", dateType, "%cn"].join(gitLogSeparator) + "%n%B";
+      `${["%H", "%P", "%an", "%ae", dateType, "%cn"].join(gitLogSeparator)}%n%B`;
   }
 
   public getBranches(repo: string, showRemoteBranches: boolean) {
@@ -84,163 +84,162 @@ export class DataSource {
     );
   }
 
-  public getCommits(repo: string, branch: string, maxCommits: number, showRemoteBranches: boolean) {
-    return new Promise<{
-      commits: GitCommitNode[];
-      head: string | null;
-      moreCommitsAvailable: boolean;
-    }>((resolve) => {
-      Promise.all([
-        this.getGitLog(repo, branch, maxCommits + 1, showRemoteBranches),
-        this.getRefs(repo, showRemoteBranches)
-      ]).then(async (results) => {
-        let commits = results[0],
-          refData = results[1],
-          i,
-          unsavedChanges = null;
-        let moreCommitsAvailable = commits.length === maxCommits + 1;
-        if (moreCommitsAvailable) commits.pop();
+  public async getCommits(
+    repo: string,
+    branch: string,
+    maxCommits: number,
+    showRemoteBranches: boolean
+  ) {
+    const [commits, refData] = await Promise.all([
+      this.getGitLog(repo, branch, maxCommits + 1, showRemoteBranches),
+      this.getRefs(repo, showRemoteBranches)
+    ]);
 
-        if (refData.head !== null) {
-          for (i = 0; i < commits.length; i++) {
-            if (refData.head === commits[i].hash) {
-              unsavedChanges = getConfig().showUncommittedChanges()
-                ? await this.getGitUnsavedChanges(repo)
-                : null;
-              if (unsavedChanges !== null) {
-                commits.unshift({
-                  hash: "*",
-                  parentHashes: [refData.head],
-                  author: "*",
-                  email: "",
-                  date: Math.round(new Date().getTime() / 1000),
-                  message: "Uncommitted Changes (" + unsavedChanges.changes + ")"
-                });
-              }
-              break;
-            }
+    const moreCommitsAvailable = commits.length === maxCommits + 1;
+    if (moreCommitsAvailable) commits.pop();
+
+    if (refData.head !== null) {
+      for (let i = 0; i < commits.length; i++) {
+        if (refData.head === commits[i].hash) {
+          const unsavedChanges = getConfig().showUncommittedChanges()
+            ? await this.getGitUnsavedChanges(repo)
+            : null;
+          if (unsavedChanges !== null) {
+            commits.unshift({
+              hash: "*",
+              parentHashes: [refData.head],
+              author: "*",
+              email: "",
+              date: Math.round(new Date().getTime() / 1000),
+              message: `Uncommitted Changes (${unsavedChanges.changes})`
+            });
           }
+          break;
         }
+      }
+    }
 
-        let commitNodes: GitCommitNode[] = [];
-        let commitLookup: { [hash: string]: number } = {};
+    const commitNodes: GitCommitNode[] = [];
+    const commitLookup: { [hash: string]: number } = {};
 
-        for (i = 0; i < commits.length; i++) {
-          commitLookup[commits[i].hash] = i;
-          commitNodes.push({
-            hash: commits[i].hash,
-            parentHashes: commits[i].parentHashes,
-            author: commits[i].author,
-            email: commits[i].email,
-            date: commits[i].date,
-            message: commits[i].message,
-            refs: []
-          });
-        }
-        for (i = 0; i < refData.refs.length; i++) {
-          if (typeof commitLookup[refData.refs[i].hash] === "number") {
-            commitNodes[commitLookup[refData.refs[i].hash]].refs.push(refData.refs[i]);
-          }
-        }
-
-        resolve({
-          commits: commitNodes,
-          head: refData.head,
-          moreCommitsAvailable: moreCommitsAvailable
-        });
+    for (let i = 0; i < commits.length; i++) {
+      commitLookup[commits[i].hash] = i;
+      commitNodes.push({
+        hash: commits[i].hash,
+        parentHashes: commits[i].parentHashes,
+        author: commits[i].author,
+        email: commits[i].email,
+        date: commits[i].date,
+        message: commits[i].message,
+        refs: []
       });
-    });
+    }
+    for (let i = 0; i < refData.refs.length; i++) {
+      if (typeof commitLookup[refData.refs[i].hash] === "number") {
+        commitNodes[commitLookup[refData.refs[i].hash]].refs.push(refData.refs[i]);
+      }
+    }
+
+    return {
+      commits: commitNodes,
+      head: refData.head,
+      moreCommitsAvailable: moreCommitsAvailable
+    };
   }
 
-  public commitDetails(repo: string, commitHash: string) {
+  public async commitDetails(
+    repo: string,
+    commitHash: string
+  ): Promise<GitCommitDetails | null> {
     if (!isValidCommitHash(commitHash)) {
-      return Promise.resolve(null);
+      return null;
     }
-    return Promise.all([
-      this.spawnGit<GitCommitDetails | null>(
-        ["show", "--quiet", commitHash, "--format=" + this.gitCommitDetailsFormat],
-        repo,
-        (stdout) => {
-          let lines = stdout.split(eolRegex);
-          let lastLine = lines.length - 1;
-          while (lines.length > 0 && lines[lastLine] === "") lastLine--;
-          let commitInfo = lines[0].split(gitLogSeparator);
-          return {
-            hash: commitInfo[0],
-            parents: commitInfo[1].split(" "),
-            author: commitInfo[2],
-            email: commitInfo[3],
-            date: parseInt(commitInfo[4], 10),
-            committer: commitInfo[5],
-            body: lines.slice(1, lastLine + 1).join("\n"),
-            fileChanges: []
-          };
-        },
-        null
-      ),
-      this.spawnGit<string[]>(
-        [
-          "diff-tree",
-          "--name-status",
-          "-r",
-          "-m",
-          "--root",
-          "--find-renames",
-          "--diff-filter=AMDR",
-          commitHash
-        ],
-        repo,
-        (stdout) => stdout.split(eolRegex),
-        []
-      ),
-      this.spawnGit<string[]>(
-        [
-          "diff-tree",
-          "--numstat",
-          "-r",
-          "-m",
-          "--root",
-          "--find-renames",
-          "--diff-filter=AMDR",
-          commitHash
-        ],
-        repo,
-        (stdout) => stdout.split(eolRegex),
-        []
-      )
-    ])
-      .then((results) => {
-        let details = results[0];
-        if (details === null) return null;
-        let fileLookup: { [file: string]: number } = {};
+    try {
+      const [details, nameStatus, numStat] = await Promise.all([
+        this.spawnGit<GitCommitDetails | null>(
+          ["show", "--quiet", commitHash, `--format=${this.gitCommitDetailsFormat}`],
+          repo,
+          (stdout) => {
+            let lines = stdout.split(eolRegex);
+            let lastLine = lines.length - 1;
+            while (lines.length > 0 && lines[lastLine] === "") lastLine--;
+            let commitInfo = lines[0].split(gitLogSeparator);
+            return {
+              hash: commitInfo[0],
+              parents: commitInfo[1].split(" "),
+              author: commitInfo[2],
+              email: commitInfo[3],
+              date: parseInt(commitInfo[4], 10),
+              committer: commitInfo[5],
+              body: lines.slice(1, lastLine + 1).join("\n"),
+              fileChanges: []
+            };
+          },
+          null
+        ),
+        this.spawnGit<string[]>(
+          [
+            "diff-tree",
+            "--name-status",
+            "-r",
+            "-m",
+            "--root",
+            "--find-renames",
+            "--diff-filter=AMDR",
+            commitHash
+          ],
+          repo,
+          (stdout) => stdout.split(eolRegex),
+          []
+        ),
+        this.spawnGit<string[]>(
+          [
+            "diff-tree",
+            "--numstat",
+            "-r",
+            "-m",
+            "--root",
+            "--find-renames",
+            "--diff-filter=AMDR",
+            commitHash
+          ],
+          repo,
+          (stdout) => stdout.split(eolRegex),
+          []
+        )
+      ]);
 
-        for (let i = 1; i < results[1].length - 1; i++) {
-          let line = results[1][i].split("\t");
-          if (line.length < 2) break;
-          let oldFilePath = getPathFromStr(line[1]),
-            newFilePath = getPathFromStr(line[line.length - 1]);
-          fileLookup[newFilePath] = details.fileChanges.length;
-          details.fileChanges.push({
-            oldFilePath: oldFilePath,
-            newFilePath: newFilePath,
-            type: <GitFileChangeType>line[0][0],
-            additions: null,
-            deletions: null
-          });
-        }
+      if (details === null) return null;
+      const fileLookup: { [file: string]: number } = {};
 
-        for (let i = 1; i < results[2].length - 1; i++) {
-          let line = results[2][i].split("\t");
-          if (line.length !== 3) break;
-          let fileName = line[2].replace(/(.*){.* => (.*)}/, "$1$2").replace(/.* => (.*)/, "$1");
-          if (typeof fileLookup[fileName] === "number") {
-            details.fileChanges[fileLookup[fileName]].additions = parseInt(line[0], 10);
-            details.fileChanges[fileLookup[fileName]].deletions = parseInt(line[1], 10);
-          }
+      for (let i = 1; i < nameStatus.length - 1; i++) {
+        let line = nameStatus[i].split("\t");
+        if (line.length < 2) break;
+        let oldFilePath = getPathFromStr(line[1]),
+          newFilePath = getPathFromStr(line[line.length - 1]);
+        fileLookup[newFilePath] = details.fileChanges.length;
+        details.fileChanges.push({
+          oldFilePath: oldFilePath,
+          newFilePath: newFilePath,
+          type: <GitFileChangeType>line[0][0],
+          additions: null,
+          deletions: null
+        });
+      }
+
+      for (let i = 1; i < numStat.length - 1; i++) {
+        let line = numStat[i].split("\t");
+        if (line.length !== 3) break;
+        let fileName = line[2].replace(/(.*){.* => (.*)}/, "$1$2").replace(/.* => (.*)/, "$1");
+        if (typeof fileLookup[fileName] === "number") {
+          details.fileChanges[fileLookup[fileName]].additions = parseInt(line[0], 10);
+          details.fileChanges[fileLookup[fileName]].deletions = parseInt(line[1], 10);
         }
-        return details;
-      })
-      .catch(() => null);
+      }
+      return details;
+    } catch {
+      return null;
+    }
   }
 
   public getCommitFile(repo: string, commitHash: string, filePath: string) {
@@ -250,7 +249,7 @@ export class DataSource {
     if (filePath.split("/").includes("..")) {
       return Promise.resolve("");
     }
-    return this.spawnGit(["show", commitHash + ":" + filePath], repo, (stdout) => stdout, "");
+    return this.spawnGit(["show", `${commitHash}:${filePath}`], repo, (stdout) => stdout, "");
   }
 
   public getRemoteUrl(repo: string) {
@@ -373,7 +372,7 @@ export class DataSource {
     if (!VALID_RESET_MODES.has(resetMode)) {
       return Promise.resolve("Invalid reset mode.");
     }
-    return this.runGitCommandSpawn(["reset", "--" + resetMode, commitHash], repo);
+    return this.runGitCommandSpawn(["reset", `--${resetMode}`, commitHash], repo);
   }
 
   private getRefs(repo: string, showRemoteBranches: boolean) {
@@ -417,7 +416,7 @@ export class DataSource {
   }
 
   private getGitLog(repo: string, branch: string, num: number, showRemoteBranches: boolean) {
-    let args = ["log", "--max-count=" + num, "--format=" + this.gitLogFormat, "--date-order"];
+    let args = ["log", `--max-count=${num}`, `--format=${this.gitLogFormat}`, "--date-order"];
     if (branch !== "") {
       args.push(branch);
     } else {
