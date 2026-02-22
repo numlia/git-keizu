@@ -399,22 +399,32 @@ class GitGraphView {
         refName,
         refActive,
         refHtml;
-      for (j = 0; j < this.commits[i].refs.length; j++) {
-        refName = escapeHtml(this.commits[i].refs[j].name);
-        refActive =
-          this.commits[i].refs[j].type === "head" &&
-          this.commits[i].refs[j].name === this.gitBranchHead;
-        refHtml =
-          '<span class="gitRef ' +
-          this.commits[i].refs[j].type +
-          (refActive ? " active" : "") +
-          '" data-name="' +
-          refName +
-          '">' +
-          (this.commits[i].refs[j].type === "tag" ? svgIcons.tag : svgIcons.branch) +
-          refName +
-          "</span>";
+      let branchLabels = getBranchLabels(this.commits[i].refs);
+      for (j = 0; j < branchLabels.heads.length; j++) {
+        refName = escapeHtml(branchLabels.heads[j].name);
+        refActive = branchLabels.heads[j].name === this.gitBranchHead;
+        refHtml = '<span class="gitRef head' + (refActive ? " active" : "") +
+          '" data-name="' + refName + '">' +
+          svgIcons.branch +
+          '<span class="gitRefName">' + refName + '</span>';
+        for (let k = 0; k < branchLabels.heads[j].remotes.length; k++) {
+          let remoteName = escapeHtml(branchLabels.heads[j].remotes[k]);
+          refHtml += '<span class="gitRefHeadRemote" data-remote="' + remoteName +
+            '" data-name="' + escapeHtml(branchLabels.heads[j].remotes[k] + '/' + branchLabels.heads[j].name) +
+            '">' + remoteName + '</span>';
+        }
+        refHtml += '</span>';
         refs = refActive ? refHtml + refs : refs + refHtml;
+      }
+      for (j = 0; j < branchLabels.remotes.length; j++) {
+        refName = escapeHtml(branchLabels.remotes[j].name);
+        refs += '<span class="gitRef remote" data-name="' + refName + '">' +
+          svgIcons.branch + refName + '</span>';
+      }
+      for (j = 0; j < branchLabels.tags.length; j++) {
+        refName = escapeHtml(branchLabels.tags[j].name);
+        refs += '<span class="gitRef tag" data-name="' + refName + '">' +
+          svgIcons.tag + refName + '</span>';
       }
       html +=
         "<tr " +
@@ -746,8 +756,12 @@ class GitGraphView {
     });
     addListenerToClass("gitRef", "contextmenu", (e: Event) => {
       e.stopPropagation();
-      let sourceElem = <HTMLElement>(<Element>e.target).closest(".gitRef")!;
-      let refName = unescapeHtml(sourceElem.dataset.name!),
+      let target = <HTMLElement>e.target;
+      let sourceElem = <HTMLElement>target.closest(".gitRef")!;
+      let isRemoteCombined = target.classList.contains("gitRefHeadRemote");
+      let refName = isRemoteCombined
+        ? unescapeHtml(target.dataset.name!)
+        : unescapeHtml(sourceElem.dataset.name!),
         menu: ContextMenuElement[],
         copyType: string;
       if (sourceElem.classList.contains("tag")) {
@@ -781,89 +795,88 @@ class GitGraphView {
           }
         ];
         copyType = "Tag Name";
-      } else {
-        if (sourceElem.classList.contains("head")) {
-          menu = [];
-          if (this.gitBranchHead !== refName) {
-            menu.push({
-              title: "Checkout Branch",
-              onClick: () => this.checkoutBranchAction(sourceElem, refName)
-            });
+      } else if (isRemoteCombined || sourceElem.classList.contains("remote")) {
+        menu = [
+          {
+            title: "Checkout Branch" + ELLIPSIS,
+            onClick: () => this.checkoutBranchAction(sourceElem, refName, isRemoteCombined)
           }
+        ];
+        copyType = "Branch Name";
+      } else {
+        menu = [];
+        if (this.gitBranchHead !== refName) {
           menu.push({
-            title: "Rename Branch" + ELLIPSIS,
-            onClick: () => {
-              showRefInputDialog(
-                "Enter the new name for branch <b><i>" + escapeHtml(refName) + "</i></b>:",
-                refName,
-                "Rename Branch",
-                (newName) => {
-                  sendMessage({
-                    command: "renameBranch",
-                    repo: this.currentRepo!,
-                    oldName: refName,
-                    newName: newName
-                  });
-                },
-                null
-              );
-            }
+            title: "Checkout Branch",
+            onClick: () => this.checkoutBranchAction(sourceElem, refName)
           });
-          if (this.gitBranchHead !== refName) {
-            menu.push(
-              {
-                title: "Delete Branch" + ELLIPSIS,
-                onClick: () => {
-                  showCheckboxDialog(
-                    "Are you sure you want to delete the branch <b><i>" +
-                      escapeHtml(refName) +
-                      "</i></b>?",
-                    "Force Delete",
-                    false,
-                    "Delete Branch",
-                    (forceDelete) => {
-                      sendMessage({
-                        command: "deleteBranch",
-                        repo: this.currentRepo!,
-                        branchName: refName,
-                        forceDelete: forceDelete
-                      });
-                    },
-                    null
-                  );
-                }
+        }
+        menu.push({
+          title: "Rename Branch" + ELLIPSIS,
+          onClick: () => {
+            showRefInputDialog(
+              "Enter the new name for branch <b><i>" + escapeHtml(refName) + "</i></b>:",
+              refName,
+              "Rename Branch",
+              (newName) => {
+                sendMessage({
+                  command: "renameBranch",
+                  repo: this.currentRepo!,
+                  oldName: refName,
+                  newName: newName
+                });
               },
-              {
-                title: "Merge into current branch" + ELLIPSIS,
-                onClick: () => {
-                  showCheckboxDialog(
-                    "Are you sure you want to merge branch <b><i>" +
-                      escapeHtml(refName) +
-                      "</i></b> into the current branch?",
-                    "Create a new commit even if fast-forward is possible",
-                    true,
-                    "Yes, merge",
-                    (createNewCommit) => {
-                      sendMessage({
-                        command: "mergeBranch",
-                        repo: this.currentRepo!,
-                        branchName: refName,
-                        createNewCommit: createNewCommit
-                      });
-                    },
-                    null
-                  );
-                }
-              }
+              null
             );
           }
-        } else {
-          menu = [
+        });
+        if (this.gitBranchHead !== refName) {
+          menu.push(
             {
-              title: "Checkout Branch" + ELLIPSIS,
-              onClick: () => this.checkoutBranchAction(sourceElem, refName)
+              title: "Delete Branch" + ELLIPSIS,
+              onClick: () => {
+                showCheckboxDialog(
+                  "Are you sure you want to delete the branch <b><i>" +
+                    escapeHtml(refName) +
+                    "</i></b>?",
+                  "Force Delete",
+                  false,
+                  "Delete Branch",
+                  (forceDelete) => {
+                    sendMessage({
+                      command: "deleteBranch",
+                      repo: this.currentRepo!,
+                      branchName: refName,
+                      forceDelete: forceDelete
+                    });
+                  },
+                  null
+                );
+              }
+            },
+            {
+              title: "Merge into current branch" + ELLIPSIS,
+              onClick: () => {
+                showCheckboxDialog(
+                  "Are you sure you want to merge branch <b><i>" +
+                    escapeHtml(refName) +
+                    "</i></b> into the current branch?",
+                  "Create a new commit even if fast-forward is possible",
+                  true,
+                  "Yes, merge",
+                  (createNewCommit) => {
+                    sendMessage({
+                      command: "mergeBranch",
+                      repo: this.currentRepo!,
+                      branchName: refName,
+                      createNewCommit: createNewCommit
+                    });
+                  },
+                  null
+                );
+              }
             }
-          ];
+          );
         }
         copyType = "Branch Name";
       }
@@ -879,8 +892,14 @@ class GitGraphView {
     addListenerToClass("gitRef", "dblclick", (e: Event) => {
       e.stopPropagation();
       hideDialogAndContextMenu();
-      let sourceElem = <HTMLElement>(<Element>e.target).closest(".gitRef")!;
-      this.checkoutBranchAction(sourceElem, unescapeHtml(sourceElem.dataset.name!));
+      let target = <HTMLElement>e.target;
+      let sourceElem = <HTMLElement>target.closest(".gitRef")!;
+      let isRemoteCombined = target.classList.contains("gitRefHeadRemote");
+      if (isRemoteCombined) {
+        this.checkoutBranchAction(sourceElem, unescapeHtml(target.dataset.name!), true);
+      } else {
+        this.checkoutBranchAction(sourceElem, unescapeHtml(sourceElem.dataset.name!));
+      }
     });
   }
   private renderUncommitedChanges() {
@@ -900,19 +919,19 @@ class GitGraphView {
     this.tableElem.innerHTML = '<h2 id="loadingHeader">' + svgIcons.loading + "Loading ...</h2>";
     this.footerElem.innerHTML = "";
   }
-  private checkoutBranchAction(sourceElem: HTMLElement, refName: string) {
-    if (sourceElem.classList.contains("head")) {
+  private checkoutBranchAction(sourceElem: HTMLElement, refName: string, isRemoteCombined?: boolean) {
+    if (!isRemoteCombined && sourceElem.classList.contains("head")) {
       sendMessage({
         command: "checkoutBranch",
         repo: this.currentRepo!,
         branchName: refName,
         remoteBranch: null
       });
-    } else if (sourceElem.classList.contains("remote")) {
+    } else if (isRemoteCombined || sourceElem.classList.contains("remote")) {
       let refNameComps = refName.split("/");
       showRefInputDialog(
         "Enter the name of the new branch you would like to create when checking out <b><i>" +
-          escapeHtml(sourceElem.dataset.name!) +
+          escapeHtml(refName) +
           "</i></b>:",
         refNameComps[refNameComps.length - 1],
         "Checkout Branch",
@@ -1751,6 +1770,52 @@ function hideDialog() {
 function hideDialogAndContextMenu() {
   if (dialog.classList.contains("active")) hideDialog();
   if (contextMenu.classList.contains("active")) hideContextMenu();
+}
+
+/* Branch Label Grouping */
+interface BranchLabel {
+  name: string;
+  remotes: string[];
+}
+
+interface BranchLabels {
+  heads: BranchLabel[];
+  remotes: GG.GitRef[];
+  tags: GG.GitRef[];
+}
+
+function getBranchLabels(refs: GG.GitRef[]): BranchLabels {
+  const heads: BranchLabel[] = [];
+  const headLookup: { [name: string]: number } = {};
+  const remotes: GG.GitRef[] = [];
+  const tags: GG.GitRef[] = [];
+
+  for (let i = 0; i < refs.length; i++) {
+    if (refs[i].type === "head") {
+      headLookup[refs[i].name] = heads.length;
+      heads.push({ name: refs[i].name, remotes: [] });
+    } else if (refs[i].type === "tag") {
+      tags.push(refs[i]);
+    } else {
+      remotes.push(refs[i]);
+    }
+  }
+
+  const remainingRemotes: GG.GitRef[] = [];
+  for (let i = 0; i < remotes.length; i++) {
+    const slashIndex = remotes[i].name.indexOf("/");
+    if (slashIndex > 0) {
+      const remoteName = remotes[i].name.substring(0, slashIndex);
+      const branchName = remotes[i].name.substring(slashIndex + 1);
+      if (typeof headLookup[branchName] === "number") {
+        heads[headLookup[branchName]].remotes.push(remoteName);
+        continue;
+      }
+    }
+    remainingRemotes.push(remotes[i]);
+  }
+
+  return { heads, remotes: remainingRemotes, tags };
 }
 
 /* Global Listeners */

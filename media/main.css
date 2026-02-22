@@ -343,6 +343,23 @@ svg.fileIcon {
   border-radius: 4px 0 0 4px;
   vertical-align: top;
 }
+.gitRef.head {
+  padding-right: 0;
+}
+.gitRefName {
+  padding-right: 5px;
+}
+.gitRefHeadRemote {
+  display: inline-block;
+  height: 18px;
+  line-height: 18px;
+  padding: 0 5px;
+  border-left: 1px solid rgba(128, 128, 128, 0.45);
+  font-style: italic;
+}
+.gitRefHeadRemote:hover {
+  background-color: rgba(128, 128, 128, 0.1);
+}
 
 /* Loader */
 #loadingHeader {
