@@ -6,8 +6,10 @@
   </samp>
 </div>
 
-![](https://img.shields.io/open-vsx/v/numlia/git-keizu)
-![](https://img.shields.io/open-vsx/dt/numlia/git-keizu)
+![](https://img.shields.io/visual-studio-marketplace/v/numlia-vs.git-keizu)
+![](https://img.shields.io/visual-studio-marketplace/i/numlia-vs.git-keizu)
+![](https://img.shields.io/open-vsx/v/numlia-vs/git-keizu)
+![](https://img.shields.io/open-vsx/dt/numlia-vs/git-keizu)
 ![](https://img.shields.io/github/license/numlia/git-keizu)
 
 A fork of [neo-git-graph](https://github.com/asispts/neo-git-graph) by asispts, which is itself a fork of [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, based on commit [4af8583](https://github.com/mhutchie/vscode-git-graph/commit/4af8583a42082b2c230d2c0187d4eaff4b69c665) (May 9, 2019) — the last version released under the MIT license.
