@@ -402,7 +402,7 @@ export class GitGraphView {
 				<link rel="stylesheet" type="text/css" href="${this.getMediaUri("main.css")}">
 				<link rel="stylesheet" type="text/css" href="${this.getMediaUri("dropdown.css")}">
 				<title>Git Keizu</title>
-				<style>${colorParams}"</style>
+				<style>${colorParams}</style>
 			</head>
 			${body}
 		</html>`;

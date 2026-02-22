@@ -49,7 +49,6 @@ export function activate(context: vscode.ExtensionContext) {
   );
 
   outputChannel.appendLine("Extension activated successfully");
-  vscode.window.showInformationMessage("Git Keizu extension loaded");
 }
 
 export function deactivate() {}

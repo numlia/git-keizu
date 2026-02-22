@@ -77,7 +77,7 @@ function decodeUriQueryArgs(query: string) {
     i;
   for (i = 0; i < queryComps.length; i++) {
     let pair = queryComps[i].split("=");
-    queryArgs[pair[0]] = decodeURIComponent(pair[1]);
+    queryArgs[pair[0]] = pair[1] !== undefined ? decodeURIComponent(pair[1]) : "";
   }
   return queryArgs;
 }

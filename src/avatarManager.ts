@@ -2,7 +2,6 @@ import * as crypto from "node:crypto";
 import * as fs from "node:fs";
 import * as http from "node:http";
 import * as https from "node:https";
-import * as url from "node:url";
 
 import { DataSource } from "./dataSource";
 import { ExtensionState } from "./extensionState";
@@ -171,7 +170,8 @@ export class AvatarManager {
           res.on("end", async () => {
             if (res.headers["x-ratelimit-remaining"] === "0") {
               // If the GitHub Api rate limit was reached, store the github timeout to prevent subsequent requests
-              this.githubTimeout = parseInt(<string>res.headers["x-ratelimit-reset"]) * 1000;
+              const resetTime = parseInt(<string>res.headers["x-ratelimit-reset"], 10);
+              this.githubTimeout = Number.isFinite(resetTime) ? resetTime * 1000 : 0;
             }
 
             if (res.statusCode === 200) {
@@ -240,7 +240,8 @@ export class AvatarManager {
           res.on("end", async () => {
             if (res.headers["ratelimit-remaining"] === "0") {
               // If the GitLab Api rate limit was reached, store the github timeout to prevent subsequent requests
-              this.gitLabTimeout = parseInt(<string>res.headers["ratelimit-reset"]) * 1000;
+              const resetTime = parseInt(<string>res.headers["ratelimit-reset"], 10);
+              this.gitLabTimeout = Number.isFinite(resetTime) ? resetTime * 1000 : 0;
             }
 
             if (res.statusCode === 200) {
@@ -274,16 +275,16 @@ export class AvatarManager {
   }
 
   private async fetchFromGravatar(avatarRequest: AvatarRequestItem) {
-    let hash: string = crypto.createHash("md5").update(avatarRequest.email).digest("hex");
+    let gravatarHash: string = crypto.createHash("md5").update(avatarRequest.email).digest("hex");
     let img = await this.downloadAvatarImage(
         avatarRequest.email,
-        "https://secure.gravatar.com/avatar/" + hash + "?s=54&d=404"
+        "https://secure.gravatar.com/avatar/" + gravatarHash + "?s=54&d=404"
       ),
       identicon = false;
     if (img === null) {
       img = await this.downloadAvatarImage(
         avatarRequest.email,
-        "https://secure.gravatar.com/avatar/" + hash + "?s=54&d=identicon"
+        "https://secure.gravatar.com/avatar/" + gravatarHash + "?s=54&d=identicon"
       );
       identicon = true;
     }
@@ -291,10 +292,15 @@ export class AvatarManager {
   }
 
   private async downloadAvatarImage(email: string, imageUrl: string): Promise<string | null> {
-    let hash: string = crypto.createHash("md5").update(email).digest("hex"),
-      imgUrl = url.parse(imageUrl);
+    let hash: string = crypto.createHash("sha256").update(email).digest("hex"),
+      imgUrl: URL;
+    try {
+      imgUrl = new URL(imageUrl);
+    } catch {
+      return null;
+    }
 
-    if (!imgUrl.hostname || !ALLOWED_AVATAR_HOSTNAMES.has(imgUrl.hostname)) {
+    if (!ALLOWED_AVATAR_HOSTNAMES.has(imgUrl.hostname)) {
       return null;
     }
 
@@ -303,7 +309,7 @@ export class AvatarManager {
         .get(
           {
             hostname: imgUrl.hostname,
-            path: imgUrl.path,
+            path: imgUrl.pathname + imgUrl.search,
             headers: { "User-Agent": "git-keizu" },
             agent: false,
             timeout: 15000
@@ -360,7 +366,9 @@ export class AvatarManager {
 
   private sendAvatarToWebView(email: string, onError: () => void) {
     if (this.view !== null) {
-      fs.readFile(this.avatarStorageFolder + "/" + this.avatars[email].image, (err, data) => {
+      let avatarImage = this.avatars[email]?.image;
+      if (!avatarImage) return;
+      fs.readFile(this.avatarStorageFolder + "/" + avatarImage, (err, data) => {
         if (err) {
           onError();
         } else if (this.view !== null) {
@@ -370,7 +378,7 @@ export class AvatarManager {
             email: email,
             image:
               "data:image/" +
-              this.avatars[email].image!.split(".")[1] +
+              avatarImage!.split(".")[1] +
               ";base64," +
               data.toString("base64")
           });

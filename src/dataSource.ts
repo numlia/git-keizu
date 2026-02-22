@@ -169,7 +169,7 @@ export class DataSource {
                   parents: commitInfo[1].split(" "),
                   author: commitInfo[2],
                   email: commitInfo[3],
-                  date: parseInt(commitInfo[4]),
+                  date: parseInt(commitInfo[4], 10),
                   committer: commitInfo[5],
                   body: lines.slice(1, lastLine + 1).join("\n"),
                   fileChanges: []
@@ -223,8 +223,8 @@ export class DataSource {
             if (line.length !== 3) break;
             let fileName = line[2].replace(/(.*){.* => (.*)}/, "$1$2").replace(/.* => (.*)/, "$1");
             if (typeof fileLookup[fileName] === "number") {
-              details.fileChanges[fileLookup[fileName]].additions = parseInt(line[0]);
-              details.fileChanges[fileLookup[fileName]].deletions = parseInt(line[1]);
+              details.fileChanges[fileLookup[fileName]].additions = parseInt(line[0], 10);
+              details.fileChanges[fileLookup[fileName]].deletions = parseInt(line[1], 10);
             }
           }
           resolve(details);
@@ -235,6 +235,9 @@ export class DataSource {
 
   public getCommitFile(repo: string, commitHash: string, filePath: string) {
     if (!isValidCommitHash(commitHash)) {
+      return Promise.resolve("");
+    }
+    if (filePath.split("/").includes("..")) {
       return Promise.resolve("");
     }
     return this.spawnGit(["show", commitHash + ":" + filePath], repo, (stdout) => stdout, "");
@@ -429,7 +432,7 @@ export class DataSource {
             parentHashes: line[1].split(" "),
             author: line[2],
             email: line[3],
-            date: parseInt(line[4]),
+            date: parseInt(line[4], 10),
             message: line[5]
           });
         }
