@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "compile",
+      "type": "shell",
+      "command": "npm exec --yes -- pnpm@10.29.3 run compile",
+      "group": "build",
+      "problemMatcher": []
+    }
+  ]
+}
