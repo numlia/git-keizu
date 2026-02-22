@@ -1,4 +1,5 @@
 import * as cp from "node:child_process";
+import * as path from "node:path";
 
 import { getConfig } from "./config";
 import {
@@ -24,10 +25,17 @@ function isValidCommitHash(hash: string): boolean {
 
 const INVALID_COMMIT_HASH_MESSAGE = "Invalid commit hash.";
 const VALID_RESET_MODES = new Set(["soft", "mixed", "hard"]);
+const VALID_GIT_BINARY_NAME = /^git(\.exe)?$/i;
+const DEFAULT_GIT_PATH = "git";
+
+function isValidGitPath(gitPath: string): boolean {
+  if (gitPath === DEFAULT_GIT_PATH) return true;
+  if (!path.isAbsolute(gitPath)) return false;
+  return VALID_GIT_BINARY_NAME.test(path.basename(gitPath));
+}
 
 export class DataSource {
   private gitPath!: string;
-  private gitExecPath!: string;
   private gitLogFormat!: string;
   private gitCommitDetailsFormat!: string;
 
@@ -37,8 +45,8 @@ export class DataSource {
   }
 
   public registerGitPath() {
-    this.gitPath = getConfig().gitPath();
-    this.gitExecPath = this.gitPath.indexOf(" ") > -1 ? '"' + this.gitPath + '"' : this.gitPath;
+    const configPath = getConfig().gitPath();
+    this.gitPath = isValidGitPath(configPath) ? configPath : DEFAULT_GIT_PATH;
   }
 
   public generateGitCommandFormats() {
@@ -49,33 +57,31 @@ export class DataSource {
   }
 
   public getBranches(repo: string, showRemoteBranches: boolean) {
-    return new Promise<{ branches: string[]; head: string | null; error: boolean }>((resolve) => {
-      this.execGit("branch" + (showRemoteBranches ? " -a" : ""), repo, (err, stdout) => {
-        let branchData = {
-          branches: <string[]>[],
-          head: <string | null>null,
+    return this.spawnGit<{ branches: string[]; head: string | null; error: boolean }>(
+      ["branch", ...(showRemoteBranches ? ["-a"] : [])],
+      repo,
+      (stdout) => {
+        let branchData: { branches: string[]; head: string | null; error: boolean } = {
+          branches: [],
+          head: null,
           error: false
         };
+        let lines = stdout.split(eolRegex);
+        for (let i = 0; i < lines.length - 1; i++) {
+          let name = lines[i].substring(2).split(" -> ")[0];
+          if (name.match(headRegex) !== null) continue;
 
-        if (err) {
-          branchData.error = true;
-        } else {
-          let lines = stdout.split(eolRegex);
-          for (let i = 0; i < lines.length - 1; i++) {
-            let name = lines[i].substring(2).split(" -> ")[0];
-            if (name.match(headRegex) !== null) continue;
-
-            if (lines[i][0] === "*") {
-              branchData.head = name;
-              branchData.branches.unshift(name);
-            } else {
-              branchData.branches.push(name);
-            }
+          if (lines[i][0] === "*") {
+            branchData.head = name;
+            branchData.branches.unshift(name);
+          } else {
+            branchData.branches.push(name);
           }
         }
-        resolve(branchData);
-      });
-    });
+        return branchData;
+      },
+      { branches: [], head: null, error: true }
+    );
   }
 
   public getCommits(repo: string, branch: string, maxCommits: number, showRemoteBranches: boolean) {
@@ -150,87 +156,91 @@ export class DataSource {
     if (!isValidCommitHash(commitHash)) {
       return Promise.resolve(null);
     }
-    return new Promise<GitCommitDetails | null>((resolve) => {
-      Promise.all([
-        new Promise<GitCommitDetails>((resolve, reject) =>
-          this.execGit(
-            "show --quiet " + commitHash + ' --format="' + this.gitCommitDetailsFormat + '"',
-            repo,
-            (err, stdout) => {
-              if (err) {
-                reject();
-              } else {
-                let lines = stdout.split(eolRegex);
-                let lastLine = lines.length - 1;
-                while (lines.length > 0 && lines[lastLine] === "") lastLine--;
-                let commitInfo = lines[0].split(gitLogSeparator);
-                resolve({
-                  hash: commitInfo[0],
-                  parents: commitInfo[1].split(" "),
-                  author: commitInfo[2],
-                  email: commitInfo[3],
-                  date: parseInt(commitInfo[4], 10),
-                  committer: commitInfo[5],
-                  body: lines.slice(1, lastLine + 1).join("\n"),
-                  fileChanges: []
-                });
-              }
-            }
-          )
-        ),
-        new Promise<string[]>((resolve, reject) =>
-          this.execGit(
-            "diff-tree --name-status -r -m --root --find-renames --diff-filter=AMDR " + commitHash,
-            repo,
-            (err, stdout) => {
-              if (err) reject();
-              else resolve(stdout.split(eolRegex));
-            }
-          )
-        ),
-        new Promise<string[]>((resolve, reject) =>
-          this.execGit(
-            "diff-tree --numstat -r -m --root --find-renames --diff-filter=AMDR " + commitHash,
-            repo,
-            (err, stdout) => {
-              if (err) reject();
-              else resolve(stdout.split(eolRegex));
-            }
-          )
-        )
-      ])
-        .then((results) => {
-          let details = results[0],
-            fileLookup: { [file: string]: number } = {};
+    return Promise.all([
+      this.spawnGit<GitCommitDetails | null>(
+        ["show", "--quiet", commitHash, "--format=" + this.gitCommitDetailsFormat],
+        repo,
+        (stdout) => {
+          let lines = stdout.split(eolRegex);
+          let lastLine = lines.length - 1;
+          while (lines.length > 0 && lines[lastLine] === "") lastLine--;
+          let commitInfo = lines[0].split(gitLogSeparator);
+          return {
+            hash: commitInfo[0],
+            parents: commitInfo[1].split(" "),
+            author: commitInfo[2],
+            email: commitInfo[3],
+            date: parseInt(commitInfo[4], 10),
+            committer: commitInfo[5],
+            body: lines.slice(1, lastLine + 1).join("\n"),
+            fileChanges: []
+          };
+        },
+        null
+      ),
+      this.spawnGit<string[]>(
+        [
+          "diff-tree",
+          "--name-status",
+          "-r",
+          "-m",
+          "--root",
+          "--find-renames",
+          "--diff-filter=AMDR",
+          commitHash
+        ],
+        repo,
+        (stdout) => stdout.split(eolRegex),
+        []
+      ),
+      this.spawnGit<string[]>(
+        [
+          "diff-tree",
+          "--numstat",
+          "-r",
+          "-m",
+          "--root",
+          "--find-renames",
+          "--diff-filter=AMDR",
+          commitHash
+        ],
+        repo,
+        (stdout) => stdout.split(eolRegex),
+        []
+      )
+    ])
+      .then((results) => {
+        let details = results[0];
+        if (details === null) return null;
+        let fileLookup: { [file: string]: number } = {};
 
-          for (let i = 1; i < results[1].length - 1; i++) {
-            let line = results[1][i].split("\t");
-            if (line.length < 2) break;
-            let oldFilePath = getPathFromStr(line[1]),
-              newFilePath = getPathFromStr(line[line.length - 1]);
-            fileLookup[newFilePath] = details.fileChanges.length;
-            details.fileChanges.push({
-              oldFilePath: oldFilePath,
-              newFilePath: newFilePath,
-              type: <GitFileChangeType>line[0][0],
-              additions: null,
-              deletions: null
-            });
-          }
+        for (let i = 1; i < results[1].length - 1; i++) {
+          let line = results[1][i].split("\t");
+          if (line.length < 2) break;
+          let oldFilePath = getPathFromStr(line[1]),
+            newFilePath = getPathFromStr(line[line.length - 1]);
+          fileLookup[newFilePath] = details.fileChanges.length;
+          details.fileChanges.push({
+            oldFilePath: oldFilePath,
+            newFilePath: newFilePath,
+            type: <GitFileChangeType>line[0][0],
+            additions: null,
+            deletions: null
+          });
+        }
 
-          for (let i = 1; i < results[2].length - 1; i++) {
-            let line = results[2][i].split("\t");
-            if (line.length !== 3) break;
-            let fileName = line[2].replace(/(.*){.* => (.*)}/, "$1$2").replace(/.* => (.*)/, "$1");
-            if (typeof fileLookup[fileName] === "number") {
-              details.fileChanges[fileLookup[fileName]].additions = parseInt(line[0], 10);
-              details.fileChanges[fileLookup[fileName]].deletions = parseInt(line[1], 10);
-            }
+        for (let i = 1; i < results[2].length - 1; i++) {
+          let line = results[2][i].split("\t");
+          if (line.length !== 3) break;
+          let fileName = line[2].replace(/(.*){.* => (.*)}/, "$1$2").replace(/.* => (.*)/, "$1");
+          if (typeof fileLookup[fileName] === "number") {
+            details.fileChanges[fileLookup[fileName]].additions = parseInt(line[0], 10);
+            details.fileChanges[fileLookup[fileName]].deletions = parseInt(line[1], 10);
           }
-          resolve(details);
-        })
-        .catch(() => resolve(null));
-    });
+        }
+        return details;
+      })
+      .catch(() => null);
   }
 
   public getCommitFile(repo: string, commitHash: string, filePath: string) {
@@ -243,20 +253,17 @@ export class DataSource {
     return this.spawnGit(["show", commitHash + ":" + filePath], repo, (stdout) => stdout, "");
   }
 
-  public async getRemoteUrl(repo: string) {
-    return new Promise<string | null>((resolve) => {
-      this.execGit("config --get remote.origin.url", repo, (err, stdout) => {
-        resolve(!err ? stdout.split(eolRegex)[0] : null);
-      });
-    });
+  public getRemoteUrl(repo: string) {
+    return this.spawnGit<string | null>(
+      ["config", "--get", "remote.origin.url"],
+      repo,
+      (stdout) => stdout.split(eolRegex)[0],
+      null
+    );
   }
 
   public isGitRepository(path: string) {
-    return new Promise<boolean>((resolve) => {
-      this.execGit("rev-parse --git-dir", path, (err) => {
-        resolve(!err);
-      });
-    });
+    return this.spawnGit<boolean>(["rev-parse", "--git-dir"], path, () => true, false);
   }
 
   public addTag(
@@ -277,54 +284,48 @@ export class DataSource {
   }
 
   public deleteTag(repo: string, tagName: string) {
-    return this.runGitCommand("tag -d " + escapeRefName(tagName), repo);
+    return this.runGitCommandSpawn(["tag", "-d", tagName], repo);
   }
 
   public pushTag(repo: string, tagName: string) {
-    return this.runGitCommand("push origin " + escapeRefName(tagName), repo);
+    return this.runGitCommandSpawn(["push", "origin", tagName], repo);
   }
 
   public createBranch(repo: string, branchName: string, commitHash: string) {
     if (!isValidCommitHash(commitHash)) {
       return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
     }
-    return this.runGitCommand("branch " + escapeRefName(branchName) + " " + commitHash, repo);
+    return this.runGitCommandSpawn(["branch", branchName, commitHash], repo);
   }
 
   public checkoutBranch(repo: string, branchName: string, remoteBranch: string | null) {
-    return this.runGitCommand(
-      "checkout " +
-        (remoteBranch === null
-          ? escapeRefName(branchName)
-          : " -b " + escapeRefName(branchName) + " " + escapeRefName(remoteBranch)),
-      repo
-    );
+    if (remoteBranch === null) {
+      return this.runGitCommandSpawn(["checkout", branchName], repo);
+    }
+    return this.runGitCommandSpawn(["checkout", "-b", branchName, remoteBranch], repo);
   }
 
   public checkoutCommit(repo: string, commitHash: string) {
     if (!isValidCommitHash(commitHash)) {
       return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
     }
-    return this.runGitCommand("checkout " + commitHash, repo);
+    return this.runGitCommandSpawn(["checkout", commitHash], repo);
   }
 
   public deleteBranch(repo: string, branchName: string, forceDelete: boolean) {
-    return this.runGitCommand(
-      "branch --delete" + (forceDelete ? " --force" : "") + " " + escapeRefName(branchName),
+    return this.runGitCommandSpawn(
+      ["branch", "--delete", ...(forceDelete ? ["--force"] : []), branchName],
       repo
     );
   }
 
   public renameBranch(repo: string, oldName: string, newName: string) {
-    return this.runGitCommand(
-      "branch -m " + escapeRefName(oldName) + " " + escapeRefName(newName),
-      repo
-    );
+    return this.runGitCommandSpawn(["branch", "-m", oldName, newName], repo);
   }
 
   public mergeBranch(repo: string, branchName: string, createNewCommit: boolean) {
-    return this.runGitCommand(
-      "merge " + escapeRefName(branchName) + (createNewCommit ? " --no-ff" : ""),
+    return this.runGitCommandSpawn(
+      ["merge", branchName, ...(createNewCommit ? ["--no-ff"] : [])],
       repo
     );
   }
@@ -333,7 +334,10 @@ export class DataSource {
     if (!isValidCommitHash(commitHash)) {
       return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
     }
-    return this.runGitCommand("merge " + commitHash + (createNewCommit ? " --no-ff" : ""), repo);
+    return this.runGitCommandSpawn(
+      ["merge", commitHash, ...(createNewCommit ? ["--no-ff"] : [])],
+      repo
+    );
   }
 
   public cherrypickCommit(repo: string, commitHash: string, parentIndex: number) {
@@ -343,8 +347,8 @@ export class DataSource {
     if (!Number.isInteger(parentIndex) || parentIndex < 0) {
       return Promise.resolve("Invalid parent index.");
     }
-    return this.runGitCommand(
-      "cherry-pick " + commitHash + (parentIndex > 0 ? " -m " + parentIndex : ""),
+    return this.runGitCommandSpawn(
+      ["cherry-pick", commitHash, ...(parentIndex > 0 ? ["-m", String(parentIndex)] : [])],
       repo
     );
   }
@@ -356,8 +360,8 @@ export class DataSource {
     if (!Number.isInteger(parentIndex) || parentIndex < 0) {
       return Promise.resolve("Invalid parent index.");
     }
-    return this.runGitCommand(
-      "revert --no-edit " + commitHash + (parentIndex > 0 ? " -m " + parentIndex : ""),
+    return this.runGitCommandSpawn(
+      ["revert", "--no-edit", commitHash, ...(parentIndex > 0 ? ["-m", String(parentIndex)] : [])],
       repo
     );
   }
@@ -369,50 +373,53 @@ export class DataSource {
     if (!VALID_RESET_MODES.has(resetMode)) {
       return Promise.resolve("Invalid reset mode.");
     }
-    return this.runGitCommand("reset --" + resetMode + " " + commitHash, repo);
+    return this.runGitCommandSpawn(["reset", "--" + resetMode, commitHash], repo);
   }
 
   private getRefs(repo: string, showRemoteBranches: boolean) {
-    return new Promise<GitRefData>((resolve) => {
-      this.execGit(
-        "show-ref " + (showRemoteBranches ? "" : "--heads --tags") + " -d --head",
-        repo,
-        (err, stdout) => {
-          let refData: GitRefData = { head: null, refs: [] };
-          if (!err) {
-            let lines = stdout.split(eolRegex);
-            for (let i = 0; i < lines.length - 1; i++) {
-              let line = lines[i].split(" ");
-              if (line.length < 2) continue;
+    let args = ["show-ref"];
+    if (!showRemoteBranches) {
+      args.push("--heads", "--tags");
+    }
+    args.push("-d", "--head");
 
-              let hash = line.shift()!;
-              let ref = line.join(" ");
+    return this.spawnGit<GitRefData>(
+      args,
+      repo,
+      (stdout) => {
+        let refData: GitRefData = { head: null, refs: [] };
+        let lines = stdout.split(eolRegex);
+        for (let i = 0; i < lines.length - 1; i++) {
+          let line = lines[i].split(" ");
+          if (line.length < 2) continue;
 
-              if (ref.startsWith("refs/heads/")) {
-                refData.refs.push({ hash: hash, name: ref.substring(11), type: "head" });
-              } else if (ref.startsWith("refs/tags/")) {
-                refData.refs.push({
-                  hash: hash,
-                  name: ref.endsWith("^{}") ? ref.substring(10, ref.length - 3) : ref.substring(10),
-                  type: "tag"
-                });
-              } else if (ref.startsWith("refs/remotes/")) {
-                refData.refs.push({ hash: hash, name: ref.substring(13), type: "remote" });
-              } else if (ref === "HEAD") {
-                refData.head = hash;
-              }
-            }
+          let hash = line.shift()!;
+          let ref = line.join(" ");
+
+          if (ref.startsWith("refs/heads/")) {
+            refData.refs.push({ hash: hash, name: ref.substring(11), type: "head" });
+          } else if (ref.startsWith("refs/tags/")) {
+            refData.refs.push({
+              hash: hash,
+              name: ref.endsWith("^{}") ? ref.substring(10, ref.length - 3) : ref.substring(10),
+              type: "tag"
+            });
+          } else if (ref.startsWith("refs/remotes/")) {
+            refData.refs.push({ hash: hash, name: ref.substring(13), type: "remote" });
+          } else if (ref === "HEAD") {
+            refData.head = hash;
           }
-          resolve(refData);
         }
-      );
-    });
+        return refData;
+      },
+      { head: null, refs: [] }
+    );
   }
 
   private getGitLog(repo: string, branch: string, num: number, showRemoteBranches: boolean) {
     let args = ["log", "--max-count=" + num, "--format=" + this.gitLogFormat, "--date-order"];
     if (branch !== "") {
-      args.push(escapeRefName(branch));
+      args.push(branch);
     } else {
       args.push("--branches", "--tags");
       if (showRemoteBranches) args.push("--remotes");
@@ -443,39 +450,17 @@ export class DataSource {
   }
 
   private getGitUnsavedChanges(repo: string) {
-    return new Promise<GitUnsavedChanges | null>((resolve) => {
-      this.execGit("status -s --branch --untracked-files --porcelain", repo, (err, stdout) => {
-        if (!err) {
-          let lines = stdout.split(eolRegex);
-          resolve(
-            lines.length > 2
-              ? { branch: lines[0].substring(3).split("...")[0], changes: lines.length - 2 }
-              : null
-          );
-        } else {
-          resolve(null);
-        }
-      });
-    });
-  }
-
-  private runGitCommand(command: string, repo: string) {
-    return new Promise<GitCommandStatus>((resolve) => {
-      this.execGit(command, repo, (err, stdout, stderr) => {
-        if (!err) {
-          resolve(null);
-        } else {
-          let lines;
-          if (stdout !== "" || stderr !== "") {
-            lines = (stdout !== "" ? stdout : stderr !== "" ? stderr : "").split(eolRegex);
-          } else {
-            lines = err.message.split(eolRegex);
-            lines.shift();
-          }
-          resolve(lines.slice(0, lines.length - 1).join("\n"));
-        }
-      });
-    });
+    return this.spawnGit<GitUnsavedChanges | null>(
+      ["status", "-s", "--branch", "--untracked-files", "--porcelain"],
+      repo,
+      (stdout) => {
+        let lines = stdout.split(eolRegex);
+        return lines.length > 2
+          ? { branch: lines[0].substring(3).split("...")[0], changes: lines.length - 2 }
+          : null;
+      },
+      null
+    );
   }
 
   private runGitCommandSpawn(args: string[], repo: string) {
@@ -506,14 +491,6 @@ export class DataSource {
     });
   }
 
-  private execGit(
-    command: string,
-    repo: string,
-    callback: { (error: Error | null, stdout: string, stderr: string): void }
-  ) {
-    cp.exec(this.gitExecPath + " " + command, { cwd: repo }, callback);
-  }
-
   private spawnGit<T>(
     args: string[],
     repo: string,
@@ -537,8 +514,4 @@ export class DataSource {
       });
     });
   }
-}
-
-function escapeRefName(str: string) {
-  return str.replace(/'/g, "'");
 }
