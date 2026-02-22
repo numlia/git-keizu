@@ -32,7 +32,7 @@
     "type": "git",
     "url": "https://github.com/numlia/git-keizu.git"
   },
-  "publisher": "numlia",
+  "publisher": "numlia-vs",
   "main": "./out/extension.js",
   "scripts": {
     "typecheck": "tsc -p ./src --noEmit && tsc -p ./web --noEmit",
