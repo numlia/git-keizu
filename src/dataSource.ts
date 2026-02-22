@@ -23,6 +23,7 @@ function isValidCommitHash(hash: string): boolean {
 }
 
 const INVALID_COMMIT_HASH_MESSAGE = "Invalid commit hash.";
+const VALID_RESET_MODES = new Set(["soft", "mixed", "hard"]);
 
 export class DataSource {
   private gitPath!: string;
@@ -233,6 +234,9 @@ export class DataSource {
   }
 
   public getCommitFile(repo: string, commitHash: string, filePath: string) {
+    if (!isValidCommitHash(commitHash)) {
+      return Promise.resolve("");
+    }
     return this.spawnGit(["show", commitHash + ":" + filePath], repo, (stdout) => stdout, "");
   }
 
@@ -358,6 +362,9 @@ export class DataSource {
   public resetToCommit(repo: string, commitHash: string, resetMode: GitResetMode) {
     if (!isValidCommitHash(commitHash)) {
       return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
+    }
+    if (!VALID_RESET_MODES.has(resetMode)) {
+      return Promise.resolve("Invalid reset mode.");
     }
     return this.runGitCommand("reset --" + resetMode + " " + commitHash, repo);
   }

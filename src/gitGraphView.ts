@@ -132,6 +132,14 @@ export class GitGraphView {
     this.panel.webview.onDidReceiveMessage(
       async (msg: RequestMessage) => {
         if (this.dataSource === null) return;
+        if (
+          msg.command !== "copyToClipboard" &&
+          msg.command !== "loadRepos" &&
+          "repo" in msg &&
+          !(msg.repo in this.repoManager.getRepos())
+        ) {
+          return;
+        }
         this.repoFileWatcher.mute();
         switch (msg.command) {
           case "addTag":

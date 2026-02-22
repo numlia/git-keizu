@@ -320,7 +320,7 @@ export class AvatarManager {
                   resolve(null);
                   return;
                 }
-                let format = contentType.split("/")[1];
+                let format = contentType.split("/")[1].split(";")[0].trim();
                 if (!ALLOWED_IMAGE_FORMATS.has(format)) {
                   resolve(null);
                   return;

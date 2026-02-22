@@ -179,6 +179,9 @@ export class RepoManager {
     });
   }
   public setRepoState(repo: string, state: GitRepoState) {
+    if (repo === "__proto__" || repo === "constructor" || repo === "prototype") {
+      return;
+    }
     this.repos[repo] = state;
     this.extensionState.saveRepos(this.repos);
   }
