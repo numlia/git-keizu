@@ -10,10 +10,6 @@
 
 A fork of [neo-git-graph](https://github.com/asispts/neo-git-graph) by asispts, which is itself a fork of [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, based on commit [4af8583](https://github.com/mhutchie/vscode-git-graph/commit/4af8583a42082b2c230d2c0187d4eaff4b69c665) (May 9, 2019) — the last version released under the MIT license.
 
-<p>&nbsp;</p>
-
-![demo](resources/demo.gif)
-
 ## Features
 
 - **Graph View**: See all your branches, tags, and uncommitted changes in one visual graph
@@ -28,13 +24,6 @@ A fork of [neo-git-graph](https://github.com/asispts/neo-git-graph) by asispts, 
 ## Installation
 
 Search for `git-keizu` in the Extensions panel.
-
-## Roadmap
-
-- [x] Fix activation event (`*` → `onStartupFinished`)
-- [x] Fix extension not activating in devcontainers
-- [x] Upgrade dependencies and toolchain
-- [ ] Modernize the codebase
 
 ## License
 
