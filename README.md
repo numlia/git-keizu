@@ -54,6 +54,10 @@ Git Keizu has undergone a full security audit and remediation (27 issues fixed):
 
 Search for `git-keizu` in the Extensions panel.
 
+## Contributing & Support
+
+Bug reports and feedback via [GitHub Issues](https://github.com/numlia/git-keizu/issues) are welcome. This is a personal project maintained in spare time — responses and fixes are not guaranteed, but reports are appreciated.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
