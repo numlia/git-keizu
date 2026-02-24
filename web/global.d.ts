@@ -56,6 +56,8 @@ declare global {
     id: number;
     hash: string;
     srcElem: HTMLElement | null;
+    compareWithHash: string | null;
+    compareWithSrcElem: HTMLElement | null;
     commitDetails: GG.GitCommitDetails | null;
     fileTree: GitFolder | null;
   }
@@ -100,6 +102,14 @@ declare global {
 
   type AvatarImageCollection = { [email: string]: string };
 
+  interface FindWidgetState {
+    text: string;
+    currentHash: string | null;
+    visible: boolean;
+    caseSensitive: boolean;
+    regex: boolean;
+  }
+
   interface WebViewState {
     gitRepos: GG.GitRepoSet;
     gitBranches: string[];
@@ -113,6 +123,7 @@ declare global {
     maxCommits: number;
     showRemoteBranches: boolean;
     expandedCommit: ExpandedCommit | null;
+    findWidgetState: FindWidgetState | null;
   }
 }
 
