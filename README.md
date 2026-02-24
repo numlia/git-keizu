@@ -16,16 +16,28 @@ A fork of [neo-git-graph](https://github.com/asispts/neo-git-graph) by asispts, 
 
 ## Features
 
-- **Graph View**: See all your branches, tags, and uncommitted changes in one visual graph
+- **Graph View**: See all your branches, tags, stash entries, and uncommitted changes in one visual graph
 - **Commit Details**: Click on a commit to see what changed, view diffs for any file
 - **Branch Actions**: Right-click to create, checkout, delete, rename, or merge branches
 - **Tag Actions**: Add, delete, and push tags directly from the graph
 - **Commit Actions**: Checkout, cherry-pick, revert, or reset to any commit
+- **Stash Support**: Stash entries appear in the graph with a distinct visual style; right-click to apply, pop, drop, or create a branch from a stash
+- **Uncommitted Changes Actions**: Right-click the Uncommitted Changes row to stash, reset (Mixed/Hard), or clean untracked files
+- **Commit Search**: Press Ctrl/Cmd+F to open a search bar with regex mode, case-sensitive mode, match counter (N of M), and prev/next navigation
+- **2-Commit Comparison**: Ctrl/Cmd+click a second commit to compare it with the selected commit side-by-side
 - **Avatar Support**: Optionally fetch commit author avatars from GitHub, GitLab, or Gravatar
 - **Multi-Repository**: Support for multiple Git repositories in one workspace
 - **Configurable**: Customize graph colors, style, date format, and more
 
 ## Improvements over neo-git-graph
+
+### Sticky header
+
+The menu bar and column headers remain fixed at the top while the commit list scrolls, so controls are always within reach in long histories.
+
+### Fetch without a dialog
+
+A dedicated **Fetch** button in the toolbar runs `git fetch --all` immediately — no confirmation dialog needed.
 
 ### Combined branch/remote labels
 
