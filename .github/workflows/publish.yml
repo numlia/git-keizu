@@ -9,17 +9,11 @@ on:
       - "v*"
 
 jobs:
-  deploy:
-    name: Deploy to ${{ matrix.name }}
+  build:
+    name: Build VSIX
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include:
-          - name: VS Marketplace
-            pat: VS_MARKETPLACE_TOKEN
-            registryUrl: https://marketplace.visualstudio.com
-          - name: Open VSX
-            pat: OPEN_VSX_TOKEN
+    outputs:
+      vsix-name: ${{ steps.package.outputs.vsix-name }}
     steps:
       - uses: actions/checkout@v6
 
@@ -30,8 +24,58 @@ jobs:
 
       - run: corepack enable && pnpm install --frozen-lockfile
 
+      - name: Package VSIX
+        id: package
+        run: |
+          pnpm run package
+          VSIX_NAME=$(ls *.vsix)
+          echo "vsix-name=${VSIX_NAME}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vsix
+          path: "*.vsix"
+
+  deploy:
+    name: Deploy to ${{ matrix.name }}
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: VS Marketplace
+            pat: VS_MARKETPLACE_TOKEN
+            registryUrl: https://marketplace.visualstudio.com
+          - name: Open VSX
+            pat: OPEN_VSX_TOKEN
+    steps:
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vsix
+
       - name: Publish to ${{ matrix.name }}
         uses: HaaLeo/publish-vscode-extension@v2
         with:
           pat: ${{ secrets[matrix.pat] }}
           registryUrl: ${{ matrix.registryUrl || '' }}
+          extensionFile: ${{ needs.build.outputs.vsix-name }}
+
+  release:
+    name: Create GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download VSIX artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: vsix
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: "*.vsix"
+          generate_release_notes: true
