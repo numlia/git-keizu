@@ -2,6 +2,9 @@
 body {
   margin: 0;
   padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
 }
 body.unableToLoad {
   margin: 0 20px;
@@ -11,9 +14,9 @@ body.unableToLoad p {
   text-align: center;
 }
 #scrollShadow.active {
-  position: fixed;
-  top: 0px;
-  left: 0px;
+  position: sticky;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 0px;
   box-shadow: 0 -6px 6px 6px var(--vscode-scrollbar-shadow);
@@ -37,10 +40,14 @@ body.unableToLoad p {
   fill: var(--vscode-editor-background);
   stroke-width: 2;
 }
-#commitGraph circle:not(.current) {
+#commitGraph circle:not(.current):not(.stashInner) {
   stroke: var(--vscode-editor-background);
   stroke-width: 1;
   stroke-opacity: 0.75;
+}
+#commitGraph circle.stashInner {
+  fill: var(--vscode-editor-background);
+  stroke-width: 1.5;
 }
 #commitGraph path.shaddow {
   fill: none;
@@ -75,12 +82,17 @@ body.unableToLoad p {
   overflow: hidden;
 }
 #commitTable tr.commit:hover td,
+#commitTable tr.unsavedChanges:hover td,
 #commitTable tr.commit.contextMenuActive td,
+#commitTable tr.unsavedChanges.contextMenuActive td,
 #commitTable tr.commit.dialogActive td,
-#commitTable tr.commit.commitDetailsOpen td {
+#commitTable tr.unsavedChanges.dialogActive td,
+#commitTable tr.commit.commitDetailsOpen td,
+#commitTable tr.unsavedChanges.commitDetailsOpen td {
   background-color: rgba(128, 128, 128, 0.15);
 }
-#commitTable tr.commit:hover td {
+#commitTable tr.commit:hover td,
+#commitTable tr.unsavedChanges:hover td {
   cursor: pointer;
 }
 #commitTable td {
@@ -109,7 +121,10 @@ body.unableToLoad p {
   cursor: col-resize;
 }
 .tableColHeader {
-  position: relative;
+  position: sticky;
+  top: 0;
+  z-index: 11;
+  background-color: var(--vscode-editor-background);
 }
 .resizeCol {
   position: absolute;
@@ -361,6 +376,17 @@ svg.fileIcon {
   background-color: rgba(128, 128, 128, 0.1);
 }
 
+/* Stash */
+#commitTable tr.commit.stash td {
+  font-style: italic;
+}
+.gitRef.stash {
+  border-color: rgba(128, 128, 128, 0.5);
+}
+.gitRef.stash > svg {
+  background-color: rgba(128, 128, 128, 0.6);
+}
+
 /* Loader */
 #loadingHeader {
   text-align: center;
@@ -389,12 +415,20 @@ svg.fileIcon {
   left: 0;
   right: 0;
   top: 0;
-  padding: 4px 96px 4px 0;
+  z-index: 12;
+  background-color: var(--vscode-editor-background);
+  padding: 4px 104px 4px 0;
   border-bottom: 1px solid rgba(128, 128, 128, 0.5);
   line-height: 32px;
   text-align: center;
   font-weight: 700;
   font-size: 13px;
+  flex-shrink: 0;
+}
+#scrollContainer {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
 }
 #repoControl,
 #branchControl,
@@ -410,15 +444,93 @@ svg.fileIcon {
   width: 14px;
   vertical-align: text-top;
 }
+#searchBtn,
+#fetchBtn,
+#currentBtn,
 #refreshBtn {
   position: absolute;
-  right: 8px;
   top: 50%;
-  width: 80px;
-  height: 22px;
-  line-height: 22px;
-  border-radius: 11px;
-  margin-top: -12px;
+  width: 20px;
+  height: 20px;
+  margin-top: -10px;
+  cursor: pointer;
+  user-select: none;
+}
+#searchBtn {
+  right: 82px;
+}
+#fetchBtn {
+  right: 58px;
+}
+#currentBtn {
+  right: 34px;
+}
+#refreshBtn {
+  right: 10px;
+}
+#searchBtn svg,
+#fetchBtn svg,
+#currentBtn svg,
+#refreshBtn svg {
+  position: absolute;
+  fill: var(--vscode-editor-foreground);
+  opacity: 0.8;
+  stroke: var(--vscode-editor-foreground);
+  stroke-opacity: 0.5;
+  stroke-width: 0;
+}
+#searchBtn svg {
+  left: 2px;
+  top: 2px;
+  width: 16px !important;
+  height: 16px !important;
+}
+#fetchBtn svg {
+  left: 2px;
+  top: 2px;
+  width: 16px !important;
+  height: 16px !important;
+}
+#currentBtn svg {
+  left: 1px;
+  top: 1px;
+  width: 18px !important;
+  height: 18px !important;
+  stroke-width: 0.5px;
+}
+#refreshBtn svg {
+  left: 2px;
+  top: 2px;
+  width: 16px !important;
+  height: 16px !important;
+}
+#searchBtn:hover svg,
+#fetchBtn:hover svg,
+#currentBtn:hover svg,
+#refreshBtn:hover svg {
+  opacity: 1;
+  stroke-width: 0.5px;
+}
+#currentBtn:hover svg {
+  stroke-width: 1px;
+}
+#refreshBtn.refreshing {
+  cursor: default;
+}
+#refreshBtn.refreshing svg {
+  left: 3.25px;
+  top: 2px;
+  width: 13.5px !important;
+  height: 18px !important;
+  animation: loadingIconAnimation 2s linear infinite;
+}
+#currentBtn.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+#currentBtn.disabled:hover svg {
+  opacity: 0.8;
+  stroke-width: 0.5px;
 }
 #loadMoreCommitsBtn {
   width: 180px;
@@ -485,7 +597,7 @@ svg.fileIcon {
   text-align: center;
   max-width: 360px;
   max-height: 80%;
-  z-index: 10;
+  z-index: 20;
   box-shadow: 0 0 30px 5px var(--vscode-widget-shadow);
   overflow-y: auto;
 }
@@ -551,7 +663,7 @@ svg.fileIcon {
   right: 0;
   top: 0;
   bottom: 0;
-  z-index: 9;
+  z-index: 19;
 }
 #dialog.noInput #dialogAction,
 #dialog.inputInvalid #dialogAction {
@@ -596,6 +708,172 @@ svg.fileIcon {
 }
 .roundedBtn:hover {
   background-color: rgba(128, 128, 128, 0.2);
+}
+
+/* Flash animation for scroll-to-current */
+#commitTable tr.commit.flash td {
+  animation: flash-commit 0.75s linear;
+}
+@keyframes flash-commit {
+  0% {
+    background-color: transparent;
+  }
+  20% {
+    background-color: rgba(128, 128, 128, 0.4);
+  }
+  35% {
+    background-color: rgba(128, 128, 128, 0.15);
+  }
+  50% {
+    background-color: rgba(128, 128, 128, 0.35);
+  }
+  65% {
+    background-color: rgba(128, 128, 128, 0.25);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+/* Compare Target */
+#commitTable tr.commit.compareTarget td {
+  background-color: rgba(255, 167, 36, 0.15);
+}
+#commitTable tr.commit.compareTarget:hover td {
+  background-color: rgba(255, 167, 36, 0.25);
+}
+
+/* Find Match Highlight */
+#commitTable tr.commit.findMatch td {
+  background-color: rgba(234, 92, 0, 0.1);
+}
+#commitTable tr.commit.findCurrentCommit td {
+  background-color: rgba(234, 92, 0, 0.25);
+}
+
+/* FindWidget */
+.findWidget {
+  position: fixed;
+  top: 0;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.5));
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+  z-index: 100;
+  transform: translateY(-100%);
+  visibility: hidden;
+}
+.findWidget.active {
+  transform: translateY(0);
+  visibility: visible;
+}
+.findWidget.transition {
+  transition:
+    transform 0.2s ease-out,
+    visibility 0.2s;
+}
+#findInput {
+  width: 200px;
+  padding: 3px 6px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-size: 13px;
+  outline: none;
+}
+#findInput:focus {
+  border-color: var(--vscode-focusBorder);
+}
+.findWidget[data-error] #findInput {
+  border-color: var(--vscode-inputValidation-errorBorder, #f44747);
+}
+#findInput:disabled {
+  opacity: 0.5;
+}
+.findModifier {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-size: 11px;
+  user-select: none;
+  opacity: 0.7;
+}
+.findModifier:hover {
+  opacity: 1;
+  background-color: rgba(128, 128, 128, 0.1);
+}
+.findModifier.active {
+  opacity: 1;
+  background-color: rgba(128, 128, 128, 0.2);
+  border-color: rgba(128, 128, 128, 0.5);
+}
+#findPosition {
+  display: inline-block;
+  min-width: 60px;
+  text-align: center;
+  font-size: 12px;
+  padding: 0 4px;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+#findPrev,
+#findNext,
+#findOpenCdv,
+#findClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+#findPrev:hover,
+#findNext:hover,
+#findOpenCdv:hover,
+#findClose:hover {
+  background-color: rgba(128, 128, 128, 0.15);
+}
+#findPrev svg,
+#findNext svg,
+#findOpenCdv svg,
+#findClose svg {
+  width: 14px;
+  height: 14px;
+  fill: var(--vscode-editor-foreground);
+  opacity: 0.7;
+}
+#findPrev:hover svg,
+#findNext:hover svg,
+#findOpenCdv:hover svg,
+#findClose:hover svg {
+  opacity: 1;
+}
+#findPrev.disabled,
+#findNext.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+#findPrev.disabled:hover,
+#findNext.disabled:hover {
+  background-color: transparent;
+}
+#findOpenCdv.active {
+  background-color: rgba(128, 128, 128, 0.2);
+}
+#findOpenCdv.active svg {
+  opacity: 1;
 }
 
 /* General */
