@@ -15,7 +15,8 @@ import {
   GitGraphViewState,
   GitRepoSet,
   RequestMessage,
-  ResponseMessage
+  ResponseMessage,
+  UNCOMMITTED_CHANGES_HASH
 } from "./types";
 import { abbrevCommit, copyToClipboard } from "./utils";
 
@@ -186,7 +187,22 @@ export class GitGraphView {
           case "commitDetails":
             this.sendMessage({
               command: "commitDetails",
-              commitDetails: await this.dataSource.commitDetails(msg.repo, msg.commitHash)
+              commitDetails:
+                msg.commitHash === UNCOMMITTED_CHANGES_HASH
+                  ? await this.dataSource.getUncommittedDetails(msg.repo)
+                  : await this.dataSource.commitDetails(msg.repo, msg.commitHash)
+            });
+            break;
+          case "compareCommits":
+            this.sendMessage({
+              command: "compareCommits",
+              fileChanges: await this.dataSource.getCommitComparison(
+                msg.repo,
+                msg.fromHash,
+                msg.toHash
+              ),
+              fromHash: msg.fromHash,
+              toHash: msg.toHash
             });
             break;
           case "copyToClipboard":
@@ -296,6 +312,54 @@ export class GitGraphView {
               status: await this.dataSource.revertCommit(msg.repo, msg.commitHash, msg.parentIndex)
             });
             break;
+          case "applyStash":
+            this.sendMessage({
+              command: "applyStash",
+              status: await this.dataSource.applyStash(msg.repo, msg.selector, msg.reinstateIndex)
+            });
+            break;
+          case "popStash":
+            this.sendMessage({
+              command: "popStash",
+              status: await this.dataSource.popStash(msg.repo, msg.selector, msg.reinstateIndex)
+            });
+            break;
+          case "dropStash":
+            this.sendMessage({
+              command: "dropStash",
+              status: await this.dataSource.dropStash(msg.repo, msg.selector)
+            });
+            break;
+          case "branchFromStash":
+            this.sendMessage({
+              command: "branchFromStash",
+              status: await this.dataSource.branchFromStash(msg.repo, msg.branchName, msg.selector)
+            });
+            break;
+          case "pushStash":
+            this.sendMessage({
+              command: "pushStash",
+              status: await this.dataSource.pushStash(msg.repo, msg.message, msg.includeUntracked)
+            });
+            break;
+          case "resetUncommitted":
+            this.sendMessage({
+              command: "resetUncommitted",
+              status: await this.dataSource.resetUncommitted(msg.repo, msg.mode)
+            });
+            break;
+          case "cleanUntrackedFiles":
+            this.sendMessage({
+              command: "cleanUntrackedFiles",
+              status: await this.dataSource.cleanUntrackedFiles(msg.repo, msg.directories)
+            });
+            break;
+          case "fetch":
+            this.sendMessage({
+              command: "fetch",
+              status: await this.dataSource.fetch(msg.repo)
+            });
+            break;
           case "saveRepoState":
             this.repoManager.setRepoState(msg.repo, msg.state);
             break;
@@ -307,7 +371,8 @@ export class GitGraphView {
                 msg.commitHash,
                 msg.oldFilePath,
                 msg.newFilePath,
-                msg.type
+                msg.type,
+                msg.compareWithHash
               )
             });
             break;
@@ -369,17 +434,22 @@ export class GitGraphView {
 				<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoSelect" class="dropdown"></div></span>
 				<span id="branchControl"><span class="unselectable">Branch: </span><div id="branchSelect" class="dropdown"></div></span>
 				<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" value="1" checked>Show Remote Branches</label>
-				<div id="refreshBtn" class="roundedBtn">Refresh</div>
+				<div id="searchBtn" title="Search"></div>
+				<div id="fetchBtn" title="Fetch"></div>
+				<div id="currentBtn" title="Current"></div>
+				<div id="refreshBtn" title="Refresh"></div>
 			</div>
-			<div id="content">
-				<div id="commitGraph"></div>
-				<div id="commitTable"></div>
+			<div id="scrollContainer">
+				<div id="scrollShadow"></div>
+				<div id="content">
+					<div id="commitGraph"></div>
+					<div id="commitTable"></div>
+				</div>
+				<div id="footer"></div>
 			</div>
-			<div id="footer"></div>
 			<ul id="contextMenu"></ul>
 			<div id="dialogBacking"></div>
 			<div id="dialog"></div>
-			<div id="scrollShadow"></div>
 			<script nonce="${nonce}">var viewState = ${JSON.stringify(viewState)};</script>
 			<script src="${this.getCompiledOutputUri("web.min.js")}"></script>
 			</body>`;
@@ -432,11 +502,59 @@ export class GitGraphView {
     commitHash: string,
     oldFilePath: string,
     newFilePath: string,
-    type: GitFileChangeType
+    type: GitFileChangeType,
+    compareWithHash?: string
   ): Promise<boolean> {
-    const abbrevHash = abbrevCommit(commitHash);
     const pathComponents = newFilePath.split("/");
     const fileName = pathComponents[pathComponents.length - 1];
+
+    if (compareWithHash !== undefined) {
+      const actualFromHash = commitHash === UNCOMMITTED_CHANGES_HASH ? "HEAD" : commitHash;
+      const isWorkingTreeTarget = compareWithHash === UNCOMMITTED_CHANGES_HASH;
+      const abbrevFrom =
+        commitHash === UNCOMMITTED_CHANGES_HASH ? "Uncommitted" : abbrevCommit(commitHash);
+      const abbrevTo = isWorkingTreeTarget ? "Uncommitted" : abbrevCommit(compareWithHash);
+      const title = `${fileName} (${abbrevFrom} ↔ ${abbrevTo})`;
+
+      try {
+        const leftUri = encodeDiffDocUri(repo, oldFilePath, actualFromHash);
+        const rightUri = isWorkingTreeTarget
+          ? type === "D"
+            ? encodeDiffDocUri(repo, oldFilePath, UNCOMMITTED_CHANGES_HASH)
+            : vscode.Uri.file(path.join(repo, newFilePath))
+          : encodeDiffDocUri(repo, newFilePath, compareWithHash);
+
+        await vscode.commands.executeCommand("vscode.diff", leftUri, rightUri, title, {
+          preview: true
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    if (commitHash === UNCOMMITTED_CHANGES_HASH) {
+      const changeDescription = type === "A" ? "Added" : type === "D" ? "Deleted" : "Modified";
+      const title = `${fileName} (Uncommitted - ${changeDescription})`;
+      try {
+        const leftUri =
+          type === "A"
+            ? encodeDiffDocUri(repo, newFilePath, "HEAD")
+            : encodeDiffDocUri(repo, oldFilePath, "HEAD");
+        const rightUri =
+          type === "D"
+            ? encodeDiffDocUri(repo, oldFilePath, UNCOMMITTED_CHANGES_HASH)
+            : vscode.Uri.file(path.join(repo, newFilePath));
+        await vscode.commands.executeCommand("vscode.diff", leftUri, rightUri, title, {
+          preview: true
+        });
+        return true;
+      } catch {
+        return false;
+      }
+    }
+
+    const abbrevHash = abbrevCommit(commitHash);
     const changeDescription =
       type === "A"
         ? `Added in ${abbrevHash}`

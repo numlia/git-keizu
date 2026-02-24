@@ -173,6 +173,7 @@ class Vertex {
   private onBranch: Branch | null = null;
   private isCommitted: boolean = true;
   private isCurrent: boolean = false;
+  private isStash: boolean = false;
   private nextX: number = 0;
   private connections: UnavailablePoint[] = [];
 
@@ -250,27 +251,47 @@ class Vertex {
   public setCurrent() {
     this.isCurrent = true;
   }
+  public setStash() {
+    this.isStash = true;
+  }
   public draw(svg: SVGElement, config: Config, expandOffset: boolean) {
     if (this.onBranch === null) return;
 
-    let circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
     let colour = this.isCommitted
       ? config.graphColours[this.onBranch.getColour() % config.graphColours.length]
       : "#808080";
-    circle.setAttribute("cx", `${this.x * config.grid.x + config.grid.offsetX}`);
-    circle.setAttribute(
-      "cy",
-      `${this.y * config.grid.y + config.grid.offsetY + (expandOffset ? config.grid.expandY : 0)}`
-    );
-    circle.setAttribute("r", "4");
-    if (this.isCurrent) {
-      circle.setAttribute("class", "current");
-      circle.setAttribute("stroke", colour);
-    } else {
-      circle.setAttribute("fill", colour);
-    }
+    let cx = `${this.x * config.grid.x + config.grid.offsetX}`;
+    let cy = `${this.y * config.grid.y + config.grid.offsetY + (expandOffset ? config.grid.expandY : 0)}`;
 
-    svg.appendChild(circle);
+    if (this.isStash) {
+      let outerCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      outerCircle.setAttribute("cx", cx);
+      outerCircle.setAttribute("cy", cy);
+      outerCircle.setAttribute("r", "4");
+      outerCircle.setAttribute("fill", colour);
+      outerCircle.setAttribute("class", "stashOuter");
+      svg.appendChild(outerCircle);
+
+      let innerCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      innerCircle.setAttribute("cx", cx);
+      innerCircle.setAttribute("cy", cy);
+      innerCircle.setAttribute("r", "2");
+      innerCircle.setAttribute("class", "stashInner");
+      innerCircle.setAttribute("stroke", colour);
+      svg.appendChild(innerCircle);
+    } else {
+      let circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("cx", cx);
+      circle.setAttribute("cy", cy);
+      circle.setAttribute("r", "4");
+      if (this.isCurrent) {
+        circle.setAttribute("class", "current");
+        circle.setAttribute("stroke", colour);
+      } else {
+        circle.setAttribute("fill", colour);
+      }
+      svg.appendChild(circle);
+    }
   }
 }
 
@@ -326,7 +347,11 @@ export class Graph {
 
     let i: number, j: number;
     for (i = 0; i < commits.length; i++) {
-      this.vertices.push(new Vertex(i));
+      let vertex = new Vertex(i);
+      if (commits[i].stash !== null) {
+        vertex.setStash();
+      }
+      this.vertices.push(vertex);
     }
     for (i = 0; i < commits.length; i++) {
       for (j = 0; j < commits[i].parentHashes.length; j++) {

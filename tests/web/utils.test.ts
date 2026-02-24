@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { arraysEqual, escapeHtml, pad2, unescapeHtml } from "../../web/utils";
+import { arraysEqual, escapeHtml, pad2, svgIcons, unescapeHtml } from "../../web/utils";
 
 describe("escapeHtml", () => {
   it("escapes ampersand", () => {
@@ -92,6 +92,26 @@ describe("arraysEqual", () => {
     const a = [{ id: 1 }, { id: 2 }];
     const b = [{ id: 1 }, { id: 3 }];
     expect(arraysEqual(a, b, (x, y) => x.id === y.id)).toBe(false);
+  });
+});
+
+describe("svgIcons", () => {
+  it("fetch icon is a non-empty SVG string (TC-F-N-04)", () => {
+    // Given: svgIcons is imported
+    // When: fetch property is referenced
+    // Then: it is a non-empty string containing "<svg"
+    expect(typeof svgIcons.fetch).toBe("string");
+    expect(svgIcons.fetch.length).toBeGreaterThan(0);
+    expect(svgIcons.fetch).toContain("<svg");
+  });
+
+  it("stash icon is a non-empty SVG string (TC-F-N-05)", () => {
+    // Given: svgIcons is imported
+    // When: stash property is referenced
+    // Then: it is a non-empty string containing "<svg"
+    expect(typeof svgIcons.stash).toBe("string");
+    expect(svgIcons.stash.length).toBeGreaterThan(0);
+    expect(svgIcons.stash).toContain("<svg");
   });
 });
 

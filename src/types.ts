@@ -1,5 +1,22 @@
 /* Git Interfaces / Types */
 
+export interface GitCommitStash {
+  selector: string;
+  baseHash: string;
+  untrackedFilesHash: string | null;
+}
+
+export interface GitStash {
+  hash: string;
+  selector: string;
+  baseHash: string;
+  untrackedFilesHash: string | null;
+  author: string;
+  email: string;
+  date: number;
+  message: string;
+}
+
 export interface GitCommitNode {
   hash: string;
   parentHashes: string[];
@@ -8,6 +25,7 @@ export interface GitCommitNode {
   date: number;
   message: string;
   refs: GitRef[];
+  stash: GitCommitStash | null;
 }
 
 export interface GitCommit {
@@ -86,6 +104,11 @@ export type TabIconColourTheme = "colour" | "grey";
 export type GitCommandStatus = string | null;
 export type GitResetMode = "soft" | "mixed" | "hard";
 export type GitFileChangeType = "A" | "M" | "D" | "R";
+
+/* Named Constants */
+
+export const UNCOMMITTED_CHANGES_HASH = "*";
+export const VALID_UNCOMMITTED_RESET_MODES: ReadonlySet<string> = new Set(["mixed", "hard"]);
 
 /* Request / Response Messages */
 
@@ -314,6 +337,19 @@ export interface RequestSaveRepoState {
   state: GitRepoState;
 }
 
+export interface RequestCompareCommits {
+  command: "compareCommits";
+  repo: string;
+  fromHash: string;
+  toHash: string;
+}
+export interface ResponseCompareCommits {
+  command: "compareCommits";
+  fileChanges: GitFileChange[] | null;
+  fromHash: string;
+  toHash: string;
+}
+
 export interface RequestViewDiff {
   command: "viewDiff";
   repo: string;
@@ -321,54 +357,156 @@ export interface RequestViewDiff {
   oldFilePath: string;
   newFilePath: string;
   type: GitFileChangeType;
+  compareWithHash?: string;
 }
 export interface ResponseViewDiff {
   command: "viewDiff";
   success: boolean;
 }
 
+export interface RequestApplyStash {
+  command: "applyStash";
+  repo: string;
+  selector: string;
+  reinstateIndex: boolean;
+}
+export interface ResponseApplyStash {
+  command: "applyStash";
+  status: GitCommandStatus;
+}
+
+export interface RequestPopStash {
+  command: "popStash";
+  repo: string;
+  selector: string;
+  reinstateIndex: boolean;
+}
+export interface ResponsePopStash {
+  command: "popStash";
+  status: GitCommandStatus;
+}
+
+export interface RequestDropStash {
+  command: "dropStash";
+  repo: string;
+  selector: string;
+}
+export interface ResponseDropStash {
+  command: "dropStash";
+  status: GitCommandStatus;
+}
+
+export interface RequestBranchFromStash {
+  command: "branchFromStash";
+  repo: string;
+  selector: string;
+  branchName: string;
+}
+export interface ResponseBranchFromStash {
+  command: "branchFromStash";
+  status: GitCommandStatus;
+}
+
+export interface RequestPushStash {
+  command: "pushStash";
+  repo: string;
+  message: string;
+  includeUntracked: boolean;
+}
+export interface ResponsePushStash {
+  command: "pushStash";
+  status: GitCommandStatus;
+}
+
+export interface RequestFetch {
+  command: "fetch";
+  repo: string;
+}
+export interface ResponseFetch {
+  command: "fetch";
+  status: GitCommandStatus;
+}
+
+export interface RequestResetUncommitted {
+  command: "resetUncommitted";
+  repo: string;
+  mode: string;
+}
+export interface ResponseResetUncommitted {
+  command: "resetUncommitted";
+  status: GitCommandStatus;
+}
+
+export interface RequestCleanUntrackedFiles {
+  command: "cleanUntrackedFiles";
+  repo: string;
+  directories: boolean;
+}
+export interface ResponseCleanUntrackedFiles {
+  command: "cleanUntrackedFiles";
+  status: GitCommandStatus;
+}
+
 export type RequestMessage =
   | RequestAddTag
+  | RequestApplyStash
+  | RequestBranchFromStash
   | RequestCheckoutBranch
   | RequestCheckoutCommit
   | RequestCherrypickCommit
+  | RequestCleanUntrackedFiles
   | RequestCommitDetails
+  | RequestCompareCommits
   | RequestCopyToClipboard
   | RequestCreateBranch
   | RequestDeleteBranch
   | RequestDeleteTag
+  | RequestDropStash
+  | RequestFetch
   | RequestFetchAvatar
   | RequestLoadBranches
   | RequestLoadCommits
   | RequestLoadRepos
   | RequestMergeBranch
   | RequestMergeCommit
+  | RequestPopStash
+  | RequestPushStash
   | RequestPushTag
   | RequestRenameBranch
   | RequestResetToCommit
+  | RequestResetUncommitted
   | RequestRevertCommit
   | RequestSaveRepoState
   | RequestViewDiff;
 
 export type ResponseMessage =
   | ResponseAddTag
+  | ResponseApplyStash
+  | ResponseBranchFromStash
   | ResponseCheckoutBranch
   | ResponseCheckoutCommit
   | ResponseCherrypickCommit
+  | ResponseCleanUntrackedFiles
   | ResponseCommitDetails
+  | ResponseCompareCommits
   | ResponseCopyToClipboard
   | ResponseCreateBranch
   | ResponseDeleteBranch
   | ResponseDeleteTag
+  | ResponseDropStash
+  | ResponseFetch
   | ResponseFetchAvatar
   | ResponseLoadBranches
   | ResponseLoadCommits
   | ResponseLoadRepos
   | ResponseMergeBranch
   | ResponseMergeCommit
+  | ResponsePopStash
+  | ResponsePushStash
   | ResponsePushTag
   | ResponseRefresh
   | ResponseRenameBranch
   | ResponseResetToCommit
+  | ResponseResetUncommitted
   | ResponseRevertCommit
   | ResponseViewDiff;
