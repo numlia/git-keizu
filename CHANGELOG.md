@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-02-25
+
+### Added
+
+- **Pull/Push for current branch**: Right-click the currently checked-out branch to run `git pull` or `git push`; git's output (success or error) is shown in an info/error dialog
+- **Enter key confirmation**: Input dialogs (checkout branch, rename branch, etc.) now confirm on Enter key press
+
+### Changed
+
+- **Fetch uses `--prune`**: The Fetch button now always runs `git fetch --prune`, automatically removing stale remote-tracking references; the button tooltip reflects this
+- **Icon redesign**: Extension icon (`icon.png`) and webview icons updated with a cleaner SVG graph layout
+
+### Fixed
+
+- **Context menu clipping**: Context menu now uses the full webview area as its bounding box, preventing items from being hidden behind the controls bar or cut off at screen edges
+- **Stash label border color**: Stash label borders now correctly use the graph line color instead of always rendering grey
+- **Remote branch checkout — branch name proposal**: Checking out `origin/feature/ebook` now correctly proposes `feature/ebook` as the local name instead of only the last path segment (`ebook`)
+- **Remote branch checkout — existing local branch**: Checking out a remote branch when a same-named local branch already exists no longer fails with `fatal: a branch named '...' already exists`
+- **Stash dialog auto-focus**: The Message field in the Stash dialog now receives focus automatically when the dialog opens
+- **Find widget auto-focus**: The search text box in the Find widget now receives focus automatically when opened
+
 ## [0.2.1] - 2026-02-25
 
 ### Added
@@ -50,7 +71,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/numlia/git-keizu/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/numlia/git-keizu/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/numlia/git-keizu/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/numlia/git-keizu/releases/tag/v0.1.0

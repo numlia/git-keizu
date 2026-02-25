@@ -23,6 +23,7 @@ A fork of [neo-git-graph](https://github.com/asispts/neo-git-graph) by asispts, 
 - **Commit Actions**: Checkout, cherry-pick, revert, or reset to any commit
 - **Stash Support**: Stash entries appear in the graph with a distinct visual style; right-click to apply, pop, drop, or create a branch from a stash
 - **Uncommitted Changes Actions**: Right-click the Uncommitted Changes row to stash, reset (Mixed/Hard), or clean untracked files
+- **Pull/Push for current branch**: Right-click the currently checked-out branch to run `git pull` or `git push` directly from the graph
 - **Commit Search**: Press Ctrl/Cmd+F to open a search bar with regex mode, case-sensitive mode, match counter (N of M), and prev/next navigation
 - **2-Commit Comparison**: Ctrl/Cmd+click a second commit to compare it with the selected commit side-by-side
 - **Avatar Support**: Optionally fetch commit author avatars from GitHub, GitLab, or Gravatar
@@ -35,9 +36,13 @@ A fork of [neo-git-graph](https://github.com/asispts/neo-git-graph) by asispts, 
 
 The menu bar and column headers remain fixed at the top while the commit list scrolls, so controls are always within reach in long histories.
 
-### Fetch without a dialog
+### Pull and Push for the current branch
 
-A dedicated **Fetch** button in the toolbar runs `git fetch --all` immediately — no confirmation dialog needed.
+Right-click the branch you currently have checked out to run **Pull** (`git pull`) or **Push** (`git push`) directly from the graph. The result — whether success or a git error — is shown in a dialog without leaving the graph view.
+
+### Fetch with automatic prune
+
+A dedicated **Fetch** button in the toolbar runs `git fetch --prune` immediately — no confirmation dialog needed. Stale remote-tracking references for deleted remote branches are cleaned up automatically on every fetch.
 
 ### Combined branch/remote labels
 
