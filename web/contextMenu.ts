@@ -2,6 +2,7 @@ import { addListenerToClass } from "./utils";
 
 const contextMenu = document.getElementById("contextMenu")!;
 let contextMenuSource: HTMLElement | null = null;
+const POSITION_OFFSET = 2;
 
 export function showContextMenu(
   e: MouseEvent,
@@ -23,16 +24,18 @@ export function showContextMenu(
   contextMenu.className = "active";
   contextMenu.innerHTML = html;
   let bounds = contextMenu.getBoundingClientRect();
-  contextMenu.style.left = `${
-    event.pageX - window.pageXOffset + bounds.width < window.innerWidth
-      ? event.pageX - 2
-      : event.pageX - bounds.width + 2
-  }px`;
-  contextMenu.style.top = `${
-    event.pageY - window.pageYOffset + bounds.height < window.innerHeight
-      ? event.pageY - 2
-      : event.pageY - bounds.height + 2
-  }px`;
+  contextMenu.style.left = `${Math.max(
+    0,
+    event.clientX + bounds.width < window.innerWidth
+      ? event.clientX - POSITION_OFFSET
+      : event.clientX - bounds.width + POSITION_OFFSET
+  )}px`;
+  contextMenu.style.top = `${Math.max(
+    0,
+    event.clientY + bounds.height < window.innerHeight
+      ? event.clientY - POSITION_OFFSET
+      : event.clientY - bounds.height + POSITION_OFFSET
+  )}px`;
   contextMenu.style.opacity = "1";
 
   addListenerToClass("contextMenuItem", "click", (e) => {

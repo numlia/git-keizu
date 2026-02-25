@@ -381,10 +381,10 @@ svg.fileIcon {
   font-style: italic;
 }
 .gitRef.stash {
-  border-color: rgba(128, 128, 128, 0.5);
+  border-color: var(--git-graph-color);
 }
 .gitRef.stash > svg {
-  background-color: rgba(128, 128, 128, 0.6);
+  background-color: var(--git-graph-color);
 }
 
 /* Loader */
@@ -551,13 +551,14 @@ svg.fileIcon {
 /* Context Menu */
 #contextMenu {
   display: none;
-  position: absolute;
+  position: fixed;
   background-color: var(--vscode-menu-background);
   box-shadow: 0 1px 4px 1px var(--vscode-widget-shadow);
   color: var(--vscode-menu-foreground);
   list-style-type: none;
   margin: 0;
   padding: 4px 0;
+  z-index: 15;
 }
 #contextMenu.active {
   display: block;
@@ -767,16 +768,12 @@ svg.fileIcon {
   box-shadow: 0 2px 8px var(--vscode-widget-shadow);
   z-index: 100;
   transform: translateY(-100%);
-  visibility: hidden;
 }
 .findWidget.active {
   transform: translateY(0);
-  visibility: visible;
 }
 .findWidget.transition {
-  transition:
-    transform 0.2s ease-out,
-    visibility 0.2s;
+  transition: transform 0.2s ease-out;
 }
 #findInput {
   width: 200px;
