@@ -553,7 +553,7 @@ export class DataSource {
     if (remoteBranch === null) {
       return this.runGitCommandSpawn(["checkout", branchName], repo);
     }
-    return this.runGitCommandSpawn(["checkout", "-b", branchName, remoteBranch], repo);
+    return this.runGitCommandSpawn(["checkout", "-B", branchName, remoteBranch], repo);
   }
 
   public checkoutCommit(repo: string, commitHash: string) {
@@ -669,8 +669,16 @@ export class DataSource {
     return this.runGitCommandSpawn(args, repo);
   }
 
+  public pull(repo: string) {
+    return this.runGitCommandSpawn(["pull"], repo);
+  }
+
+  public push(repo: string) {
+    return this.runGitCommandSpawn(["push"], repo);
+  }
+
   public fetch(repo: string) {
-    return this.runGitCommandSpawn(["fetch", "--all"], repo);
+    return this.runGitCommandSpawn(["fetch", "--all", "--prune"], repo);
   }
 
   private getRefs(repo: string, showRemoteBranches: boolean) {

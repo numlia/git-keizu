@@ -288,6 +288,18 @@ export class GitGraphView {
               )
             });
             break;
+          case "pull":
+            this.sendMessage({
+              command: "pull",
+              status: await this.dataSource.pull(msg.repo)
+            });
+            break;
+          case "push":
+            this.sendMessage({
+              command: "push",
+              status: await this.dataSource.push(msg.repo)
+            });
+            break;
           case "pushTag":
             this.sendMessage({
               command: "pushTag",
@@ -435,7 +447,7 @@ export class GitGraphView {
 				<span id="branchControl"><span class="unselectable">Branch: </span><div id="branchSelect" class="dropdown"></div></span>
 				<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" value="1" checked>Show Remote Branches</label>
 				<div id="searchBtn" title="Search"></div>
-				<div id="fetchBtn" title="Fetch"></div>
+				<div id="fetchBtn" title="Fetch --prune"></div>
 				<div id="currentBtn" title="Current"></div>
 				<div id="refreshBtn" title="Refresh"></div>
 			</div>
