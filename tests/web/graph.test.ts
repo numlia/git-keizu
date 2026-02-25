@@ -100,7 +100,7 @@ describe("Graph stash vertex drawing", () => {
     vi.clearAllMocks();
   });
 
-  it("draws double circle (outer + inner ring) for stash vertex (TC-SR-N-06)", () => {
+  it("draws double circle (outer + inner ring) for stash vertex (TC-001)", () => {
     // Given: a commit node with stash !== null
     const graph = new Graph("testGraph", DEFAULT_CONFIG);
     const stashCommit = makeCommit("abc123def456", [], {
@@ -133,7 +133,7 @@ describe("Graph stash vertex drawing", () => {
     expect(innerCircle!.attributes.has("stroke")).toBe(true);
   });
 
-  it("draws single circle for non-stash vertex (TC-SR-N-07)", () => {
+  it("draws single circle for non-stash vertex (TC-002)", () => {
     // Given: a commit node with stash === null (regular commit)
     const graph = new Graph("testGraph", DEFAULT_CONFIG);
     const regularCommit = makeCommit("abc123def456", [], null);

@@ -162,7 +162,7 @@ describe("GitGraphView stash message routing", () => {
     GitGraphView.currentPanel = undefined;
   });
 
-  it("routes applyStash message to DataSource.applyStash (TC-BS-N-07)", async () => {
+  it("routes applyStash message to DataSource.applyStash (TC-001)", async () => {
     // Given: GitGraphView instance with mocked DataSource
     // When: RequestApplyStash message is received
     await mocks.messageHandler.current!({
@@ -183,7 +183,7 @@ describe("GitGraphView stash message routing", () => {
     });
   });
 
-  it("routes popStash message to DataSource.popStash (TC-BS-N-08)", async () => {
+  it("routes popStash message to DataSource.popStash (TC-002)", async () => {
     // Given: GitGraphView instance with mocked DataSource
     // When: RequestPopStash message is received
     await mocks.messageHandler.current!({
@@ -202,7 +202,7 @@ describe("GitGraphView stash message routing", () => {
     });
   });
 
-  it("routes dropStash message to DataSource.dropStash (TC-BS-N-09)", async () => {
+  it("routes dropStash message to DataSource.dropStash (TC-003)", async () => {
     // Given: GitGraphView instance with mocked DataSource
     // When: RequestDropStash message is received
     await mocks.messageHandler.current!({
@@ -220,7 +220,7 @@ describe("GitGraphView stash message routing", () => {
     });
   });
 
-  it("routes branchFromStash message to DataSource.branchFromStash (TC-BS-N-10)", async () => {
+  it("routes branchFromStash message to DataSource.branchFromStash (TC-004)", async () => {
     // Given: GitGraphView instance with mocked DataSource
     // When: RequestBranchFromStash message is received
     await mocks.messageHandler.current!({
@@ -239,7 +239,7 @@ describe("GitGraphView stash message routing", () => {
     });
   });
 
-  it("routes pushStash message to DataSource.pushStash (TC-BU-N-08)", async () => {
+  it("routes pushStash message to DataSource.pushStash (TC-005)", async () => {
     // Given: GitGraphView instance with mocked DataSource
     // When: RequestPushStash message is received
     await mocks.messageHandler.current!({
@@ -260,7 +260,7 @@ describe("GitGraphView stash message routing", () => {
     });
   });
 
-  it("routes resetUncommitted message to DataSource.resetUncommitted (TC-BU-N-09)", async () => {
+  it("routes resetUncommitted message to DataSource.resetUncommitted (TC-006)", async () => {
     // Given: GitGraphView instance with mocked DataSource
     // When: RequestResetUncommitted message is received
     await mocks.messageHandler.current!({
@@ -280,7 +280,7 @@ describe("GitGraphView stash message routing", () => {
     });
   });
 
-  it("routes cleanUntrackedFiles message to DataSource.cleanUntrackedFiles (TC-BU-N-10)", async () => {
+  it("routes cleanUntrackedFiles message to DataSource.cleanUntrackedFiles (TC-007)", async () => {
     // Given: GitGraphView instance with mocked DataSource
     // When: RequestCleanUntrackedFiles message is received
     await mocks.messageHandler.current!({
@@ -360,7 +360,7 @@ describe("GitGraphView compareCommits message routing", () => {
     GitGraphView.currentPanel = undefined;
   });
 
-  it("routes compareCommits message to DataSource.getCommitComparison with correct args (TC-MR-N-01)", async () => {
+  it("routes compareCommits message to DataSource.getCommitComparison with correct args (TC-008)", async () => {
     // Given: GitGraphView instance with mocked DataSource
     const fromHash = "abc1234567890abcdef1234567890abcdef123456";
     const toHash = "def4567890abcdef1234567890abcdef12345678";
@@ -378,7 +378,7 @@ describe("GitGraphView compareCommits message routing", () => {
     expect(mocks.getCommitComparison).toHaveBeenCalledWith(TEST_REPO, fromHash, toHash);
   });
 
-  it("returns ResponseCompareCommits with fileChanges when comparison succeeds (TC-MR-N-02)", async () => {
+  it("returns ResponseCompareCommits with fileChanges when comparison succeeds (TC-009)", async () => {
     // Given: getCommitComparison returns a file change array
     const fromHash = "abc1234567890abcdef1234567890abcdef123456";
     const toHash = "def4567890abcdef1234567890abcdef12345678";
@@ -410,7 +410,7 @@ describe("GitGraphView compareCommits message routing", () => {
     });
   });
 
-  it("returns ResponseCompareCommits with null fileChanges when comparison fails (TC-MR-A-01)", async () => {
+  it("returns ResponseCompareCommits with null fileChanges when comparison fails (TC-010)", async () => {
     // Given: getCommitComparison returns null (error case)
     const fromHash = "abc1234567890abcdef1234567890abcdef123456";
     const toHash = "def4567890abcdef1234567890abcdef12345678";
@@ -493,7 +493,7 @@ describe("GitGraphView viewDiff with compareWithHash", () => {
     GitGraphView.currentPanel = undefined;
   });
 
-  it("generates correct URIs for two-commit comparison when compareWithHash is specified (TC-MR-N-03)", async () => {
+  it("generates correct URIs for two-commit comparison when compareWithHash is specified (TC-011)", async () => {
     // Given: viewDiff message with compareWithHash
     const commitHash = "abc1234567890abcdef1234567890abcdef123456";
     const compareWithHash = "def4567890abcdef1234567890abcdef12345678";
@@ -531,7 +531,7 @@ describe("GitGraphView viewDiff with compareWithHash", () => {
     });
   });
 
-  it("maintains existing behavior when compareWithHash is not specified (TC-MR-N-04)", async () => {
+  it("maintains existing behavior when compareWithHash is not specified (TC-012)", async () => {
     // Given: viewDiff message without compareWithHash (standard parent comparison)
     const commitHash = "abc1234567890abcdef1234567890abcdef123456";
 
@@ -554,6 +554,100 @@ describe("GitGraphView viewDiff with compareWithHash", () => {
     expect(mocks.postMessage).toHaveBeenCalledWith({
       command: "viewDiff",
       success: true
+    });
+  });
+});
+
+describe("GitGraphView pull/push message routing", () => {
+  const pullMock = vi.fn();
+  const pushMock = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitGraphView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    pullMock.mockResolvedValue(null);
+    pushMock.mockResolvedValue(null);
+
+    const mockDataSource = {
+      applyStash: mocks.applyStash,
+      popStash: mocks.popStash,
+      dropStash: mocks.dropStash,
+      branchFromStash: mocks.branchFromStash,
+      pushStash: mocks.pushStash,
+      resetUncommitted: mocks.resetUncommitted,
+      cleanUntrackedFiles: mocks.cleanUntrackedFiles,
+      getCommitComparison: mocks.getCommitComparison,
+      pull: pullMock,
+      push: pushMock
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitGraphView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitGraphView.currentPanel?.dispose();
+    GitGraphView.currentPanel = undefined;
+  });
+
+  it("routes pull message to DataSource.pull and returns ResponsePull (TC-013)", async () => {
+    // Given: GitGraphView instance with mocked DataSource
+    // When: RequestPull message is received
+    await mocks.messageHandler.current!({
+      command: "pull",
+      repo: TEST_REPO
+    });
+
+    // Then: DataSource.pull is called with correct repo and ResponsePull is sent
+    expect(pullMock).toHaveBeenCalledTimes(1);
+    expect(pullMock).toHaveBeenCalledWith(TEST_REPO);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "pull",
+      status: null
+    });
+  });
+
+  it("routes push message to DataSource.push and returns ResponsePush (TC-014)", async () => {
+    // Given: GitGraphView instance with mocked DataSource
+    // When: RequestPush message is received
+    await mocks.messageHandler.current!({
+      command: "push",
+      repo: TEST_REPO
+    });
+
+    // Then: DataSource.push is called with correct repo and ResponsePush is sent
+    expect(pushMock).toHaveBeenCalledTimes(1);
+    expect(pushMock).toHaveBeenCalledWith(TEST_REPO);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "push",
+      status: null
     });
   });
 });

@@ -165,7 +165,7 @@ function makeStash(overrides: Partial<GitCommitStash> = {}): GitCommitStash {
 /* ------------------------------------------------------------------ */
 
 describe("buildCommitRowAttributes", () => {
-  it("includes 'commit' and 'stash' CSS classes for stash commit (TC-SR-N-01)", () => {
+  it("includes 'commit' and 'stash' CSS classes for stash commit (TC-001)", () => {
     // Given: a commit node with stash !== null
     const hash = "abc123def456";
     const stash = makeStash();
@@ -177,7 +177,7 @@ describe("buildCommitRowAttributes", () => {
     expect(result).toContain('class="commit stash"');
   });
 
-  it("includes data-hash attribute with commit hash for stash commit (TC-SR-N-04)", () => {
+  it("includes data-hash attribute with commit hash for stash commit (TC-004)", () => {
     // Given: a stash commit with a specific hash
     const hash = "abc123def456";
     const stash = makeStash();
@@ -189,7 +189,7 @@ describe("buildCommitRowAttributes", () => {
     expect(result).toContain(`data-hash="${hash}"`);
   });
 
-  it("does not include 'stash' CSS class for non-stash commit (TC-SR-N-05)", () => {
+  it("does not include 'stash' CSS class for non-stash commit (TC-005)", () => {
     // Given: a commit node with stash === null (regular commit)
     const hash = "abc123def456";
 
@@ -213,7 +213,7 @@ describe("buildCommitRowAttributes", () => {
 });
 
 describe("buildStashSelectorDisplay", () => {
-  it("extracts @{0} from stash@{0} (TC-SR-N-02)", () => {
+  it("extracts @{0} from stash@{0} (TC-002)", () => {
     // Given: selector is "stash@{0}"
     const selector = "stash@{0}";
 
@@ -224,7 +224,7 @@ describe("buildStashSelectorDisplay", () => {
     expect(display).toBe("@{0}");
   });
 
-  it("extracts @{12} from stash@{12} for multi-digit index (TC-SR-N-03)", () => {
+  it("extracts @{12} from stash@{12} for multi-digit index (TC-003)", () => {
     // Given: selector is "stash@{12}" (multi-digit index)
     const selector = "stash@{12}";
 
@@ -260,7 +260,7 @@ describe("buildStashContextMenuItems", () => {
     vi.mocked(vscode.postMessage).mockClear();
   });
 
-  it("returns 7 items (4 actions + separator + 2 copy) for stash context menu (TC-SC-N-01)", () => {
+  it("returns 7 items (4 actions + separator + 2 copy) for stash context menu (TC-006)", () => {
     // Given: stash !== null commit row
     // When: stash context menu items are built
     const items = buildStashContextMenuItems(MOCK_REPO, MOCK_HASH, MOCK_SELECTOR, MOCK_SOURCE_ELEM);
@@ -284,7 +284,7 @@ describe("buildStashContextMenuItems", () => {
     expect(items[6]!.title).toBe("Copy Stash Hash to Clipboard");
   });
 
-  it("shows checkbox dialog with 'Reinstate Index' default false when Apply is clicked (TC-SC-N-02)", () => {
+  it("shows checkbox dialog with 'Reinstate Index' default false when Apply is clicked (TC-007)", () => {
     // Given: stash context menu items
     const items = buildStashContextMenuItems(MOCK_REPO, MOCK_HASH, MOCK_SELECTOR, MOCK_SOURCE_ELEM);
 
@@ -298,7 +298,7 @@ describe("buildStashContextMenuItems", () => {
     expect(call[2]).toBe(false);
   });
 
-  it("sends applyStash with reinstateIndex: true when confirmed with Reinstate Index ON (TC-SC-N-03)", () => {
+  it("sends applyStash with reinstateIndex: true when confirmed with Reinstate Index ON (TC-008)", () => {
     // Given: stash context menu items
     const items = buildStashContextMenuItems(MOCK_REPO, MOCK_HASH, MOCK_SELECTOR, MOCK_SOURCE_ELEM);
     items[0]!.onClick();
@@ -316,7 +316,7 @@ describe("buildStashContextMenuItems", () => {
     });
   });
 
-  it("sends applyStash with reinstateIndex: false when confirmed with Reinstate Index OFF (TC-SC-N-04)", () => {
+  it("sends applyStash with reinstateIndex: false when confirmed with Reinstate Index OFF (TC-009)", () => {
     // Given: stash context menu items
     const items = buildStashContextMenuItems(MOCK_REPO, MOCK_HASH, MOCK_SELECTOR, MOCK_SOURCE_ELEM);
     items[0]!.onClick();
@@ -334,7 +334,7 @@ describe("buildStashContextMenuItems", () => {
     });
   });
 
-  it("sends popStash message when Pop is confirmed (TC-SC-N-05)", () => {
+  it("sends popStash message when Pop is confirmed (TC-010)", () => {
     // Given: stash context menu items
     const items = buildStashContextMenuItems(MOCK_REPO, MOCK_HASH, MOCK_SELECTOR, MOCK_SOURCE_ELEM);
 
@@ -353,7 +353,7 @@ describe("buildStashContextMenuItems", () => {
     });
   });
 
-  it("shows confirmation dialog when Drop is clicked (TC-SC-N-06)", () => {
+  it("shows confirmation dialog when Drop is clicked (TC-011)", () => {
     // Given: stash context menu items
     const items = buildStashContextMenuItems(MOCK_REPO, MOCK_HASH, MOCK_SELECTOR, MOCK_SOURCE_ELEM);
 
@@ -364,7 +364,7 @@ describe("buildStashContextMenuItems", () => {
     expect(showConfirmationDialog).toHaveBeenCalledTimes(1);
   });
 
-  it("sends dropStash message when Drop is confirmed (TC-SC-N-07)", () => {
+  it("sends dropStash message when Drop is confirmed (TC-012)", () => {
     // Given: stash context menu items
     const items = buildStashContextMenuItems(MOCK_REPO, MOCK_HASH, MOCK_SELECTOR, MOCK_SOURCE_ELEM);
     items[3]!.onClick();
@@ -381,7 +381,7 @@ describe("buildStashContextMenuItems", () => {
     });
   });
 
-  it("shows ref input dialog when Create Branch is clicked (TC-SC-N-08)", () => {
+  it("shows ref input dialog when Create Branch is clicked (TC-013)", () => {
     // Given: stash context menu items
     const items = buildStashContextMenuItems(MOCK_REPO, MOCK_HASH, MOCK_SELECTOR, MOCK_SOURCE_ELEM);
 
@@ -392,7 +392,7 @@ describe("buildStashContextMenuItems", () => {
     expect(showRefInputDialog).toHaveBeenCalledTimes(1);
   });
 
-  it("sends branchFromStash message when Branch dialog is confirmed (TC-SC-N-09)", () => {
+  it("sends branchFromStash message when Branch dialog is confirmed (TC-014)", () => {
     // Given: stash context menu items
     const items = buildStashContextMenuItems(MOCK_REPO, MOCK_HASH, MOCK_SELECTOR, MOCK_SOURCE_ELEM);
     items[1]!.onClick();
@@ -410,7 +410,7 @@ describe("buildStashContextMenuItems", () => {
     });
   });
 
-  it("sends copyToClipboard with Stash Name when Copy Name is clicked (TC-SC-N-10)", () => {
+  it("sends copyToClipboard with Stash Name when Copy Name is clicked (TC-015)", () => {
     // Given: stash context menu items
     const items = buildStashContextMenuItems(MOCK_REPO, MOCK_HASH, MOCK_SELECTOR, MOCK_SOURCE_ELEM);
 
@@ -425,7 +425,7 @@ describe("buildStashContextMenuItems", () => {
     });
   });
 
-  it("sends copyToClipboard with Stash Hash when Copy Hash is clicked (TC-SC-N-11)", () => {
+  it("sends copyToClipboard with Stash Hash when Copy Hash is clicked (TC-016)", () => {
     // Given: stash context menu items
     const items = buildStashContextMenuItems(MOCK_REPO, MOCK_HASH, MOCK_SELECTOR, MOCK_SOURCE_ELEM);
 
@@ -451,7 +451,7 @@ describe("buildUncommittedContextMenuItems", () => {
     vi.mocked(vscode.postMessage).mockClear();
   });
 
-  it("returns 3 items (Stash, Reset, Clean) for uncommitted context menu (TC-UC-N-01)", () => {
+  it("returns 3 items (Stash, Reset, Clean) for uncommitted context menu (TC-017)", () => {
     // Given: Uncommitted Changes row
     // When: uncommitted context menu items are built
     const items = buildUncommittedContextMenuItems(MOCK_REPO, MOCK_SOURCE_ELEM);
@@ -468,7 +468,7 @@ describe("buildUncommittedContextMenuItems", () => {
     expect(items[2]!.title).toContain("Clean untracked files");
   });
 
-  it("shows form dialog with message input and Include Untracked checkbox when Stash is clicked (TC-UC-N-02)", () => {
+  it("shows form dialog with message input and Include Untracked checkbox when Stash is clicked (TC-018)", () => {
     // Given: uncommitted context menu items
     const items = buildUncommittedContextMenuItems(MOCK_REPO, MOCK_SOURCE_ELEM);
 
@@ -487,7 +487,7 @@ describe("buildUncommittedContextMenuItems", () => {
     expect(inputs[1].name).toBe("Include Untracked");
   });
 
-  it("sends pushStash with message and includeUntracked: true when Stash confirmed with options (TC-UC-N-03)", () => {
+  it("sends pushStash with message and includeUntracked: true when Stash confirmed with options (TC-019)", () => {
     // Given: uncommitted context menu items
     const items = buildUncommittedContextMenuItems(MOCK_REPO, MOCK_SOURCE_ELEM);
     items[0]!.onClick();
@@ -505,7 +505,7 @@ describe("buildUncommittedContextMenuItems", () => {
     });
   });
 
-  it("sends pushStash with empty message and includeUntracked: false when Stash confirmed with defaults (TC-UC-N-04)", () => {
+  it("sends pushStash with empty message and includeUntracked: false when Stash confirmed with defaults (TC-020)", () => {
     // Given: uncommitted context menu items
     const items = buildUncommittedContextMenuItems(MOCK_REPO, MOCK_SOURCE_ELEM);
     items[0]!.onClick();
@@ -523,7 +523,7 @@ describe("buildUncommittedContextMenuItems", () => {
     });
   });
 
-  it("shows select dialog with Mixed and Hard options when Reset is clicked (TC-UC-N-05)", () => {
+  it("shows select dialog with Mixed and Hard options when Reset is clicked (TC-021)", () => {
     // Given: uncommitted context menu items
     const items = buildUncommittedContextMenuItems(MOCK_REPO, MOCK_SOURCE_ELEM);
 
@@ -541,7 +541,7 @@ describe("buildUncommittedContextMenuItems", () => {
     expect(options[1].value).toBe("hard");
   });
 
-  it("sends resetUncommitted with mode: mixed after select and confirmation (TC-UC-N-06)", () => {
+  it("sends resetUncommitted with mode: mixed after select and confirmation (TC-022)", () => {
     // Given: uncommitted context menu items
     const items = buildUncommittedContextMenuItems(MOCK_REPO, MOCK_SOURCE_ELEM);
     items[1]!.onClick();
@@ -566,7 +566,7 @@ describe("buildUncommittedContextMenuItems", () => {
     });
   });
 
-  it("sends resetUncommitted with mode: hard after select and confirmation (TC-UC-N-07)", () => {
+  it("sends resetUncommitted with mode: hard after select and confirmation (TC-023)", () => {
     // Given: uncommitted context menu items
     const items = buildUncommittedContextMenuItems(MOCK_REPO, MOCK_SOURCE_ELEM);
     items[1]!.onClick();
@@ -592,7 +592,7 @@ describe("buildUncommittedContextMenuItems", () => {
     });
   });
 
-  it("shows checkbox dialog with 'Clean untracked directories' default false when Clean is clicked (TC-UC-N-08)", () => {
+  it("shows checkbox dialog with 'Clean untracked directories' default false when Clean is clicked (TC-024)", () => {
     // Given: uncommitted context menu items
     const items = buildUncommittedContextMenuItems(MOCK_REPO, MOCK_SOURCE_ELEM);
 
@@ -607,7 +607,7 @@ describe("buildUncommittedContextMenuItems", () => {
     expect(call[2]).toBe(false);
   });
 
-  it("sends cleanUntrackedFiles with directories: true when Clean confirmed with option ON (TC-UC-N-09)", () => {
+  it("sends cleanUntrackedFiles with directories: true when Clean confirmed with option ON (TC-025)", () => {
     // Given: uncommitted context menu items
     const items = buildUncommittedContextMenuItems(MOCK_REPO, MOCK_SOURCE_ELEM);
     items[2]!.onClick();
@@ -624,7 +624,7 @@ describe("buildUncommittedContextMenuItems", () => {
     });
   });
 
-  it("sends cleanUntrackedFiles with directories: false when Clean confirmed with option OFF (TC-UC-N-10)", () => {
+  it("sends cleanUntrackedFiles with directories: false when Clean confirmed with option OFF (TC-026)", () => {
     // Given: uncommitted context menu items
     const items = buildUncommittedContextMenuItems(MOCK_REPO, MOCK_SOURCE_ELEM);
     items[2]!.onClick();
@@ -652,7 +652,7 @@ describe("fetch button message", () => {
     vi.mocked(vscode.postMessage).mockClear();
   });
 
-  it("sends fetch message with correct format including repo (TC-FT-N-04)", () => {
+  it("sends fetch message with correct format including repo (TC-027)", () => {
     // Given: fetch button is clicked (simulated via sendMessage)
     const repo = "/test/repo";
 
@@ -676,7 +676,7 @@ describe("refreshGraphOrDisplayError", () => {
     mockRefresh = vi.fn();
   });
 
-  it("calls onRefresh when status is null (TC-FT-N-05)", () => {
+  it("calls onRefresh when status is null (TC-028)", () => {
     // Given: fetch response with status === null (success)
     const status = null;
     const errorMessage = "Unable to Fetch";
@@ -689,7 +689,7 @@ describe("refreshGraphOrDisplayError", () => {
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
-  it("calls showErrorDialog when status is an error message (TC-FT-A-02)", () => {
+  it("calls showErrorDialog when status is an error message (TC-029)", () => {
     // Given: fetch response with status === "error message" (failure)
     const status = "fatal: Could not resolve host";
     const errorMessage = "Unable to Fetch";
@@ -932,14 +932,14 @@ describe("GitGraphView frontend integration", () => {
   beforeAll(async () => {
     setupTestDOM();
     setupViewState();
-    // Set prevState with findWidgetState for TC-FI-N-11
+    // Set prevState with findWidgetState for TC-048
     vi.mocked(vscode.getState).mockReturnValueOnce(
       MOCK_PREV_STATE as ReturnType<typeof vscode.getState>
     );
     await import("../../web/main");
     // Respond to the auto-request from constructor
     loadTestCommits();
-    // Check if restoreState was called during init (for TC-FI-N-11)
+    // Check if restoreState was called during init (for TC-048)
     restoreStateCaptured = mockFindWidgetInstance.restoreState.mock.calls.length > 0;
   });
 
@@ -952,7 +952,7 @@ describe("GitGraphView frontend integration", () => {
   /* ---------------------------------------------------------------- */
 
   describe("comparison mode state transitions", () => {
-    it("normal click sends commitDetails request (TC-FI-N-01)", () => {
+    it("normal click sends commitDetails request (TC-030)", () => {
       // Given: no expanded commit, table is rendered with commits
       // When: a commit row is clicked without modifier keys
       clickCommit(COMMIT_HASH_1);
@@ -967,7 +967,7 @@ describe("GitGraphView frontend integration", () => {
       );
     });
 
-    it("Ctrl+click different commit enters compare mode (TC-FI-N-02)", () => {
+    it("Ctrl+click different commit enters compare mode (TC-031)", () => {
       // Given: commit 1 is expanded
       expandCommit(COMMIT_HASH_1);
 
@@ -985,7 +985,7 @@ describe("GitGraphView frontend integration", () => {
       );
     });
 
-    it("Ctrl+click same compare target cancels comparison (TC-FI-N-03)", () => {
+    it("Ctrl+click same compare target cancels comparison (TC-032)", () => {
       // Given: compare mode active between commit 1 and commit 2
       expandCommitWithCompare(COMMIT_HASH_1, COMMIT_HASH_2);
 
@@ -1006,7 +1006,7 @@ describe("GitGraphView frontend integration", () => {
       expect(row2!.classList.contains("compareTarget")).toBe(false);
     });
 
-    it("Ctrl+click different commit changes comparison target (TC-FI-N-04)", () => {
+    it("Ctrl+click different commit changes comparison target (TC-033)", () => {
       // Given: compare mode active between commit 1 and commit 2
       expandCommitWithCompare(COMMIT_HASH_1, COMMIT_HASH_2);
 
@@ -1033,7 +1033,7 @@ describe("GitGraphView frontend integration", () => {
       expect(row2!.classList.contains("compareTarget")).toBe(false);
     });
 
-    it("normal click in compare mode cancels compare and shows new detail (TC-FI-N-05)", () => {
+    it("normal click in compare mode cancels compare and shows new detail (TC-034)", () => {
       // Given: compare mode active between commit 1 and commit 2
       expandCommitWithCompare(COMMIT_HASH_1, COMMIT_HASH_2);
 
@@ -1057,7 +1057,7 @@ describe("GitGraphView frontend integration", () => {
       expect(compareCalls).toHaveLength(0);
     });
 
-    it("Ctrl+click without expanded commit shows normal detail (TC-FI-B-01)", () => {
+    it("Ctrl+click without expanded commit shows normal detail (TC-035)", () => {
       // Given: no expanded commit (clean state from resetCommitState)
       // When: commit 1 is Ctrl+clicked
       clickCommit(COMMIT_HASH_1, { ctrlKey: true });
@@ -1079,7 +1079,7 @@ describe("GitGraphView frontend integration", () => {
       expect(compareCalls).toHaveLength(0);
     });
 
-    it("uncommitted changes as expanded commit + Ctrl+click sends compare with fromHash='*' (TC-FI-B-02)", () => {
+    it("uncommitted changes as expanded commit + Ctrl+click sends compare with fromHash='*' (TC-036)", () => {
       // Given: commits including uncommitted changes as first entry
       const commitsWithUncommitted: GitCommitNode[] = [
         {
@@ -1149,7 +1149,7 @@ describe("GitGraphView frontend integration", () => {
   /* ---------------------------------------------------------------- */
 
   describe("comparison response processing", () => {
-    it("ResponseCompareCommits with fileChanges shows compare details (TC-FI-N-06)", () => {
+    it("ResponseCompareCommits with fileChanges shows compare details (TC-037)", () => {
       // Given: commit 1 is expanded
       expandCommit(COMMIT_HASH_1);
 
@@ -1176,7 +1176,7 @@ describe("GitGraphView frontend integration", () => {
       expect(detailsElem!.innerHTML).toContain("Comparing");
     });
 
-    it("ResponseCompareCommits with fileChanges: null shows error dialog (TC-FI-A-01)", () => {
+    it("ResponseCompareCommits with fileChanges: null shows error dialog (TC-038)", () => {
       // Given: commit 1 is expanded
       expandCommit(COMMIT_HASH_1);
 
@@ -1195,7 +1195,7 @@ describe("GitGraphView frontend integration", () => {
       expect(showErrorDialog).toHaveBeenCalledWith("Unable to load commit comparison", null, null);
     });
 
-    it("file click in compare mode includes compareWithHash in viewDiff (TC-FI-N-07)", () => {
+    it("file click in compare mode includes compareWithHash in viewDiff (TC-039)", () => {
       // Given: compare mode active with file tree HTML containing a clickable file
       expandCommit(COMMIT_HASH_1);
 
@@ -1240,7 +1240,7 @@ describe("GitGraphView frontend integration", () => {
       );
     });
 
-    it("accepts ResponseCompareCommits with reordered fromHash/toHash (TC-FI-N-15)", () => {
+    it("accepts ResponseCompareCommits with reordered fromHash/toHash (TC-040)", () => {
       // Given: commit 1 is expanded
       expandCommit(COMMIT_HASH_1);
 
@@ -1267,7 +1267,7 @@ describe("GitGraphView frontend integration", () => {
       expect(detailsElem!.innerHTML).toContain("Comparing");
     });
 
-    it("restores unsavedChanges srcElem after table re-render (TC-FI-N-16)", () => {
+    it("restores unsavedChanges srcElem after table re-render (TC-041)", () => {
       // Given: commits with uncommitted changes, uncommitted row is expanded
       const commitsWithUncommitted: GitCommitNode[] = [
         {
@@ -1363,7 +1363,7 @@ describe("GitGraphView frontend integration", () => {
       });
     }
 
-    it("Ctrl+click unsaved changes row enters compare mode with UNCOMMITTED_CHANGES_HASH as fromHash (TC-FI-N-12)", () => {
+    it("Ctrl+click unsaved changes row enters compare mode with UNCOMMITTED_CHANGES_HASH as fromHash (TC-042)", () => {
       // Given: commits with uncommitted changes loaded, commit 1 is expanded
       loadCommitsWithUncommitted();
       expandCommit(COMMIT_HASH_1);
@@ -1383,7 +1383,7 @@ describe("GitGraphView frontend integration", () => {
       restoreNormalCommits();
     });
 
-    it("Ctrl+click same unsaved changes row cancels comparison (TC-FI-N-13)", () => {
+    it("Ctrl+click same unsaved changes row cancels comparison (TC-043)", () => {
       // Given: commits with uncommitted changes, compare mode active with unsaved changes
       loadCommitsWithUncommitted();
       expandCommit(COMMIT_HASH_1);
@@ -1413,7 +1413,7 @@ describe("GitGraphView frontend integration", () => {
       restoreNormalCommits();
     });
 
-    it("normal click on unsaved changes sends commitDetails (TC-FI-N-14)", () => {
+    it("normal click on unsaved changes sends commitDetails (TC-044)", () => {
       // Given: commits with uncommitted changes loaded, no expanded commit
       loadCommitsWithUncommitted();
 
@@ -1437,7 +1437,7 @@ describe("GitGraphView frontend integration", () => {
   /* ---------------------------------------------------------------- */
 
   describe("FindWidget integration", () => {
-    it("Ctrl+F triggers FindWidget.show() (TC-FI-N-08)", () => {
+    it("Ctrl+F triggers FindWidget.show() (TC-045)", () => {
       // Given: the page is loaded with commits rendered
       // When: Ctrl+F keyboard shortcut is pressed
       document.dispatchEvent(
@@ -1453,7 +1453,7 @@ describe("GitGraphView frontend integration", () => {
       expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
     });
 
-    it("search button click triggers FindWidget.show() (TC-FI-N-09)", () => {
+    it("search button click triggers FindWidget.show() (TC-046)", () => {
       // Given: the page is loaded with commits rendered
       const searchBtn = document.getElementById("searchBtn");
       expect(searchBtn).not.toBeNull();
@@ -1466,7 +1466,7 @@ describe("GitGraphView frontend integration", () => {
       expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
     });
 
-    it("saveState includes findWidgetState from FindWidget.getState() (TC-FI-N-10)", () => {
+    it("saveState includes findWidgetState from FindWidget.getState() (TC-047)", () => {
       // Given: FindWidget.getState returns a specific state
       const expectedFindState = {
         text: "",
@@ -1488,7 +1488,7 @@ describe("GitGraphView frontend integration", () => {
       expect(savedState.findWidgetState).toEqual(expectedFindState);
     });
 
-    it("restoreState is called with findWidgetState during initialization (TC-FI-N-11)", () => {
+    it("restoreState is called with findWidgetState during initialization (TC-048)", () => {
       // Given: prevState had findWidgetState set (configured in beforeAll)
       // When: GitGraphView was constructed (in beforeAll)
       // Then: findWidget.restoreState was called during initialization
@@ -1502,7 +1502,7 @@ describe("GitGraphView frontend integration", () => {
 /* ------------------------------------------------------------------ */
 
 describe("GitGraphView findWidgetState backward compatibility", () => {
-  it("prevState without findWidgetState does not call restoreState (TC-FI-B-03)", async () => {
+  it("prevState without findWidgetState does not call restoreState (TC-049)", async () => {
     // Given: a fresh module scope
     vi.resetModules();
     setupTestDOM();
