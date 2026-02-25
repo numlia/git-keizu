@@ -60,6 +60,34 @@ export function buildRefContextMenuItems(
         onClick: () => checkoutBranchAction(repo, sourceElem, refName)
       });
     }
+    if (gitBranchHead === refName) {
+      menu.push(
+        {
+          title: "Pull",
+          onClick: () => {
+            showConfirmationDialog(
+              `Are you sure you want to pull into <b><i>${escapeHtml(refName)}</i></b>?`,
+              () => {
+                sendMessage({ command: "pull", repo: repo });
+              },
+              null
+            );
+          }
+        },
+        {
+          title: "Push",
+          onClick: () => {
+            showConfirmationDialog(
+              `Are you sure you want to push <b><i>${escapeHtml(refName)}</i></b>?`,
+              () => {
+                sendMessage({ command: "push", repo: repo });
+              },
+              null
+            );
+          }
+        }
+      );
+    }
     menu.push({
       title: `Rename Branch${ELLIPSIS}`,
       onClick: () => {
@@ -148,10 +176,11 @@ export function checkoutBranchAction(
       remoteBranch: null
     });
   } else if (isRemoteCombined || sourceElem.classList.contains("remote")) {
-    let refNameComps = refName.split("/");
+    const slashIndex = refName.indexOf("/");
+    const defaultBranchName = slashIndex > 0 ? refName.substring(slashIndex + 1) : refName;
     showRefInputDialog(
       `Enter the name of the new branch you would like to create when checking out <b><i>${escapeHtml(refName)}</i></b>:`,
-      refNameComps[refNameComps.length - 1],
+      defaultBranchName,
       "Checkout Branch",
       (newBranch) => {
         sendMessage({

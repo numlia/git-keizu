@@ -96,7 +96,7 @@ describe("arraysEqual", () => {
 });
 
 describe("svgIcons", () => {
-  it("fetch icon is a non-empty SVG string (TC-F-N-04)", () => {
+  it("fetch icon is a non-empty SVG string (TC-001)", () => {
     // Given: svgIcons is imported
     // When: fetch property is referenced
     // Then: it is a non-empty string containing "<svg"
@@ -105,7 +105,7 @@ describe("svgIcons", () => {
     expect(svgIcons.fetch).toContain("<svg");
   });
 
-  it("stash icon is a non-empty SVG string (TC-F-N-05)", () => {
+  it("stash icon is a non-empty SVG string (TC-002)", () => {
     // Given: svgIcons is imported
     // When: stash property is referenced
     // Then: it is a non-empty string containing "<svg"

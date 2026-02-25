@@ -427,6 +427,24 @@ export interface ResponseFetch {
   status: GitCommandStatus;
 }
 
+export interface RequestPull {
+  command: "pull";
+  repo: string;
+}
+export interface ResponsePull {
+  command: "pull";
+  status: GitCommandStatus;
+}
+
+export interface RequestPush {
+  command: "push";
+  repo: string;
+}
+export interface ResponsePush {
+  command: "push";
+  status: GitCommandStatus;
+}
+
 export interface RequestResetUncommitted {
   command: "resetUncommitted";
   repo: string;
@@ -464,6 +482,8 @@ export type RequestMessage =
   | RequestDropStash
   | RequestFetch
   | RequestFetchAvatar
+  | RequestPull
+  | RequestPush
   | RequestLoadBranches
   | RequestLoadCommits
   | RequestLoadRepos
@@ -496,6 +516,8 @@ export type ResponseMessage =
   | ResponseDropStash
   | ResponseFetch
   | ResponseFetchAvatar
+  | ResponsePull
+  | ResponsePush
   | ResponseLoadBranches
   | ResponseLoadCommits
   | ResponseLoadRepos

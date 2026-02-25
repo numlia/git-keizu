@@ -4,6 +4,15 @@ const dialog = document.getElementById("dialog")!;
 const dialogBacking = document.getElementById("dialogBacking")!;
 let dialogMenuSource: HTMLElement | null = null;
 
+const DIALOG_CLASS_NO_INPUT = "active noInput";
+const DIALOG_CLASS_INPUT_INVALID = "active inputInvalid";
+
+function isDialogSubmittable(): boolean {
+  return (
+    dialog.className !== DIALOG_CLASS_NO_INPUT && dialog.className !== DIALOG_CLASS_INPUT_INVALID
+  );
+}
+
 export function showConfirmationDialog(
   message: string,
   confirmed: () => void,
@@ -108,8 +117,7 @@ export function showFormDialog(
     actionName,
     "Cancel",
     () => {
-      if (dialog.className === "active noInput" || dialog.className === "active inputInvalid")
-        return;
+      if (!isDialogSubmittable()) return;
       let values = [];
       for (let i = 0; i < inputs.length; i++) {
         let input = inputs[i],
@@ -128,10 +136,11 @@ export function showFormDialog(
     sourceElem
   );
 
+  let dialogActionBtn = document.getElementById("dialogAction")!;
+
   if (textRefInput > -1) {
-    let dialogInput = <HTMLInputElement>document.getElementById(`dialogInput${textRefInput}`),
-      dialogAction = document.getElementById("dialogAction")!;
-    if (dialogInput.value === "") dialog.className = "active noInput";
+    let dialogInput = <HTMLInputElement>document.getElementById(`dialogInput${textRefInput}`);
+    if (dialogInput.value === "") dialog.className = DIALOG_CLASS_NO_INPUT;
     dialogInput.focus();
     dialogInput.addEventListener("keyup", () => {
       let noInput = dialogInput.value === "",
@@ -139,11 +148,34 @@ export function showFormDialog(
       let newClassName = `active${noInput ? " noInput" : invalidInput ? " inputInvalid" : ""}`;
       if (dialog.className !== newClassName) {
         dialog.className = newClassName;
-        dialogAction.title = invalidInput
+        dialogActionBtn.title = invalidInput
           ? `Unable to ${actionName}, one or more invalid characters entered.`
           : "";
       }
     });
+  } else {
+    for (let i = 0; i < inputs.length; i++) {
+      if (inputs[i].type === "text") {
+        (<HTMLInputElement>document.getElementById(`dialogInput${i}`)).focus();
+        break;
+      }
+    }
+  }
+
+  for (let i = 0; i < inputs.length; i++) {
+    if (inputs[i].type === "text" || inputs[i].type === "text-ref") {
+      let inputElem = document.getElementById(`dialogInput${i}`);
+      if (inputElem) {
+        inputElem.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            if (isDialogSubmittable()) {
+              dialogActionBtn.click();
+            }
+          }
+        });
+      }
+    }
   }
 }
 

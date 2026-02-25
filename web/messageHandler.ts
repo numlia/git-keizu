@@ -106,6 +106,12 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
     case "popStash":
       refreshOrError(gitGraph, msg.status, "Unable to Pop Stash");
       break;
+    case "pull":
+      refreshOrError(gitGraph, msg.status, "Unable to Pull");
+      break;
+    case "push":
+      refreshOrError(gitGraph, msg.status, "Unable to Push");
+      break;
     case "pushStash":
       refreshOrError(gitGraph, msg.status, "Unable to Stash Changes");
       break;

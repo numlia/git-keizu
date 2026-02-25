@@ -120,7 +120,7 @@ describe("getStashes", () => {
     vi.restoreAllMocks();
   });
 
-  it("parses 3 stash entries from git reflog output (TC-SD-N-01)", async () => {
+  it("parses 3 stash entries from git reflog output (TC-001)", async () => {
     // Given: Repository has 3 stashes (mocked reflog output)
     const output = [
       makeStashLine(
@@ -200,7 +200,7 @@ describe("getStashes", () => {
     });
   });
 
-  it("returns empty array when no stashes exist (TC-SD-N-02)", async () => {
+  it("returns empty array when no stashes exist (TC-002)", async () => {
     // Given: refs/stash does not exist (git exits with code 128)
     setupSpawnForStash("", 128);
 
@@ -211,7 +211,7 @@ describe("getStashes", () => {
     expect(result).toEqual([]);
   });
 
-  it("parses single stash entry (TC-SD-B-01)", async () => {
+  it("parses single stash entry (TC-003)", async () => {
     // Given: Repository has exactly 1 stash (minimum valid count)
     const output = [
       makeStashLine(
@@ -239,7 +239,7 @@ describe("getStashes", () => {
     expect(result[0].message).toBe("single stash");
   });
 
-  it("returns empty array when git command fails (TC-SD-A-01)", async () => {
+  it("returns empty array when git command fails (TC-004)", async () => {
     // Given: spawn emits an error event (simulating process spawn failure)
     setupSpawnForStash("", 0, true);
 
@@ -250,7 +250,7 @@ describe("getStashes", () => {
     expect(result).toEqual([]);
   });
 
-  it("skips malformed lines with incorrect field count (TC-SD-B-02)", async () => {
+  it("skips malformed lines with incorrect field count (TC-005)", async () => {
     // Given: Output contains a malformed line (3 fields) mixed with a valid line
     const malformedLine = ["hash_only", "parents", "selector"].join(SEP);
     const validLine = makeStashLine(
@@ -275,7 +275,7 @@ describe("getStashes", () => {
     expect(result[0].hash).toBe("aaa111");
   });
 
-  it("skips lines with empty parent hashes (TC-SD-B-03)", async () => {
+  it("skips lines with empty parent hashes (TC-006)", async () => {
     // Given: Output contains a line with empty parent hashes (line[1] === "")
     const emptyParentLine = [
       "hash111",
@@ -321,7 +321,7 @@ describe("stash integration in getCommits", () => {
     vi.restoreAllMocks();
   });
 
-  it("attaches stash info when stash hash matches commit hash (TC-SI-N-01)", async () => {
+  it("attaches stash info when stash hash matches commit hash (TC-007)", async () => {
     // Given: Commit array has a commit whose hash matches a stash hash
     const commitHash = "abc123def456";
     const baseHash = "000111222333";
@@ -359,7 +359,7 @@ describe("stash integration in getCommits", () => {
     });
   });
 
-  it("inserts stash node before base commit when baseHash matches (TC-SI-N-02)", async () => {
+  it("inserts stash node before base commit when baseHash matches (TC-008)", async () => {
     // Given: Stash's baseHash matches a commit, but stash hash is not in commits
     const baseHash = "base111222333";
     const stashHash = "sss111222333";
@@ -402,7 +402,7 @@ describe("stash integration in getCommits", () => {
     expect(result.commits[stashIdx].message).toBe("WIP on main");
   });
 
-  it("skips stash when neither hash nor baseHash is in commits (TC-SI-N-03)", async () => {
+  it("skips stash when neither hash nor baseHash is in commits (TC-009)", async () => {
     // Given: Stash hash and baseHash are both absent from the commit array
     const logOutput = [
       makeCommitLine("commit111", "root000", "Author", "a@t.com", 1700000001, "only commit"),
@@ -433,7 +433,7 @@ describe("stash integration in getCommits", () => {
     expect(result.commits[0].stash).toBeNull();
   });
 
-  it("orders stashes with same baseHash by date descending (TC-SI-N-04)", async () => {
+  it("orders stashes with same baseHash by date descending (TC-010)", async () => {
     // Given: Two stashes with the same baseHash (newer date > older date)
     const baseHash = "base111";
     const newerHash = "stash_new";
@@ -479,7 +479,7 @@ describe("stash integration in getCommits", () => {
     expect(newerIdx).toBeLessThan(olderIdx);
   });
 
-  it("returns commits unchanged when zero stashes exist (TC-SI-B-02)", async () => {
+  it("returns commits unchanged when zero stashes exist (TC-011)", async () => {
     // Given: getStashes returns empty array (no stashes)
     const logOutput = [
       makeCommitLine("commit111", "root000", "Author", "a@t.com", 1700000002, "first"),
@@ -497,7 +497,7 @@ describe("stash integration in getCommits", () => {
     expect(result.commits[1].stash).toBeNull();
   });
 
-  it("inserts stashes at correct positions for different baseHashes (TC-SI-N-05)", async () => {
+  it("inserts stashes at correct positions for different baseHashes (TC-012)", async () => {
     // Given: 3 stashes with different baseHashes matching different commits
     const commitA = "commit_aaa";
     const commitB = "commit_bbb";
@@ -586,7 +586,7 @@ describe("getCommitFile", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns file content for a valid commit hash (TC-CF-N-01)", async () => {
+  it("returns file content for a valid commit hash (TC-013)", async () => {
     // Given: git show succeeds with file content
     const fileContent = "@extends('layouts.default')\n@section('title')";
     spawnMock.mockImplementation(() => createMockProcess(fileContent));
@@ -601,7 +601,7 @@ describe("getCommitFile", () => {
     });
   });
 
-  it("returns file content for commit hash with ^ suffix (TC-CF-N-02)", async () => {
+  it("returns file content for commit hash with ^ suffix (TC-014)", async () => {
     // Given: git show succeeds for parent commit
     const fileContent = "parent version content";
     spawnMock.mockImplementation(() => createMockProcess(fileContent));
@@ -616,7 +616,7 @@ describe("getCommitFile", () => {
     });
   });
 
-  it("returns empty string for invalid commit hash (TC-CF-B-01)", async () => {
+  it("returns empty string for invalid commit hash (TC-015)", async () => {
     // Given: an invalid commit hash containing non-hex characters
     // When: getCommitFile is called
     const result = await ds.getCommitFile(REPO, "not-a-valid-hash!", "src/file.ts");
@@ -626,7 +626,7 @@ describe("getCommitFile", () => {
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  it("returns empty string for path with .. traversal (TC-CF-B-02)", async () => {
+  it("returns empty string for path with .. traversal (TC-016)", async () => {
     // Given: a file path containing directory traversal
     // When: getCommitFile is called
     const result = await ds.getCommitFile(REPO, "abc123def456", "src/../../etc/passwd");
@@ -636,7 +636,7 @@ describe("getCommitFile", () => {
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  it("returns empty string when git show fails (TC-CF-A-01)", async () => {
+  it("returns empty string when git show fails (TC-017)", async () => {
     // Given: git show exits with non-zero code (file doesn't exist at commit)
     spawnMock.mockImplementation(() => createMockProcess("", 128));
 
@@ -647,7 +647,7 @@ describe("getCommitFile", () => {
     expect(result).toBe("");
   });
 
-  it("rejects hash with only ^ (no base hash) (TC-CF-B-03)", async () => {
+  it("rejects hash with only ^ (no base hash) (TC-018)", async () => {
     // Given: commit hash is just "^" (stripping ^ leaves empty string)
     // When: getCommitFile is called
     const result = await ds.getCommitFile(REPO, "^", "src/file.ts");
@@ -657,7 +657,7 @@ describe("getCommitFile", () => {
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  it("returns file content for HEAD ref (TC-CF-N-03)", async () => {
+  it("returns file content for HEAD ref (TC-019)", async () => {
     // Given: git show HEAD:path succeeds with file content
     const fileContent = "content at HEAD";
     spawnMock.mockImplementation(() => createMockProcess(fileContent));
@@ -672,7 +672,7 @@ describe("getCommitFile", () => {
     });
   });
 
-  it("returns file content for HEAD^ ref (TC-CF-N-04)", async () => {
+  it("returns file content for HEAD^ ref (TC-020)", async () => {
     // Given: git show HEAD^:path succeeds with file content
     const fileContent = "content at HEAD parent";
     spawnMock.mockImplementation(() => createMockProcess(fileContent));
@@ -728,7 +728,7 @@ describe("stash commands", () => {
     vi.restoreAllMocks();
   });
 
-  it("applyStash passes correct args without --index (TC-BS-N-01)", async () => {
+  it("applyStash passes correct args without --index (TC-021)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -740,7 +740,7 @@ describe("stash commands", () => {
     expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "apply", "stash@{0}"], { cwd: REPO });
   });
 
-  it("applyStash passes --index flag when reinstateIndex is true (TC-BS-N-02)", async () => {
+  it("applyStash passes --index flag when reinstateIndex is true (TC-022)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -754,7 +754,7 @@ describe("stash commands", () => {
     });
   });
 
-  it("popStash passes correct args without --index (TC-BS-N-03)", async () => {
+  it("popStash passes correct args without --index (TC-023)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -766,7 +766,7 @@ describe("stash commands", () => {
     expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "pop", "stash@{1}"], { cwd: REPO });
   });
 
-  it("popStash passes --index flag when reinstateIndex is true (TC-BS-N-04)", async () => {
+  it("popStash passes --index flag when reinstateIndex is true (TC-024)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -780,7 +780,7 @@ describe("stash commands", () => {
     });
   });
 
-  it("dropStash passes correct args (TC-BS-N-05)", async () => {
+  it("dropStash passes correct args (TC-025)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -792,7 +792,7 @@ describe("stash commands", () => {
     expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "drop", "stash@{2}"], { cwd: REPO });
   });
 
-  it("branchFromStash passes correct args (TC-BS-N-06)", async () => {
+  it("branchFromStash passes correct args (TC-026)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -806,7 +806,7 @@ describe("stash commands", () => {
     });
   });
 
-  it("returns error message when applyStash encounters a conflict (TC-BS-A-01)", async () => {
+  it("returns error message when applyStash encounters a conflict (TC-027)", async () => {
     // Given: spawn outputs conflict message on stderr with non-zero exit
     spawnMock.mockImplementation(() =>
       createCommandMockProcess({
@@ -823,7 +823,7 @@ describe("stash commands", () => {
     expect(result).toContain("CONFLICT");
   });
 
-  it("returns error message when dropStash receives invalid selector (TC-BS-A-02)", async () => {
+  it("returns error message when dropStash receives invalid selector (TC-028)", async () => {
     // Given: spawn outputs error on stderr with non-zero exit
     spawnMock.mockImplementation(() =>
       createCommandMockProcess({
@@ -856,7 +856,7 @@ describe("uncommitted commands", () => {
 
   // --- pushStash ---
 
-  it("pushStash passes full options: message + includeUntracked (TC-BU-N-01)", async () => {
+  it("pushStash passes full options: message + includeUntracked (TC-029)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -872,7 +872,7 @@ describe("uncommitted commands", () => {
     );
   });
 
-  it("pushStash passes message only when includeUntracked is false (TC-BU-N-02)", async () => {
+  it("pushStash passes message only when includeUntracked is false (TC-030)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -886,7 +886,7 @@ describe("uncommitted commands", () => {
     });
   });
 
-  it("pushStash passes --include-untracked only when message is empty (TC-BU-N-03)", async () => {
+  it("pushStash passes --include-untracked only when message is empty (TC-031)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -900,7 +900,7 @@ describe("uncommitted commands", () => {
     });
   });
 
-  it("pushStash passes minimal args when message is empty and includeUntracked is false (TC-BU-B-01)", async () => {
+  it("pushStash passes minimal args when message is empty and includeUntracked is false (TC-032)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -914,7 +914,7 @@ describe("uncommitted commands", () => {
 
   // --- resetUncommitted ---
 
-  it("resetUncommitted passes correct args for mixed mode (TC-BU-N-04)", async () => {
+  it("resetUncommitted passes correct args for mixed mode (TC-033)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -926,7 +926,7 @@ describe("uncommitted commands", () => {
     expect(spawnMock).toHaveBeenCalledWith("git", ["reset", "--mixed", "HEAD"], { cwd: REPO });
   });
 
-  it("resetUncommitted passes correct args for hard mode (TC-BU-N-05)", async () => {
+  it("resetUncommitted passes correct args for hard mode (TC-034)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -938,7 +938,7 @@ describe("uncommitted commands", () => {
     expect(spawnMock).toHaveBeenCalledWith("git", ["reset", "--hard", "HEAD"], { cwd: REPO });
   });
 
-  it("resetUncommitted rejects soft mode (TC-BU-A-01)", async () => {
+  it("resetUncommitted rejects soft mode (TC-035)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -950,7 +950,7 @@ describe("uncommitted commands", () => {
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  it("resetUncommitted rejects arbitrary invalid mode (TC-BU-A-02)", async () => {
+  it("resetUncommitted rejects arbitrary invalid mode (TC-036)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -962,7 +962,7 @@ describe("uncommitted commands", () => {
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  it("resetUncommitted rejects empty string mode (TC-BU-A-03)", async () => {
+  it("resetUncommitted rejects empty string mode (TC-037)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -976,7 +976,7 @@ describe("uncommitted commands", () => {
 
   // --- cleanUntrackedFiles ---
 
-  it("cleanUntrackedFiles passes -f without -d when directories is false (TC-BU-N-06)", async () => {
+  it("cleanUntrackedFiles passes -f without -d when directories is false (TC-038)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -988,7 +988,7 @@ describe("uncommitted commands", () => {
     expect(spawnMock).toHaveBeenCalledWith("git", ["clean", "-f"], { cwd: REPO });
   });
 
-  it("cleanUntrackedFiles passes -f -d when directories is true (TC-BU-N-07)", async () => {
+  it("cleanUntrackedFiles passes -f -d when directories is true (TC-039)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
@@ -1002,7 +1002,7 @@ describe("uncommitted commands", () => {
 
   // --- Error handling ---
 
-  it("pushStash returns error message when git command fails (TC-BU-A-04)", async () => {
+  it("pushStash returns error message when git command fails (TC-040)", async () => {
     // Given: spawn outputs error on stderr with non-zero exit
     spawnMock.mockImplementation(() =>
       createCommandMockProcess({
@@ -1019,7 +1019,7 @@ describe("uncommitted commands", () => {
     expect(result).toContain("no local changes to save");
   });
 
-  it("cleanUntrackedFiles returns error message when git command fails (TC-BU-A-05)", async () => {
+  it("cleanUntrackedFiles returns error message when git command fails (TC-041)", async () => {
     // Given: spawn outputs error on stderr with non-zero exit
     spawnMock.mockImplementation(() =>
       createCommandMockProcess({
@@ -1050,19 +1050,19 @@ describe("fetch command", () => {
     vi.restoreAllMocks();
   });
 
-  it("fetch passes correct args: ['fetch', '--all'] (TC-FT-N-01)", async () => {
+  it("fetch passes correct args: ['fetch', '--all', '--prune'] (TC-042)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
     // When: fetch(repo) is called
     const result = await ds.fetch(REPO);
 
-    // Then: spawn is called with ["fetch", "--all"]
+    // Then: spawn is called with ["fetch", "--all", "--prune"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["fetch", "--all"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["fetch", "--all", "--prune"], { cwd: REPO });
   });
 
-  it("fetch returns null on success (TC-FT-N-02)", async () => {
+  it("fetch returns null on success (TC-043)", async () => {
     // Given: spawn completes successfully (exit code 0)
     spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "From origin\n" }));
 
@@ -1073,7 +1073,7 @@ describe("fetch command", () => {
     expect(result).toBeNull();
   });
 
-  it("fetch returns error message when network error occurs (TC-FT-A-01)", async () => {
+  it("fetch returns error message when network error occurs (TC-044)", async () => {
     // Given: spawn outputs error on stderr with non-zero exit
     spawnMock.mockImplementation(() =>
       createCommandMockProcess({
@@ -1090,7 +1090,7 @@ describe("fetch command", () => {
     expect(result).toContain("Could not resolve host");
   });
 
-  it("fetch returns error message when spawn emits error event (TC-FT-A-01b)", async () => {
+  it("fetch returns error message when spawn emits error event (TC-045)", async () => {
     // Given: spawn emits an error event (process spawn failure)
     spawnMock.mockImplementation(() => createCommandMockProcess({ emitError: true }));
 
@@ -1128,7 +1128,7 @@ describe("getCommitComparison", () => {
     });
   }
 
-  it("returns file changes for two valid commit hashes (TC-DC-N-01)", async () => {
+  it("returns file changes for two valid commit hashes (TC-046)", async () => {
     // Given: Two valid commit hashes with modified and added files in diff output
     const nameStatus = "M\tsrc/modified.ts\nA\tsrc/added.ts\n";
     const numStat = "10\t5\tsrc/modified.ts\n20\t0\tsrc/added.ts\n";
@@ -1158,7 +1158,7 @@ describe("getCommitComparison", () => {
     expect(spawnMock).toHaveBeenCalledTimes(2);
   });
 
-  it("returns different oldFilePath and newFilePath for renamed files (TC-DC-N-02)", async () => {
+  it("returns different oldFilePath and newFilePath for renamed files (TC-047)", async () => {
     // Given: Diff contains a renamed file (R100 status with old and new paths)
     const nameStatus = "R100\tsrc/old-name.ts\tsrc/new-name.ts\n";
     const numStat = "8\t3\tsrc/{old-name.ts => new-name.ts}\n";
@@ -1177,7 +1177,7 @@ describe("getCommitComparison", () => {
     expect(result![0].deletions).toBe(3);
   });
 
-  it("correctly classifies all change types A/M/D/R (TC-DC-N-03)", async () => {
+  it("correctly classifies all change types A/M/D/R (TC-048)", async () => {
     // Given: Diff contains all 4 change types (Added, Modified, Deleted, Renamed)
     const nameStatus = [
       "A\tsrc/added.ts",
@@ -1207,7 +1207,7 @@ describe("getCommitComparison", () => {
     expect(result![3].type).toBe("R");
   });
 
-  it("parses numStat additions and deletions as numbers (TC-DC-N-04)", async () => {
+  it("parses numStat additions and deletions as numbers (TC-049)", async () => {
     // Given: numStat output with specific addition/deletion counts
     const nameStatus = "M\tsrc/file.ts\n";
     const numStat = "42\t17\tsrc/file.ts\n";
@@ -1222,7 +1222,7 @@ describe("getCommitComparison", () => {
     expect(result![0].deletions).toBe(17);
   });
 
-  it("omits toHash from git args when toHash is empty string (TC-DC-B-01)", async () => {
+  it("omits toHash from git args when toHash is empty string (TC-050)", async () => {
     // Given: toHash is empty string (working tree comparison)
     const nameStatus = "M\tsrc/file.ts\n";
     const numStat = "5\t2\tsrc/file.ts\n";
@@ -1249,7 +1249,7 @@ describe("getCommitComparison", () => {
     ]);
   });
 
-  it("uses toHash as diff base when fromHash is UNCOMMITTED_CHANGES_HASH (TC-DC-B-02)", async () => {
+  it("uses toHash as diff base when fromHash is UNCOMMITTED_CHANGES_HASH (TC-051)", async () => {
     // Given: fromHash is UNCOMMITTED_CHANGES_HASH ("*")
     const nameStatus = "M\tsrc/file.ts\n";
     const numStat = "3\t1\tsrc/file.ts\n";
@@ -1272,7 +1272,7 @@ describe("getCommitComparison", () => {
     expect(commitArgs).toEqual(["abc123def456"]);
   });
 
-  it("returns empty array when no changes exist (TC-DC-B-03)", async () => {
+  it("returns empty array when no changes exist (TC-052)", async () => {
     // Given: git diff returns empty output (identical commits or no changes)
     setupSpawnForComparison("", "");
 
@@ -1284,7 +1284,7 @@ describe("getCommitComparison", () => {
     expect(result).not.toBeNull();
   });
 
-  it("returns null when git spawn throws an exception (TC-DC-A-01)", async () => {
+  it("returns null when git spawn throws an exception (TC-053)", async () => {
     // Given: cp.spawn throws synchronously (e.g., binary not found)
     spawnMock.mockImplementation(() => {
       throw new Error("spawn ENOENT");
@@ -1297,7 +1297,7 @@ describe("getCommitComparison", () => {
     expect(result).toBeNull();
   });
 
-  it("returns file changes with null additions/deletions when numStat has no matching entry (TC-DC-A-02)", async () => {
+  it("returns file changes with null additions/deletions when numStat has no matching entry (TC-054)", async () => {
     // Given: nameStatus has 2 entries but numStat output references a different file
     const nameStatus = "M\tsrc/file1.ts\nA\tsrc/file2.ts\n";
     const numStat = "10\t5\tsrc/unrelated.ts\n";
@@ -1359,7 +1359,7 @@ describe("getCommitComparison", () => {
     });
   }
 
-  it("includes untracked files when fromHash is UNCOMMITTED_CHANGES_HASH (TC-DC-N-05)", async () => {
+  it("includes untracked files when fromHash is UNCOMMITTED_CHANGES_HASH (TC-055)", async () => {
     // Given: fromHash is UNCOMMITTED_CHANGES_HASH, diff has 1 modified file, ls-files has 1 untracked file
     const nameStatus = "M\tsrc/existing.ts\n";
     const numStat = "5\t2\tsrc/existing.ts\n";
@@ -1388,7 +1388,7 @@ describe("getCommitComparison", () => {
     });
   });
 
-  it("includes untracked files when toHash is empty string (TC-DC-N-06)", async () => {
+  it("includes untracked files when toHash is empty string (TC-056)", async () => {
     // Given: toHash is empty string (working tree comparison), ls-files has untracked files
     const nameStatus = "M\tsrc/file.ts\n";
     const numStat = "3\t1\tsrc/file.ts\n";
@@ -1410,7 +1410,7 @@ describe("getCommitComparison", () => {
     });
   });
 
-  it("does not run ls-files for two-commit comparison (TC-DC-B-04)", async () => {
+  it("does not run ls-files for two-commit comparison (TC-057)", async () => {
     // Given: both fromHash and toHash are valid commit hashes
     const nameStatus = "M\tsrc/file.ts\n";
     const numStat = "3\t1\tsrc/file.ts\n";
@@ -1428,7 +1428,7 @@ describe("getCommitComparison", () => {
     expect(lsFilesCall).toBeUndefined();
   });
 
-  it("deduplicates untracked files already present in diff output (TC-DC-B-05)", async () => {
+  it("deduplicates untracked files already present in diff output (TC-058)", async () => {
     // Given: working tree comparison, untracked file has same name as a file in diff output
     const nameStatus = "M\tsrc/file.ts\n";
     const numStat = "3\t1\tsrc/file.ts\n";
@@ -1444,7 +1444,7 @@ describe("getCommitComparison", () => {
     expect(result![0].type).toBe("M");
   });
 
-  it("returns diff-only results when ls-files output is empty (TC-DC-B-06)", async () => {
+  it("returns diff-only results when ls-files output is empty (TC-059)", async () => {
     // Given: working tree comparison, ls-files returns empty output
     const nameStatus = "M\tsrc/file.ts\n";
     const numStat = "3\t1\tsrc/file.ts\n";
@@ -1460,7 +1460,7 @@ describe("getCommitComparison", () => {
     expect(result![0].type).toBe("M");
   });
 
-  it("skips empty lines in ls-files output (TC-DC-B-07)", async () => {
+  it("skips empty lines in ls-files output (TC-060)", async () => {
     // Given: working tree comparison, ls-files output has empty lines mixed in
     const nameStatus = "M\tsrc/file.ts\n";
     const numStat = "3\t1\tsrc/file.ts\n";
@@ -1515,7 +1515,7 @@ describe("getUncommittedDetails", () => {
     });
   }
 
-  it("returns diff changes plus untracked files (TC-UD-N-01)", async () => {
+  it("returns diff changes plus untracked files (TC-061)", async () => {
     // Given: diff has 1 modified file, ls-files has 1 untracked file
     const nameStatus = "M\tsrc/modified.ts\n";
     const numStat = "10\t3\tsrc/modified.ts\n";
@@ -1545,7 +1545,7 @@ describe("getUncommittedDetails", () => {
     });
   });
 
-  it("returns diff changes only when no untracked files exist (TC-UD-N-02)", async () => {
+  it("returns diff changes only when no untracked files exist (TC-062)", async () => {
     // Given: diff has changes but ls-files returns empty output
     const nameStatus = "M\tsrc/file.ts\n";
     const numStat = "5\t2\tsrc/file.ts\n";
@@ -1561,7 +1561,7 @@ describe("getUncommittedDetails", () => {
     expect(result!.fileChanges[0].type).toBe("M");
   });
 
-  it("returns only untracked files when diff output is empty (TC-UD-B-01)", async () => {
+  it("returns only untracked files when diff output is empty (TC-063)", async () => {
     // Given: no diff output, ls-files has 2 untracked files
     const nameStatus = "";
     const numStat = "";
@@ -1590,7 +1590,7 @@ describe("getUncommittedDetails", () => {
     });
   });
 
-  it("deduplicates untracked files already present in diff output (TC-UD-B-02)", async () => {
+  it("deduplicates untracked files already present in diff output (TC-064)", async () => {
     // Given: diff has a file, ls-files also lists the same file
     const nameStatus = "A\tsrc/file.ts\n";
     const numStat = "10\t0\tsrc/file.ts\n";
@@ -1607,7 +1607,7 @@ describe("getUncommittedDetails", () => {
     expect(result!.fileChanges[0].additions).toBe(10);
   });
 
-  it("skips empty lines in ls-files output (TC-UD-B-03)", async () => {
+  it("skips empty lines in ls-files output (TC-065)", async () => {
     // Given: ls-files output has empty lines mixed in
     const nameStatus = "";
     const numStat = "";
@@ -1624,7 +1624,7 @@ describe("getUncommittedDetails", () => {
     expect(result!.fileChanges[1].newFilePath).toBe("src/b.ts");
   });
 
-  it("returns null when spawn throws an exception (TC-UD-A-01)", async () => {
+  it("returns null when spawn throws an exception (TC-066)", async () => {
     // Given: cp.spawn throws synchronously
     spawnMock.mockImplementation(() => {
       throw new Error("spawn ENOENT");
@@ -1637,7 +1637,7 @@ describe("getUncommittedDetails", () => {
     expect(result).toBeNull();
   });
 
-  it("parses renamed files correctly in diff output (TC-UD-N-03)", async () => {
+  it("parses renamed files correctly in diff output (TC-067)", async () => {
     // Given: diff has a renamed file with R status
     const nameStatus = "R100\tsrc/old.ts\tsrc/new.ts\n";
     const numStat = "2\t1\tsrc/{old.ts => new.ts}\n";
@@ -1656,5 +1656,200 @@ describe("getUncommittedDetails", () => {
     expect(result!.fileChanges[0].type).toBe("R");
     expect(result!.fileChanges[0].additions).toBe(2);
     expect(result!.fileChanges[0].deletions).toBe(1);
+  });
+});
+
+describe("checkoutBranch", () => {
+  let ds: DataSource;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("uses -B flag when checking out remote branch (TC-068)", async () => {
+    // Given: A remote branch "origin/feature/x" and local branch name "feature/x"
+    const mock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+    mock.mockImplementation(() => createMockProcess("", 0));
+
+    // When: checkoutBranch is called with a remote branch
+    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature/x");
+
+    // Then: git is spawned with -B flag (uppercase) for force-create
+    expect(mock).toHaveBeenCalledTimes(1);
+    const args = mock.mock.calls[0][1];
+    expect(args).toEqual(["checkout", "-B", "feature/x", "origin/feature/x"]);
+    expect(result).toBeNull();
+  });
+
+  it("does not use -B flag when checking out local branch (TC-069)", async () => {
+    // Given: A local branch "main" with remoteBranch = null
+    const mock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+    mock.mockImplementation(() => createMockProcess("", 0));
+
+    // When: checkoutBranch is called with remoteBranch = null
+    const result = await ds.checkoutBranch(REPO, "main", null);
+
+    // Then: git is spawned with just "checkout main" (no -B flag)
+    expect(mock).toHaveBeenCalledTimes(1);
+    const args = mock.mock.calls[0][1];
+    expect(args).toEqual(["checkout", "main"]);
+    expect(result).toBeNull();
+  });
+
+  it("returns error message when git fails for invalid branch name (TC-070)", async () => {
+    // Given: git spawn returns non-zero exit code with stderr message
+    const mock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+    mock.mockImplementation(() => {
+      const stdoutEmitter = new EventEmitter();
+      const stderrEmitter = new EventEmitter();
+      const proc = new EventEmitter();
+      Object.assign(proc, { stdout: stdoutEmitter, stderr: stderrEmitter });
+
+      queueMicrotask(() => {
+        stderrEmitter.emit("data", "fatal: 'origin/invalid..branch' is not a valid branch name\n");
+        proc.emit("close", 128);
+      });
+      return proc as unknown as cp.ChildProcess;
+    });
+
+    // When: checkoutBranch is called with an invalid remote branch
+    const result = await ds.checkoutBranch(REPO, "invalid..branch", "origin/invalid..branch");
+
+    // Then: Error message string from git stderr is returned
+    expect(result).toBe("fatal: 'origin/invalid..branch' is not a valid branch name");
+  });
+});
+
+describe("pull command", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("pull passes correct args: ['pull'] (TC-071)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: pull(repo) is called
+    const result = await ds.pull(REPO);
+
+    // Then: spawn is called with ["pull"] and correct cwd
+    expect(spawnMock).toHaveBeenCalledWith("git", ["pull"], { cwd: REPO });
+    expect(result).toBeNull();
+  });
+
+  it("pull returns null on success (TC-072)", async () => {
+    // Given: spawn completes successfully (exit code 0)
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({ stdout: "Already up to date.\n" })
+    );
+
+    // When: pull(repo) is called
+    const result = await ds.pull(REPO);
+
+    // Then: null is returned (GitCommandStatus success)
+    expect(result).toBeNull();
+  });
+
+  it("pull returns error message on merge conflict (TC-073)", async () => {
+    // Given: spawn outputs error on stderr with non-zero exit
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({
+        stderr: "error: Your local changes would be overwritten by merge.\n",
+        exitCode: 1
+      })
+    );
+
+    // When: pull is executed
+    const result = await ds.pull(REPO);
+
+    // Then: Error message string is returned (not null)
+    expect(result).not.toBeNull();
+    expect(result).toContain("Your local changes would be overwritten by merge");
+  });
+});
+
+describe("push command", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("push passes correct args: ['push'] (TC-074)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: push(repo) is called
+    const result = await ds.push(REPO);
+
+    // Then: spawn is called with ["push"] and correct cwd
+    expect(spawnMock).toHaveBeenCalledWith("git", ["push"], { cwd: REPO });
+    expect(result).toBeNull();
+  });
+
+  it("push returns null on success (TC-075)", async () => {
+    // Given: spawn completes successfully (exit code 0)
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({ stdout: "Everything up-to-date\n" })
+    );
+
+    // When: push(repo) is called
+    const result = await ds.push(REPO);
+
+    // Then: null is returned (GitCommandStatus success)
+    expect(result).toBeNull();
+  });
+
+  it("push returns error message on rejection (TC-076)", async () => {
+    // Given: spawn outputs error on stderr with non-zero exit
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({
+        stderr: "error: failed to push some refs to 'origin'\n",
+        exitCode: 1
+      })
+    );
+
+    // When: push is executed
+    const result = await ds.push(REPO);
+
+    // Then: Error message string is returned (not null)
+    expect(result).not.toBeNull();
+    expect(result).toContain("failed to push some refs");
+  });
+
+  it("push returns error message when upstream is not set (TC-077)", async () => {
+    // Given: spawn outputs upstream error on stderr with non-zero exit
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({
+        stderr: "fatal: The current branch feature has no upstream branch.\n",
+        exitCode: 128
+      })
+    );
+
+    // When: push is executed
+    const result = await ds.push(REPO);
+
+    // Then: Error message about no upstream branch is returned
+    expect(result).not.toBeNull();
+    expect(result).toContain("has no upstream branch");
   });
 });

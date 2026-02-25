@@ -115,7 +115,7 @@ describe("FindWidget", () => {
   /* --- DOM generation and visibility --- */
 
   describe("DOM generation and visibility", () => {
-    it("generates correct DOM structure on construction (TC-FW-N-01)", () => {
+    it("generates correct DOM structure on construction (TC-001)", () => {
       // Given: FindWidget is constructed
       // When: DOM is inspected
       // Then: all required elements exist
@@ -130,7 +130,7 @@ describe("FindWidget", () => {
       expect(document.getElementById("findClose")).not.toBeNull();
     });
 
-    it("show() makes widget visible and focuses input (TC-FW-N-02)", () => {
+    it("show() makes widget visible and focuses input (TC-002)", () => {
       // Given: widget is initially hidden
       // When: show() is called
       widget.show(false);
@@ -142,7 +142,7 @@ describe("FindWidget", () => {
       expect(document.activeElement).toBe(document.getElementById("findInput"));
     });
 
-    it("close() hides widget and clears highlights (TC-FW-N-03)", () => {
+    it("close() hides widget and clears highlights (TC-003)", () => {
       // Given: widget is visible with matches
       const commits = [makeCommit({ hash: "aaa1111100000000", message: "fix bug" })];
       setupCommitsAndDom(commits, callbacks);
@@ -160,7 +160,7 @@ describe("FindWidget", () => {
       expect(callbacks.saveState).toHaveBeenCalled();
     });
 
-    it("isVisible() returns true after show() (TC-FW-N-04)", () => {
+    it("isVisible() returns true after show() (TC-004)", () => {
       // Given: widget is hidden
       // When: show() is called
       widget.show(false);
@@ -168,7 +168,7 @@ describe("FindWidget", () => {
       expect(widget.isVisible()).toBe(true);
     });
 
-    it("isVisible() returns false after close() (TC-FW-N-05)", () => {
+    it("isVisible() returns false after close() (TC-005)", () => {
       // Given: widget is visible
       widget.show(false);
       // When: close() is called
@@ -181,7 +181,7 @@ describe("FindWidget", () => {
   /* --- Input control --- */
 
   describe("Input control", () => {
-    it("setInputEnabled(false) disables input when visible (TC-FW-N-06)", () => {
+    it("setInputEnabled(false) disables input when visible (TC-006)", () => {
       // Given: widget is visible
       widget.show(false);
       // When: setInputEnabled(false)
@@ -190,7 +190,7 @@ describe("FindWidget", () => {
       expect((document.getElementById("findInput") as HTMLInputElement).disabled).toBe(true);
     });
 
-    it("setInputEnabled(true) enables input when visible (TC-FW-N-07)", () => {
+    it("setInputEnabled(true) enables input when visible (TC-007)", () => {
       // Given: widget is visible and input is disabled
       widget.show(false);
       widget.setInputEnabled(false);
@@ -200,7 +200,7 @@ describe("FindWidget", () => {
       expect((document.getElementById("findInput") as HTMLInputElement).disabled).toBe(false);
     });
 
-    it("search on zero commits shows no results (TC-FW-B-01)", () => {
+    it("search on zero commits shows no results (TC-008)", () => {
       // Given: no commits exist
       (callbacks.getCommits as Mock).mockReturnValue([]);
       // When: search is triggered
@@ -214,7 +214,7 @@ describe("FindWidget", () => {
   /* --- Search matching --- */
 
   describe("Search matching", () => {
-    it("matches commit message text (TC-FW-N-08)", () => {
+    it("matches commit message text (TC-009)", () => {
       // Given: commit with message "fix bug" exists
       const commits = [
         makeCommit({ hash: "aaa1111100000000", message: "fix bug" }),
@@ -229,7 +229,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("1 of 1");
     });
 
-    it("matches author name (TC-FW-N-09)", () => {
+    it("matches author name (TC-010)", () => {
       // Given: commit with author "Alice" exists
       const commits = [
         makeCommit({ hash: "aaa1111100000000", author: "Alice", message: "some change" }),
@@ -244,7 +244,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("1 of 1");
     });
 
-    it("matches abbreviated commit hash (TC-FW-N-10)", () => {
+    it("matches abbreviated commit hash (TC-011)", () => {
       // Given: commit with hash starting with "abc12345"
       const commits = [
         makeCommit({ hash: "abc1234567890abc", message: "change" }),
@@ -259,7 +259,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("1 of 1");
     });
 
-    it("matches branch and tag names (TC-FW-N-11)", () => {
+    it("matches branch and tag names (TC-012)", () => {
       // Given: commit with branch ref "main"
       const commits = [
         makeCommit({
@@ -283,7 +283,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("1 of 1");
     });
 
-    it("shows correct match count for multiple matches (TC-FW-N-12)", () => {
+    it("shows correct match count for multiple matches (TC-013)", () => {
       // Given: 3 commits matching "fix"
       const commits = [
         makeCommit({ hash: "aaa1111100000000", message: "fix bug A" }),
@@ -299,7 +299,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("1 of 3");
     });
 
-    it("shows No Results for zero matches (TC-FW-B-02)", () => {
+    it("shows No Results for zero matches (TC-014)", () => {
       // Given: commits exist but none match
       const commits = [makeCommit({ hash: "aaa1111100000000", message: "add feature" })];
       setupCommitsAndDom(commits, callbacks);
@@ -312,7 +312,7 @@ describe("FindWidget", () => {
       expect(getHighlightedRows()).toHaveLength(0);
     });
 
-    it("shows 1 of 1 for single match (TC-FW-B-03)", () => {
+    it("shows 1 of 1 for single match (TC-015)", () => {
       // Given: exactly one matching commit
       const commits = [
         makeCommit({ hash: "aaa1111100000000", message: "unique text" }),
@@ -327,7 +327,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("1 of 1");
     });
 
-    it("clears highlights when search text is emptied (TC-FW-B-04)", () => {
+    it("clears highlights when search text is emptied (TC-016)", () => {
       vi.useFakeTimers();
       try {
         // Given: search active with matches
@@ -354,7 +354,7 @@ describe("FindWidget", () => {
   /* --- Search options --- */
 
   describe("Search options", () => {
-    it("case insensitive by default (TC-FW-N-13)", () => {
+    it("case insensitive by default (TC-017)", () => {
       // Given: commit with message "Fix bug"
       const commits = [makeCommit({ hash: "aaa1111100000000", message: "Fix bug" })];
       setupCommitsAndDom(commits, callbacks);
@@ -366,7 +366,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("1 of 1");
     });
 
-    it("case sensitive when enabled (TC-FW-N-14)", () => {
+    it("case sensitive when enabled (TC-018)", () => {
       // Given: commits with "Fix" and "fix"
       const commits = [
         makeCommit({ hash: "aaa1111100000000", message: "Fix bug" }),
@@ -381,7 +381,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("1 of 1");
     });
 
-    it("regex mode matches patterns (TC-FW-N-15)", () => {
+    it("regex mode matches patterns (TC-019)", () => {
       // Given: commits with "fix" and "feat" messages
       const commits = [
         makeCommit({ hash: "aaa1111100000000", message: "fix bug" }),
@@ -397,7 +397,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("1 of 2");
     });
 
-    it("invalid regex sets error attribute (TC-FW-A-01)", () => {
+    it("invalid regex sets error attribute (TC-020)", () => {
       // Given: commits exist
       const commits = [makeCommit({ hash: "aaa1111100000000", message: "test" })];
       setupCommitsAndDom(commits, callbacks);
@@ -411,7 +411,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("No Results");
     });
 
-    it("zero-length match sets error and clears matches (TC-FW-A-02)", () => {
+    it("zero-length match sets error and clears matches (TC-021)", () => {
       // Given: commits exist
       const commits = [makeCommit({ hash: "aaa1111100000000", message: "test data" })];
       setupCommitsAndDom(commits, callbacks);
@@ -425,7 +425,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("No Results");
     });
 
-    it("potential ReDoS pattern does not crash (TC-FW-A-03)", () => {
+    it("potential ReDoS pattern does not crash (TC-022)", () => {
       // Given: commits exist
       const commits = [makeCommit({ hash: "aaa1111100000000", message: "aaaaaa" })];
       setupCommitsAndDom(commits, callbacks);
@@ -451,7 +451,7 @@ describe("FindWidget", () => {
       triggerSearch(widget, "fix");
     }
 
-    it("next() advances position (TC-FW-N-16)", () => {
+    it("next() advances position (TC-023)", () => {
       // Given: 3 matches, position at 1
       setupThreeMatches();
       expect(getPositionText()).toBe("1 of 3");
@@ -463,7 +463,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("2 of 3");
     });
 
-    it("prev() wraps to last position (TC-FW-N-17)", () => {
+    it("prev() wraps to last position (TC-024)", () => {
       // Given: 3 matches, position at 1
       setupThreeMatches();
       expect(getPositionText()).toBe("1 of 3");
@@ -475,7 +475,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("3 of 3");
     });
 
-    it("next() wraps from last to first (TC-FW-B-05)", () => {
+    it("next() wraps from last to first (TC-025)", () => {
       // Given: 3 matches, position at 3
       setupThreeMatches();
       document.getElementById("findPrev")!.click(); // go to 3
@@ -488,7 +488,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("1 of 3");
     });
 
-    it("next() with zero matches does nothing (TC-FW-B-06)", () => {
+    it("next() with zero matches does nothing (TC-026)", () => {
       // Given: no matches
       const commits = [makeCommit({ hash: "aaa1111100000000", message: "other" })];
       setupCommitsAndDom(commits, callbacks);
@@ -502,7 +502,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("No Results");
     });
 
-    it("navigation triggers scrollToCommit (TC-FW-N-18)", () => {
+    it("navigation triggers scrollToCommit (TC-027)", () => {
       // Given: matches exist
       setupThreeMatches();
       (callbacks.scrollToCommit as Mock).mockClear();
@@ -519,7 +519,7 @@ describe("FindWidget", () => {
   /* --- State persistence --- */
 
   describe("State persistence", () => {
-    it("getState() returns current FindWidgetState (TC-FW-N-19)", () => {
+    it("getState() returns current FindWidgetState (TC-028)", () => {
       // Given: widget is visible with specific settings
       widget.restoreState({
         text: "search term",
@@ -539,7 +539,7 @@ describe("FindWidget", () => {
       expect(state.regex).toBe(false);
     });
 
-    it("restoreState() restores saved state correctly (TC-FW-N-20)", () => {
+    it("restoreState() restores saved state correctly (TC-029)", () => {
       // Given: a saved state
       const savedState: FindWidgetState = {
         text: "restored",
@@ -561,7 +561,7 @@ describe("FindWidget", () => {
       expect(widget.isVisible()).toBe(true);
     });
 
-    it("restoreState with non-visible state does not activate widget (TC-FW-B-07)", () => {
+    it("restoreState with non-visible state does not activate widget (TC-030)", () => {
       // Given: state with visible: false
       const state: FindWidgetState = {
         text: "test",
@@ -590,7 +590,7 @@ describe("FindWidget", () => {
       vi.useRealTimers();
     });
 
-    it("search executes after SEARCH_DEBOUNCE_MS delay (TC-FW-N-21)", () => {
+    it("search executes after SEARCH_DEBOUNCE_MS delay (TC-031)", () => {
       // Given: widget is visible with commits
       const commits = [makeCommit({ hash: "aaa1111100000000", message: "fix bug" })];
       setupCommitsAndDom(commits, callbacks);
@@ -612,7 +612,7 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("1 of 1");
     });
 
-    it("rapid input resets debounce timer (TC-FW-B-08)", () => {
+    it("rapid input resets debounce timer (TC-032)", () => {
       // Given: widget is visible with commits
       const commits = [
         makeCommit({ hash: "aaa1111100000000", message: "fix bug" }),
