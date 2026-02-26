@@ -16,58 +16,24 @@ A fork of [neo-git-graph](https://github.com/asispts/neo-git-graph) by asispts, 
 
 ## Features
 
-- **Graph View**: See all your branches, tags, stash entries, and uncommitted changes in one visual graph
-- **Commit Details**: Click on a commit to see what changed, view diffs for any file
+- **Graph View**: See all your branches, tags, stash entries, and uncommitted changes in one visual graph. The menu bar and column headers stay fixed as you scroll, so controls are always within reach in long histories.
+- **Commit Details**: Click on a commit to see what changed and view diffs for any file. The panel height adjusts to your viewport size, and the view only scrolls enough to bring the panel into view — no jarring auto-center on every click.
 - **Branch Actions**: Right-click to create, checkout, delete, rename, or merge branches
 - **Tag Actions**: Add, delete, and push tags directly from the graph
 - **Commit Actions**: Checkout, cherry-pick, revert, or reset to any commit
 - **Stash Support**: Stash entries appear in the graph with a distinct visual style; right-click to apply, pop, drop, or create a branch from a stash
 - **Uncommitted Changes Actions**: Right-click the Uncommitted Changes row to stash, reset (Mixed/Hard), or clean untracked files
 - **Pull/Push for current branch**: Right-click the currently checked-out branch to run `git pull` or `git push` directly from the graph
+- **Fetch with automatic prune**: The Fetch button runs `git fetch --prune` — stale remote-tracking references are cleaned up automatically on every fetch
 - **Commit Search**: Press Ctrl/Cmd+F to open a search bar with regex mode, case-sensitive mode, match counter (N of M), and prev/next navigation
 - **2-Commit Comparison**: Ctrl/Cmd+click a second commit to compare it with the selected commit side-by-side
+- **Combined branch/remote labels**: Local and remote branches on the same commit merge into a single pill label — `[main | origin]`. Right-clicking either part opens the appropriate context menu.
+- **Smooth refresh**: Git operations update the graph in the background without blanking the view or losing your scroll position
 - **Avatar Support**: Optionally fetch commit author avatars from GitHub, GitLab, or Gravatar
 - **Multi-Repository**: Support for multiple Git repositories in one workspace
 - **Configurable**: Customize graph colors, style, date format, and more
 
-## Improvements over neo-git-graph
-
-### Sticky header
-
-The menu bar and column headers remain fixed at the top while the commit list scrolls, so controls are always within reach in long histories.
-
-### Pull and Push for the current branch
-
-Right-click the branch you currently have checked out to run **Pull** (`git pull`) or **Push** (`git push`) directly from the graph. The result — whether success or a git error — is shown in a dialog without leaving the graph view.
-
-### Fetch with automatic prune
-
-A dedicated **Fetch** button in the toolbar runs `git fetch --prune` immediately — no confirmation dialog needed. Stale remote-tracking references for deleted remote branches are cleaned up automatically on every fetch.
-
-### Combined branch/remote labels
-
-Local and remote branches that point to the same commit are now merged into a single pill label.
-
-```
-Before: [main]  [origin/main]
-After:  [main | origin]
-```
-
-The remote name appears in italics after a separator. Right-clicking either part of the pill opens the appropriate context menu (local branch actions or remote branch actions). Double-clicking the remote part opens the checkout dialog.
-
-### Smooth refresh after Git operations
-
-Git actions (Delete Branch, Fetch, Push, Merge, Rebase, Cherry-pick, Reset, and more) now use a **soft refresh**: the current commit table stays on screen while new data loads in the background. The view no longer flashes blank between operations, and your scroll position is preserved.
-
-### Dynamic commit details panel height
-
-The commit details panel height is calculated from the available viewport space instead of being fixed at 250px. The panel expands up to a comfortable default size and shrinks gracefully in narrow panels, with a minimum height to keep content readable. The height also adjusts automatically when the VS Code panel is resized.
-
-### Minimal-scroll commit details panel
-
-When you click a commit to open its details, the view only scrolls if the panel would extend outside the visible area — it no longer auto-centers on every click. If scrolling is needed, only the minimum amount to bring the panel into view is applied. The `autoCenterCommitDetailsView` setting has been removed in favor of this improved behavior.
-
-### Security hardening
+## Security
 
 Git Keizu has undergone a full security audit and remediation (27 issues fixed):
 
@@ -84,6 +50,8 @@ Git Keizu has undergone a full security audit and remediation (27 issues fixed):
 Search for `git-keizu` in the Extensions panel.
 
 ## Contributing & Support
+
+The codebase has been modernized from its 2019 origins: async/await throughout, ES2020 targets, a Vitest test suite, and oxlint/oxfmt for consistent style.
 
 Bug reports and feedback via [GitHub Issues](https://github.com/numlia/git-keizu/issues) are welcome. This is a personal project maintained in spare time — responses and fixes are not guaranteed, but reports are appreciated.
 
