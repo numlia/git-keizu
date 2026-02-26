@@ -129,11 +129,11 @@ The extension uses a typed request/response message protocol:
 
 ## Settings Namespace
 
-All user-facing settings under `git-keizu.*` (12 settings):
+All user-facing settings under `git-keizu.*` (11 settings):
 
 - Graph appearance: `graphColours`, `graphStyle`, `tabIconColourTheme`
 - Display: `dateFormat`, `dateType`, `showUncommittedChanges`, `showCurrentBranchByDefault`
-- Behavior: `autoCenterCommitDetailsView`, `fetchAvatars`, `initialLoadCommits`, `loadMoreCommits`
+- Behavior: `fetchAvatars`, `initialLoadCommits`, `loadMoreCommits`
 - Discovery: `maxDepthOfRepoSearch`, `showStatusBarItem`
 
 Read via `src/config.ts` wrapper around `vscode.workspace.getConfiguration('git-keizu')`.

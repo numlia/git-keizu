@@ -108,3 +108,50 @@
 | TC-047  | saveState() 呼び出し                              | Equivalence - normal                 | findWidgetState が WebViewState に含まれる                    | -        |
 | TC-048  | restoreState (findWidgetState あり)               | Equivalence - normal                 | FindWidget.restoreState() が呼ばれる                          | -        |
 | TC-049  | restoreState (findWidgetState なし、旧バージョン) | Boundary - backward compat           | FindWidget がデフォルト状態で初期化される（エラーにならない） | 後方互換 |
+
+## S7: calculateCdvHeight() CDV高さ算出
+
+> Origin: Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)
+> Added: 2026-02-26
+
+**シグネチャ**: `private calculateCdvHeight(): number`
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition               | Perspective (Equivalence / Boundary) | Expected Result                     | Notes                          |
+| ------- | ---------------------------------- | ------------------------------------ | ----------------------------------- | ------------------------------ |
+| TC-050  | innerHeight=800, controlsHeight=50 | Equivalence - normal                 | 250 (CDV_DEFAULT_HEIGHT)            | available=695 > 250            |
+| TC-051  | innerHeight=355, controlsHeight=50 | Boundary - available == default      | 250                                 | available=250, 境界一致        |
+| TC-052  | innerHeight=354, controlsHeight=50 | Boundary - available == default-1    | 249                                 | available=249 < 250            |
+| TC-053  | innerHeight=205, controlsHeight=50 | Boundary - available == min          | 100 (CDV_MIN_HEIGHT)                | available=100, 最小境界一致    |
+| TC-054  | innerHeight=204, controlsHeight=50 | Boundary - available == min-1        | 100 (CDV_MIN_HEIGHT)                | available=99 → 100にクランプ   |
+| TC-055  | innerHeight=0                      | Boundary - zero viewport             | 100 (CDV_MIN_HEIGHT)                | 負の available → 100にクランプ |
+| TC-056  | #controls要素が存在しない          | Boundary - missing element           | ビューポート全体 - マージンから算出 | controlsHeight=0フォールバック |
+
+## S8: showCommitDetails() CDV高さ適用・スクロール制御
+
+> Origin: Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)
+> Added: 2026-02-26
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                                                                    | Perspective (Equivalence / Boundary) | Expected Result                                                             | Notes                    |
+| ------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------- | ------------------------ |
+| TC-057  | CDVがビューポート内に完全に収まる (offsetTop > scrollTop, offsetTop + expandY < scrollTop + viewHeight) | Equivalence - normal                 | scrollTop が変化しない                                                      | スクロール位置維持       |
+| TC-058  | CDV上端がビューポートより上 (offsetTop - CDV_SCROLL_PADDING < scrollTop)                                | Equivalence - top overflow           | scrollTop = offsetTop - CDV_SCROLL_PADDING                                  | 上方はみ出し時スクロール |
+| TC-059  | CDV下端がビューポートより下 (offsetTop + expandY + CDV_SCROLL_BOTTOM_OFFSET > scrollTop + viewHeight)   | Equivalence - bottom overflow        | scrollTop = offsetTop + expandY - viewHeight + CDV_SCROLL_BOTTOM_OFFSET     | 下方はみ出し時スクロール |
+| TC-060  | showCommitDetails() 呼び出し                                                                            | Equivalence - normal                 | CDV要素の style.height に calculateCdvHeight() の結果が px 単位で設定される | 動的高さ適用             |
+| TC-061  | showCommitDetails() 呼び出し                                                                            | Equivalence - normal                 | renderGraph() が CDV高さ適用後に呼ばれる                                    | 描画座標更新             |
+
+## S9: updateCommitDetailsHeight() リサイズ対応
+
+> Origin: Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)
+> Added: 2026-02-26
+
+**シグネチャ**: `private updateCommitDetailsHeight(): void`
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                  | Perspective (Equivalence / Boundary) | Expected Result                                          | Notes                         |
+| ------- | ----------------------------------------------------- | ------------------------------------ | -------------------------------------------------------- | ----------------------------- |
+| TC-062  | CDV表示中 + resize イベント (outer dimensions change) | Equivalence - normal                 | CDV高さ再計算・style.height 更新、renderGraph() 呼び出し | -                             |
+| TC-063  | CDV非表示 + resize イベント                           | Equivalence - no CDV                 | CDV高さ変更なし、既存動作維持                            | expandedCommit === null       |
+| TC-064  | CDV表示中 + 内部リサイズ (outer unchanged)            | Equivalence - inner resize           | CDV高さ再計算・更新（パネル幅変更に対応）                | 既存renderGraph動作 + CDV更新 |
