@@ -10,7 +10,6 @@ declare global {
   var viewState: GG.GitGraphViewState;
 
   interface Config {
-    autoCenterCommitDetailsView: boolean;
     fetchAvatars: boolean;
     graphColours: string[];
     graphStyle: "rounded" | "angular";

@@ -70,7 +70,6 @@ export interface GitUnsavedChanges {
 }
 
 export interface GitGraphViewState {
-  autoCenterCommitDetailsView: boolean;
   dateFormat: DateFormat;
   fetchAvatars: boolean;
   graphColours: string[];

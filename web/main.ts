@@ -37,6 +37,10 @@ const SCROLL_PADDING_TOP = 8;
 const SCROLL_ROW_HEIGHT = 32;
 const SCROLL_CENTER_OFFSET = 12;
 
+const CDV_DEFAULT_HEIGHT = 250;
+const CDV_MIN_HEIGHT = 100;
+const CDV_SCROLL_PADDING = 8;
+
 class GitGraphView {
   private gitRepos: GG.GitRepoSet;
   private gitBranches: string[] = [];
@@ -432,6 +436,25 @@ class GitGraphView {
     });
   }
 
+  /* CDV Height Helpers */
+  private calculateCdvHeight(): number {
+    const viewportHeight = window.innerHeight;
+    const controlsHeight = document.getElementById("controls")?.clientHeight ?? 0;
+    const headerHeight = (document.getElementById("tableColHeaders")?.clientHeight ?? 0) + 1;
+    const commitRowHeight = this.config.grid.y;
+    const availableHeight = viewportHeight - controlsHeight - headerHeight - commitRowHeight;
+    return Math.max(Math.min(CDV_DEFAULT_HEIGHT, availableHeight), CDV_MIN_HEIGHT);
+  }
+
+  private updateCommitDetailsHeight() {
+    if (this.expandedCommit === null) return;
+    const cdvElem = document.getElementById("commitDetails");
+    if (!cdvElem) return;
+    const height = this.calculateCdvHeight();
+    cdvElem.style.height = `${height}px`;
+    this.renderGraph();
+  }
+
   /* Renderers */
   private render() {
     this.renderTable();
@@ -822,10 +845,17 @@ class GitGraphView {
       windowHeight = window.outerHeight;
     window.addEventListener("resize", () => {
       if (windowWidth === window.outerWidth && windowHeight === window.outerHeight) {
-        this.renderGraph();
+        if (this.expandedCommit !== null) {
+          this.updateCommitDetailsHeight();
+        } else {
+          this.renderGraph();
+        }
       } else {
         windowWidth = window.outerWidth;
         windowHeight = window.outerHeight;
+        if (this.expandedCommit !== null) {
+          this.updateCommitDetailsHeight();
+        }
       }
     });
   }
@@ -990,17 +1020,19 @@ class GitGraphView {
     newElem.innerHTML = html;
     insertAfter(newElem, this.expandedCommit.srcElem);
 
+    const cdvHeight = this.calculateCdvHeight();
+    newElem.style.height = `${cdvHeight}px`;
+
     this.renderGraph();
 
     const scrollTop = this.scrollContainerElem.scrollTop;
     const viewHeight = this.scrollContainerElem.clientHeight;
-    if (this.config.autoCenterCommitDetailsView) {
-      this.scrollContainerElem.scrollTop = newElem.offsetTop + 177 - viewHeight / 2;
-    } else if (newElem.offsetTop + 8 < scrollTop) {
-      this.scrollContainerElem.scrollTop = newElem.offsetTop + 8;
-    } else if (newElem.offsetTop + this.config.grid.expandY - viewHeight + 48 > scrollTop) {
-      this.scrollContainerElem.scrollTop =
-        newElem.offsetTop + this.config.grid.expandY - viewHeight + 48;
+    if (newElem.offsetTop - CDV_SCROLL_PADDING < scrollTop) {
+      this.scrollContainerElem.scrollTop = newElem.offsetTop - CDV_SCROLL_PADDING;
+    } else if (newElem.offsetTop + this.config.grid.expandY - viewHeight > scrollTop) {
+      const desiredScroll = newElem.offsetTop + this.config.grid.expandY - viewHeight;
+      const maxScroll = this.expandedCommit.srcElem!.offsetTop;
+      this.scrollContainerElem.scrollTop = Math.min(desiredScroll, maxScroll);
     }
 
     document.getElementById("commitDetailsClose")!.addEventListener("click", () => {
@@ -1064,11 +1096,10 @@ let gitGraph = new GitGraphView(
   viewState.repos,
   viewState.lastActiveRepo,
   {
-    autoCenterCommitDetailsView: viewState.autoCenterCommitDetailsView,
     fetchAvatars: viewState.fetchAvatars,
     graphColours: viewState.graphColours,
     graphStyle: viewState.graphStyle,
-    grid: { x: 16, y: 24, offsetX: 8, offsetY: 12, expandY: 250 },
+    grid: { x: 16, y: 24, offsetX: 8, offsetY: 12, expandY: CDV_DEFAULT_HEIGHT },
     initialLoadCommits: viewState.initialLoadCommits,
     loadMoreCommits: viewState.loadMoreCommits,
     showCurrentBranchByDefault: viewState.showCurrentBranchByDefault

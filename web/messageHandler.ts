@@ -140,5 +140,5 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
 }
 
 function refreshOrError(gitGraph: GitGraphViewAPI, status: string | null, errorMessage: string) {
-  refreshGraphOrDisplayError(status, errorMessage, () => gitGraph.refresh(true), showErrorDialog);
+  refreshGraphOrDisplayError(status, errorMessage, () => gitGraph.refresh(false), showErrorDialog);
 }

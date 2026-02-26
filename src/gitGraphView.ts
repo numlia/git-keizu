@@ -420,7 +420,6 @@ export class GitGraphView {
     const config = getConfig(),
       nonce = getNonce();
     const viewState: GitGraphViewState = {
-      autoCenterCommitDetailsView: config.autoCenterCommitDetailsView(),
       dateFormat: config.dateFormat(),
       fetchAvatars: config.fetchAvatars() && this.extensionState.isAvatarStorageAvailable(),
       graphColours: config.graphColours(),

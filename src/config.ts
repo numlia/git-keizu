@@ -9,10 +9,6 @@ class Config {
     this.workspaceConfiguration = vscode.workspace.getConfiguration("git-keizu");
   }
 
-  public autoCenterCommitDetailsView() {
-    return this.workspaceConfiguration.get("autoCenterCommitDetailsView", true);
-  }
-
   public dateFormat(): DateFormat {
     return this.workspaceConfiguration.get("dateFormat", "Date & Time");
   }

@@ -79,11 +79,6 @@
       "type": "object",
       "title": "Git Keizu",
       "properties": {
-        "git-keizu.autoCenterCommitDetailsView": {
-          "type": "boolean",
-          "default": true,
-          "description": "Automatically center the commit details view when it is opened."
-        },
         "git-keizu.dateFormat": {
           "type": "string",
           "enum": [
@@ -200,7 +195,9 @@
     }
   },
   "activationEvents": [
-    "onStartupFinished"
+    "onCommand:git-keizu.clearAvatarCache",
+    "onCommand:git-keizu.view",
+    "workspaceContains:.git"
   ],
   "icon": "resources/icon.png",
   "engines": {

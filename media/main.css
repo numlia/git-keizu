@@ -144,7 +144,6 @@ body.unableToLoad p {
 
 /* Commit Details View */
 #commitDetails {
-  height: 250px;
   vertical-align: top;
 }
 #commitDetails td {
