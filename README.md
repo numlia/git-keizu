@@ -47,7 +47,10 @@ Git Keizu has undergone a full security audit and remediation (27 issues fixed):
 
 ## Installation
 
-Search for `git-keizu` in the Extensions panel.
+Search for **git-keizu** in Extensions, or install from:
+
+- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=numlia-vs.git-keizu)
+- [Open VSX Registry](https://open-vsx.org/extension/numlia-vs/git-keizu)
 
 ## Contributing & Support
 
