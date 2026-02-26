@@ -56,7 +56,6 @@ vi.mock("../../src/config", () => ({
     dateType: () => "Author Date",
     showUncommittedChanges: () => false,
     tabIconColourTheme: () => "colour",
-    autoCenterCommitDetailsView: () => false,
     dateFormat: () => "Date & Time",
     fetchAvatars: () => false,
     graphColours: () => ["#0085d9"],

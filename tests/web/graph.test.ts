@@ -58,7 +58,6 @@ import { Graph } from "../../web/graph";
 /* ------------------------------------------------------------------ */
 
 const DEFAULT_CONFIG: Config = {
-  autoCenterCommitDetailsView: false,
   fetchAvatars: false,
   graphColours: ["#0085d9", "#d9534f", "#428bca", "#5cb85c"],
   graphStyle: "rounded",

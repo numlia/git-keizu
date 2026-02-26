@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GitCommitDetails, GitCommitNode, GitCommitStash } from "../../src/types";
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
@@ -791,7 +791,6 @@ function setupViewState(): void {
   (globalThis as Record<string, unknown>).viewState = {
     repos: { [TEST_REPO]: { columnWidths: null } },
     lastActiveRepo: TEST_REPO,
-    autoCenterCommitDetailsView: false,
     dateFormat: "Date & Time",
     fetchAvatars: false,
     graphColours: ["#0085d9"],
@@ -892,6 +891,35 @@ function makeCommitDetails(hash: string): GitCommitDetails {
     body: "",
     fileChanges: []
   };
+}
+
+/**
+ * Mock table layout properties so calculateCdvHeight uses realistic values.
+ * jsdom returns 0 for all clientHeight; this sets:
+ *   #tableColHeaders.clientHeight = 30 → headerHeight = 31
+ *   <table>.clientHeight = 103 → grid.y = (103-31)/3 = 24
+ * Total CDV deduction from viewport: 31 (header) + 24 (commit row) = 55
+ */
+const CDV_HEIGHT_DEDUCTION = 55;
+
+function setupTableLayoutMocks(): void {
+  const headerElem = document.getElementById("tableColHeaders");
+  if (headerElem) {
+    Object.defineProperty(headerElem, "clientHeight", {
+      value: 30,
+      configurable: true
+    });
+  }
+  const tableDiv = document.getElementById("commitTable");
+  const tableBody = tableDiv?.querySelector("table");
+  if (tableBody) {
+    Object.defineProperty(tableBody, "clientHeight", {
+      value: 103,
+      configurable: true
+    });
+  }
+  // Trigger renderGraph to update grid.y with mocked values
+  window.dispatchEvent(new Event("resize"));
 }
 
 function expandCommit(hash: string): void {
@@ -1493,6 +1521,383 @@ describe("GitGraphView frontend integration", () => {
       // When: GitGraphView was constructed (in beforeAll)
       // Then: findWidget.restoreState was called during initialization
       expect(restoreStateCaptured).toBe(true);
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* calculateCdvHeight() — CDV height calculation (S7)               */
+  /* ---------------------------------------------------------------- */
+
+  describe("calculateCdvHeight()", () => {
+    const originalInnerHeight = window.innerHeight;
+
+    function setupControlsElement(height: number): void {
+      let controls = document.getElementById("controls");
+      if (!controls) {
+        controls = document.createElement("div");
+        controls.id = "controls";
+        document.body.appendChild(controls);
+      }
+      Object.defineProperty(controls, "clientHeight", {
+        value: height,
+        configurable: true
+      });
+    }
+
+    function removeControlsElement(): void {
+      document.getElementById("controls")?.remove();
+    }
+
+    afterEach(() => {
+      removeControlsElement();
+      vi.stubGlobal("innerHeight", originalInnerHeight);
+    });
+
+    beforeEach(() => {
+      setupTableLayoutMocks();
+    });
+
+    it("returns CDV_DEFAULT_HEIGHT when viewport is large (TC-050)", () => {
+      // Given: innerHeight=800, controlsHeight=50 → available=800-50-55=695
+      vi.stubGlobal("innerHeight", 800);
+      setupControlsElement(50);
+
+      // When: a commit is expanded (triggers calculateCdvHeight via showCommitDetails)
+      expandCommit(COMMIT_HASH_1);
+
+      // Then: CDV element height is 250px (CDV_DEFAULT_HEIGHT)
+      const cdvElem = document.getElementById("commitDetails");
+      expect(cdvElem).not.toBeNull();
+      expect(cdvElem!.style.height).toBe("250px");
+    });
+
+    it("returns CDV_DEFAULT_HEIGHT when available equals default (TC-051)", () => {
+      // Given: innerHeight=355, controlsHeight=50 → available=355-50-55=250 (boundary: == CDV_DEFAULT_HEIGHT)
+      vi.stubGlobal("innerHeight", 355);
+      setupControlsElement(50);
+
+      // When: a commit is expanded
+      expandCommit(COMMIT_HASH_1);
+
+      // Then: CDV element height is 250px (available exactly equals CDV_DEFAULT_HEIGHT)
+      const cdvElem = document.getElementById("commitDetails");
+      expect(cdvElem).not.toBeNull();
+      expect(cdvElem!.style.height).toBe("250px");
+    });
+
+    it("returns available height when one below default (TC-052)", () => {
+      // Given: innerHeight=354, controlsHeight=50 → available=354-50-55=249 (boundary: CDV_DEFAULT_HEIGHT - 1)
+      vi.stubGlobal("innerHeight", 354);
+      setupControlsElement(50);
+
+      // When: a commit is expanded
+      expandCommit(COMMIT_HASH_1);
+
+      // Then: CDV element height is 249px (available < CDV_DEFAULT_HEIGHT, not clamped)
+      const cdvElem = document.getElementById("commitDetails");
+      expect(cdvElem).not.toBeNull();
+      expect(cdvElem!.style.height).toBe("249px");
+    });
+
+    it("returns CDV_MIN_HEIGHT when available equals minimum (TC-053)", () => {
+      // Given: innerHeight=205, controlsHeight=50 → available=205-50-55=100 (boundary: == CDV_MIN_HEIGHT)
+      vi.stubGlobal("innerHeight", 205);
+      setupControlsElement(50);
+
+      // When: a commit is expanded
+      expandCommit(COMMIT_HASH_1);
+
+      // Then: CDV element height is 100px (available exactly equals CDV_MIN_HEIGHT)
+      const cdvElem = document.getElementById("commitDetails");
+      expect(cdvElem).not.toBeNull();
+      expect(cdvElem!.style.height).toBe("100px");
+    });
+
+    it("clamps to CDV_MIN_HEIGHT when available is below minimum (TC-054)", () => {
+      // Given: innerHeight=204, controlsHeight=50 → available=204-50-55=99 (boundary: CDV_MIN_HEIGHT - 1)
+      vi.stubGlobal("innerHeight", 204);
+      setupControlsElement(50);
+
+      // When: a commit is expanded
+      expandCommit(COMMIT_HASH_1);
+
+      // Then: CDV element height is 100px (clamped to CDV_MIN_HEIGHT)
+      const cdvElem = document.getElementById("commitDetails");
+      expect(cdvElem).not.toBeNull();
+      expect(cdvElem!.style.height).toBe("100px");
+    });
+
+    it("clamps to CDV_MIN_HEIGHT with zero viewport (TC-055)", () => {
+      // Given: innerHeight=0 → available is negative (-55)
+      vi.stubGlobal("innerHeight", 0);
+
+      // When: a commit is expanded
+      expandCommit(COMMIT_HASH_1);
+
+      // Then: CDV element height is 100px (clamped to CDV_MIN_HEIGHT)
+      const cdvElem = document.getElementById("commitDetails");
+      expect(cdvElem).not.toBeNull();
+      expect(cdvElem!.style.height).toBe("100px");
+    });
+
+    it("falls back to controlsHeight=0 when #controls element is missing (TC-056)", () => {
+      // Given: innerHeight=280, no #controls element → controlsHeight=0, available=280-0-55=225
+      vi.stubGlobal("innerHeight", 280);
+      removeControlsElement();
+
+      // When: a commit is expanded
+      expandCommit(COMMIT_HASH_1);
+
+      // Then: CDV element height is 225px (viewport - headerHeight - commitRowHeight, without controls)
+      const cdvElem = document.getElementById("commitDetails");
+      expect(cdvElem).not.toBeNull();
+      expect(cdvElem!.style.height).toBe("225px");
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* showCommitDetails() CDV height & scroll control (S8)             */
+  /* ---------------------------------------------------------------- */
+
+  describe("showCommitDetails() CDV height and scroll control", () => {
+    const CDV_SCROLL_PADDING = 8;
+    const CDV_DEFAULT_HEIGHT = 250;
+    const MOCK_COMMIT_ROW_HEIGHT = 24; // grid.y from setupTableLayoutMocks: (103-31)/3
+
+    const originalInnerHeight = window.innerHeight;
+    const origGetBCR = HTMLElement.prototype.getBoundingClientRect;
+    let scrollContainer: HTMLElement;
+
+    function setupControlsForScroll(height: number): void {
+      let controls = document.getElementById("controls");
+      if (!controls) {
+        controls = document.createElement("div");
+        controls.id = "controls";
+        document.body.appendChild(controls);
+      }
+      Object.defineProperty(controls, "clientHeight", {
+        value: height,
+        configurable: true
+      });
+    }
+
+    function setupScrollEnvironment(options: {
+      scrollTop: number;
+      clientHeight: number;
+      cdvOffsetTop: number;
+    }): void {
+      scrollContainer = document.getElementById("scrollContainer")!;
+      // Override scrollTop as simple getter/setter to bypass jsdom's scroll clamping
+      // (jsdom clamps scrollTop based on scrollHeight - clientHeight)
+      let mockScrollTop = options.scrollTop;
+      Object.defineProperty(scrollContainer, "scrollTop", {
+        get() {
+          return mockScrollTop;
+        },
+        set(value: number) {
+          mockScrollTop = value;
+        },
+        configurable: true
+      });
+      Object.defineProperty(scrollContainer, "clientHeight", {
+        value: options.clientHeight,
+        configurable: true
+      });
+      // Override offsetTop so the CDV element created inside showCommitDetails
+      // returns the controlled value instead of jsdom's default 0.
+      // Also handle srcElem (the clicked commit row, marked with commitDetailsOpen class)
+      // which sits directly above the CDV in the DOM.
+      Object.defineProperty(HTMLElement.prototype, "offsetTop", {
+        get() {
+          if (this.id === "commitDetails") return options.cdvOffsetTop;
+          if (this.classList?.contains("commitDetailsOpen"))
+            return options.cdvOffsetTop - MOCK_COMMIT_ROW_HEIGHT;
+          return 0;
+        },
+        configurable: true
+      });
+      // Mock getBoundingClientRect for CDV element so renderGraph reads correct expandY
+      // (jsdom returns 0 for all layout properties; renderGraph uses this to set config.grid.expandY)
+      HTMLElement.prototype.getBoundingClientRect = function () {
+        if (this.id === "commitDetails") {
+          const rect = origGetBCR.call(this);
+          return new DOMRect(rect.x, rect.y, rect.width, CDV_DEFAULT_HEIGHT);
+        }
+        return origGetBCR.call(this);
+      };
+      // Ensure calculateCdvHeight returns CDV_DEFAULT_HEIGHT (250)
+      vi.stubGlobal("innerHeight", 800);
+      setupControlsForScroll(50);
+    }
+
+    afterEach(() => {
+      // Remove instance-level scrollTop override to restore jsdom's native behavior
+      if (scrollContainer) {
+        delete (scrollContainer as Record<string, unknown>).scrollTop;
+      }
+      HTMLElement.prototype.getBoundingClientRect = origGetBCR;
+      Object.defineProperty(HTMLElement.prototype, "offsetTop", {
+        get() {
+          return 0;
+        },
+        configurable: true
+      });
+      document.getElementById("controls")?.remove();
+      vi.stubGlobal("innerHeight", originalInnerHeight);
+    });
+
+    it("does not change scrollTop when CDV is within viewport (TC-057)", () => {
+      // Given: CDV at offsetTop=100, viewport clientHeight=500, scrollTop=0
+      //   Top check: 100 - 8 = 92 < 0 → false (not above viewport)
+      //   Bottom check: 100 + 250 - 500 = -150 > 0 → false (not below viewport)
+      setupScrollEnvironment({ scrollTop: 0, clientHeight: 500, cdvOffsetTop: 100 });
+
+      // When: a commit is expanded (triggers showCommitDetails with scroll logic)
+      expandCommit(COMMIT_HASH_1);
+
+      // Then: scrollTop remains unchanged (CDV fully within viewport)
+      expect(scrollContainer.scrollTop).toBe(0);
+    });
+
+    it("scrolls up when CDV top is above viewport (TC-058)", () => {
+      // Given: CDV at offsetTop=100, scrollTop=200 (CDV top is above viewport)
+      //   Top check: 100 - 8 = 92 < 200 → true (above viewport)
+      setupScrollEnvironment({ scrollTop: 200, clientHeight: 500, cdvOffsetTop: 100 });
+
+      // When: a commit is expanded
+      expandCommit(COMMIT_HASH_1);
+
+      // Then: scrollTop = offsetTop - CDV_SCROLL_PADDING = 92
+      expect(scrollContainer.scrollTop).toBe(100 - CDV_SCROLL_PADDING);
+    });
+
+    it("scrolls down when CDV bottom exceeds viewport (TC-059)", () => {
+      // Given: CDV at offsetTop=400, expandY=250, viewHeight=500, scrollTop=100
+      //   Top check: 400 - 8 = 392 < 100 → false (not above viewport)
+      //   Bottom check: 400 + 250 - 500 = 150 > 100 → true (below viewport)
+      //   desiredScroll = 150, maxScroll = srcElem.offsetTop = 400 - 24 = 376
+      //   Math.min(150, 376) = 150
+      setupScrollEnvironment({ scrollTop: 100, clientHeight: 500, cdvOffsetTop: 400 });
+
+      // When: a commit is expanded
+      expandCommit(COMMIT_HASH_1);
+
+      // Then: scrollTop = offsetTop + expandY - viewHeight = 150
+      expect(scrollContainer.scrollTop).toBe(400 + CDV_DEFAULT_HEIGHT - 500);
+    });
+
+    it("applies calculateCdvHeight result to CDV element style.height (TC-060)", () => {
+      // Given: innerHeight=800, controlsHeight=50 → calculateCdvHeight returns 250
+      setupScrollEnvironment({ scrollTop: 0, clientHeight: 500, cdvOffsetTop: 100 });
+
+      // When: a commit is expanded
+      expandCommit(COMMIT_HASH_1);
+
+      // Then: CDV element style.height is set to calculateCdvHeight result
+      const cdvElem = document.getElementById("commitDetails");
+      expect(cdvElem).not.toBeNull();
+      expect(cdvElem!.style.height).toBe("250px");
+    });
+
+    it("executes renderGraph after CDV height is applied (TC-061)", () => {
+      // Given: standard scroll environment
+      setupScrollEnvironment({ scrollTop: 0, clientHeight: 500, cdvOffsetTop: 100 });
+
+      // When: a commit is expanded
+      expandCommit(COMMIT_HASH_1);
+
+      // Then: CDV height is set AND scroll logic executed
+      //   (source code order: style.height → renderGraph() → scroll logic)
+      const cdvElem = document.getElementById("commitDetails");
+      expect(cdvElem).not.toBeNull();
+      expect(cdvElem!.style.height).toBe("250px");
+      // Scroll logic runs after renderGraph; successful execution proves renderGraph completed
+      expect(scrollContainer.scrollTop).toBe(0);
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* updateCommitDetailsHeight() resize (S9)                          */
+  /* ---------------------------------------------------------------- */
+
+  describe("updateCommitDetailsHeight() resize", () => {
+    const originalInnerHeight = window.innerHeight;
+    const originalOuterWidth = window.outerWidth;
+    const originalOuterHeight = window.outerHeight;
+
+    function setupControlsForResize(height: number): void {
+      let controls = document.getElementById("controls");
+      if (!controls) {
+        controls = document.createElement("div");
+        controls.id = "controls";
+        document.body.appendChild(controls);
+      }
+      Object.defineProperty(controls, "clientHeight", {
+        value: height,
+        configurable: true
+      });
+    }
+
+    afterEach(() => {
+      document.getElementById("controls")?.remove();
+      vi.stubGlobal("innerHeight", originalInnerHeight);
+      vi.stubGlobal("outerWidth", originalOuterWidth);
+      vi.stubGlobal("outerHeight", originalOuterHeight);
+    });
+
+    beforeEach(() => {
+      setupTableLayoutMocks();
+    });
+
+    it("does not affect CDV when no commit is expanded on resize (TC-063)", () => {
+      // Given: no commit expanded (no CDV visible)
+
+      // When: resize event fires
+      window.dispatchEvent(new Event("resize"));
+
+      // Then: no CDV element exists (no height change possible)
+      const cdv = document.getElementById("commitDetails");
+      expect(cdv).toBeNull();
+    });
+
+    it("recalculates CDV height on inner resize when CDV is visible (TC-064)", () => {
+      // Given: CDV visible with innerHeight=800, controlsHeight=50 → height=250px
+      vi.stubGlobal("innerHeight", 800);
+      setupControlsForResize(50);
+      expandCommit(COMMIT_HASH_1);
+      const cdvBefore = document.getElementById("commitDetails");
+      expect(cdvBefore).not.toBeNull();
+      expect(cdvBefore!.style.height).toBe("250px");
+
+      // When: inner viewport shrinks (outer dimensions unchanged) and resize fires
+      vi.stubGlobal("innerHeight", 250);
+      window.dispatchEvent(new Event("resize"));
+
+      // Then: CDV height is recalculated (250 - 50 - 55 = 145px)
+      const cdvAfter = document.getElementById("commitDetails");
+      expect(cdvAfter).not.toBeNull();
+      expect(cdvAfter!.style.height).toBe("145px");
+    });
+
+    it("recalculates CDV height on outer resize when CDV is visible (TC-062)", () => {
+      // Given: CDV visible with innerHeight=800, controlsHeight=50 → height=250px
+      vi.stubGlobal("innerHeight", 800);
+      setupControlsForResize(50);
+      expandCommit(COMMIT_HASH_1);
+      const cdvBefore = document.getElementById("commitDetails");
+      expect(cdvBefore).not.toBeNull();
+      expect(cdvBefore!.style.height).toBe("250px");
+
+      // When: window outer dimensions change and resize event fires
+      vi.stubGlobal("innerHeight", 250);
+      vi.stubGlobal("outerWidth", 1920);
+      vi.stubGlobal("outerHeight", 1080);
+      window.dispatchEvent(new Event("resize"));
+
+      // Then: CDV height is recalculated (250 - 50 - 55 = 145px)
+      const cdvAfter = document.getElementById("commitDetails");
+      expect(cdvAfter).not.toBeNull();
+      expect(cdvAfter!.style.height).toBe("145px");
     });
   });
 });

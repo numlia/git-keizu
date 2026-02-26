@@ -41,9 +41,9 @@ describe("handleMessage pull response", () => {
     // When: handleMessage is called with the success response
     handleMessage(msg, gitGraph);
 
-    // Then: gitGraph.refresh(true) is called for a hard refresh
+    // Then: gitGraph.refresh(false) is called for a soft refresh
     expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
-    expect(gitGraph.refresh).toHaveBeenCalledWith(true);
+    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -58,6 +58,42 @@ describe("handleMessage pull response", () => {
     // Then: showErrorDialog is called with "Unable to Pull" and the git error message
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith("Unable to Pull", errorMsg, null);
+    expect(gitGraph.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("refreshOrError soft refresh argument (S2)", () => {
+  let gitGraph: GitGraphViewAPI;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitGraph = createMockGitGraphView();
+  });
+
+  it("calls refresh(false) for soft refresh on deleteBranch success (TC-005)", () => {
+    // Given: A deleteBranch success response (status = null) routed through refreshOrError
+    const msg: ResponseMessage = { command: "deleteBranch", status: null };
+
+    // When: handleMessage is called with the success response
+    handleMessage(msg, gitGraph);
+
+    // Then: gitGraph.refresh(false) is called (hard=false means soft refresh)
+    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
+    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    expect(showErrorDialog).not.toHaveBeenCalled();
+  });
+
+  it("shows error dialog and skips refresh on deleteBranch failure (TC-006)", () => {
+    // Given: A deleteBranch error response (status = error message string)
+    const errorMsg = "error: branch 'feature' not found.";
+    const msg: ResponseMessage = { command: "deleteBranch", status: errorMsg };
+
+    // When: handleMessage is called with the error response
+    handleMessage(msg, gitGraph);
+
+    // Then: showErrorDialog is called and refresh is NOT called
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Delete Branch", errorMsg, null);
     expect(gitGraph.refresh).not.toHaveBeenCalled();
   });
 });
@@ -77,9 +113,9 @@ describe("handleMessage push response", () => {
     // When: handleMessage is called with the success response
     handleMessage(msg, gitGraph);
 
-    // Then: gitGraph.refresh(true) is called for a hard refresh
+    // Then: gitGraph.refresh(false) is called for a soft refresh
     expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
-    expect(gitGraph.refresh).toHaveBeenCalledWith(true);
+    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
