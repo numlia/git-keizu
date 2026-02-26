@@ -55,6 +55,18 @@ After:  [main | origin]
 
 The remote name appears in italics after a separator. Right-clicking either part of the pill opens the appropriate context menu (local branch actions or remote branch actions). Double-clicking the remote part opens the checkout dialog.
 
+### Smooth refresh after Git operations
+
+Git actions (Delete Branch, Fetch, Push, Merge, Rebase, Cherry-pick, Reset, and more) now use a **soft refresh**: the current commit table stays on screen while new data loads in the background. The view no longer flashes blank between operations, and your scroll position is preserved.
+
+### Dynamic commit details panel height
+
+The commit details panel height is calculated from the available viewport space instead of being fixed at 250px. The panel expands up to a comfortable default size and shrinks gracefully in narrow panels, with a minimum height to keep content readable. The height also adjusts automatically when the VS Code panel is resized.
+
+### Minimal-scroll commit details panel
+
+When you click a commit to open its details, the view only scrolls if the panel would extend outside the visible area — it no longer auto-centers on every click. If scrolling is needed, only the minimum amount to bring the panel into view is applied. The `autoCenterCommitDetailsView` setting has been removed in favor of this improved behavior.
+
 ### Security hardening
 
 Git Keizu has undergone a full security audit and remediation (27 issues fixed):

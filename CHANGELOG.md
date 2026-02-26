@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-02-26
+
+### Changed
+
+- **Smooth refresh after Git operations**: Branch deletions, fetches, pushes, merges, tags, resets, cherry-picks, and other Git actions now use a soft refresh — the commit table stays visible while new data loads in the background, eliminating the screen flash on every operation and preserving scroll position
+- **Commit details panel height**: The panel height is now calculated dynamically from the available viewport space instead of being fixed at 250px; the height adjusts automatically when the VS Code panel is resized
+- **Commit details scroll behavior**: When opening a commit's detail panel, the view only scrolls if the panel would extend outside the visible area, keeping your reading position stable; when scrolling is needed, only the minimum displacement to bring the panel into view is applied
+
+### Removed
+
+- **`git-keizu.autoCenterCommitDetailsView` setting**: Removed — the new scroll behavior (scroll only when the panel extends outside the viewport) replaces the old auto-center option
+
 ## [0.2.2] - 2026-02-25
 
 ### Added
@@ -71,7 +83,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/numlia/git-keizu/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/numlia/git-keizu/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/numlia/git-keizu/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/numlia/git-keizu/compare/v0.1.0...v0.2.0
