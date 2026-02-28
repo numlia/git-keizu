@@ -22,7 +22,8 @@ function createMockGitGraphView(): GitGraphViewAPI {
     loadBranches: vi.fn(),
     loadCommits: vi.fn(),
     loadRepos: vi.fn(),
-    refresh: vi.fn()
+    refresh: vi.fn(),
+    selectRepo: vi.fn()
   };
 }
 
@@ -131,5 +132,35 @@ describe("handleMessage push response", () => {
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith("Unable to Push", errorMsg, null);
     expect(gitGraph.refresh).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleMessage selectRepo response (S3)", () => {
+  let gitGraph: GitGraphViewAPI;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitGraph = createMockGitGraphView();
+  });
+
+  it("routes selectRepo message to gitGraph.selectRepo with repo path (TC-007)", () => {
+    // Given: A selectRepo response with a repo path
+    const msg: ResponseMessage = { command: "selectRepo", repo: "/path/to/repo" };
+
+    // When: handleMessage is called with the selectRepo response
+    handleMessage(msg, gitGraph);
+
+    // Then: gitGraph.selectRepo is called with the repo path
+    expect(gitGraph.selectRepo).toHaveBeenCalledTimes(1);
+    expect(gitGraph.selectRepo).toHaveBeenCalledWith("/path/to/repo");
+  });
+
+  it("completes without error on selectRepo message (TC-008)", () => {
+    // Given: A selectRepo response message
+    const msg: ResponseMessage = { command: "selectRepo", repo: "/some/other/repo" };
+
+    // When/Then: handleMessage processes without throwing
+    expect(() => handleMessage(msg, gitGraph)).not.toThrow();
+    expect(gitGraph.selectRepo).toHaveBeenCalledTimes(1);
   });
 });

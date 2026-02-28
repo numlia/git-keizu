@@ -61,7 +61,12 @@ vi.mock("../../src/config", () => ({
     graphColours: () => ["#0085d9"],
     graphStyle: () => "rounded",
     initialLoadCommits: () => 300,
+    keyboardShortcutFind: () => "f",
+    keyboardShortcutRefresh: () => "r",
+    keyboardShortcutScrollToHead: () => "h",
+    keyboardShortcutScrollToStash: () => "s",
     loadMoreCommits: () => 100,
+    loadMoreCommitsAutomatically: () => true,
     showCurrentBranchByDefault: () => false
   }))
 }));
@@ -84,8 +89,11 @@ vi.mock("../../src/diffDocProvider", () => ({
 
 vi.mock("../../src/utils", () => ({
   abbrevCommit: vi.fn((h: string) => h.substring(0, 8)),
-  copyToClipboard: vi.fn()
+  copyToClipboard: vi.fn(),
+  getPathFromUri: vi.fn((uri: { fsPath: string }) => uri.fsPath)
 }));
+
+import * as vscode from "vscode";
 
 import type { AvatarManager } from "../../src/avatarManager";
 import type { DataSource } from "../../src/dataSource";
@@ -648,5 +656,270 @@ describe("GitGraphView pull/push message routing", () => {
       command: "push",
       status: null
     });
+  });
+});
+
+describe("GitGraphView createOrShow rootUri handling (S6)", () => {
+  const SCM_REPO = "/scm/repo/path";
+  let mockSetLastActiveRepo: ReturnType<typeof vi.fn>;
+  let mockRegisterRepoFromUri: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitGraphView.currentPanel = undefined;
+
+    mockSetLastActiveRepo = vi.fn();
+    mockRegisterRepoFromUri = vi.fn().mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    GitGraphView.currentPanel?.dispose();
+    GitGraphView.currentPanel = undefined;
+  });
+
+  function createDeps(reposMap: Record<string, unknown> = { [TEST_REPO]: "Test Repo" }) {
+    mocks.getRepos.mockReturnValue(reposMap);
+
+    const mockDataSource = {
+      applyStash: mocks.applyStash,
+      popStash: mocks.popStash,
+      dropStash: mocks.dropStash,
+      branchFromStash: mocks.branchFromStash,
+      pushStash: mocks.pushStash,
+      resetUncommitted: mocks.resetUncommitted,
+      cleanUntrackedFiles: mocks.cleanUntrackedFiles,
+      getCommitComparison: mocks.getCommitComparison
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: mockSetLastActiveRepo
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn(),
+      registerRepoFromUri: mockRegisterRepoFromUri
+    } as unknown as RepoManager;
+
+    return { mockDataSource, mockExtensionState, mockAvatarManager, mockRepoManager };
+  }
+
+  it("sets lastActiveRepo from rootUri.fsPath when panel is new (TC-015)", () => {
+    // Given: No existing panel, rootUri is specified
+    const deps = createDeps();
+    const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
+
+    // When: createOrShow is called with rootUri (first time, creates panel)
+    GitGraphView.createOrShow(
+      "/test/extension",
+      deps.mockDataSource,
+      deps.mockExtensionState,
+      deps.mockAvatarManager,
+      deps.mockRepoManager,
+      rootUri
+    );
+
+    // Then: setLastActiveRepo is called with rootUri.fsPath
+    expect(mockSetLastActiveRepo).toHaveBeenCalledTimes(1);
+    expect(mockSetLastActiveRepo).toHaveBeenCalledWith(SCM_REPO);
+  });
+
+  it("sends ResponseSelectRepo when panel exists and repo is registered (TC-016)", () => {
+    // Given: Panel already exists, SCM_REPO is in registered repos
+    const deps = createDeps({ [TEST_REPO]: "Test Repo", [SCM_REPO]: "SCM Repo" });
+    GitGraphView.createOrShow(
+      "/test/extension",
+      deps.mockDataSource,
+      deps.mockExtensionState,
+      deps.mockAvatarManager,
+      deps.mockRepoManager
+    );
+    vi.clearAllMocks();
+
+    // When: createOrShow is called again with rootUri for a registered repo
+    const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
+    GitGraphView.createOrShow(
+      "/test/extension",
+      deps.mockDataSource,
+      deps.mockExtensionState,
+      deps.mockAvatarManager,
+      deps.mockRepoManager,
+      rootUri
+    );
+
+    // Then: ResponseSelectRepo is sent with the repo path (no registerRepoFromUri)
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "selectRepo",
+      repo: SCM_REPO
+    });
+    expect(mockRegisterRepoFromUri).not.toHaveBeenCalled();
+  });
+
+  it("calls registerRepoFromUri then sends selectRepo when repo is unregistered (TC-017)", async () => {
+    // Given: Panel already exists, SCM_REPO is NOT in registered repos
+    const deps = createDeps({ [TEST_REPO]: "Test Repo" });
+    GitGraphView.createOrShow(
+      "/test/extension",
+      deps.mockDataSource,
+      deps.mockExtensionState,
+      deps.mockAvatarManager,
+      deps.mockRepoManager
+    );
+    vi.clearAllMocks();
+
+    // When: createOrShow is called with rootUri for unregistered repo
+    const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
+    GitGraphView.createOrShow(
+      "/test/extension",
+      deps.mockDataSource,
+      deps.mockExtensionState,
+      deps.mockAvatarManager,
+      deps.mockRepoManager,
+      rootUri
+    );
+    // Wait for async registerRepoFromUri to complete
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Then: registerRepoFromUri is called with rootUri
+    expect(mockRegisterRepoFromUri).toHaveBeenCalledTimes(1);
+    expect(mockRegisterRepoFromUri).toHaveBeenCalledWith(rootUri);
+    // And: ResponseSelectRepo is sent with the repo path
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "selectRepo",
+      repo: SCM_REPO
+    });
+  });
+
+  it("does not send selectRepo when rootUri is not specified (TC-018)", () => {
+    // Given: Panel already exists
+    const deps = createDeps();
+    GitGraphView.createOrShow(
+      "/test/extension",
+      deps.mockDataSource,
+      deps.mockExtensionState,
+      deps.mockAvatarManager,
+      deps.mockRepoManager
+    );
+    vi.clearAllMocks();
+
+    // When: createOrShow is called without rootUri (command palette)
+    GitGraphView.createOrShow(
+      "/test/extension",
+      deps.mockDataSource,
+      deps.mockExtensionState,
+      deps.mockAvatarManager,
+      deps.mockRepoManager
+    );
+
+    // Then: no selectRepo message is sent
+    const selectRepoCalls = mocks.postMessage.mock.calls.filter(
+      (call: unknown[]) => (call[0] as Record<string, unknown>).command === "selectRepo"
+    );
+    expect(selectRepoCalls).toHaveLength(0);
+  });
+});
+
+describe("GitGraphView viewState keybindings and loadMoreCommitsAutomatically (S7)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitGraphView.currentPanel = undefined;
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+  });
+
+  afterEach(() => {
+    GitGraphView.currentPanel?.dispose();
+    GitGraphView.currentPanel = undefined;
+  });
+
+  function createPanel(): void {
+    const mockDataSource = {
+      applyStash: mocks.applyStash,
+      popStash: mocks.popStash,
+      dropStash: mocks.dropStash,
+      branchFromStash: mocks.branchFromStash,
+      pushStash: mocks.pushStash,
+      resetUncommitted: mocks.resetUncommitted,
+      cleanUntrackedFiles: mocks.cleanUntrackedFiles,
+      getCommitComparison: mocks.getCommitComparison
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitGraphView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  }
+
+  function getPanelHtml(): string {
+    const panelMock = vi.mocked(vscode.window.createWebviewPanel).mock.results[0].value as {
+      webview: { html: string };
+    };
+    return panelMock.webview.html;
+  }
+
+  function parseViewState(html: string): Record<string, unknown> {
+    const match = html.match(/var viewState = (.+?);/);
+    expect(match).not.toBeNull();
+    return JSON.parse(match![1]);
+  }
+
+  it("includes keybindings object in viewState (TC-019)", async () => {
+    // Given: config returns keybinding values (f, r, h, s)
+    // When: panel is created
+    createPanel();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Then: viewState in HTML contains keybindings from config
+    const viewState = parseViewState(getPanelHtml());
+    expect(viewState.keybindings).toEqual({
+      find: "f",
+      refresh: "r",
+      scrollToHead: "h",
+      scrollToStash: "s"
+    });
+  });
+
+  it("includes loadMoreCommitsAutomatically in viewState (TC-020)", async () => {
+    // Given: config returns loadMoreCommitsAutomatically = true
+    // When: panel is created
+    createPanel();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Then: viewState in HTML contains loadMoreCommitsAutomatically
+    const viewState = parseViewState(getPanelHtml());
+    expect(viewState.loadMoreCommitsAutomatically).toBe(true);
   });
 });
