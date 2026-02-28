@@ -23,6 +23,7 @@ export interface GitGraphViewAPI {
   ): void;
   loadRepos(repos: GitRepoSet, lastActiveRepo: string | null): void;
   refresh(hard: boolean): void;
+  selectRepo(repo: string): void;
 }
 
 export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void {
@@ -132,6 +133,9 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
       break;
     case "revertCommit":
       refreshOrError(gitGraph, msg.status, "Unable to Revert Commit");
+      break;
+    case "selectRepo":
+      gitGraph.selectRepo(msg.repo);
       break;
     case "viewDiff":
       if (msg.success === false) showErrorDialog("Unable to view diff of file", null, null);

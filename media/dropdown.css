@@ -21,6 +21,12 @@
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  max-width: 30vw;
+}
+body.singleRepo .dropdownCurrentValue {
+  max-width: 40vw;
 }
 .dropdownCurrentValue:hover {
   background-color: rgba(128, 128, 128, 0.2);
@@ -61,6 +67,8 @@
   cursor: pointer;
   padding: 4px 10px;
   user-select: none;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 .dropdownOptions.showInfo .dropdownOption {
   padding-right: 30px;

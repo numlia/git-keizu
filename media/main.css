@@ -9,6 +9,9 @@ body {
 body.unableToLoad {
   margin: 0 20px;
 }
+body.singleRepo #repoControl {
+  display: none;
+}
 body.unableToLoad h2,
 body.unableToLoad p {
   text-align: center;
