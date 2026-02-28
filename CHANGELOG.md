@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-02-28
+
+### Added
+
+- **SCM panel button**: A "View Git Graph" button now appears in the VS Code Source Control panel title bar; clicking it opens the graph and automatically selects the repository associated with the SCM provider. The button position can be set to Inline (title bar) or More Actions (`...` menu) via `git-keizu.sourceCodeProviderIntegrationLocation`
+- **Keyboard shortcuts**: Four configurable shortcuts are now available — Find (Ctrl/Cmd+F), Refresh (Ctrl/Cmd+R), Scroll to HEAD (Ctrl/Cmd+H), and Scroll to Stash (Ctrl/Cmd+S); Shift+Stash shortcut moves to the previous stash. Each key can be rebound to any Ctrl/Cmd+letter combination or disabled via `git-keizu.keyboardShortcut.*` settings
+- **Escape key staged dismissal**: Pressing Escape closes UI components one at a time in priority order — context menu → dialog → dropdown → find widget → commit details panel — so a single keypress always leaves you at the right state
+- **Auto load more commits**: Additional commits load automatically when scrolling near the bottom of the commit list; can be disabled via the `git-keizu.loadMoreCommitsAutomatically` setting (default: enabled)
+- **Dropdown overflow handling**: Branch and repository dropdowns are capped at 30% of the viewport width (multi-repo) or 40% (single-repo); names that exceed the width are truncated with an ellipsis and shown in full on hover
+
 ## [0.2.3] - 2026-02-26
 
 ### Changed
@@ -83,7 +93,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.4...HEAD
+[0.2.4]: https://github.com/numlia/git-keizu/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/numlia/git-keizu/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/numlia/git-keizu/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/numlia/git-keizu/compare/v0.2.0...v0.2.1

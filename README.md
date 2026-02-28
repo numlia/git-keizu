@@ -26,10 +26,14 @@ Git Keizu is a personal take on a git history viewer — shaped around the featu
 - **Uncommitted Changes Actions**: Right-click the Uncommitted Changes row to stash, reset (Mixed/Hard), or clean untracked files
 - **Pull/Push for current branch**: Right-click the currently checked-out branch to run `git pull` or `git push` directly from the graph
 - **Fetch with automatic prune**: The Fetch button runs `git fetch --prune` — stale remote-tracking references are cleaned up automatically on every fetch
+- **SCM Panel Button**: Open the Git Keizu graph directly from the VS Code Source Control panel title bar; the repository is selected automatically based on the active SCM provider. Button position (Inline or More Actions menu) is configurable
+- **Keyboard Shortcuts**: Configurable shortcuts for Find (Ctrl/Cmd+F), Refresh (Ctrl/Cmd+R), Scroll to HEAD (Ctrl/Cmd+H), and Scroll to Stash (Ctrl/Cmd+S, Shift to go backward); each can be rebound or disabled in settings
 - **Commit Search**: Press Ctrl/Cmd+F to open a search bar with regex mode, case-sensitive mode, match counter (N of M), and prev/next navigation
 - **2-Commit Comparison**: Ctrl/Cmd+click a second commit to compare it with the selected commit side-by-side
 - **Combined branch/remote labels**: Local and remote branches on the same commit merge into a single pill label — `[main | origin]`. Right-clicking either part opens the appropriate context menu.
 - **Smooth refresh**: Git operations update the graph in the background without blanking the view or losing your scroll position
+- **Auto load more commits**: Commits load automatically as you scroll to the bottom of the list — no manual button press needed (configurable)
+- **Dropdown overflow handling**: Long branch and repository names are truncated with an ellipsis; hover to see the full name in a tooltip
 - **Avatar Support**: Optionally fetch commit author avatars from GitHub, GitLab, or Gravatar
 - **Multi-Repository**: Support for multiple Git repositories in one workspace
 - **Configurable**: Customize graph colors, style, date format, and more
