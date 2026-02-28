@@ -155,3 +155,93 @@
 | TC-062  | CDV表示中 + resize イベント (outer dimensions change) | Equivalence - normal                 | CDV高さ再計算・style.height 更新、renderGraph() 呼び出し | -                             |
 | TC-063  | CDV非表示 + resize イベント                           | Equivalence - no CDV                 | CDV高さ変更なし、既存動作維持                            | expandedCommit === null       |
 | TC-064  | CDV表示中 + 内部リサイズ (outer unchanged)            | Equivalence - inner resize           | CDV高さ再計算・更新（パネル幅変更に対応）                | 既存renderGraph動作 + CDV更新 |
+
+## S10: handleKeyboardShortcut() ショートカットキーマッチング
+
+> Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-02-27
+
+**シグネチャ**: `handleKeyboardShortcut(e: KeyboardEvent): void`
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                              | Perspective (Equivalence / Boundary)  | Expected Result                                               | Notes                  |
+| ------- | ------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------- | ---------------------- |
+| TC-065  | Ctrl+F (config find="f")                          | Equivalence - normal                  | findWidget.show(true) が呼ばれる                              | Find アクション        |
+| TC-066  | Cmd+F (metaKey=true, config find="f")             | Equivalence - normal (macOS)          | findWidget.show(true) が呼ばれる                              | macOS対応              |
+| TC-067  | Ctrl+R (config refresh="r")                       | Equivalence - normal                  | refresh(true) が呼ばれる                                      | Refresh アクション     |
+| TC-068  | Ctrl+H (config scrollToHead="h"), commitHead 存在 | Equivalence - normal                  | scrollToCommit(commitHead, true, true) が呼ばれる             | HEAD スクロール        |
+| TC-069  | Ctrl+H, commitHead が null                        | Boundary - no HEAD                    | 何も起きない                                                  | HEAD 不在時            |
+| TC-070  | キー押下（Ctrl/Cmd なし）                         | Equivalence - abnormal (no modifier)  | 何も起きない                                                  | 修飾キーなし           |
+| TC-071  | Ctrl + 設定に存在しないキー                       | Equivalence - abnormal (unmapped key) | 何も起きない                                                  | マッチなし             |
+| TC-072  | isComposing=true の状態でCtrl+F                   | Boundary - IME composing              | 何も起きない                                                  | IME入力中は無視        |
+| TC-073  | Shift+Ctrl+F (Shift修飾あり)                      | Equivalence - normal (with shift)     | e.key を toLowerCase して "f" にマッチ、findWidget.show(true) | Shift時の大文字対応    |
+| TC-074  | Ctrl+F だが find 設定が null (UNASSIGNED)         | Boundary - disabled shortcut          | 何も起きない                                                  | ショートカット無効化時 |
+
+## S11: scrollToStash() スタッシュナビゲーション
+
+> Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-02-27
+
+**シグネチャ**: `scrollToStash(forward: boolean): void`
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                              | Perspective (Equivalence / Boundary)     | Expected Result                                 | Notes                       |
+| ------- | ------------------------------------------------- | ---------------------------------------- | ----------------------------------------------- | --------------------------- |
+| TC-075  | forward=true, stash 3件, index=-1 (初期)          | Equivalence - normal (first nav)         | 最初の stash (index 0) にスクロール、フラッシュ | index=-1 → 0                |
+| TC-076  | forward=true, stash 3件, index=0                  | Equivalence - normal                     | 次の stash (index 1) にスクロール               | 前方移動                    |
+| TC-077  | forward=true, stash 3件, index=2 (末尾)           | Boundary - wrap forward                  | 最初の stash (index 0) に循環移動               | 末尾 → 先頭                 |
+| TC-078  | forward=false (Shift), stash 3件, index=-1 (初期) | Equivalence - normal (reverse first nav) | 最後の stash (index 2) にスクロール             | 逆方向初期                  |
+| TC-079  | forward=false, stash 3件, index=0 (先頭)          | Boundary - wrap backward                 | 最後の stash (index 2) に循環移動               | 先頭 → 末尾                 |
+| TC-080  | stash コミットが 0 件                             | Boundary - no stashes                    | 何も起きない（サイレント）                      | stash 不在                  |
+| TC-081  | stash 操作後、5秒タイムアウト経過                 | Boundary - timeout reset                 | stashNavigationIndex が -1 にリセットされる     | STASH_NAVIGATION_TIMEOUT_MS |
+| TC-082  | stash 1件のみ, forward=true                       | Boundary - single stash                  | 同じ stash にスクロール（循環）                 | index 0 → 0                 |
+
+## S12: handleEscape() 段階的UI解除チェーン
+
+> Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-02-27
+
+**シグネチャ**: `handleEscape(): void`
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                        | Perspective (Equivalence / Boundary)     | Expected Result                                   | Notes          |
+| ------- | ----------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------- | -------------- |
+| TC-083  | コンテキストメニュー表示中                                  | Equivalence - normal (priority 1)        | hideContextMenu() のみ呼ばれる                    | 最高優先       |
+| TC-084  | ダイアログ表示中（コンテキストメニューなし）                | Equivalence - normal (priority 2)        | hideDialog() のみ呼ばれる                         | -              |
+| TC-085  | repoDropdown 展開中（メニュー/ダイアログなし）              | Equivalence - normal (priority 3)        | repoDropdown.close() のみ呼ばれる                 | -              |
+| TC-086  | branchDropdown 展開中（repoDropdown 閉じ）                  | Equivalence - normal (priority 3 alt)    | branchDropdown.close() のみ呼ばれる               | repo→branch 順 |
+| TC-087  | 両方のドロップダウン展開中                                  | Equivalence - normal (both open)         | repoDropdown.close() のみ呼ばれる（先にチェック） | repo 優先      |
+| TC-088  | FindWidget 表示中（メニュー/ダイアログ/ドロップダウンなし） | Equivalence - normal (priority 4)        | findWidget.close() のみ呼ばれる                   | -              |
+| TC-089  | コミット詳細展開中（他すべて閉じ）                          | Equivalence - normal (priority 5)        | hideCommitDetails() のみ呼ばれる                  | 最低優先       |
+| TC-090  | 全UIコンポーネントが閉じている                              | Boundary - nothing active                | 何も起きない                                      | -              |
+| TC-091  | コンテキストメニュー閉じ後に再度Escape                      | Equivalence - normal (chain progression) | 次の優先のコンポーネントが閉じる                  | 連続Escape     |
+
+## S13: 自動読み込み（observeWebviewScroll 拡張）
+
+> Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-02-27
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                                                        | Perspective (Equivalence / Boundary)     | Expected Result                                                                       | Notes              |
+| ------- | ------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------------------------------------------- | ------------------ |
+| TC-092  | scrollTop+clientHeight >= scrollHeight-25, config=true, moreAvailable=true, isLoading=false | Equivalence - normal                     | 読み込み発火: isLoadingMoreCommits=true, maxCommits 増加, requestLoadCommits 呼び出し | 全ガード条件充足   |
+| TC-093  | config.loadMoreCommitsAutomatically=false                                                   | Equivalence - abnormal (config disabled) | 自動読み込みが発火しない                                                              | 設定無効時         |
+| TC-094  | moreCommitsAvailable=false                                                                  | Boundary - no more commits               | 自動読み込みが発火しない                                                              | 全コミット取得済み |
+| TC-095  | isLoadingMoreCommits=true (読み込み中)                                                      | Boundary - already loading               | 自動読み込みが発火しない（二重発火防止）                                              | ガード条件         |
+| TC-096  | スクロール位置が末尾から26px以上離れている                                                  | Boundary - threshold not met             | 自動読み込みが発火しない                                                              | 閾値未達           |
+| TC-097  | スクロール位置が末尾からちょうど25px                                                        | Boundary - exact threshold               | 自動読み込みが発火する                                                                | 境界値一致         |
+| TC-098  | 読み込み完了コールバック実行                                                                | Equivalence - normal (completion)        | isLoadingMoreCommits が false にリセットされる                                        | 状態復帰           |
+
+## S14: selectRepo() リポジトリ選択
+
+> Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-02-27
+
+**シグネチャ**: `selectRepo(repo: string): void`
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition          | Perspective (Equivalence / Boundary) | Expected Result                                             | Notes          |
+| ------- | ----------------------------- | ------------------------------------ | ----------------------------------------------------------- | -------------- |
+| TC-099  | repo が gitRepos に存在する   | Equivalence - normal                 | currentRepo 設定、repoDropdown 更新、refresh(true) 呼び出し | 正常選択       |
+| TC-100  | repo が gitRepos に存在しない | Boundary - unknown repo              | 何も起きない（サイレント）                                  | 不明リポジトリ |

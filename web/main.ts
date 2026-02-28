@@ -41,6 +41,9 @@ const CDV_DEFAULT_HEIGHT = 250;
 const CDV_MIN_HEIGHT = 100;
 const CDV_SCROLL_PADDING = 8;
 
+const STASH_NAVIGATION_TIMEOUT_MS = 5000;
+const SCROLL_AUTO_LOAD_THRESHOLD = 25;
+
 class GitGraphView {
   private gitRepos: GG.GitRepoSet;
   private gitBranches: string[] = [];
@@ -70,6 +73,10 @@ class GitGraphView {
 
   private loadBranchesCallback: ((changes: boolean, isRepo: boolean) => void) | null = null;
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
+
+  private stashNavigationIndex: number = -1;
+  private stashNavigationTimer: ReturnType<typeof setTimeout> | null = null;
+  private isLoadingMoreCommits: boolean = false;
 
   constructor(
     repos: GG.GitRepoSet,
@@ -148,12 +155,7 @@ class GitGraphView {
         this.expandedCommit.hash === hash &&
         this.expandedCommit.compareWithHash === compareWithHash
     });
-    document.addEventListener("keydown", (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "f") {
-        e.preventDefault();
-        this.findWidget.show(true);
-      }
-    });
+    document.addEventListener("keydown", (e) => this.handleKeyboardShortcut(e));
     this.observeWindowSizeChanges();
     this.observeWebviewStyleChanges();
     this.observeWebviewScroll();
@@ -207,13 +209,27 @@ class GitGraphView {
       repoComps = repoPaths[i].split("/");
       options.push({ name: repoComps[repoComps.length - 1], value: repoPaths[i] });
     }
-    document.getElementById("repoControl")!.style.display =
-      repoPaths.length > 1 ? "inline" : "none";
+    document.body.classList.toggle("singleRepo", repoPaths.length <= 1);
     this.repoDropdown.setOptions(options, this.currentRepo);
 
     if (changedRepo) {
       this.refresh(true);
     }
+  }
+
+  public selectRepo(repo: string) {
+    if (this.gitRepos[repo] === undefined) {
+      return;
+    }
+
+    this.currentRepo = repo;
+    const repoPaths = Object.keys(this.gitRepos);
+    const options = repoPaths.map((path) => {
+      const comps = path.split("/");
+      return { name: comps[comps.length - 1], value: path };
+    });
+    this.repoDropdown.setOptions(options, this.currentRepo);
+    this.refresh(true);
   }
 
   public loadBranches(
@@ -395,9 +411,10 @@ class GitGraphView {
   private requestLoadBranchesAndCommits(hard: boolean) {
     this.requestLoadBranches(hard, (branchChanges: boolean, isRepo: boolean) => {
       if (isRepo) {
-        this.requestLoadCommits(hard, (commitChanges: boolean) => {
+        this.requestLoadCommits(hard || branchChanges, (commitChanges: boolean) => {
           if (!hard && (branchChanges || commitChanges)) {
-            hideDialogAndContextMenu();
+            if (isDialogActive()) hideDialog();
+            if (isContextMenuActive()) hideContextMenu();
           }
         });
       } else {
@@ -483,6 +500,7 @@ class GitGraphView {
     this.graph.render(this.expandedCommit);
   }
   private renderTable() {
+    const savedScrollTop = this.scrollContainerElem.scrollTop;
     let html =
         '<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader">Graph</th><th class="tableColHeader">Description</th><th class="tableColHeader">Date</th><th class="tableColHeader">Author</th><th class="tableColHeader">Commit</th></tr>',
       i,
@@ -719,7 +737,8 @@ class GitGraphView {
     addListenerToClass("gitRef", "click", (e: Event) => e.stopPropagation());
     addListenerToClass("gitRef", "dblclick", (e: Event) => {
       e.stopPropagation();
-      hideDialogAndContextMenu();
+      if (isDialogActive()) hideDialog();
+      if (isContextMenuActive()) hideContextMenu();
       let target = <HTMLElement>e.target;
       let sourceElem = <HTMLElement>target.closest(".gitRef")!;
       let isRemoteCombined = target.classList.contains("gitRefHeadRemote");
@@ -734,6 +753,8 @@ class GitGraphView {
         checkoutBranchAction(this.currentRepo, sourceElem, unescapeHtml(sourceElem.dataset.name!));
       }
     });
+
+    this.scrollContainerElem.scrollTop = savedScrollTop;
   }
   private renderUncommitedChanges() {
     let date = getCommitDate(this.commits[0].date);
@@ -741,7 +762,8 @@ class GitGraphView {
       `<td></td><td><b>${escapeHtml(this.commits[0].message)}</b></td><td title="${date.title}">${date.value}</td><td title="* <>">*</td><td title="*">*</td>`;
   }
   private renderShowLoading() {
-    hideDialogAndContextMenu();
+    if (isDialogActive()) hideDialog();
+    if (isContextMenuActive()) hideContextMenu();
     this.graph.clear();
     this.tableElem.innerHTML = `<h2 id="loadingHeader">${svgIcons.loading}Loading ...</h2>`;
     this.footerElem.innerHTML = "";
@@ -878,6 +900,20 @@ class GitGraphView {
         active = this.scrollContainerElem.scrollTop > 0;
         this.scrollShadowElem.className = active ? "active" : "";
       }
+
+      const { scrollTop, clientHeight, scrollHeight } = this.scrollContainerElem;
+      if (
+        this.config.loadMoreCommitsAutomatically &&
+        this.moreCommitsAvailable &&
+        !this.isLoadingMoreCommits &&
+        scrollTop + clientHeight >= scrollHeight - SCROLL_AUTO_LOAD_THRESHOLD
+      ) {
+        this.isLoadingMoreCommits = true;
+        this.maxCommits += this.config.loadMoreCommits;
+        this.requestLoadCommits(true, () => {
+          this.isLoadingMoreCommits = false;
+        });
+      }
     });
   }
 
@@ -914,6 +950,97 @@ class GitGraphView {
       currentBtn.classList.remove("disabled");
     } else {
       currentBtn.classList.add("disabled");
+    }
+  }
+
+  /* Keyboard Shortcuts */
+  private handleKeyboardShortcut(e: KeyboardEvent) {
+    if (e.isComposing) return;
+    if (!(e.ctrlKey || e.metaKey)) return;
+
+    const key = e.key.toLowerCase();
+    const { keybindings } = this.config;
+
+    if (key === keybindings.find) {
+      e.preventDefault();
+      this.findWidget.show(true);
+    } else if (key === keybindings.refresh) {
+      e.preventDefault();
+      this.refresh(true);
+    } else if (key === keybindings.scrollToHead) {
+      e.preventDefault();
+      if (this.commitHead !== null && typeof this.commitLookup[this.commitHead] === "number") {
+        this.scrollToCommit(this.commitHead, true, true);
+      }
+    } else if (key === keybindings.scrollToStash) {
+      e.preventDefault();
+      this.scrollToStash(!e.shiftKey);
+    }
+  }
+
+  /* Stash Navigation */
+  private getStashCommitIndices(): number[] {
+    const indices: number[] = [];
+    for (let i = 0; i < this.commits.length; i++) {
+      if (this.commits[i].stash !== null) {
+        indices.push(i);
+      }
+    }
+    return indices;
+  }
+
+  private scrollToStash(forward: boolean) {
+    const stashIndices = this.getStashCommitIndices();
+    if (stashIndices.length === 0) return;
+
+    if (forward) {
+      this.stashNavigationIndex =
+        this.stashNavigationIndex < stashIndices.length - 1 ? this.stashNavigationIndex + 1 : 0;
+    } else {
+      this.stashNavigationIndex =
+        this.stashNavigationIndex > 0 ? this.stashNavigationIndex - 1 : stashIndices.length - 1;
+    }
+
+    const commitIndex = stashIndices[this.stashNavigationIndex];
+    this.scrollToCommit(this.commits[commitIndex].hash, true, true);
+    this.resetStashNavigationTimer();
+  }
+
+  private resetStashNavigationTimer() {
+    if (this.stashNavigationTimer !== null) {
+      clearTimeout(this.stashNavigationTimer);
+    }
+    this.stashNavigationTimer = setTimeout(() => {
+      this.stashNavigationIndex = -1;
+      this.stashNavigationTimer = null;
+    }, STASH_NAVIGATION_TIMEOUT_MS);
+  }
+
+  /* Escape Chain */
+  public handleEscape() {
+    if (isContextMenuActive()) {
+      hideContextMenu();
+      return;
+    }
+    if (isDialogActive()) {
+      hideDialog();
+      return;
+    }
+    if (this.repoDropdown.isOpen()) {
+      this.repoDropdown.close();
+      return;
+    }
+    if (this.branchDropdown.isOpen()) {
+      this.branchDropdown.close();
+      return;
+    }
+    if (this.findWidget.isVisible()) {
+      this.findWidget.close();
+      return;
+    }
+    if (this.expandedCommit !== null) {
+      this.hideCommitDetails();
+      return;
     }
   }
 
@@ -1101,7 +1228,9 @@ let gitGraph = new GitGraphView(
     graphStyle: viewState.graphStyle,
     grid: { x: 16, y: 24, offsetX: 8, offsetY: 12, expandY: CDV_DEFAULT_HEIGHT },
     initialLoadCommits: viewState.initialLoadCommits,
+    keybindings: viewState.keybindings,
     loadMoreCommits: viewState.loadMoreCommits,
+    loadMoreCommitsAutomatically: viewState.loadMoreCommitsAutomatically,
     showCurrentBranchByDefault: viewState.showCurrentBranchByDefault
   },
   vscode.getState()
@@ -1112,14 +1241,9 @@ window.addEventListener("message", (event) => {
   handleMessage(event.data, gitGraph);
 });
 
-function hideDialogAndContextMenu() {
-  if (isDialogActive()) hideDialog();
-  if (isContextMenuActive()) hideContextMenu();
-}
-
 /* Global Listeners */
 document.addEventListener("keyup", (e) => {
-  if (e.key === "Escape") hideDialogAndContextMenu();
+  if (e.key === "Escape") gitGraph.handleEscape();
 });
 document.addEventListener("click", hideContextMenuListener);
 document.addEventListener("contextmenu", hideContextMenuListener);

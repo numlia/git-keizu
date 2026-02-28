@@ -8,7 +8,8 @@ import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 /* Hoisted mocks (shared references for mock factories + assertions)  */
 /* ------------------------------------------------------------------ */
 
-const { mockFindWidgetInstance } = vi.hoisted(() => ({
+const { mockFindWidgetInstance, capturedConfig } = vi.hoisted(() => ({
+  capturedConfig: { ref: null as Record<string, unknown> | null },
   mockFindWidgetInstance: {
     show: vi.fn(),
     close: vi.fn(),
@@ -58,7 +59,8 @@ vi.mock("../../web/findWidget", () => ({
 /* ------------------------------------------------------------------ */
 
 vi.mock("../../web/graph", () => ({
-  Graph: vi.fn(function () {
+  Graph: vi.fn(function (_elemId: string, config: Record<string, unknown>) {
+    capturedConfig.ref = config;
     return {
       loadCommits: vi.fn(),
       render: vi.fn(),
@@ -75,12 +77,27 @@ vi.mock("../../web/graph", () => ({
 /* Mock: dropdown module                                              */
 /* ------------------------------------------------------------------ */
 
+const { mockRepoDropdownInstance, mockBranchDropdownInstance } = vi.hoisted(() => ({
+  mockRepoDropdownInstance: {
+    setOptions: vi.fn(),
+    refresh: vi.fn(),
+    isOpen: vi.fn(() => false),
+    close: vi.fn()
+  },
+  mockBranchDropdownInstance: {
+    setOptions: vi.fn(),
+    refresh: vi.fn(),
+    isOpen: vi.fn(() => false),
+    close: vi.fn()
+  }
+}));
+
+let dropdownCallCount = 0;
 vi.mock("../../web/dropdown", () => ({
   Dropdown: vi.fn(function () {
-    return {
-      setOptions: vi.fn(),
-      refresh: vi.fn()
-    };
+    dropdownCallCount++;
+    // First Dropdown instance is repoDropdown, second is branchDropdown
+    return dropdownCallCount % 2 === 1 ? mockRepoDropdownInstance : mockBranchDropdownInstance;
   })
 }));
 
@@ -127,7 +144,10 @@ vi.mock("../../web/fileTree", () => ({
   generateGitFileTreeHtml: vi.fn(() => "<table></table>")
 }));
 
+import { hideContextMenu, isContextMenuActive } from "../../web/contextMenu";
 import {
+  hideDialog,
+  isDialogActive,
   showCheckboxDialog,
   showConfirmationDialog,
   showErrorDialog,
@@ -796,7 +816,9 @@ function setupViewState(): void {
     graphColours: ["#0085d9"],
     graphStyle: "rounded",
     initialLoadCommits: 300,
+    keybindings: { find: "f", refresh: "r", scrollToHead: "h", scrollToStash: "s" },
     loadMoreCommits: 100,
+    loadMoreCommitsAutomatically: true,
     showCurrentBranchByDefault: false
   };
 }
@@ -1898,6 +1920,698 @@ describe("GitGraphView frontend integration", () => {
       const cdvAfter = document.getElementById("commitDetails");
       expect(cdvAfter).not.toBeNull();
       expect(cdvAfter!.style.height).toBe("145px");
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* selectRepo() repository selection (S14)                          */
+  /* ---------------------------------------------------------------- */
+
+  describe("selectRepo()", () => {
+    it("selects repo, updates dropdown, and refreshes when repo exists (TC-099)", () => {
+      // Given: gitRepos contains TEST_REPO (loaded during beforeAll)
+      vi.clearAllMocks();
+
+      // When: selectRepo message is dispatched for existing repo
+      dispatchMessage({ command: "selectRepo", repo: TEST_REPO });
+
+      // Then: refresh is triggered (loadBranches request sent via vscode.postMessage)
+      expect(vscode.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: "loadBranches",
+          repo: TEST_REPO
+        })
+      );
+    });
+
+    it("silently ignores selectRepo for unknown repo (TC-100)", () => {
+      // Given: gitRepos does not contain "/unknown/repo"
+      vi.clearAllMocks();
+
+      // When: selectRepo message is dispatched for unknown repo
+      dispatchMessage({ command: "selectRepo", repo: "/unknown/repo" });
+
+      // Then: no postMessage calls (no refresh triggered)
+      expect(vscode.postMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* handleKeyboardShortcut() — shortcut key matching (S10)           */
+  /* ---------------------------------------------------------------- */
+
+  describe("handleKeyboardShortcut()", () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it("Ctrl+F triggers findWidget.show(true) (TC-065)", () => {
+      // Given: config keybindings.find = "f"
+      // When: Ctrl+F is pressed
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true })
+      );
+
+      // Then: findWidget.show is called with true
+      expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(1);
+      expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
+    });
+
+    it("Cmd+F triggers findWidget.show(true) on macOS (TC-066)", () => {
+      // Given: config keybindings.find = "f"
+      // When: Cmd+F is pressed (metaKey)
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "f", metaKey: true, bubbles: true })
+      );
+
+      // Then: findWidget.show is called with true
+      expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(1);
+      expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
+    });
+
+    it("Ctrl+R triggers refresh (TC-067)", () => {
+      // Given: config keybindings.refresh = "r"
+      // When: Ctrl+R is pressed
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "r", ctrlKey: true, bubbles: true })
+      );
+
+      // Then: refresh is triggered (renderShowLoading sets table to loading state)
+      const tableElem = document.getElementById("commitTable");
+      expect(tableElem).not.toBeNull();
+      expect(tableElem!.innerHTML).toContain("Loading");
+    });
+
+    it("Ctrl+H scrolls to HEAD commit when commitHead exists (TC-068)", () => {
+      // Given: commits loaded with commitHead = COMMIT_HASH_1
+      // When: Ctrl+H is pressed
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "h", ctrlKey: true, bubbles: true })
+      );
+
+      // Then: scroll occurs (flash class added to HEAD commit row)
+      const headRow = document.querySelector(`.commit[data-hash="${COMMIT_HASH_1}"]`);
+      expect(headRow).not.toBeNull();
+      expect(headRow!.classList.contains("flash")).toBe(true);
+    });
+
+    it("Ctrl+H does nothing when commitHead is null (TC-069)", () => {
+      // Given: commits loaded but commitHead is not in commitLookup
+      //   Load commits with head set to a non-existent hash
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: null,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+      vi.clearAllMocks();
+
+      // When: Ctrl+H is pressed
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "h", ctrlKey: true, bubbles: true })
+      );
+
+      // Then: no scroll occurs (no flash class on any element)
+      const flashElements = document.querySelectorAll(".flash");
+      expect(flashElements.length).toBe(0);
+
+      // Restore commits with head
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+
+    it("key press without Ctrl/Cmd modifier does nothing (TC-070)", () => {
+      // Given: config keybindings.find = "f"
+      // When: F is pressed without modifier
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "f", bubbles: true }));
+
+      // Then: findWidget.show is NOT called
+      expect(mockFindWidgetInstance.show).not.toHaveBeenCalled();
+    });
+
+    it("Ctrl + unmapped key does nothing (TC-071)", () => {
+      // Given: "x" is not mapped to any shortcut
+      // When: Ctrl+X is pressed
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "x", ctrlKey: true, bubbles: true })
+      );
+
+      // Then: no shortcut action is triggered
+      expect(mockFindWidgetInstance.show).not.toHaveBeenCalled();
+      expect(vscode.postMessage).not.toHaveBeenCalled();
+    });
+
+    it("IME composing state suppresses shortcuts (TC-072)", () => {
+      // Given: isComposing = true (IME active)
+      // When: Ctrl+F is pressed during composition
+      const event = new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true });
+      Object.defineProperty(event, "isComposing", { value: true });
+      document.dispatchEvent(event);
+
+      // Then: findWidget.show is NOT called
+      expect(mockFindWidgetInstance.show).not.toHaveBeenCalled();
+    });
+
+    it("Shift+Ctrl+F still matches find shortcut via toLowerCase (TC-073)", () => {
+      // Given: config keybindings.find = "f"
+      // When: Shift+Ctrl+F is pressed (key might be uppercase "F")
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "F",
+          ctrlKey: true,
+          shiftKey: true,
+          bubbles: true
+        })
+      );
+
+      // Then: findWidget.show is called (key.toLowerCase() matches "f")
+      expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(1);
+      expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
+    });
+
+    it("Ctrl+F does nothing when find shortcut is null (UNASSIGNED) (TC-074)", () => {
+      // Given: config keybindings.find is set to null (UNASSIGNED)
+      const viewState = (globalThis as Record<string, unknown>).viewState as Record<
+        string,
+        unknown
+      >;
+      const keybindings = viewState.keybindings as Record<string, string | null>;
+      const originalFind = keybindings.find;
+      keybindings.find = null;
+
+      // When: Ctrl+F is pressed
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true })
+      );
+
+      // Then: findWidget.show is NOT called (shortcut disabled)
+      expect(mockFindWidgetInstance.show).not.toHaveBeenCalled();
+
+      // Cleanup: restore original keybinding
+      keybindings.find = originalFind;
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* scrollToStash() — stash navigation (S11)                        */
+  /* ---------------------------------------------------------------- */
+
+  describe("scrollToStash()", () => {
+    const STASH_HASH_0 = "stash000stash000";
+    const STASH_HASH_1 = "stash111stash111";
+    const STASH_HASH_2 = "stash222stash222";
+
+    function loadCommitsWithStashes(stashCount: number): void {
+      const stashCommits: GitCommitNode[] = [];
+      const hashes = [STASH_HASH_0, STASH_HASH_1, STASH_HASH_2];
+      for (let i = 0; i < stashCount; i++) {
+        stashCommits.push({
+          hash: hashes[i],
+          parentHashes: [],
+          author: "Stasher",
+          email: "stash@test.com",
+          date: 1700000000 + i * 1000,
+          message: `stash@{${i}}`,
+          refs: [],
+          stash: { selector: `stash@{${i}}`, baseHash: "base", untrackedFilesHash: null }
+        });
+      }
+      const allCommits = [...stashCommits, ...MOCK_COMMITS];
+      dispatchMessage({
+        command: "loadCommits",
+        commits: allCommits,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+      vi.clearAllMocks();
+    }
+
+    function pressScrollToStash(shift: boolean = false): void {
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", {
+          key: "s",
+          ctrlKey: true,
+          shiftKey: shift,
+          bubbles: true
+        })
+      );
+    }
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      vi.useFakeTimers();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+      // Restore normal commits
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+
+    it("forward from initial navigates to first stash (TC-075)", () => {
+      // Given: 3 stash commits loaded, navigation index = -1 (initial)
+      loadCommitsWithStashes(3);
+
+      // When: Ctrl+S pressed (forward)
+      pressScrollToStash();
+
+      // Then: first stash (index 0) receives flash class
+      const stashRow = document.querySelector(`.commit[data-hash="${STASH_HASH_0}"]`);
+      expect(stashRow).not.toBeNull();
+      expect(stashRow!.classList.contains("flash")).toBe(true);
+    });
+
+    it("forward from first navigates to second stash (TC-076)", () => {
+      // Given: 3 stash commits, already navigated to first
+      loadCommitsWithStashes(3);
+      pressScrollToStash(); // navigate to index 0
+      vi.clearAllMocks();
+
+      // When: Ctrl+S pressed again (forward)
+      pressScrollToStash();
+
+      // Then: second stash (index 1) receives flash class
+      const stashRow = document.querySelector(`.commit[data-hash="${STASH_HASH_1}"]`);
+      expect(stashRow).not.toBeNull();
+      expect(stashRow!.classList.contains("flash")).toBe(true);
+    });
+
+    it("forward from last wraps to first stash (TC-077)", () => {
+      // Given: 3 stash commits, navigated to last (index 2)
+      loadCommitsWithStashes(3);
+      pressScrollToStash(); // index 0
+      pressScrollToStash(); // index 1
+      pressScrollToStash(); // index 2
+      vi.clearAllMocks();
+
+      // When: Ctrl+S pressed again (forward from end)
+      pressScrollToStash();
+
+      // Then: wraps to first stash (index 0)
+      const stashRow = document.querySelector(`.commit[data-hash="${STASH_HASH_0}"]`);
+      expect(stashRow).not.toBeNull();
+      expect(stashRow!.classList.contains("flash")).toBe(true);
+    });
+
+    it("backward from initial navigates to last stash (TC-078)", () => {
+      // Given: 3 stash commits, navigation index = -1 (initial)
+      loadCommitsWithStashes(3);
+
+      // When: Shift+Ctrl+S pressed (backward)
+      pressScrollToStash(true);
+
+      // Then: last stash (index 2) receives flash class
+      const stashRow = document.querySelector(`.commit[data-hash="${STASH_HASH_2}"]`);
+      expect(stashRow).not.toBeNull();
+      expect(stashRow!.classList.contains("flash")).toBe(true);
+    });
+
+    it("backward from first wraps to last stash (TC-079)", () => {
+      // Given: 3 stash commits, navigated to first (index 0)
+      loadCommitsWithStashes(3);
+      pressScrollToStash(); // forward to index 0
+      vi.clearAllMocks();
+
+      // When: Shift+Ctrl+S pressed (backward from first)
+      pressScrollToStash(true);
+
+      // Then: wraps to last stash (index 2)
+      const stashRow = document.querySelector(`.commit[data-hash="${STASH_HASH_2}"]`);
+      expect(stashRow).not.toBeNull();
+      expect(stashRow!.classList.contains("flash")).toBe(true);
+    });
+
+    it("does nothing when no stash commits exist (TC-080)", () => {
+      // Given: no stash commits (regular MOCK_COMMITS only)
+      // commits restored by beforeEach via resetCommitState
+
+      // When: Ctrl+S pressed
+      pressScrollToStash();
+
+      // Then: no flash class added anywhere (silent no-op)
+      const flashElements = document.querySelectorAll(".flash");
+      expect(flashElements.length).toBe(0);
+    });
+
+    it("resets navigation index after 5s timeout (TC-081)", () => {
+      // Given: 3 stash commits, navigated to first
+      loadCommitsWithStashes(3);
+      pressScrollToStash(); // index 0
+      vi.clearAllMocks();
+
+      // When: 5 seconds pass
+      vi.advanceTimersByTime(5000);
+
+      // Then: next forward navigation goes to first stash again (index reset to -1)
+      pressScrollToStash();
+      const stashRow = document.querySelector(`.commit[data-hash="${STASH_HASH_0}"]`);
+      expect(stashRow).not.toBeNull();
+      expect(stashRow!.classList.contains("flash")).toBe(true);
+    });
+
+    it("single stash loops to same stash on forward (TC-082)", () => {
+      // Given: only 1 stash commit
+      loadCommitsWithStashes(1);
+      pressScrollToStash(); // index 0
+      vi.clearAllMocks();
+
+      // When: Ctrl+S pressed again (forward from only stash)
+      pressScrollToStash();
+
+      // Then: same stash (index 0) receives flash class
+      const stashRow = document.querySelector(`.commit[data-hash="${STASH_HASH_0}"]`);
+      expect(stashRow).not.toBeNull();
+      expect(stashRow!.classList.contains("flash")).toBe(true);
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* handleEscape() — progressive UI dismiss chain (S12)             */
+  /* ---------------------------------------------------------------- */
+
+  describe("handleEscape()", () => {
+    function pressEscape(): void {
+      document.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", bubbles: true }));
+    }
+
+    function resetAllUIStates(): void {
+      vi.mocked(isContextMenuActive).mockReturnValue(false);
+      vi.mocked(isDialogActive).mockReturnValue(false);
+      mockRepoDropdownInstance.isOpen.mockReturnValue(false);
+      mockBranchDropdownInstance.isOpen.mockReturnValue(false);
+      mockFindWidgetInstance.isVisible.mockReturnValue(false);
+    }
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      resetAllUIStates();
+    });
+
+    it("closes context menu first when active (TC-083)", () => {
+      // Given: context menu is active
+      vi.mocked(isContextMenuActive).mockReturnValue(true);
+      vi.mocked(isDialogActive).mockReturnValue(true); // also active but lower priority
+
+      // When: Escape is pressed
+      pressEscape();
+
+      // Then: only hideContextMenu is called
+      expect(hideContextMenu).toHaveBeenCalledTimes(1);
+      expect(hideDialog).not.toHaveBeenCalled();
+    });
+
+    it("closes dialog when no context menu active (TC-084)", () => {
+      // Given: dialog is active, no context menu
+      vi.mocked(isDialogActive).mockReturnValue(true);
+
+      // When: Escape is pressed
+      pressEscape();
+
+      // Then: only hideDialog is called
+      expect(hideDialog).toHaveBeenCalledTimes(1);
+      expect(hideContextMenu).not.toHaveBeenCalled();
+    });
+
+    it("closes repoDropdown when no menu/dialog active (TC-085)", () => {
+      // Given: repoDropdown is open
+      mockRepoDropdownInstance.isOpen.mockReturnValue(true);
+
+      // When: Escape is pressed
+      pressEscape();
+
+      // Then: only repoDropdown.close() is called
+      expect(mockRepoDropdownInstance.close).toHaveBeenCalledTimes(1);
+      expect(mockBranchDropdownInstance.close).not.toHaveBeenCalled();
+      expect(hideDialog).not.toHaveBeenCalled();
+    });
+
+    it("closes branchDropdown when repoDropdown is closed (TC-086)", () => {
+      // Given: branchDropdown is open, repoDropdown closed
+      mockBranchDropdownInstance.isOpen.mockReturnValue(true);
+
+      // When: Escape is pressed
+      pressEscape();
+
+      // Then: only branchDropdown.close() is called
+      expect(mockBranchDropdownInstance.close).toHaveBeenCalledTimes(1);
+      expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
+    });
+
+    it("closes repoDropdown first when both dropdowns are open (TC-087)", () => {
+      // Given: both dropdowns are open
+      mockRepoDropdownInstance.isOpen.mockReturnValue(true);
+      mockBranchDropdownInstance.isOpen.mockReturnValue(true);
+
+      // When: Escape is pressed
+      pressEscape();
+
+      // Then: only repoDropdown.close() is called (repo priority over branch)
+      expect(mockRepoDropdownInstance.close).toHaveBeenCalledTimes(1);
+      expect(mockBranchDropdownInstance.close).not.toHaveBeenCalled();
+    });
+
+    it("closes FindWidget when no menu/dialog/dropdown active (TC-088)", () => {
+      // Given: FindWidget is visible
+      mockFindWidgetInstance.isVisible.mockReturnValue(true);
+
+      // When: Escape is pressed
+      pressEscape();
+
+      // Then: only findWidget.close() is called
+      expect(mockFindWidgetInstance.close).toHaveBeenCalledTimes(1);
+      expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
+    });
+
+    it("closes commit details when all other UI is closed (TC-089)", () => {
+      // Given: a commit is expanded (only expandedCommit is active)
+      expandCommit(COMMIT_HASH_1);
+      vi.clearAllMocks();
+      resetAllUIStates();
+
+      // When: Escape is pressed
+      pressEscape();
+
+      // Then: commit details element is removed
+      const detailsElem = document.getElementById("commitDetails");
+      expect(detailsElem).toBeNull();
+    });
+
+    it("does nothing when all UI components are closed (TC-090)", () => {
+      // Given: all UI components are closed
+      // (resetAllUIStates in beforeEach, no expandedCommit)
+
+      // When: Escape is pressed
+      pressEscape();
+
+      // Then: no close/hide methods are called
+      expect(hideContextMenu).not.toHaveBeenCalled();
+      expect(hideDialog).not.toHaveBeenCalled();
+      expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
+      expect(mockBranchDropdownInstance.close).not.toHaveBeenCalled();
+      expect(mockFindWidgetInstance.close).not.toHaveBeenCalled();
+    });
+
+    it("progressive chain: context menu → dialog on consecutive Escapes (TC-091)", () => {
+      // Given: context menu and dialog are both active
+      vi.mocked(isContextMenuActive).mockReturnValue(true);
+      vi.mocked(isDialogActive).mockReturnValue(true);
+
+      // When: first Escape is pressed
+      pressEscape();
+
+      // Then: context menu is closed first
+      expect(hideContextMenu).toHaveBeenCalledTimes(1);
+      expect(hideDialog).not.toHaveBeenCalled();
+
+      // Given: context menu is now closed
+      vi.mocked(isContextMenuActive).mockReturnValue(false);
+      vi.clearAllMocks();
+
+      // When: second Escape is pressed
+      pressEscape();
+
+      // Then: dialog is closed next
+      expect(hideDialog).toHaveBeenCalledTimes(1);
+      expect(hideContextMenu).not.toHaveBeenCalled();
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* Auto-load on scroll (S13)                                        */
+  /* ---------------------------------------------------------------- */
+
+  describe("auto-load on scroll (observeWebviewScroll)", () => {
+    function setScrollMetrics(scrollTop: number, clientHeight: number, scrollHeight: number): void {
+      const container = document.getElementById("scrollContainer")!;
+      Object.defineProperty(container, "scrollTop", {
+        value: scrollTop,
+        writable: true,
+        configurable: true
+      });
+      Object.defineProperty(container, "clientHeight", {
+        value: clientHeight,
+        configurable: true
+      });
+      Object.defineProperty(container, "scrollHeight", {
+        value: scrollHeight,
+        configurable: true
+      });
+    }
+
+    function fireScroll(): void {
+      const container = document.getElementById("scrollContainer")!;
+      container.dispatchEvent(new Event("scroll", { bubbles: true }));
+    }
+
+    function loadCommitsWithMore(moreAvailable: boolean): void {
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: moreAvailable,
+        hard: true
+      });
+    }
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      // Ensure moreCommitsAvailable=true and config.loadMoreCommitsAutomatically=true
+      loadCommitsWithMore(true);
+      vi.clearAllMocks();
+    });
+
+    it("fires auto-load when all guard conditions are met (TC-092)", () => {
+      // Given: config enabled, moreAvailable=true, not loading, scroll near bottom
+      // scrollTop(475) + clientHeight(500) = 975 >= scrollHeight(1000) - 25 = 975
+      setScrollMetrics(475, 500, 1000);
+
+      // When: scroll event fires
+      fireScroll();
+
+      // Then: loadCommits request is sent (auto-load triggered)
+      expect(vscode.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: "loadCommits",
+          hard: true
+        })
+      );
+    });
+
+    it("does not fire when config.loadMoreCommitsAutomatically is false (TC-093)", () => {
+      // Given: config disabled via capturedConfig reference
+      capturedConfig.ref!.loadMoreCommitsAutomatically = false;
+      setScrollMetrics(475, 500, 1000);
+
+      // When: scroll event fires
+      fireScroll();
+
+      // Then: no loadCommits request (auto-load NOT triggered)
+      expect(vscode.postMessage).not.toHaveBeenCalled();
+
+      // Cleanup: restore config
+      capturedConfig.ref!.loadMoreCommitsAutomatically = true;
+    });
+
+    it("does not fire when moreCommitsAvailable is false (TC-094)", () => {
+      // Given: no more commits available
+      loadCommitsWithMore(false);
+      vi.clearAllMocks();
+
+      setScrollMetrics(475, 500, 1000);
+
+      // When: scroll event fires
+      fireScroll();
+
+      // Then: no loadCommits request
+      expect(vscode.postMessage).not.toHaveBeenCalled();
+
+      // Restore state
+      loadCommitsWithMore(true);
+      vi.clearAllMocks();
+    });
+
+    it("does not fire twice while already loading (TC-095)", () => {
+      // Given: scroll triggers first auto-load
+      setScrollMetrics(475, 500, 1000);
+      fireScroll();
+      expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+      vi.clearAllMocks();
+
+      // When: scroll fires again before loadCommits response arrives
+      fireScroll();
+
+      // Then: no additional loadCommits request (double-fire prevention)
+      expect(vscode.postMessage).not.toHaveBeenCalled();
+    });
+
+    it("does not fire when scroll position is 26px+ from bottom (TC-096)", () => {
+      // Given: scroll position is 26px from bottom (threshold not met)
+      // scrollTop(474) + clientHeight(500) = 974 < scrollHeight(1000) - 25 = 975
+      setScrollMetrics(474, 500, 1000);
+
+      // When: scroll event fires
+      fireScroll();
+
+      // Then: no loadCommits request
+      expect(vscode.postMessage).not.toHaveBeenCalled();
+    });
+
+    it("fires when scroll position is exactly at threshold (25px from bottom) (TC-097)", () => {
+      // Given: scroll position is exactly 25px from bottom (boundary)
+      // scrollTop(475) + clientHeight(500) = 975 >= scrollHeight(1000) - 25 = 975
+      setScrollMetrics(475, 500, 1000);
+
+      // When: scroll event fires
+      fireScroll();
+
+      // Then: loadCommits request is sent
+      expect(vscode.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: "loadCommits",
+          hard: true
+        })
+      );
+    });
+
+    it("resets isLoadingMoreCommits on completion callback (TC-098)", () => {
+      // Given: auto-load was triggered
+      setScrollMetrics(475, 500, 1000);
+      fireScroll();
+      expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+      vi.clearAllMocks();
+
+      // When: loadCommits response arrives (triggers completion callback)
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: true,
+        hard: true
+      });
+      vi.clearAllMocks();
+
+      // Then: next scroll can trigger auto-load again (isLoadingMoreCommits reset)
+      setScrollMetrics(475, 500, 1000);
+      fireScroll();
+      expect(vscode.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: "loadCommits",
+          hard: true
+        })
+      );
     });
   });
 });

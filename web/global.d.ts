@@ -15,7 +15,9 @@ declare global {
     graphStyle: "rounded" | "angular";
     grid: { x: number; y: number; offsetX: number; offsetY: number; expandY: number };
     initialLoadCommits: number;
+    keybindings: GG.KeybindingConfig;
     loadMoreCommits: number;
+    loadMoreCommitsAutomatically: boolean;
     showCurrentBranchByDefault: boolean;
   }
 
