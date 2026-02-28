@@ -18,13 +18,25 @@ export function activate(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     outputChannel,
-    vscode.commands.registerCommand("git-keizu.view", () => {
+    vscode.commands.registerCommand("git-keizu.view", (arg?: unknown) => {
+      // When invoked from SCM title bar, arg is a SourceControl object with rootUri property.
+      // When invoked from command palette or programmatically, arg may be a Uri or undefined.
+      let rootUri: vscode.Uri | undefined;
+      if (arg instanceof vscode.Uri) {
+        rootUri = arg;
+      } else if (arg !== null && arg !== undefined && typeof arg === "object" && "rootUri" in arg) {
+        const candidate = (arg as { rootUri?: unknown }).rootUri;
+        if (candidate instanceof vscode.Uri) {
+          rootUri = candidate;
+        }
+      }
       GitGraphView.createOrShow(
         context.extensionPath,
         dataSource,
         extensionState,
         avatarManager,
-        repoManager
+        repoManager,
+        rootUri
       );
     }),
     vscode.commands.registerCommand("git-keizu.clearAvatarCache", () => {

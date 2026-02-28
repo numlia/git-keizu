@@ -69,14 +69,23 @@ export interface GitUnsavedChanges {
   changes: number;
 }
 
+export interface KeybindingConfig {
+  find: string | null;
+  refresh: string | null;
+  scrollToHead: string | null;
+  scrollToStash: string | null;
+}
+
 export interface GitGraphViewState {
   dateFormat: DateFormat;
   fetchAvatars: boolean;
   graphColours: string[];
   graphStyle: GraphStyle;
   initialLoadCommits: number;
+  keybindings: KeybindingConfig;
   lastActiveRepo: string | null;
   loadMoreCommits: number;
+  loadMoreCommitsAutomatically: boolean;
   repos: GitRepoSet;
   showCurrentBranchByDefault: boolean;
 }
@@ -295,6 +304,11 @@ export interface ResponsePushTag {
 
 export interface ResponseRefresh {
   command: "refresh";
+}
+
+export interface ResponseSelectRepo {
+  command: "selectRepo";
+  repo: string;
 }
 
 export interface RequestRenameBranch {
@@ -526,6 +540,7 @@ export type ResponseMessage =
   | ResponsePushStash
   | ResponsePushTag
   | ResponseRefresh
+  | ResponseSelectRepo
   | ResponseRenameBranch
   | ResponseResetToCommit
   | ResponseResetUncommitted

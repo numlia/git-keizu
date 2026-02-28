@@ -18,7 +18,7 @@ import {
   ResponseMessage,
   UNCOMMITTED_CHANGES_HASH
 } from "./types";
-import { abbrevCommit, copyToClipboard } from "./utils";
+import { abbrevCommit, copyToClipboard, getPathFromUri } from "./utils";
 
 export class GitGraphView {
   public static currentPanel: GitGraphView | undefined;
@@ -40,7 +40,8 @@ export class GitGraphView {
     dataSource: DataSource,
     extensionState: ExtensionState,
     avatarManager: AvatarManager,
-    repoManager: RepoManager
+    repoManager: RepoManager,
+    rootUri?: vscode.Uri
   ) {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
@@ -48,7 +49,14 @@ export class GitGraphView {
 
     if (GitGraphView.currentPanel) {
       GitGraphView.currentPanel.panel.reveal(column);
+      if (rootUri !== undefined) {
+        GitGraphView.currentPanel.selectRepoFromUri(rootUri, repoManager);
+      }
       return;
+    }
+
+    if (rootUri !== undefined) {
+      extensionState.setLastActiveRepo(getPathFromUri(rootUri));
     }
 
     const panel = vscode.window.createWebviewPanel(
@@ -400,6 +408,15 @@ export class GitGraphView {
     this.panel.webview.postMessage(msg);
   }
 
+  private async selectRepoFromUri(rootUri: vscode.Uri, repoManager: RepoManager) {
+    const repoPath = getPathFromUri(rootUri);
+    const repos = repoManager.getRepos();
+    if (!(repoPath in repos)) {
+      await repoManager.registerRepoFromUri(rootUri);
+    }
+    this.sendMessage({ command: "selectRepo", repo: repoPath });
+  }
+
   public dispose() {
     GitGraphView.currentPanel = undefined;
     this.panel.dispose();
@@ -425,8 +442,15 @@ export class GitGraphView {
       graphColours: config.graphColours(),
       graphStyle: config.graphStyle(),
       initialLoadCommits: config.initialLoadCommits(),
+      keybindings: {
+        find: config.keyboardShortcutFind(),
+        refresh: config.keyboardShortcutRefresh(),
+        scrollToHead: config.keyboardShortcutScrollToHead(),
+        scrollToStash: config.keyboardShortcutScrollToStash()
+      },
       lastActiveRepo: this.extensionState.getLastActiveRepo(),
       loadMoreCommits: config.loadMoreCommits(),
+      loadMoreCommitsAutomatically: config.loadMoreCommitsAutomatically(),
       repos: this.repoManager.getRepos(),
       showCurrentBranchByDefault: config.showCurrentBranchByDefault()
     };

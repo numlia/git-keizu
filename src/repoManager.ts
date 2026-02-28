@@ -127,7 +127,7 @@ export class RepoManager {
     }
     return repos;
   }
-  private addRepo(repo: string) {
+  public addRepo(repo: string) {
     this.repos[repo] = { columnWidths: null };
     this.extensionState.saveRepos(this.repos);
   }
@@ -179,6 +179,18 @@ export class RepoManager {
     }
     this.repos[repo] = state;
     this.extensionState.saveRepos(this.repos);
+  }
+
+  public async registerRepoFromUri(uri: vscode.Uri): Promise<void> {
+    const repoPath = getPathFromUri(uri);
+    if (repoPath in this.repos) {
+      return;
+    }
+    const isRepo = await this.dataSource.isGitRepository(repoPath);
+    if (isRepo) {
+      this.addRepo(repoPath);
+      this.sendRepos();
+    }
   }
 
   /* Repo Searching */
