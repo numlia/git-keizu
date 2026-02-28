@@ -27,3 +27,16 @@
 | ------- | ----------------------------------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------- | ------------------------------------------------- |
 | TC-005  | refreshOrError経由コマンド (例: deleteBranch), status = null            | Equivalence - normal                 | gitGraph.refresh(false) が呼ばれる（hard=false でソフトリフレッシュ） | REQ-2.1: hard パラメータが false であることが重要 |
 | TC-006  | refreshOrError経由コマンド (例: deleteBranch), status = "error message" | Equivalence - error                  | showErrorDialog が呼ばれ、gitGraph.refresh は呼ばれない               | REQ-2.2: エラー時はリフレッシュしない             |
+
+## S3: handleMessage() selectRepo レスポンス処理
+
+> Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-02-27
+
+**シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
+**テスト対象パス**: `web/messageHandler.ts`
+
+| Case ID | Input / Precondition                       | Perspective (Equivalence / Boundary) | Expected Result                          | Notes                |
+| ------- | ------------------------------------------ | ------------------------------------ | ---------------------------------------- | -------------------- |
+| TC-007  | ResponseSelectRepo: repo = "/path/to/repo" | Equivalence - normal                 | gitGraph.selectRepo(msg.repo) が呼ばれる | 正常ルーティング     |
+| TC-008  | ResponseSelectRepo メッセージ処理          | Equivalence - normal                 | エラーなく処理が完了する                 | switch case 追加検証 |

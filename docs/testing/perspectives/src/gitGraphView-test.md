@@ -63,3 +63,29 @@
 | ------- | ----------------------------------------------- | ------------------------------------ | --------------------------------------------------------- | -------------------- |
 | TC-013  | { command: "pull", repo: "..." } メッセージ受信 | Equivalence - normal                 | dataSource.pull(repo) が呼ばれ、ResponsePull が送信される | pushTag パターン準拠 |
 | TC-014  | { command: "push", repo: "..." } メッセージ受信 | Equivalence - normal                 | dataSource.push(repo) が呼ばれ、ResponsePush が送信される | pushTag パターン準拠 |
+
+## S6: createOrShow() rootUri ハンドリング
+
+> Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-02-27
+
+**テスト対象パス**: `src/gitGraphView.ts`
+
+| Case ID | Input / Precondition                             | Perspective (Equivalence / Boundary)  | Expected Result                                                        | Notes          |
+| ------- | ------------------------------------------------ | ------------------------------------- | ---------------------------------------------------------------------- | -------------- |
+| TC-015  | rootUri 指定あり、パネル未作成                   | Equivalence - normal (new panel)      | viewState.lastActiveRepo が rootUri.fsPath に設定される                | 初回起動時     |
+| TC-016  | rootUri 指定あり、パネル既存、リポジトリ登録済み | Equivalence - normal (existing panel) | panel.reveal() 後に ResponseSelectRepo が送信される                    | リポジトリ切替 |
+| TC-017  | rootUri 指定あり、パネル既存、リポジトリ未登録   | Equivalence - normal (unregistered)   | registerRepoFromUri() が呼ばれ、その後 ResponseSelectRepo が送信される | 新規登録フロー |
+| TC-018  | rootUri 指定なし（コマンドパレットから実行）     | Equivalence - normal (no rootUri)     | 従来動作維持（selectRepo メッセージ送信なし）                          | 後方互換       |
+
+## S7: viewState キーバインド・自動読み込み設定の受け渡し
+
+> Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-02-27
+
+**テスト対象パス**: `src/gitGraphView.ts`
+
+| Case ID | Input / Precondition         | Perspective (Equivalence / Boundary) | Expected Result                                      | Notes                |
+| ------- | ---------------------------- | ------------------------------------ | ---------------------------------------------------- | -------------------- |
+| TC-019  | getHtmlForWebview() 呼び出し | Equivalence - normal                 | viewState に keybindings オブジェクトが含まれる      | 設定パイプライン検証 |
+| TC-020  | getHtmlForWebview() 呼び出し | Equivalence - normal                 | viewState に loadMoreCommitsAutomatically が含まれる | 設定パイプライン検証 |
