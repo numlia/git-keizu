@@ -67,7 +67,11 @@
       {
         "category": "Git Keizu",
         "command": "git-keizu.view",
-        "title": "View Git Graph (git log)"
+        "title": "View Git Keizu (git log)",
+        "icon": {
+          "light": "resources/cmd-icon-light.svg",
+          "dark": "resources/cmd-icon-dark.svg"
+        }
       },
       {
         "category": "Git Keizu",
@@ -75,6 +79,19 @@
         "title": "Clear Avatar Cache"
       }
     ],
+    "menus": {
+      "scm/title": [
+        {
+          "command": "git-keizu.view",
+          "when": "scmProvider == git && config.git-keizu.sourceCodeProviderIntegrationLocation == 'Inline'",
+          "group": "navigation"
+        },
+        {
+          "command": "git-keizu.view",
+          "when": "scmProvider == git && config.git-keizu.sourceCodeProviderIntegrationLocation == 'More Actions'"
+        }
+      ]
+    },
     "configuration": {
       "type": "object",
       "title": "Git Keizu",
@@ -190,6 +207,44 @@
           ],
           "default": "colour",
           "description": "Specifies the colour theme of the icon displayed on the Git Graph tab."
+        },
+        "git-keizu.sourceCodeProviderIntegrationLocation": {
+          "type": "string",
+          "enum": [
+            "Inline",
+            "More Actions"
+          ],
+          "enumDescriptions": [
+            "Show the Git Graph button inline on the SCM title bar",
+            "Show the Git Graph button in the SCM title bar 'More Actions' menu"
+          ],
+          "default": "Inline",
+          "description": "Specifies where the Git Graph button is shown on the SCM title bar."
+        },
+        "git-keizu.keyboardShortcutFind": {
+          "type": "string",
+          "default": "CTRL/CMD + F",
+          "description": "Specifies the keyboard shortcut for opening the Find widget. Format: \"CTRL/CMD + <letter>\". Set to \"UNASSIGNED\" to disable."
+        },
+        "git-keizu.keyboardShortcutRefresh": {
+          "type": "string",
+          "default": "CTRL/CMD + R",
+          "description": "Specifies the keyboard shortcut for refreshing the graph. Format: \"CTRL/CMD + <letter>\". Set to \"UNASSIGNED\" to disable."
+        },
+        "git-keizu.keyboardShortcutScrollToHead": {
+          "type": "string",
+          "default": "CTRL/CMD + H",
+          "description": "Specifies the keyboard shortcut for scrolling to HEAD. Format: \"CTRL/CMD + <letter>\". Set to \"UNASSIGNED\" to disable."
+        },
+        "git-keizu.keyboardShortcutScrollToStash": {
+          "type": "string",
+          "default": "CTRL/CMD + S",
+          "description": "Specifies the keyboard shortcut for scrolling to Stash entries. Format: \"CTRL/CMD + <letter>\". Set to \"UNASSIGNED\" to disable."
+        },
+        "git-keizu.loadMoreCommitsAutomatically": {
+          "type": "boolean",
+          "default": true,
+          "description": "When enabled, automatically loads more commits when scrolling to the bottom of the graph."
         }
       }
     }

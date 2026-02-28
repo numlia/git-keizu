@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!-- Left branch top -->
+  <line x1="4" y1="2.5" x2="4" y2="8" stroke="#b0b0b0" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Left branch bottom -->
+  <line x1="4" y1="8" x2="4" y2="13.5" stroke="#c0c0c0" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Center branch -->
+  <line x1="8" y1="2.5" x2="8" y2="13.5" stroke="#b8b8b8" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Right branch -->
+  <line x1="12" y1="2.5" x2="12" y2="13.5" stroke="#bcbcbc" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Connecting line -->
+  <line x1="4" y1="8" x2="12" y2="4.7" stroke="#c0c0c0" stroke-width="1.2" stroke-linecap="round"/>
+  <!-- Node: top right -->
+  <circle cx="12" cy="4.7" r="1.8" fill="#bcbcbc"/>
+  <!-- Node: middle left -->
+  <circle cx="4" cy="8" r="1.8" fill="#c0c0c0"/>
+  <!-- Node: bottom center -->
+  <circle cx="8" cy="11.3" r="1.8" fill="#b8b8b8"/>
+</svg>
