@@ -1,7 +1,7 @@
 ---
 name: update-release-docs
 description: "main との差分と要件ドキュメントを参考に、次バージョン用の README と CHANGELOG を更新する"
-allowed-tools: Read, Edit, Bash(cd:*), Bash(git log:*), Bash(git diff:*)
+allowed-tools: Read, Edit, Bash(cd:*), Bash(git log:*), Bash(git diff:*), Bash(git status:*), Bash(git add:*), Bash(git commit:*)
 argument-hint: <要件ドキュメントのパス> [バージョン] # 例: notes/features/007-xxx/要件整理.md 0.2.7
 ---
 
@@ -34,6 +34,21 @@ main ブランチとの差分と指定された要件ドキュメントを参照
 ```
 
 引数が指定されていない場合は、要件ドキュメントのパスをユーザーに確認してから進めること。
+
+## ⚠️ CRITICAL: ドキュメント更新前に必ず実行すること
+
+コミットメッセージを生成する前に、以下を必ず実行すること。
+
+### 言語設定の確認（MANDATORY）
+
+1. `docs/development/project-settings.md` を **Read ツール**で読む
+   - 読めた場合: `commit-language: en` があれば**英語**、`commit-language: ja` または記述なしなら**日本語**を使用
+   - 読めなかった場合（ファイルが存在しない）: 次へ
+2. プロジェクトルートの `CLAUDE.md` を **Read ツール**で読む
+   - 同様に `commit-language:` を探す
+   - 読めなかった場合: 日本語（グローバルデフォルト）を使用
+
+**言語の優先順位**: `docs/development/project-settings.md` > `CLAUDE.md` > グローバルデフォルト（日本語）
 
 ## 実行手順
 
@@ -136,14 +151,42 @@ cd /home/numlia/work/ai/git-keizu
 - `## Installation` / `## Contributing & Support` / `## License` セクション
 - badge 行やタイトル行
 
-### Step 6: 変更内容の確認と報告
+### Step 6: コミット
+
+CHANGELOG.md と README.md をまとめて1コミットとして記録する。
+
+#### コミットメッセージの生成ルール
+
+- **形式**: `docs: {説明}` の prefix を使う
+- **言語**: Step 0 で確認した言語設定に従う
+  - 英語の場合: `docs: update CHANGELOG and README for v{version}`
+  - 日本語の場合: `docs: v{バージョン}の CHANGELOG と README を更新`
+- **🚫 ブランチ情報は絶対に手動で付けない**: Git Hook が自動付与するため `(#issue-number)` を含めない
+
+#### コミット手順
+
+```bash
+# Step 6-1: ステータス確認
+git status
+
+# Step 6-2: 対象ファイルをステージング（別々の Bash tool call で実行）
+git add CHANGELOG.md README.md
+
+# Step 6-3: コミット（HEREDOC 形式）
+git commit -m "$(cat <<'EOF'
+docs: {決定したメッセージ}
+EOF
+)"
+```
+
+### Step 7: 変更内容の確認と報告
 
 更新後、以下の形式でレポートを出力する:
 
 ```
 ## 📊 Report
 
-**Overview**: [バージョン X.Y.Z の CHANGELOG と README を更新した旨]
+**Overview**: [バージョン X.Y.Z の CHANGELOG と README を更新・コミットした旨]
 
 **Changed files**: 2 files
 - `CHANGELOG.md`
@@ -156,12 +199,12 @@ cd /home/numlia/work/ai/git-keizu
 **README の主な変更**:
 - [追加・変更した bullet の概要]
 
-**Next step**: /commit または /release X.Y.Z を実行してください
+**Next step**: /release X.Y.Z を実行してください
 ```
 
 ## 注意事項
 
-- **コミットはしない**: このスキルは編集のみ行う。コミットは `/commit` スキルで別途実行する
+- **コミットは自動実行**: Step 6 でドキュメント更新後に自動コミットする。手動の `/commit` は不要
 - **既存エントリを消さない**: CHANGELOG の過去バージョンエントリは一切変更しない
 - **`## [Unreleased]` は空のまま**: 新バージョンのセクションはその下に追加する
 - **要件外の変更も拾う**: 要件ドキュメントになくても git diff に含まれるユーザー向け改善は記述する
