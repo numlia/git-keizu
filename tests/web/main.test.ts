@@ -959,7 +959,7 @@ function makeCommitDetails(hash: string): GitCommitDetails {
  *   <table>.clientHeight = 103 → grid.y = (103-31)/3 = 24
  * Total CDV deduction from viewport: 31 (header) + 24 (commit row) = 55
  */
-const CDV_HEIGHT_DEDUCTION = 55;
+const _CDV_HEIGHT_DEDUCTION = 55;
 
 function setupTableLayoutMocks(): void {
   const headerElem = document.getElementById("tableColHeaders");

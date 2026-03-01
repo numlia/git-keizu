@@ -833,8 +833,9 @@ class GitGraphView {
     this.findWidget.setInputEnabled(false);
   }
   private makeTableResizable() {
-    let colHeadersElem = document.getElementById("tableColHeaders")!,
-      cols = <HTMLCollectionOf<HTMLElement>>document.getElementsByClassName("tableColHeader");
+    const colHeadersElem = document.getElementById("tableColHeaders");
+    if (colHeadersElem === null) return;
+    const cols = <HTMLCollectionOf<HTMLElement>>document.getElementsByClassName("tableColHeader");
     let columnWidths = this.gitRepos[this.currentRepo].columnWidths,
       mouseX = -1,
       col = -1;
@@ -881,11 +882,9 @@ class GitGraphView {
       } else {
         this.graph.limitMaxWidth(-1);
       }
-      const graphPadding = Math.max(
-        0,
-        Math.round((graphCappedWidth - (cols[0].offsetWidth - 24)) / 2)
-      );
-      cols[0].style.padding = `0 ${graphPadding}px`;
+      const col0Width = cols[0]?.offsetWidth ?? 0;
+      const graphPadding = Math.max(0, Math.round((graphCappedWidth - (col0Width - 24)) / 2));
+      if (cols[0]) cols[0].style.padding = `0 ${graphPadding}px`;
     }
 
     addListenerToClass("resizeCol", "mousedown", (e) => {
@@ -1443,9 +1442,13 @@ let gitGraph = new GitGraphView(
 );
 
 /* Command Processing */
-window.addEventListener("message", (event) => {
-  handleMessage(event.data, gitGraph);
-});
+const LISTENER_CLEANUP_KEY = "__gitKeizuMessageCleanup";
+const _win = window as unknown as Record<string, unknown>;
+const prevCleanup = _win[LISTENER_CLEANUP_KEY];
+if (typeof prevCleanup === "function") (prevCleanup as () => void)();
+const messageHandler = (event: MessageEvent) => handleMessage(event.data, gitGraph);
+window.addEventListener("message", messageHandler);
+_win[LISTENER_CLEANUP_KEY] = () => window.removeEventListener("message", messageHandler);
 
 /* Global Listeners */
 document.addEventListener("keyup", (e) => {
