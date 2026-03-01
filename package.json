@@ -1,7 +1,7 @@
 {
   "name": "git-keizu",
   "displayName": "Git Keizu",
-  "version": "0.2.5",
+  "version": "0.2.6",
   "description": "View your Git history as a graph, and do common Git actions directly from it.",
   "categories": [
     "Other"

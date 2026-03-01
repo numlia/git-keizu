@@ -77,27 +77,49 @@ vi.mock("../../web/graph", () => ({
 /* Mock: dropdown module                                              */
 /* ------------------------------------------------------------------ */
 
-const { mockRepoDropdownInstance, mockBranchDropdownInstance } = vi.hoisted(() => ({
-  mockRepoDropdownInstance: {
-    setOptions: vi.fn(),
-    refresh: vi.fn(),
-    isOpen: vi.fn(() => false),
-    close: vi.fn()
-  },
-  mockBranchDropdownInstance: {
-    setOptions: vi.fn(),
-    refresh: vi.fn(),
-    isOpen: vi.fn(() => false),
-    close: vi.fn()
-  }
-}));
+const { mockRepoDropdownInstance, mockBranchDropdownInstance, mockAuthorDropdownInstance } =
+  vi.hoisted(() => ({
+    mockRepoDropdownInstance: {
+      setOptions: vi.fn(),
+      refresh: vi.fn(),
+      isOpen: vi.fn(() => false),
+      close: vi.fn()
+    },
+    mockBranchDropdownInstance: {
+      setOptions: vi.fn(),
+      refresh: vi.fn(),
+      isOpen: vi.fn(() => false),
+      close: vi.fn()
+    },
+    mockAuthorDropdownInstance: {
+      setOptions: vi.fn(),
+      refresh: vi.fn(),
+      isOpen: vi.fn(() => false),
+      close: vi.fn()
+    }
+  }));
 
+const DROPDOWN_INSTANCES = [
+  mockRepoDropdownInstance,
+  mockBranchDropdownInstance,
+  mockAuthorDropdownInstance
+];
 let dropdownCallCount = 0;
+let capturedAuthorCallback: ((value: string) => void) | null = null;
 vi.mock("../../web/dropdown", () => ({
-  Dropdown: vi.fn(function () {
+  Dropdown: vi.fn(function (
+    _id: string,
+    _showInfo: boolean,
+    _type: string,
+    callback?: (value: string) => void
+  ) {
+    const index = dropdownCallCount % DROPDOWN_INSTANCES.length;
     dropdownCallCount++;
-    // First Dropdown instance is repoDropdown, second is branchDropdown
-    return dropdownCallCount % 2 === 1 ? mockRepoDropdownInstance : mockBranchDropdownInstance;
+    // 1st=repoDropdown, 2nd=branchDropdown, 3rd=authorDropdown
+    if (index === 2 && callback) {
+      capturedAuthorCallback = callback;
+    }
+    return DROPDOWN_INSTANCES[index];
   })
 }));
 
@@ -121,6 +143,15 @@ vi.mock("../../web/branchLabels", () => ({
 }));
 
 /* ------------------------------------------------------------------ */
+/* Mock: refMenu module                                               */
+/* ------------------------------------------------------------------ */
+
+vi.mock("../../web/refMenu", () => ({
+  buildRefContextMenuItems: vi.fn(() => []),
+  checkoutBranchAction: vi.fn()
+}));
+
+/* ------------------------------------------------------------------ */
 /* Mock: dates module                                                 */
 /* ------------------------------------------------------------------ */
 
@@ -141,9 +172,11 @@ vi.mock("../../web/fileTree", () => ({
     contents: {},
     open: true
   })),
-  generateGitFileTreeHtml: vi.fn(() => "<table></table>")
+  generateGitFileTreeHtml: vi.fn(() => "<table></table>"),
+  generateGitFileListHtml: vi.fn(() => '<ul class="gitFolderContents"></ul>')
 }));
 
+import { getBranchLabels } from "../../web/branchLabels";
 import { hideContextMenu, isContextMenuActive } from "../../web/contextMenu";
 import {
   hideDialog,
@@ -155,7 +188,8 @@ import {
   showRefInputDialog,
   showSelectDialog
 } from "../../web/dialogs";
-import { generateGitFileTreeHtml } from "../../web/fileTree";
+import { generateGitFileListHtml, generateGitFileTreeHtml } from "../../web/fileTree";
+import { buildRefContextMenuItems } from "../../web/refMenu";
 import { buildStashContextMenuItems } from "../../web/stashMenu";
 import { buildUncommittedContextMenuItems } from "../../web/uncommittedMenu";
 import {
@@ -786,7 +820,8 @@ const MOCK_PREV_STATE: WebViewState = {
     visible: true,
     caseSensitive: false,
     regex: false
-  }
+  },
+  authorFilter: null
 };
 
 function setupTestDOM(): void {
@@ -798,6 +833,7 @@ function setupTestDOM(): void {
     '<div id="footer"></div>',
     '<div id="repoControl"><div id="repoSelect"></div></div>',
     '<div id="branchSelect"></div>',
+    '<div id="authorSelect"></div>',
     '<input id="showRemoteBranchesCheckbox" type="checkbox" checked />',
     '<div id="scrollShadow"></div>',
     '<div id="refreshBtn"></div>',
@@ -910,6 +946,7 @@ function makeCommitDetails(hash: string): GitCommitDetails {
     email: "",
     date: 0,
     committer: "",
+    committerEmail: "",
     body: "",
     fileChanges: []
   };
@@ -922,7 +959,7 @@ function makeCommitDetails(hash: string): GitCommitDetails {
  *   <table>.clientHeight = 103 → grid.y = (103-31)/3 = 24
  * Total CDV deduction from viewport: 31 (header) + 24 (commit row) = 55
  */
-const CDV_HEIGHT_DEDUCTION = 55;
+const _CDV_HEIGHT_DEDUCTION = 55;
 
 function setupTableLayoutMocks(): void {
   const headerElem = document.getElementById("tableColHeaders");
@@ -1783,14 +1820,18 @@ describe("GitGraphView frontend integration", () => {
 
     it("scrolls up when CDV top is above viewport (TC-058)", () => {
       // Given: CDV at offsetTop=100, scrollTop=200 (CDV top is above viewport)
-      //   Top check: 100 - 8 = 92 < 200 → true (above viewport)
+      //   srcElemTop = 100 - 24 = 76, headerHeight = 1
+      //   Top check: 76 < 200 + 1 + 8 = 209 → true (above viewport)
       setupScrollEnvironment({ scrollTop: 200, clientHeight: 500, cdvOffsetTop: 100 });
 
       // When: a commit is expanded
       expandCommit(COMMIT_HASH_1);
 
-      // Then: scrollTop = offsetTop - CDV_SCROLL_PADDING = 92
-      expect(scrollContainer.scrollTop).toBe(100 - CDV_SCROLL_PADDING);
+      // Then: scrollTop = srcElemTop - headerHeight - CDV_SCROLL_PADDING = 76 - 1 - 8 = 67
+      const headerHeight = 1; // jsdom default: clientHeight=0, +1
+      expect(scrollContainer.scrollTop).toBe(
+        100 - MOCK_COMMIT_ROW_HEIGHT - headerHeight - CDV_SCROLL_PADDING
+      );
     });
 
     it("scrolls down when CDV bottom exceeds viewport (TC-059)", () => {
@@ -2643,5 +2684,635 @@ describe("GitGraphView findWidgetState backward compatibility", () => {
 
     // Then: FindWidget.restoreState was NOT called
     expect(mockFindWidgetInstance.restoreState).not.toHaveBeenCalled();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S15: File View Toggle (Tree/List) (Task 6.2)                       */
+/* ------------------------------------------------------------------ */
+
+describe("File View Toggle (Tree/List)", () => {
+  let freshVscode: typeof vscode;
+  let freshFileTreeHtml: typeof generateGitFileTreeHtml;
+  let freshFileListHtml: typeof generateGitFileListHtml;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    // Re-import utils and fileTree to get fresh mock references after resetModules
+    const utilsMod = await import("../../web/utils");
+    freshVscode = utilsMod.vscode;
+    vi.mocked(freshVscode.getState).mockReturnValueOnce(null);
+
+    const fileTreeMod = await import("../../web/fileTree");
+    freshFileTreeHtml = fileTreeMod.generateGitFileTreeHtml;
+    freshFileListHtml = fileTreeMod.generateGitFileListHtml;
+
+    await import("../../web/main");
+    loadTestCommits();
+  });
+
+  beforeEach(() => {
+    resetCommitState();
+    setupTableLayoutMocks();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("toggles fileViewType from tree to list and calls generateGitFileListHtml (TC-101)", () => {
+    // Given: fileViewType is "tree" (default), commit details are expanded
+    expandCommit(COMMIT_HASH_1);
+    const toggleBtn = document.getElementById("fileViewToggle");
+    expect(toggleBtn).not.toBeNull();
+
+    // When: toggle button is clicked
+    toggleBtn!.click();
+
+    // Then: generateGitFileListHtml is called (list mode)
+    expect(freshFileListHtml).toHaveBeenCalled();
+  });
+
+  it("toggles fileViewType from list to tree and calls generateGitFileTreeHtml (TC-102)", () => {
+    // Given: commit details are expanded, ensure starting in list mode
+    expandCommit(COMMIT_HASH_1);
+    let toggleBtn = document.getElementById("fileViewToggle");
+    // If in tree mode, toggle to list first
+    if (toggleBtn?.getAttribute("title") === "Switch to List View") {
+      toggleBtn.click();
+    }
+    vi.clearAllMocks();
+
+    // When: toggle button is clicked (list → tree)
+    const currentToggle = document.getElementById("fileViewToggle")!;
+    currentToggle.click();
+
+    // Then: generateGitFileTreeHtml is called (tree mode)
+    expect(freshFileTreeHtml).toHaveBeenCalled();
+  });
+
+  it("sends saveRepoState message with new fileViewType after toggle (TC-103)", () => {
+    // Given: commit details are expanded, ensure starting in tree mode
+    expandCommit(COMMIT_HASH_1);
+    let toggleBtn = document.getElementById("fileViewToggle");
+    if (toggleBtn?.getAttribute("title") === "Switch to Tree View") {
+      toggleBtn.click();
+    }
+    vi.clearAllMocks();
+
+    // When: toggle button is clicked (tree → list)
+    const currentToggle = document.getElementById("fileViewToggle")!;
+    currentToggle.click();
+
+    // Then: saveRepoState message is sent with fileViewType: "list"
+    expect(freshVscode.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "saveRepoState",
+        repo: TEST_REPO,
+        state: expect.objectContaining({
+          fileViewType: "list"
+        })
+      })
+    );
+  });
+
+  it("persists list mode across commit re-expand (TC-104)", () => {
+    // Given: ensure starting in tree mode, then toggle to "list"
+    expandCommit(COMMIT_HASH_1);
+    let toggleBtn = document.getElementById("fileViewToggle");
+    if (toggleBtn?.getAttribute("title") === "Switch to Tree View") {
+      toggleBtn.click(); // list → tree
+    }
+    // Now in tree mode; toggle to list
+    toggleBtn = document.getElementById("fileViewToggle");
+    toggleBtn!.click();
+
+    // When: commit is collapsed and re-expanded (raw dispatch, no clearAllMocks)
+    resetCommitState();
+    setupTableLayoutMocks();
+    clickCommit(COMMIT_HASH_1);
+    vi.clearAllMocks();
+    dispatchMessage({
+      command: "commitDetails",
+      commitDetails: makeCommitDetails(COMMIT_HASH_1)
+    });
+
+    // Then: generateGitFileListHtml is called (list mode persisted in gitRepos)
+    expect(freshFileListHtml).toHaveBeenCalled();
+  });
+
+  it("renders in tree mode when GitRepoState.fileViewType is undefined (TC-105)", () => {
+    // Given: fileViewType was set to "list" by previous test, toggle back to "tree"
+    expandCommit(COMMIT_HASH_1);
+    let toggleBtn = document.getElementById("fileViewToggle");
+    if (toggleBtn?.getAttribute("title") === "Switch to Tree View") {
+      toggleBtn.click();
+    }
+    resetCommitState();
+    setupTableLayoutMocks();
+
+    // When: commit details are expanded (raw dispatch for assertions)
+    clickCommit(COMMIT_HASH_1);
+    vi.clearAllMocks();
+    dispatchMessage({
+      command: "commitDetails",
+      commitDetails: makeCommitDetails(COMMIT_HASH_1)
+    });
+
+    // Then: generateGitFileTreeHtml is called (tree mode)
+    expect(freshFileTreeHtml).toHaveBeenCalled();
+    expect(freshFileListHtml).not.toHaveBeenCalled();
+  });
+
+  it("displays correct toggle icon based on current mode (TC-106)", () => {
+    // Given: fileViewType is "tree" (ensured by TC-105 resetting to tree)
+    expandCommit(COMMIT_HASH_1);
+
+    // Then: toggle button shows list icon (to switch TO list)
+    const toggleBtn = document.getElementById("fileViewToggle");
+    expect(toggleBtn).not.toBeNull();
+    expect(toggleBtn!.getAttribute("title")).toBe("Switch to List View");
+
+    // When: toggled to list mode
+    toggleBtn!.click();
+
+    // Then: toggle button now shows tree icon (to switch TO tree)
+    const toggleBtnAfter = document.getElementById("fileViewToggle");
+    expect(toggleBtnAfter!.getAttribute("title")).toBe("Switch to Tree View");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S16-S19: Author Dropdown, Commit details, data-remotes, Parents    */
+/* ------------------------------------------------------------------ */
+
+describe("Author, details, remotes & parent navigation", () => {
+  let liveVscode: typeof vscode;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    capturedAuthorCallback = null;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    liveVscode = utilsMod.vscode;
+    vi.mocked(liveVscode.getState).mockReturnValueOnce(null);
+
+    await import("../../web/main");
+    loadTestCommits();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* S16: Author Dropdown UI                                          */
+  /* ---------------------------------------------------------------- */
+
+  describe("Author Dropdown UI", () => {
+    const ALL_AUTHORS_OPTION = { name: "All Authors", value: "" };
+
+    it("builds unique sorted author list on loadCommits (TC-107)", () => {
+      // Given: commits with authors Alice, Bob, Carol (authorFilter is null)
+      vi.clearAllMocks();
+
+      // When: loadCommits response is dispatched
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+
+      // Then: authorDropdown.setOptions is called with sorted unique authors
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
+        [
+          ALL_AUTHORS_OPTION,
+          { name: "Alice", value: "Alice" },
+          { name: "Bob", value: "Bob" },
+          { name: "Carol", value: "Carol" }
+        ],
+        ""
+      );
+    });
+
+    it("sends loadCommits with authorFilter on author selection (TC-108)", () => {
+      // Given: authorDropdown callback was captured during construction
+      expect(capturedAuthorCallback).not.toBeNull();
+      vi.clearAllMocks();
+
+      // When: user selects "Alice" from the author dropdown
+      capturedAuthorCallback!("Alice");
+
+      // Then: loadCommits message is sent with authorFilter
+      expect(liveVscode.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: "loadCommits",
+          authorFilter: "Alice"
+        })
+      );
+    });
+
+    it("sends loadCommits without authorFilter on All Authors selection (TC-109)", () => {
+      // Given: authorFilter was previously set
+      expect(capturedAuthorCallback).not.toBeNull();
+      capturedAuthorCallback!("Alice");
+      // Complete the pending loadCommits to clear loadCommitsCallback
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+      vi.clearAllMocks();
+
+      // When: user selects "All Authors" (empty value)
+      capturedAuthorCallback!("");
+
+      // Then: loadCommits message does NOT contain authorFilter
+      const sentMessage = vi.mocked(liveVscode.postMessage).mock.calls[0][0] as Record<
+        string,
+        unknown
+      >;
+      expect(sentMessage.command).toBe("loadCommits");
+      expect(sentMessage).not.toHaveProperty("authorFilter");
+    });
+
+    it("does not update author list when authorFilter is set (TC-110)", () => {
+      // Given: authorFilter is set via dropdown callback
+      expect(capturedAuthorCallback).not.toBeNull();
+      capturedAuthorCallback!("Alice");
+      vi.clearAllMocks();
+
+      // When: loadCommits response is dispatched (filtered commits)
+      dispatchMessage({
+        command: "loadCommits",
+        commits: [MOCK_COMMITS[0]],
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+
+      // Then: authorDropdown.setOptions is NOT called (list stays stable)
+      expect(mockAuthorDropdownInstance.setOptions).not.toHaveBeenCalled();
+
+      // Cleanup: reset authorFilter by selecting All Authors
+      capturedAuthorCallback!("");
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+
+    it("shows only All Authors for empty commits (TC-111)", () => {
+      // Given: authorFilter is null (reset by previous test cleanup)
+      vi.clearAllMocks();
+
+      // When: loadCommits response with empty commits array
+      dispatchMessage({
+        command: "loadCommits",
+        commits: [],
+        head: null,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+
+      // Then: dropdown shows only "All Authors"
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith([ALL_AUTHORS_OPTION], "");
+
+      // Cleanup: restore normal commits
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* S17: コミット詳細表示改善                                         */
+  /* ---------------------------------------------------------------- */
+
+  describe("Commit details display improvements", () => {
+    beforeEach(() => {
+      resetCommitState();
+    });
+
+    it("display order is Commit → Parents → Author → Committer → Date (TC-112)", () => {
+      // Given: a commit is expanded with full details
+      clickCommit(COMMIT_HASH_2);
+      dispatchMessage({
+        command: "commitDetails",
+        commitDetails: {
+          ...makeCommitDetails(COMMIT_HASH_2),
+          parents: [COMMIT_HASH_1],
+          author: "Bob",
+          email: "bob@test.com",
+          date: 1700001000,
+          committer: "Bob",
+          committerEmail: "bob@test.com"
+        }
+      });
+
+      // Then: labels appear in the correct order
+      const detailsElem = document.getElementById("commitDetails");
+      expect(detailsElem).not.toBeNull();
+      const html = detailsElem!.innerHTML;
+      const commitIdx = html.indexOf("<b>Commit: </b>");
+      const parentsIdx = html.indexOf("<b>Parents: </b>");
+      const authorIdx = html.indexOf("<b>Author: </b>");
+      const committerIdx = html.indexOf("<b>Committer: </b>");
+      const dateIdx = html.indexOf("<b>Date: </b>");
+
+      expect(commitIdx).toBeGreaterThan(-1);
+      expect(parentsIdx).toBeGreaterThan(commitIdx);
+      expect(authorIdx).toBeGreaterThan(parentsIdx);
+      expect(committerIdx).toBeGreaterThan(authorIdx);
+      expect(dateIdx).toBeGreaterThan(committerIdx);
+    });
+
+    it("Committer shows email with mailto link (TC-113)", () => {
+      // Given: a commit with committerEmail
+      clickCommit(COMMIT_HASH_2);
+      dispatchMessage({
+        command: "commitDetails",
+        commitDetails: {
+          ...makeCommitDetails(COMMIT_HASH_2),
+          committer: "Bob",
+          committerEmail: "bob@test.com"
+        }
+      });
+
+      // Then: Committer line contains mailto link with email
+      const detailsElem = document.getElementById("commitDetails");
+      const html = detailsElem!.innerHTML;
+      expect(html).toContain("mailto:bob%40test.com");
+      expect(html).toContain("bob@test.com");
+      expect(html).toContain("<b>Committer: </b>");
+    });
+
+    it("Committer shows name only when email is empty (TC-114)", () => {
+      // Given: a commit with empty committerEmail
+      clickCommit(COMMIT_HASH_2);
+      dispatchMessage({
+        command: "commitDetails",
+        commitDetails: {
+          ...makeCommitDetails(COMMIT_HASH_2),
+          committer: "Bob",
+          committerEmail: ""
+        }
+      });
+
+      // Then: Committer shows name only without mailto link
+      const detailsElem = document.getElementById("commitDetails");
+      const html = detailsElem!.innerHTML;
+      const committerMatch = html.match(/<b>Committer: <\/b>(.*?)<br>/);
+      expect(committerMatch).not.toBeNull();
+      expect(committerMatch![1]).toBe("Bob");
+      expect(committerMatch![1]).not.toContain("mailto:");
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* S18: data-remotes attribute                                      */
+  /* ---------------------------------------------------------------- */
+
+  describe("data-remotes attribute", () => {
+    beforeEach(() => {
+      resetCommitState();
+    });
+
+    it("sets data-remotes on branch with multiple remotes (TC-115)", () => {
+      // Given: getBranchLabels returns a head branch with remotes
+      vi.mocked(getBranchLabels).mockReturnValue({
+        heads: [{ name: "main", remotes: ["origin", "upstream"] }],
+        remotes: [],
+        tags: []
+      });
+
+      // When: commits are loaded (triggers renderTable)
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+
+      // Then: the gitRef head span has data-remotes attribute
+      const headSpan = document.querySelector(".gitRef.head");
+      expect(headSpan).not.toBeNull();
+      expect(headSpan!.getAttribute("data-remotes")).toBe("origin,upstream");
+
+      // Cleanup
+      vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+    });
+
+    it("omits data-remotes on branch without remotes (TC-116)", () => {
+      // Given: getBranchLabels returns a head branch without remotes
+      vi.mocked(getBranchLabels).mockReturnValue({
+        heads: [{ name: "feature", remotes: [] }],
+        remotes: [],
+        tags: []
+      });
+
+      // When: commits are loaded
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+
+      // Then: the gitRef head span does NOT have data-remotes attribute
+      const headSpan = document.querySelector(".gitRef.head");
+      expect(headSpan).not.toBeNull();
+      expect(headSpan!.hasAttribute("data-remotes")).toBe(false);
+
+      // Cleanup
+      vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+    });
+
+    it("contextmenu reads data-remotes and passes to buildRefContextMenuItems (TC-117)", () => {
+      // Given: a branch with remotes is rendered
+      vi.mocked(getBranchLabels).mockReturnValue({
+        heads: [{ name: "main", remotes: ["origin"] }],
+        remotes: [],
+        tags: []
+      });
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+      vi.clearAllMocks();
+
+      // When: contextmenu is triggered on the gitRef element
+      const headSpan = document.querySelector(".gitRef.head");
+      expect(headSpan).not.toBeNull();
+      headSpan!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+      // Then: buildRefContextMenuItems is called with remotes parameter
+      expect(buildRefContextMenuItems).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.any(HTMLElement),
+        expect.any(Boolean),
+        expect.anything(),
+        ["origin"]
+      );
+
+      // Cleanup
+      vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* S19: Parents link navigation                                     */
+  /* ---------------------------------------------------------------- */
+
+  describe("Parents link navigation", () => {
+    beforeEach(() => {
+      resetCommitState();
+    });
+
+    it("displays parent hash as clickable span with data-hash (TC-118)", () => {
+      // Given: a commit with one parent
+      clickCommit(COMMIT_HASH_2);
+      dispatchMessage({
+        command: "commitDetails",
+        commitDetails: {
+          ...makeCommitDetails(COMMIT_HASH_2),
+          parents: [COMMIT_HASH_1]
+        }
+      });
+
+      // Then: parent hash is rendered as a span with parentHash class and data-hash
+      const parentSpan = document.querySelector(".parentHash");
+      expect(parentSpan).not.toBeNull();
+      expect(parentSpan!.getAttribute("data-hash")).toBe(COMMIT_HASH_1);
+    });
+
+    it("displays full parent hash without abbreviation (TC-119)", () => {
+      // Given: a commit with one parent
+      clickCommit(COMMIT_HASH_2);
+      dispatchMessage({
+        command: "commitDetails",
+        commitDetails: {
+          ...makeCommitDetails(COMMIT_HASH_2),
+          parents: [COMMIT_HASH_1]
+        }
+      });
+
+      // Then: displayed text is the full hash (not abbreviated)
+      const parentSpan = document.querySelector(".parentHash");
+      expect(parentSpan).not.toBeNull();
+      expect(parentSpan!.textContent).toBe(COMMIT_HASH_1);
+    });
+
+    it("clicking loaded parent scrolls and opens details (TC-120)", () => {
+      // Given: commit 2 is expanded, parent is commit 1 (which is loaded)
+      clickCommit(COMMIT_HASH_2);
+      dispatchMessage({
+        command: "commitDetails",
+        commitDetails: {
+          ...makeCommitDetails(COMMIT_HASH_2),
+          parents: [COMMIT_HASH_1]
+        }
+      });
+      vi.clearAllMocks();
+
+      // When: parent hash link is clicked
+      const parentSpan = document.querySelector(".parentHash");
+      expect(parentSpan).not.toBeNull();
+      parentSpan!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+      // Then: commitDetails request is sent for the parent commit
+      expect(liveVscode.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: "commitDetails",
+          commitHash: COMMIT_HASH_1
+        })
+      );
+    });
+
+    it("unloaded parent is rendered as plain text without link (TC-121)", () => {
+      // Given: commit 1 is expanded with a parent hash that is NOT in commitLookup
+      const unknownParentHash = "fff999fff999fff9";
+      clickCommit(COMMIT_HASH_1);
+      dispatchMessage({
+        command: "commitDetails",
+        commitDetails: {
+          ...makeCommitDetails(COMMIT_HASH_1),
+          parents: [unknownParentHash]
+        }
+      });
+
+      // Then: unknown parent is rendered as plain text (no .parentHash span)
+      const parentSpan = document.querySelector(".parentHash");
+      expect(parentSpan).toBeNull();
+
+      // And: the hash text is present in the details HTML
+      const detailsElem = document.getElementById("commitDetails");
+      expect(detailsElem!.innerHTML).toContain(unknownParentHash);
+    });
+
+    it("merge commit shows both parent hashes as links (TC-122)", () => {
+      // Given: a merge commit with two parents
+      const mergeHash = "eee888eee888eee8";
+      const mergeCommits: GitCommitNode[] = [
+        {
+          hash: mergeHash,
+          parentHashes: [COMMIT_HASH_1, COMMIT_HASH_2],
+          author: "Alice",
+          email: "alice@test.com",
+          date: 1700003000,
+          message: "Merge commit",
+          refs: [],
+          stash: null
+        },
+        ...MOCK_COMMITS
+      ];
+      dispatchMessage({
+        command: "loadCommits",
+        commits: mergeCommits,
+        head: mergeHash,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+
+      // When: merge commit is expanded
+      clickCommit(mergeHash);
+      dispatchMessage({
+        command: "commitDetails",
+        commitDetails: {
+          ...makeCommitDetails(mergeHash),
+          parents: [COMMIT_HASH_1, COMMIT_HASH_2]
+        }
+      });
+
+      // Then: both parent hashes are rendered as links
+      const parentSpans = document.querySelectorAll(".parentHash");
+      expect(parentSpans.length).toBe(2);
+      expect(parentSpans[0].getAttribute("data-hash")).toBe(COMMIT_HASH_1);
+      expect(parentSpans[1].getAttribute("data-hash")).toBe(COMMIT_HASH_2);
+    });
   });
 });

@@ -23,7 +23,22 @@ const headRegex = /^\(HEAD detached at [0-9A-Za-z]+\)/g;
 const gitLogSeparator = "XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb";
 const COMMIT_HASH_PATTERN = /^[0-9a-f]{4,40}$/i;
 const NO_QUOTE_PATH_CONFIG = ["-c", "core.quotePath=false"];
+const LOG_FORMAT_FIELD_COUNT = 6;
 const STASH_FORMAT_FIELD_COUNT = 7;
+
+/**
+ * Commit details format field indices (used in gitCommitDetailsFormat and commitDetails parser).
+ * Maps to: %H(hash), %P(parents), %an(author), %ae(email), dateType, %cn(committer), %ce(committerEmail)
+ */
+const COMMIT_DETAILS_FIELD = {
+  HASH: 0,
+  PARENTS: 1,
+  AUTHOR: 2,
+  EMAIL: 3,
+  DATE: 4,
+  COMMITTER: 5,
+  COMMITTER_EMAIL: 6
+} as const;
 
 function isValidCommitHash(hash: string): boolean {
   return COMMIT_HASH_PATTERN.test(hash);
@@ -71,7 +86,8 @@ export class DataSource {
     let dateType = getConfig().dateType() === "Author Date" ? "%at" : "%ct";
     this.gitLogFormat = ["%H", "%P", "%an", "%ae", dateType, "%s"].join(gitLogSeparator);
     this.gitStashFormat = ["%H", "%P", "%gD", "%an", "%ae", dateType, "%s"].join(gitLogSeparator);
-    this.gitCommitDetailsFormat = `${["%H", "%P", "%an", "%ae", dateType, "%cn"].join(gitLogSeparator)}%n%B`;
+    const commitDetailsFields = ["%H", "%P", "%an", "%ae", dateType, "%cn", "%ce"];
+    this.gitCommitDetailsFormat = `${commitDetailsFields.join(gitLogSeparator)}%n%B`;
   }
 
   public getBranches(repo: string, showRemoteBranches: boolean) {
@@ -106,10 +122,11 @@ export class DataSource {
     repo: string,
     branch: string,
     maxCommits: number,
-    showRemoteBranches: boolean
+    showRemoteBranches: boolean,
+    authorFilter?: string
   ) {
     const [commits, refData, stashes] = await Promise.all([
-      this.getGitLog(repo, branch, maxCommits + 1, showRemoteBranches),
+      this.getGitLog(repo, branch, maxCommits + 1, showRemoteBranches, authorFilter),
       this.getRefs(repo, showRemoteBranches),
       this.getStashes(repo)
     ]);
@@ -216,12 +233,13 @@ export class DataSource {
             while (lines.length > 0 && lines[lastLine] === "") lastLine--;
             let commitInfo = lines[0].split(gitLogSeparator);
             return {
-              hash: commitInfo[0],
-              parents: commitInfo[1].split(" "),
-              author: commitInfo[2],
-              email: commitInfo[3],
-              date: parseInt(commitInfo[4], 10),
-              committer: commitInfo[5],
+              hash: commitInfo[COMMIT_DETAILS_FIELD.HASH],
+              parents: commitInfo[COMMIT_DETAILS_FIELD.PARENTS].split(" "),
+              author: commitInfo[COMMIT_DETAILS_FIELD.AUTHOR],
+              email: commitInfo[COMMIT_DETAILS_FIELD.EMAIL],
+              date: parseInt(commitInfo[COMMIT_DETAILS_FIELD.DATE], 10),
+              committer: commitInfo[COMMIT_DETAILS_FIELD.COMMITTER],
+              committerEmail: commitInfo[COMMIT_DETAILS_FIELD.COMMITTER_EMAIL] ?? "",
               body: lines.slice(1, lastLine + 1).join("\n"),
               fileChanges: []
             };
@@ -339,6 +357,7 @@ export class DataSource {
         email: "",
         date: 0,
         committer: "",
+        committerEmail: "",
         body: "",
         fileChanges: []
       };
@@ -581,6 +600,14 @@ export class DataSource {
     );
   }
 
+  public deleteRemoteBranch(repo: string, remoteName: string, branchName: string) {
+    return this.runGitCommandSpawn(["push", remoteName, "--delete", branchName], repo);
+  }
+
+  public rebaseBranch(repo: string, branchName: string) {
+    return this.runGitCommandSpawn(["rebase", branchName], repo);
+  }
+
   public mergeCommit(repo: string, commitHash: string, createNewCommit: boolean) {
     if (!isValidCommitHash(commitHash)) {
       return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
@@ -721,8 +748,17 @@ export class DataSource {
     );
   }
 
-  private getGitLog(repo: string, branch: string, num: number, showRemoteBranches: boolean) {
-    let args = ["log", `--max-count=${num}`, `--format=${this.gitLogFormat}`, "--date-order"];
+  private getGitLog(
+    repo: string,
+    branch: string,
+    num: number,
+    showRemoteBranches: boolean,
+    authorFilter?: string
+  ) {
+    const args = ["log", `--max-count=${num}`, `--format=${this.gitLogFormat}`, "--date-order"];
+    if (authorFilter) {
+      args.push(`--author=${authorFilter}`);
+    }
     if (branch !== "") {
       args.push(branch);
     } else {
@@ -734,11 +770,11 @@ export class DataSource {
       args,
       repo,
       (stdout) => {
-        let lines = stdout.split(eolRegex);
-        let gitCommits: GitCommit[] = [];
+        const lines = stdout.split(eolRegex);
+        const gitCommits: GitCommit[] = [];
         for (let i = 0; i < lines.length - 1; i++) {
-          let line = lines[i].split(gitLogSeparator);
-          if (line.length !== 6) break;
+          const line = lines[i].split(gitLogSeparator);
+          if (line.length !== LOG_FORMAT_FIELD_COUNT) break;
           gitCommits.push({
             hash: line[0],
             parentHashes: line[1].split(" "),

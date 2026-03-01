@@ -10,6 +10,10 @@ const mocks = vi.hoisted(() => ({
   resetUncommitted: vi.fn(),
   cleanUntrackedFiles: vi.fn(),
   getCommitComparison: vi.fn(),
+  deleteRemoteBranch: vi.fn(),
+  rebaseBranch: vi.fn(),
+  deleteBranch: vi.fn(),
+  getCommits: vi.fn(),
   executeCommand: vi.fn(),
   encodeDiffDocUri: vi.fn(),
   mute: vi.fn(),
@@ -921,5 +925,405 @@ describe("GitGraphView viewState keybindings and loadMoreCommitsAutomatically (S
     // Then: viewState in HTML contains loadMoreCommitsAutomatically
     const viewState = parseViewState(getPanelHtml());
     expect(viewState.loadMoreCommitsAutomatically).toBe(true);
+  });
+});
+
+describe("GitGraphView deleteRemoteBranch/rebaseBranch message routing (S8)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitGraphView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.deleteRemoteBranch.mockResolvedValue(null);
+    mocks.rebaseBranch.mockResolvedValue(null);
+
+    const mockDataSource = {
+      applyStash: mocks.applyStash,
+      popStash: mocks.popStash,
+      dropStash: mocks.dropStash,
+      branchFromStash: mocks.branchFromStash,
+      pushStash: mocks.pushStash,
+      resetUncommitted: mocks.resetUncommitted,
+      cleanUntrackedFiles: mocks.cleanUntrackedFiles,
+      getCommitComparison: mocks.getCommitComparison,
+      deleteRemoteBranch: mocks.deleteRemoteBranch,
+      rebaseBranch: mocks.rebaseBranch
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitGraphView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitGraphView.currentPanel?.dispose();
+    GitGraphView.currentPanel = undefined;
+  });
+
+  it("routes deleteRemoteBranch message to DataSource.deleteRemoteBranch (TC-021)", async () => {
+    // Given: GitGraphView instance with mocked DataSource
+    // When: RequestDeleteRemoteBranch message is received
+    await mocks.messageHandler.current!({
+      command: "deleteRemoteBranch",
+      repo: TEST_REPO,
+      remoteName: "origin",
+      branchName: "feature/x"
+    });
+
+    // Then: DataSource.deleteRemoteBranch is called with correct arguments
+    expect(mocks.deleteRemoteBranch).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteRemoteBranch).toHaveBeenCalledWith(TEST_REPO, "origin", "feature/x");
+    expect(mocks.mute).toHaveBeenCalled();
+    expect(mocks.unmute).toHaveBeenCalled();
+  });
+
+  it("routes rebaseBranch message to DataSource.rebaseBranch (TC-022)", async () => {
+    // Given: GitGraphView instance with mocked DataSource
+    // When: RequestRebaseBranch message is received
+    await mocks.messageHandler.current!({
+      command: "rebaseBranch",
+      repo: TEST_REPO,
+      branchName: "main"
+    });
+
+    // Then: DataSource.rebaseBranch is called with correct arguments
+    expect(mocks.rebaseBranch).toHaveBeenCalledTimes(1);
+    expect(mocks.rebaseBranch).toHaveBeenCalledWith(TEST_REPO, "main");
+    expect(mocks.mute).toHaveBeenCalled();
+    expect(mocks.unmute).toHaveBeenCalled();
+  });
+
+  it("sends ResponseDeleteRemoteBranch with status null on success (TC-023)", async () => {
+    // Given: deleteRemoteBranch returns null (success)
+    mocks.deleteRemoteBranch.mockResolvedValue(null);
+
+    // When: RequestDeleteRemoteBranch message is received
+    await mocks.messageHandler.current!({
+      command: "deleteRemoteBranch",
+      repo: TEST_REPO,
+      remoteName: "origin",
+      branchName: "feature/y"
+    });
+
+    // Then: ResponseDeleteRemoteBranch is sent with status null
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "deleteRemoteBranch",
+      status: null
+    });
+  });
+
+  it("sends ResponseRebaseBranch with error status on failure (TC-024)", async () => {
+    // Given: rebaseBranch returns an error message
+    const errorMsg = "CONFLICT (content): Merge conflict in src/file.ts";
+    mocks.rebaseBranch.mockResolvedValue(errorMsg);
+
+    // When: RequestRebaseBranch message is received
+    await mocks.messageHandler.current!({
+      command: "rebaseBranch",
+      repo: TEST_REPO,
+      branchName: "develop"
+    });
+
+    // Then: ResponseRebaseBranch is sent with the error status
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "rebaseBranch",
+      status: errorMsg
+    });
+  });
+});
+
+describe("GitGraphView deleteBranch extension (S9)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitGraphView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.deleteBranch.mockResolvedValue(null);
+    mocks.deleteRemoteBranch.mockResolvedValue(null);
+
+    const mockDataSource = {
+      applyStash: mocks.applyStash,
+      popStash: mocks.popStash,
+      dropStash: mocks.dropStash,
+      branchFromStash: mocks.branchFromStash,
+      pushStash: mocks.pushStash,
+      resetUncommitted: mocks.resetUncommitted,
+      cleanUntrackedFiles: mocks.cleanUntrackedFiles,
+      getCommitComparison: mocks.getCommitComparison,
+      deleteBranch: mocks.deleteBranch,
+      deleteRemoteBranch: mocks.deleteRemoteBranch,
+      rebaseBranch: mocks.rebaseBranch
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitGraphView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitGraphView.currentPanel?.dispose();
+    GitGraphView.currentPanel = undefined;
+  });
+
+  it("calls deleteRemoteBranch for each remote after successful local delete (TC-025)", async () => {
+    // Given: local delete succeeds, deleteOnRemotes has one remote
+    mocks.deleteBranch.mockResolvedValue(null);
+    mocks.deleteRemoteBranch.mockResolvedValue(null);
+
+    // When: deleteBranch message with deleteOnRemotes is received
+    await mocks.messageHandler.current!({
+      command: "deleteBranch",
+      repo: TEST_REPO,
+      branchName: "feature/done",
+      forceDelete: false,
+      deleteOnRemotes: ["origin"]
+    });
+
+    // Then: local delete is called
+    expect(mocks.deleteBranch).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteBranch).toHaveBeenCalledWith(TEST_REPO, "feature/done", false);
+
+    // Then: refresh is sent after local success
+    expect(mocks.postMessage).toHaveBeenCalledWith({ command: "refresh" });
+
+    // Then: deleteRemoteBranch is called for origin
+    expect(mocks.deleteRemoteBranch).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteRemoteBranch).toHaveBeenCalledWith(TEST_REPO, "origin", "feature/done");
+  });
+
+  it("does not call deleteRemoteBranch when deleteOnRemotes is empty (TC-026)", async () => {
+    // Given: local delete succeeds, deleteOnRemotes is empty
+    mocks.deleteBranch.mockResolvedValue(null);
+
+    // When: deleteBranch message with empty deleteOnRemotes is received
+    await mocks.messageHandler.current!({
+      command: "deleteBranch",
+      repo: TEST_REPO,
+      branchName: "feature/local-only",
+      forceDelete: false,
+      deleteOnRemotes: []
+    });
+
+    // Then: local delete is called and response is sent
+    expect(mocks.deleteBranch).toHaveBeenCalledTimes(1);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "deleteBranch",
+      status: null
+    });
+
+    // Then: deleteRemoteBranch is NOT called
+    expect(mocks.deleteRemoteBranch).not.toHaveBeenCalled();
+
+    // Then: no refresh message is sent (handled by frontend refreshOrError)
+    const refreshCalls = mocks.postMessage.mock.calls.filter(
+      (call: unknown[]) => (call[0] as Record<string, unknown>).command === "refresh"
+    );
+    expect(refreshCalls).toHaveLength(0);
+  });
+
+  it("sends refresh and error dialog when local succeeds but remote fails (TC-027)", async () => {
+    // Given: local delete succeeds, remote delete fails
+    mocks.deleteBranch.mockResolvedValue(null);
+    const remoteError = "error: unable to delete 'feature/done': remote ref does not exist";
+    mocks.deleteRemoteBranch.mockResolvedValue(remoteError);
+
+    // When: deleteBranch message with deleteOnRemotes is received
+    await mocks.messageHandler.current!({
+      command: "deleteBranch",
+      repo: TEST_REPO,
+      branchName: "feature/done",
+      forceDelete: false,
+      deleteOnRemotes: ["origin"]
+    });
+
+    // Then: ResponseDeleteBranch with local success status
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "deleteBranch",
+      status: null
+    });
+
+    // Then: refresh is sent
+    expect(mocks.postMessage).toHaveBeenCalledWith({ command: "refresh" });
+
+    // Then: error is reported via ResponseDeleteRemoteBranch
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "deleteRemoteBranch",
+      status: `origin: ${remoteError}`
+    });
+  });
+
+  it("does not attempt remote delete when local delete fails (TC-028)", async () => {
+    // Given: local delete fails
+    const localError = "error: The branch 'feature/done' is not fully merged.";
+    mocks.deleteBranch.mockResolvedValue(localError);
+
+    // When: deleteBranch message with deleteOnRemotes is received
+    await mocks.messageHandler.current!({
+      command: "deleteBranch",
+      repo: TEST_REPO,
+      branchName: "feature/done",
+      forceDelete: false,
+      deleteOnRemotes: ["origin"]
+    });
+
+    // Then: ResponseDeleteBranch with error status
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "deleteBranch",
+      status: localError
+    });
+
+    // Then: deleteRemoteBranch is NOT called
+    expect(mocks.deleteRemoteBranch).not.toHaveBeenCalled();
+
+    // Then: no refresh is sent
+    const refreshCalls = mocks.postMessage.mock.calls.filter(
+      (call: unknown[]) => (call[0] as Record<string, unknown>).command === "refresh"
+    );
+    expect(refreshCalls).toHaveLength(0);
+  });
+});
+
+describe("GitGraphView loadCommits authorFilter (S10)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitGraphView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.getCommits.mockResolvedValue({
+      commits: [],
+      head: null,
+      moreCommitsAvailable: false
+    });
+
+    const mockDataSource = {
+      applyStash: mocks.applyStash,
+      popStash: mocks.popStash,
+      dropStash: mocks.dropStash,
+      branchFromStash: mocks.branchFromStash,
+      pushStash: mocks.pushStash,
+      resetUncommitted: mocks.resetUncommitted,
+      cleanUntrackedFiles: mocks.cleanUntrackedFiles,
+      getCommitComparison: mocks.getCommitComparison,
+      deleteBranch: mocks.deleteBranch,
+      deleteRemoteBranch: mocks.deleteRemoteBranch,
+      rebaseBranch: mocks.rebaseBranch,
+      getCommits: mocks.getCommits
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitGraphView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitGraphView.currentPanel?.dispose();
+    GitGraphView.currentPanel = undefined;
+  });
+
+  it("passes authorFilter to dataSource.getCommits when specified (TC-029)", async () => {
+    // Given: loadCommits message with authorFilter
+    // When: RequestLoadCommits message with authorFilter is received
+    await mocks.messageHandler.current!({
+      command: "loadCommits",
+      repo: TEST_REPO,
+      branchName: "main",
+      maxCommits: 300,
+      showRemoteBranches: true,
+      hard: false,
+      authorFilter: "Alice"
+    });
+
+    // Then: getCommits is called with authorFilter "Alice"
+    expect(mocks.getCommits).toHaveBeenCalledTimes(1);
+    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, "main", 300, true, "Alice");
+  });
+
+  it("passes undefined authorFilter to dataSource.getCommits when not specified (TC-030)", async () => {
+    // Given: loadCommits message without authorFilter
+    // When: RequestLoadCommits message without authorFilter is received
+    await mocks.messageHandler.current!({
+      command: "loadCommits",
+      repo: TEST_REPO,
+      branchName: "main",
+      maxCommits: 300,
+      showRemoteBranches: true,
+      hard: false
+    });
+
+    // Then: getCommits is called without authorFilter (undefined)
+    expect(mocks.getCommits).toHaveBeenCalledTimes(1);
+    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, "main", 300, true, undefined);
   });
 });

@@ -44,6 +44,7 @@ export interface GitCommitDetails {
   email: string;
   date: number;
   committer: string;
+  committerEmail: string;
   body: string;
   fileChanges: GitFileChange[];
 }
@@ -62,6 +63,7 @@ export interface GitRefData {
 export type GitRepoSet = { [repo: string]: GitRepoState };
 export interface GitRepoState {
   columnWidths: number[] | null;
+  fileViewType?: "tree" | "list";
 }
 
 export interface GitUnsavedChanges {
@@ -202,9 +204,31 @@ export interface RequestDeleteBranch {
   repo: string;
   branchName: string;
   forceDelete: boolean;
+  deleteOnRemotes: string[];
 }
 export interface ResponseDeleteBranch {
   command: "deleteBranch";
+  status: GitCommandStatus;
+}
+
+export interface RequestDeleteRemoteBranch {
+  command: "deleteRemoteBranch";
+  repo: string;
+  remoteName: string;
+  branchName: string;
+}
+export interface ResponseDeleteRemoteBranch {
+  command: "deleteRemoteBranch";
+  status: GitCommandStatus;
+}
+
+export interface RequestRebaseBranch {
+  command: "rebaseBranch";
+  repo: string;
+  branchName: string;
+}
+export interface ResponseRebaseBranch {
+  command: "rebaseBranch";
   status: GitCommandStatus;
 }
 
@@ -251,6 +275,7 @@ export interface RequestLoadCommits {
   maxCommits: number;
   showRemoteBranches: boolean;
   hard: boolean;
+  authorFilter?: string;
 }
 export interface ResponseLoadCommits {
   command: "loadCommits";
@@ -491,6 +516,7 @@ export type RequestMessage =
   | RequestCopyToClipboard
   | RequestCreateBranch
   | RequestDeleteBranch
+  | RequestDeleteRemoteBranch
   | RequestDeleteTag
   | RequestDropStash
   | RequestFetch
@@ -505,6 +531,7 @@ export type RequestMessage =
   | RequestPopStash
   | RequestPushStash
   | RequestPushTag
+  | RequestRebaseBranch
   | RequestRenameBranch
   | RequestResetToCommit
   | RequestResetUncommitted
@@ -525,6 +552,7 @@ export type ResponseMessage =
   | ResponseCopyToClipboard
   | ResponseCreateBranch
   | ResponseDeleteBranch
+  | ResponseDeleteRemoteBranch
   | ResponseDeleteTag
   | ResponseDropStash
   | ResponseFetch
@@ -539,6 +567,7 @@ export type ResponseMessage =
   | ResponsePopStash
   | ResponsePushStash
   | ResponsePushTag
+  | ResponseRebaseBranch
   | ResponseRefresh
   | ResponseSelectRepo
   | ResponseRenameBranch

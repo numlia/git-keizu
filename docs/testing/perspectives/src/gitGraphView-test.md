@@ -89,3 +89,43 @@
 | ------- | ---------------------------- | ------------------------------------ | ---------------------------------------------------- | -------------------- |
 | TC-019  | getHtmlForWebview() 呼び出し | Equivalence - normal                 | viewState に keybindings オブジェクトが含まれる      | 設定パイプライン検証 |
 | TC-020  | getHtmlForWebview() 呼び出し | Equivalence - normal                 | viewState に loadMoreCommitsAutomatically が含まれる | 設定パイプライン検証 |
+
+## S8: deleteRemoteBranch/rebaseBranch メッセージルーティング
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**テスト対象パス**: `src/gitGraphView.ts`
+
+| Case ID | Input / Precondition                     | Perspective (Equivalence / Boundary) | Expected Result                                                          | Notes                |
+| ------- | ---------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------ | -------------------- |
+| TC-021  | RequestDeleteRemoteBranch メッセージ受信 | Equivalence - normal                 | DataSource.deleteRemoteBranch が repo, remoteName, branchName で呼ばれる | mute/unmute パターン |
+| TC-022  | RequestRebaseBranch メッセージ受信       | Equivalence - normal                 | DataSource.rebaseBranch が repo, branchName で呼ばれる                   | mute/unmute パターン |
+| TC-023  | deleteRemoteBranch 成功（null 返却）     | Equivalence - normal                 | ResponseDeleteRemoteBranch が status: null で webview に送信される       | -                    |
+| TC-024  | rebaseBranch 失敗（エラー文字列返却）    | Equivalence - error                  | ResponseRebaseBranch が status: "error message" で webview に送信される  | -                    |
+
+## S9: deleteBranch 拡張（リモート同時削除）
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**テスト対象パス**: `src/gitGraphView.ts`
+
+| Case ID | Input / Precondition                                     | Perspective (Equivalence / Boundary) | Expected Result                                                                              | Notes                |
+| ------- | -------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------- | -------------------- |
+| TC-025  | deleteOnRemotes = ["origin"], ローカル削除成功           | Equivalence - normal                 | ローカル削除後にリフレッシュ送信、続けて deleteRemoteBranch("origin", branchName) が呼ばれる | 部分成功考慮         |
+| TC-026  | deleteOnRemotes = [] (空配列)                            | Equivalence - normal (no remote)     | ローカル削除のみ実行。deleteRemoteBranch は呼ばれない                                        | 既存動作維持         |
+| TC-027  | deleteOnRemotes = ["origin"], ローカル成功、リモート失敗 | Equivalence - partial success        | グラフリフレッシュ後、リモート削除エラーが別途エラーダイアログで表示される                   | ローカル削除は維持   |
+| TC-028  | ローカル削除が失敗                                       | Equivalence - error                  | エラーレスポンスが返却される。deleteRemoteBranch は呼ばれない                                | リモート削除試行なし |
+
+## S10: loadCommits 拡張（Author フィルタ）
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**テスト対象パス**: `src/gitGraphView.ts`
+
+| Case ID | Input / Precondition         | Perspective (Equivalence / Boundary) | Expected Result                                                         | Notes    |
+| ------- | ---------------------------- | ------------------------------------ | ----------------------------------------------------------------------- | -------- |
+| TC-029  | msg.authorFilter = "Alice"   | Equivalence - normal                 | dataSource.getCommits() の authorFilter パラメータに "Alice" が渡される | -        |
+| TC-030  | msg.authorFilter = undefined | Equivalence - normal (no filter)     | dataSource.getCommits() が authorFilter なしで呼ばれる（既存動作維持）  | 後方互換 |

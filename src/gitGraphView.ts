@@ -226,10 +226,29 @@ export class GitGraphView {
               status: await this.dataSource.createBranch(msg.repo, msg.branchName, msg.commitHash)
             });
             break;
-          case "deleteBranch":
+          case "deleteBranch": {
+            const localStatus = await this.dataSource.deleteBranch(
+              msg.repo,
+              msg.branchName,
+              msg.forceDelete
+            );
             this.sendMessage({
               command: "deleteBranch",
-              status: await this.dataSource.deleteBranch(msg.repo, msg.branchName, msg.forceDelete)
+              status: localStatus
+            });
+            if (localStatus === null && msg.deleteOnRemotes.length > 0) {
+              await this.deleteRemoteBranches(msg.repo, msg.branchName, msg.deleteOnRemotes);
+            }
+            break;
+          }
+          case "deleteRemoteBranch":
+            this.sendMessage({
+              command: "deleteRemoteBranch",
+              status: await this.dataSource.deleteRemoteBranch(
+                msg.repo,
+                msg.remoteName,
+                msg.branchName
+              )
             });
             break;
           case "deleteTag":
@@ -238,13 +257,11 @@ export class GitGraphView {
               status: await this.dataSource.deleteTag(msg.repo, msg.tagName)
             });
             break;
-          case "loadBranches":
-            let branchData = await this.dataSource.getBranches(msg.repo, msg.showRemoteBranches),
-              isRepo = true;
-            if (branchData.error) {
-              // If an error occurred, check to make sure the repo still exists
-              isRepo = await this.dataSource.isGitRepository(msg.repo);
-            }
+          case "loadBranches": {
+            const branchData = await this.dataSource.getBranches(msg.repo, msg.showRemoteBranches);
+            const isRepo = branchData.error
+              ? await this.dataSource.isGitRepository(msg.repo)
+              : true;
             this.sendMessage({
               command: "loadBranches",
               branches: branchData.branches,
@@ -258,6 +275,7 @@ export class GitGraphView {
               this.repoFileWatcher.start(msg.repo);
             }
             break;
+          }
           case "loadCommits":
             this.sendMessage({
               command: "loadCommits",
@@ -265,7 +283,8 @@ export class GitGraphView {
                 msg.repo,
                 msg.branchName,
                 msg.maxCommits,
-                msg.showRemoteBranches
+                msg.showRemoteBranches,
+                msg.authorFilter
               )),
               hard: msg.hard
             });
@@ -294,6 +313,12 @@ export class GitGraphView {
                 msg.commitHash,
                 msg.createNewCommit
               )
+            });
+            break;
+          case "rebaseBranch":
+            this.sendMessage({
+              command: "rebaseBranch",
+              status: await this.dataSource.rebaseBranch(msg.repo, msg.branchName)
             });
             break;
           case "pull":
@@ -468,7 +493,8 @@ export class GitGraphView {
 			<div id="controls">
 				<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoSelect" class="dropdown"></div></span>
 				<span id="branchControl"><span class="unselectable">Branch: </span><div id="branchSelect" class="dropdown"></div></span>
-				<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" value="1" checked>Show Remote Branches</label>
+				<span id="authorControl"><span class="unselectable">Author: </span><div id="authorSelect" class="dropdown"></div></span>
+				<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" value="1" checked><span class="customCheckbox"></span>Show Remote Branches</label>
 				<div id="searchBtn" title="Search"></div>
 				<div id="fetchBtn" title="Fetch --prune"></div>
 				<div id="currentBtn" title="Current"></div>
@@ -530,6 +556,27 @@ export class GitGraphView {
       repos: repos,
       lastActiveRepo: this.extensionState.getLastActiveRepo()
     });
+  }
+
+  private async deleteRemoteBranches(
+    repo: string,
+    branchName: string,
+    remotes: string[]
+  ): Promise<void> {
+    this.sendMessage({ command: "refresh" });
+    const remoteErrors: string[] = [];
+    for (const remote of remotes) {
+      const remoteStatus = await this.dataSource.deleteRemoteBranch(repo, remote, branchName);
+      if (remoteStatus !== null) {
+        remoteErrors.push(`${remote}: ${remoteStatus}`);
+      }
+    }
+    if (remoteErrors.length > 0) {
+      this.sendMessage({
+        command: "deleteRemoteBranch",
+        status: remoteErrors.join("\n")
+      });
+    }
   }
 
   private async viewDiff(

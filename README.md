@@ -18,8 +18,11 @@ Git Keizu is a personal take on a git history viewer — shaped around the featu
 ## Features
 
 - **Graph View**: See all your branches, tags, stash entries, and uncommitted changes in one visual graph. The menu bar and column headers stay fixed as you scroll, so controls are always within reach in long histories.
-- **Commit Details**: Click on a commit to see what changed and view diffs for any file. The panel height adjusts to your viewport size, and the view only scrolls enough to bring the panel into view — no jarring auto-center on every click.
-- **Branch Actions**: Right-click to create, checkout, delete, rename, or merge branches
+- **Author Filter**: A dropdown in the toolbar lets you filter commits by author — select any name to show only their commits, or choose "All Authors" to clear the filter. Author options are built automatically from the current commit list.
+- **Commit Details**: Click on a commit to see what changed and view diffs for any file. The panel height adjusts to your viewport size, and the view only scrolls enough to bring the panel into view — no jarring auto-center on every click. Parent hashes are clickable links that jump straight to the parent commit's details.
+- **File View Toggle**: Switch between Tree View (folder hierarchy) and List View (flat alphabetical list of full paths) in the commit details panel; the chosen mode is saved per repository.
+- **Branch Actions**: Right-click to create, checkout, delete, rename, merge, or rebase branches. When deleting a local branch, an optional checkbox lets you also delete the corresponding remote branch in one step.
+- **Remote Branch Actions**: Right-click a remote branch label to delete it on the remote, merge it into the current branch, or check it out as a new local branch.
 - **Tag Actions**: Add, delete, and push tags directly from the graph
 - **Commit Actions**: Checkout, cherry-pick, revert, or reset to any commit
 - **Stash Support**: Stash entries appear in the graph with a distinct visual style; right-click to apply, pop, drop, or create a branch from a stash

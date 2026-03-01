@@ -92,7 +92,8 @@ export function showFormDialog(
   let html = `${message}<br><table class="dialogForm ${multiElementForm ? "multi" : "single"}">`;
   for (let i = 0; i < inputs.length; i++) {
     let input = inputs[i];
-    html += `<tr>${multiElementForm ? `<td>${input.name}</td>` : ""}<td>`;
+    let isCheckbox = input.type === "checkbox";
+    html += `<tr>${multiElementForm && !isCheckbox ? `<td>${input.name}</td>` : ""}<td>`;
     if (input.type === "select") {
       html += `<select id="dialogInput${i}">`;
       for (let j = 0; j < input.options.length; j++) {
@@ -100,7 +101,7 @@ export function showFormDialog(
       }
       html += "</select>";
     } else if (input.type === "checkbox") {
-      html += `<span class="dialogFormCheckbox"><label><input id="dialogInput${i}" type="checkbox"${input.value ? " checked" : ""}/>${multiElementForm ? "" : input.name}</label></span>`;
+      html += `<span class="dialogFormCheckbox"><label><input id="dialogInput${i}" type="checkbox"${input.value ? " checked" : ""}/><span class="customCheckbox"></span>${multiElementForm ? "" : input.name}</label></span>`;
     } else {
       let placeholder =
         input.type === "text" && input.placeholder !== null
@@ -109,7 +110,7 @@ export function showFormDialog(
       html += `<input id="dialogInput${i}" type="text" value="${input.default}"${placeholder}/>`;
       if (input.type === "text-ref") textRefInput = i;
     }
-    html += "</td></tr>";
+    html += `</td>${multiElementForm && isCheckbox ? `<td>${input.name}</td>` : ""}</tr>`;
   }
   html += "</table>";
   showDialog(

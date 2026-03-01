@@ -245,3 +245,75 @@
 | ------- | ----------------------------- | ------------------------------------ | ----------------------------------------------------------- | -------------- |
 | TC-099  | repo が gitRepos に存在する   | Equivalence - normal                 | currentRepo 設定、repoDropdown 更新、refresh(true) 呼び出し | 正常選択       |
 | TC-100  | repo が gitRepos に存在しない | Boundary - unknown repo              | 何も起きない（サイレント）                                  | 不明リポジトリ |
+
+## S15: ファイルリスト表示切替（Tree/List トグル）
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                            | Perspective (Equivalence / Boundary) | Expected Result                                                               | Notes              |
+| ------- | ----------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------- | ------------------ |
+| TC-101  | fileViewType="tree" の状態でトグルクリック      | Equivalence - normal                 | fileViewType が "list" に変更され、フラットリスト描画関数が呼ばれる           | tree → list        |
+| TC-102  | fileViewType="list" の状態でトグルクリック      | Equivalence - normal                 | fileViewType が "tree" に変更され、ツリー描画関数が呼ばれる                   | list → tree        |
+| TC-103  | トグルクリック後                                | Equivalence - normal                 | saveRepoState メッセージが新しい fileViewType を含んで送信される              | 永続化             |
+| TC-104  | 初期表示: GitRepoState.fileViewType = "list"    | Equivalence - normal                 | リスト表示で初期描画される                                                    | 保存値の復元       |
+| TC-105  | 初期表示: GitRepoState.fileViewType = undefined | Boundary - default                   | ツリー表示で初期描画される（現行動作と同一）                                  | デフォルト値       |
+| TC-106  | トグルアイコンの表示                            | Equivalence - normal                 | 現在のモードに応じたアイコンが表示される（Tree アイコンまたは List アイコン） | 視覚フィードバック |
+
+## S16: Author Dropdown UI
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                       | Perspective (Equivalence / Boundary) | Expected Result                                                                | Notes          |
+| ------- | ---------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------ | -------------- |
+| TC-107  | loadCommits レスポンス受信（authorFilter 未設定）          | Equivalence - normal                 | commits[].author から一意の Author 名が抽出、ソートされ、Dropdown に設定される | 初回リスト構築 |
+| TC-108  | Author "Alice" を選択                                      | Equivalence - normal                 | loadCommits メッセージが authorFilter: "Alice" を含んで送信される              | 絞り込み要求   |
+| TC-109  | "All Authors" を選択                                       | Equivalence - normal                 | loadCommits メッセージが authorFilter なしで送信される（全コミット表示）       | 絞り込み解除   |
+| TC-110  | authorFilter が設定済みの状態で loadCommits レスポンス受信 | Equivalence - normal (filtered)      | Author Dropdown のリストが更新されない（初回リストを維持）                     | リスト安定性   |
+| TC-111  | commits に Author が0人（空コミット配列）                  | Boundary - empty                     | Dropdown に "All Authors" のみ表示される                                       | 空リポジトリ等 |
+
+## S17: コミット詳細表示改善
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                         | Perspective (Equivalence / Boundary) | Expected Result                                             | Notes             |
+| ------- | -------------------------------------------- | ------------------------------------ | ----------------------------------------------------------- | ----------------- |
+| TC-112  | コミット詳細表示                             | Equivalence - normal                 | 表示順: Commit → Parents → Author → Committer → Date        | 表示順変更        |
+| TC-113  | Committer に committerEmail が設定されている | Equivalence - normal                 | "Committer: {name} <{email}>" 形式で表示。mailto リンク付き | Author 行と同形式 |
+| TC-114  | committerEmail が空文字列                    | Boundary - empty email               | Committer 名のみ表示（メールアドレス部分は省略）            | 防御的表示        |
+
+## S18: data-remotes 属性
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                           | Perspective (Equivalence / Boundary) | Expected Result                                                                   | Notes          |
+| ------- | ---------------------------------------------- | ------------------------------------ | --------------------------------------------------------------------------------- | -------------- |
+| TC-115  | ブランチに remotes=["origin", "upstream"]      | Equivalence - normal                 | span 要素に data-remotes="origin,upstream" が設定される                           | カンマ区切り   |
+| TC-116  | ブランチに remotes が空（リモートなし）        | Equivalence - normal (no remote)     | span 要素に data-remotes 属性が付与されない                                       | 属性自体を省略 |
+| TC-117  | contextmenu ハンドラで data-remotes を読み取り | Equivalence - normal                 | data-remotes をカンマ分割し、buildRefContextMenuItems の remotes パラメータに渡す | 連携検証       |
+
+## S19: Parents リンクナビゲーション
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                             | Perspective (Equivalence / Boundary) | Expected Result                                                                   | Notes                      |
+| ------- | ------------------------------------------------ | ------------------------------------ | --------------------------------------------------------------------------------- | -------------------------- |
+| TC-118  | コミットに parent hash が1つ                     | Equivalence - normal                 | parentHash クラスの span 要素として表示。data-hash 属性にフルハッシュが設定される | クリック可能               |
+| TC-119  | parent hash の表示                               | Equivalence - normal                 | 8文字に短縮表示される                                                             | abbrevCommit() パターン    |
+| TC-120  | parent hash クリック（該当コミットがロード済み） | Equivalence - normal                 | 該当コミット行にスクロールし、コミット詳細が表示される                            | loadCommitDetails 呼び出し |
+| TC-121  | parent hash クリック（該当コミットが未ロード）   | Boundary - not found                 | 何も起きない（エラー表示なし）                                                    | 静かに失敗                 |
+| TC-122  | マージコミット（parents が2つ）                  | Equivalence - normal (multiple)      | 両方の parent hash がリンクとして表示される                                       | 複数 parents 対応          |
