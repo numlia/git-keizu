@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-03-01
+
+### Fixed
+
+- **Delete remote branch refresh timing**: When deleting a local branch with "Delete this branch on the remote" checked, the graph now refreshes after all remote branches are deleted instead of before, preventing the UI from briefly showing remote branches as still present after deletion
+
 ## [0.2.6] - 2026-03-01
 
 ### Added
@@ -113,7 +119,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.6...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.7...HEAD
+[0.2.7]: https://github.com/numlia/git-keizu/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/numlia/git-keizu/compare/v0.2.5...v0.2.6
 [0.2.4]: https://github.com/numlia/git-keizu/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/numlia/git-keizu/compare/v0.2.2...v0.2.3
