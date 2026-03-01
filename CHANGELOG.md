@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-03-01
+
+### Added
+
+- **Author filter**: New "Author" dropdown in the toolbar — select a commit author to show only their commits in the graph; choose "All Authors" to clear the filter. Author options are built from the currently loaded commits and passed as `--author` to `git log`
+- **File view toggle**: A toggle icon button in the commit details panel switches between Tree View (folder hierarchy, default) and List View (flat alphabetical list of full paths); the chosen mode is saved per repository and restored across sessions
+- **Delete Remote Branch**: Right-clicking a remote branch label now shows "Delete Remote Branch..." — a confirmation dialog runs `git push <remote> --delete <branch>` on confirmation
+- **Merge remote branch**: Right-clicking a remote branch label now shows "Merge into current branch..." with the same confirmation dialog as for local branches
+- **Rebase current branch**: Right-clicking any non-HEAD local branch now shows "Rebase current branch on Branch..." — confirms before running `git rebase <branch>`
+- **Delete local + remote together**: When deleting a local branch that has a remote tracking counterpart, the Delete Branch dialog now includes a "Delete this branch on the remote" checkbox; when checked, the remote branch is also deleted after the local deletion succeeds (unchecked by default; only shown when a remote tracking branch exists)
+- **Committer email in commit details**: The Committer field in the commit details panel now shows `Name <email>` format, matching the Author field
+- **Clickable parent hashes**: Parent commit hashes in the commit details panel are now clickable — clicking one scrolls to and opens that commit's details panel
+
+### Changed
+
+- **Commit details field order**: Fields are now ordered Commit → Parents → Author → Committer → Date (previously ...Author → Date → Committer), aligning with the original Git Graph layout
+- **Custom checkboxes**: Native OS checkboxes in dialogs and the "Show Remote Branches" control are replaced with theme-aware styled checkboxes
+- **Graph column auto-layout**: The auto-layout graph column is now capped at 40% of the viewport width to prevent the graph from dominating wide screens; column width adjusts smoothly when the panel is resized
+- **Scroll to expanded commit**: Opening commit details now accounts for the sticky header height, so the selected commit row is never hidden behind the controls bar
+
 ## [0.2.4] - 2026-02-28
 
 ### Added
@@ -93,7 +113,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.4...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.6...HEAD
+[0.2.6]: https://github.com/numlia/git-keizu/compare/v0.2.5...v0.2.6
 [0.2.4]: https://github.com/numlia/git-keizu/compare/v0.2.3...v0.2.4
 [0.2.3]: https://github.com/numlia/git-keizu/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/numlia/git-keizu/compare/v0.2.1...v0.2.2
