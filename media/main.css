@@ -244,6 +244,22 @@ body.unableToLoad p {
   text-overflow: ellipsis;
   overflow-x: hidden;
 }
+.fileViewToggleBtn {
+  display: inline-block;
+  float: right;
+  cursor: pointer;
+  padding: 2px 4px;
+  margin-right: 4px;
+}
+.fileViewToggleBtn svg {
+  width: 16px;
+  height: 16px;
+  fill: var(--vscode-editor-foreground);
+  fill-opacity: 0.6;
+}
+.fileViewToggleBtn:hover svg {
+  fill-opacity: 1;
+}
 #commitDetailsClose {
   position: absolute;
   right: 4px;
@@ -438,6 +454,9 @@ svg.fileIcon {
   white-space: nowrap;
   margin: 0 10px;
 }
+#showRemoteBranchesControl > .customCheckbox {
+  margin-right: 6px;
+}
 #repoSelect,
 #branchSelect {
   margin-left: 3px;
@@ -628,15 +647,22 @@ svg.fileIcon {
   text-align: center;
   width: 100%;
 }
+#dialog .dialogFormCheckbox > label {
+  user-select: none;
+  cursor: pointer;
+}
 #dialog > table.dialogForm input[type="text"] {
   width: 100%;
 }
-#dialog > table.dialogForm input[type="checkbox"] {
-  vertical-align: text-top;
-  outline-style: none;
+#dialog > table.dialogForm.single .customCheckbox,
+#dialog > table.dialogForm.multi .customCheckbox {
+  margin-right: 6px;
 }
-#dialog > table.dialogForm.multi input[type="checkbox"] {
-  margin-left: 0;
+#dialog .dialogFormCheckbox > label > input[type="checkbox"]:checked ~ .customCheckbox:after {
+  border-color: var(--vscode-menu-foreground);
+}
+#dialog .dialogFormCheckbox > label > input[type="checkbox"]:focus ~ .customCheckbox {
+  border-color: var(--vscode-focusBorder);
 }
 #dialog > table.dialogForm input[type="text"],
 #dialog > table.dialogForm select {
@@ -711,6 +737,16 @@ svg.fileIcon {
 }
 .roundedBtn:hover {
   background-color: rgba(128, 128, 128, 0.2);
+}
+
+/* Parent Hash Links */
+.parentHash {
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.parentHash:hover {
+  color: var(--vscode-textLink-activeForeground);
 }
 
 /* Flash animation for scroll-to-current */
@@ -873,6 +909,43 @@ svg.fileIcon {
 }
 #findOpenCdv.active svg {
   opacity: 1;
+}
+
+/* Custom Checkboxes */
+
+input[type="checkbox"] {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+}
+.customCheckbox {
+  display: inline-block;
+  width: 15px;
+  height: 15px;
+  background-color: rgba(128, 128, 128, 0.1);
+  border: 1px solid rgba(128, 128, 128, 0.5);
+  border-radius: 3px;
+  vertical-align: middle;
+  margin-top: -2px;
+}
+label:hover > .customCheckbox {
+  background-color: rgba(128, 128, 128, 0.2);
+}
+.customCheckbox:after {
+  content: "";
+  display: none;
+}
+label > input[type="checkbox"]:checked ~ .customCheckbox:after {
+  position: relative;
+  display: block;
+  left: 5px;
+  top: 2px;
+  width: 3px;
+  height: 7px;
+  border: solid var(--vscode-editor-foreground);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 
 /* General */

@@ -125,6 +125,7 @@ declare global {
     showRemoteBranches: boolean;
     expandedCommit: ExpandedCommit | null;
     findWidgetState: FindWidgetState | null;
+    authorFilter: string | null;
   }
 }
 

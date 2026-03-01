@@ -1,7 +1,9 @@
-import * as GG from "../src/types";
+import type { GitFileChange } from "../src/types";
 import { escapeHtml, svgIcons } from "./utils";
 
-export function generateGitFileTree(gitFiles: GG.GitFileChange[]) {
+const BINARY_FILE_TITLE = ' title="This is a binary file, unable to view diff."';
+
+export function generateGitFileTree(gitFiles: GitFileChange[]) {
   let contents: GitFolderContents = {},
     i,
     j,
@@ -38,7 +40,28 @@ export function generateGitFileTree(gitFiles: GG.GitFileChange[]) {
   return files;
 }
 
-export function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GG.GitFileChange[]) {
+/**
+ * Build the HTML for a single file item (used by both tree and list views).
+ * @param gitFile - The file change data
+ * @param displayName - Already-escaped display name (basename for tree view, full path for list view)
+ */
+function buildFileItemHtml(gitFile: GitFileChange, displayName: string): string {
+  const diffPossible = gitFile.additions !== null && gitFile.deletions !== null;
+  const binaryTitle = diffPossible ? "" : BINARY_FILE_TITLE;
+  const renameHtml =
+    gitFile.type === "R"
+      ? ` <span class="gitFileRename" title="${escapeHtml(`${gitFile.oldFilePath} was renamed to ${gitFile.newFilePath}`)}">R</span>`
+      : "";
+  const addDelHtml =
+    gitFile.type !== "A" && gitFile.type !== "D" && diffPossible
+      ? `<span class="gitFileAddDel">(<span class="gitFileAdditions" title="${gitFile.additions} addition${gitFile.additions !== 1 ? "s" : ""}">+${gitFile.additions}</span>|<span class="gitFileDeletions" title="${gitFile.deletions} deletion${gitFile.deletions !== 1 ? "s" : ""}">-${gitFile.deletions}</span>)</span>`
+      : "";
+  const oldPath = encodeURIComponent(gitFile.oldFilePath);
+  const newPath = encodeURIComponent(gitFile.newFilePath);
+  return `<li class="gitFile ${gitFile.type}${diffPossible ? " gitDiffPossible" : ""}" data-oldfilepath="${oldPath}" data-newfilepath="${newPath}" data-type="${gitFile.type}"${binaryTitle}><span class="gitFileIcon">${svgIcons.file}</span>${displayName}${renameHtml}${addDelHtml}</li>`;
+}
+
+export function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GitFileChange[]) {
   let html =
       (folder.name !== ""
         ? `<span class="gitFolder" data-folderpath="${encodeURIComponent(folder.folderPath)}"><span class="gitFolderIcon">${folder.open ? svgIcons.openFolder : svgIcons.closedFolder}</span><span class="gitFolderName">${folder.name}</span></span>`
@@ -64,18 +87,17 @@ export function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GG.GitFileC
       html += `<li${!gitFolder.open ? ' class="closed"' : ""}>${generateGitFileTreeHtml(gitFolder, gitFiles)}</li>`;
     } else {
       gitFile = gitFiles[(<GitFile>folder.contents[keys[i]]).index];
-      let diffPossible = gitFile.additions !== null && gitFile.deletions !== null;
-      let binaryTitle = !diffPossible ? ' title="This is a binary file, unable to view diff."' : "";
-      let renameHtml =
-        gitFile.type === "R"
-          ? ` <span class="gitFileRename" title="${escapeHtml(`${gitFile.oldFilePath} was renamed to ${gitFile.newFilePath}`)}">R</span>`
-          : "";
-      let addDelHtml =
-        gitFile.type !== "A" && gitFile.type !== "D" && diffPossible
-          ? `<span class="gitFileAddDel">(<span class="gitFileAdditions" title="${gitFile.additions} addition${gitFile.additions !== 1 ? "s" : ""}">+${gitFile.additions}</span>|<span class="gitFileDeletions" title="${gitFile.deletions} deletion${gitFile.deletions !== 1 ? "s" : ""}">-${gitFile.deletions}</span>)</span>`
-          : "";
-      html += `<li class="gitFile ${gitFile.type}${diffPossible ? " gitDiffPossible" : ""}" data-oldfilepath="${encodeURIComponent(gitFile.oldFilePath)}" data-newfilepath="${encodeURIComponent(gitFile.newFilePath)}" data-type="${gitFile.type}"${binaryTitle}><span class="gitFileIcon">${svgIcons.file}</span>${folder.contents[keys[i]].name}${renameHtml}${addDelHtml}</li>`;
+      html += buildFileItemHtml(gitFile, folder.contents[keys[i]].name);
     }
+  }
+  return `${html}</ul>`;
+}
+
+export function generateGitFileListHtml(gitFiles: GitFileChange[]) {
+  const sorted = [...gitFiles].sort((a, b) => a.newFilePath.localeCompare(b.newFilePath));
+  let html = '<ul class="gitFolderContents">';
+  for (const gitFile of sorted) {
+    html += buildFileItemHtml(gitFile, escapeHtml(gitFile.newFilePath));
   }
   return `${html}</ul>`;
 }

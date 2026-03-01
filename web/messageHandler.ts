@@ -77,6 +77,9 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
     case "deleteBranch":
       refreshOrError(gitGraph, msg.status, "Unable to Delete Branch");
       break;
+    case "deleteRemoteBranch":
+      refreshOrError(gitGraph, msg.status, "Unable to Delete Remote Branch");
+      break;
     case "deleteTag":
       refreshOrError(gitGraph, msg.status, "Unable to Delete Tag");
       break;
@@ -103,6 +106,9 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
       break;
     case "mergeCommit":
       refreshOrError(gitGraph, msg.status, "Unable to Merge Commit");
+      break;
+    case "rebaseBranch":
+      refreshOrError(gitGraph, msg.status, "Unable to Rebase Branch");
       break;
     case "popStash":
       refreshOrError(gitGraph, msg.status, "Unable to Pop Stash");

@@ -9,7 +9,12 @@ import {
 import { getCommitDate } from "./dates";
 import { hideDialog, isDialogActive } from "./dialogs";
 import { Dropdown } from "./dropdown";
-import { alterGitFileTree, generateGitFileTree, generateGitFileTreeHtml } from "./fileTree";
+import {
+  alterGitFileTree,
+  generateGitFileListHtml,
+  generateGitFileTree,
+  generateGitFileTreeHtml
+} from "./fileTree";
 import { FindWidget } from "./findWidget";
 import { Graph } from "./graph";
 import { handleMessage } from "./messageHandler";
@@ -43,6 +48,33 @@ const CDV_SCROLL_PADDING = 8;
 
 const STASH_NAVIGATION_TIMEOUT_MS = 5000;
 const SCROLL_AUTO_LOAD_THRESHOLD = 25;
+const COMMIT_DETAILS_COLSPAN = 4;
+const SECONDS_TO_MS = 1000;
+const ALL_AUTHORS_LABEL = "All Authors";
+const ALL_AUTHORS_VALUE = "";
+const GRAPH_AUTO_LAYOUT_MAX_RATIO = 0.4;
+const GRAPH_COL_MIN_WIDTH = 64;
+const FILE_VIEW_LIST = "list" as const;
+const FILE_VIEW_TREE = "tree" as const;
+type FileViewType = typeof FILE_VIEW_LIST | typeof FILE_VIEW_TREE;
+const DEFAULT_FILE_VIEW_TYPE: FileViewType = FILE_VIEW_TREE;
+
+function getFileViewToggle(mode: FileViewType): { icon: string; title: string } {
+  return mode === FILE_VIEW_LIST
+    ? { icon: svgIcons.treeView, title: "Switch to Tree View" }
+    : { icon: svgIcons.listView, title: "Switch to List View" };
+}
+
+function buildAuthorOptions(
+  authors: string[],
+  selectedValue: string
+): { options: { name: string; value: string }[]; selected: string } {
+  const options = [
+    { name: ALL_AUTHORS_LABEL, value: ALL_AUTHORS_VALUE },
+    ...authors.map((author) => ({ name: author, value: author }))
+  ];
+  return { options, selected: selectedValue };
+}
 
 class GitGraphView {
   private gitRepos: GG.GitRepoSet;
@@ -68,11 +100,14 @@ class GitGraphView {
   private scrollContainerElem: HTMLElement;
   private repoDropdown: Dropdown;
   private branchDropdown: Dropdown;
+  private authorDropdown: Dropdown;
   private showRemoteBranchesElem: HTMLInputElement;
   private scrollShadowElem: HTMLElement;
 
   private loadBranchesCallback: ((changes: boolean, isRepo: boolean) => void) | null = null;
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
+
+  private authorFilter: string | null = null;
 
   private stashNavigationIndex: number = -1;
   private stashNavigationTimer: ReturnType<typeof setTimeout> | null = null;
@@ -101,6 +136,14 @@ class GitGraphView {
     });
     this.branchDropdown = new Dropdown("branchSelect", false, "Branches", (value) => {
       this.currentBranch = value;
+      this.maxCommits = this.config.initialLoadCommits;
+      this.expandedCommit = null;
+      this.saveState();
+      this.renderShowLoading();
+      this.requestLoadCommits(true, () => {});
+    });
+    this.authorDropdown = new Dropdown("authorSelect", false, "Authors", (value) => {
+      this.authorFilter = value === ALL_AUTHORS_VALUE ? null : value;
       this.maxCommits = this.config.initialLoadCommits;
       this.expandedCommit = null;
       this.saveState();
@@ -180,6 +223,11 @@ class GitGraphView {
       }
       if (prevState.findWidgetState !== null && prevState.findWidgetState !== undefined) {
         this.findWidget.restoreState(prevState.findWidgetState);
+      }
+      this.authorFilter = prevState.authorFilter ?? null;
+      if (this.authorFilter !== null) {
+        const { options, selected } = buildAuthorOptions([this.authorFilter], this.authorFilter);
+        this.authorDropdown.setOptions(options, selected);
       }
     }
     this.loadRepos(this.gitRepos, lastActiveRepo);
@@ -347,6 +395,12 @@ class GitGraphView {
     }
     this.render();
 
+    if (this.authorFilter === null) {
+      const uniqueAuthors = [...new Set(this.commits.map((c) => c.author))].sort();
+      const { options, selected } = buildAuthorOptions(uniqueAuthors, ALL_AUTHORS_VALUE);
+      this.authorDropdown.setOptions(options, selected);
+    }
+
     this.triggerLoadCommitsCallback(true);
     this.fetchAvatars(avatarsNeeded);
     this.updateCurrentBtnState();
@@ -405,7 +459,8 @@ class GitGraphView {
       branchName: this.currentBranch !== null ? this.currentBranch : "",
       maxCommits: this.maxCommits,
       showRemoteBranches: this.showRemoteBranches,
-      hard: hard
+      hard: hard,
+      ...(this.authorFilter !== null ? { authorFilter: this.authorFilter } : {})
     });
   }
   private requestLoadBranchesAndCommits(hard: boolean) {
@@ -449,7 +504,8 @@ class GitGraphView {
       maxCommits: this.maxCommits,
       showRemoteBranches: this.showRemoteBranches,
       expandedCommit: this.expandedCommit,
-      findWidgetState: this.findWidget.getState()
+      findWidgetState: this.findWidget.getState(),
+      authorFilter: this.authorFilter
     });
   }
 
@@ -520,7 +576,10 @@ class GitGraphView {
       for (j = 0; j < branchLabels.heads.length; j++) {
         refName = escapeHtml(branchLabels.heads[j].name);
         refActive = branchLabels.heads[j].name === this.gitBranchHead;
-        refHtml = `<span class="gitRef head${refActive ? " active" : ""}" data-name="${refName}">${svgIcons.branch}<span class="gitRefName">${refName}</span>`;
+        const headRemotes = branchLabels.heads[j].remotes;
+        const remotesAttr =
+          headRemotes.length > 0 ? ` data-remotes="${headRemotes.map(escapeHtml).join(",")}"` : "";
+        refHtml = `<span class="gitRef head${refActive ? " active" : ""}" data-name="${refName}"${remotesAttr}>${svgIcons.branch}<span class="gitRefName">${refName}</span>`;
         for (let k = 0; k < branchLabels.heads[j].remotes.length; k++) {
           let remoteName = escapeHtml(branchLabels.heads[j].remotes[k]);
           refHtml += `<span class="gitRefHeadRemote" data-remote="${remoteName}" data-name="${escapeHtml(`${branchLabels.heads[j].remotes[k]}/${branchLabels.heads[j].name}`)}">${remoteName}</span>`;
@@ -722,6 +781,9 @@ class GitGraphView {
       let refName = isRemoteCombined
         ? unescapeHtml(target.dataset.name!)
         : unescapeHtml(sourceElem.dataset.name!);
+      const remotes = sourceElem.dataset.remotes
+        ? sourceElem.dataset.remotes.split(",")
+        : undefined;
       showContextMenu(
         <MouseEvent>e,
         buildRefContextMenuItems(
@@ -729,7 +791,8 @@ class GitGraphView {
           refName,
           sourceElem,
           isRemoteCombined,
-          this.gitBranchHead
+          this.gitBranchHead,
+          remotes
         ),
         sourceElem
       );
@@ -810,8 +873,19 @@ class GitGraphView {
       makeTableFixedLayout();
     } else {
       this.tableElem.className = "autoLayout";
-      this.graph.limitMaxWidth(-1);
-      cols[0].style.padding = `0 ${Math.round((Math.max(this.graph.getWidth() + 16, 64) - (cols[0].offsetWidth - 24)) / 2)}px`;
+      const graphTargetWidth = Math.max(this.graph.getWidth() + 16, GRAPH_COL_MIN_WIDTH);
+      const graphMaxWidth = Math.floor(document.body.clientWidth * GRAPH_AUTO_LAYOUT_MAX_RATIO);
+      const graphCappedWidth = Math.min(graphTargetWidth, graphMaxWidth);
+      if (graphCappedWidth < graphTargetWidth) {
+        this.graph.limitMaxWidth(graphCappedWidth);
+      } else {
+        this.graph.limitMaxWidth(-1);
+      }
+      const graphPadding = Math.max(
+        0,
+        Math.round((graphCappedWidth - (cols[0].offsetWidth - 24)) / 2)
+      );
+      cols[0].style.padding = `0 ${graphPadding}px`;
     }
 
     addListenerToClass("resizeCol", "mousedown", (e) => {
@@ -889,6 +963,7 @@ class GitGraphView {
         fontFamily = ff;
         this.repoDropdown.refresh();
         this.branchDropdown.refresh();
+        this.authorDropdown.refresh();
       }
     }).observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
   }
@@ -1034,6 +1109,10 @@ class GitGraphView {
       this.branchDropdown.close();
       return;
     }
+    if (this.authorDropdown.isOpen()) {
+      this.authorDropdown.close();
+      return;
+    }
     if (this.findWidget.isVisible()) {
       this.findWidget.close();
       return;
@@ -1112,37 +1191,27 @@ class GitGraphView {
     this.expandedCommit.srcElem.classList.add("commitDetailsOpen");
     this.saveState();
 
-    const isUncommitted = commitDetails.hash === UNCOMMITTED_CHANGES_HASH;
-    let newElem = document.createElement("tr"),
-      html = '<td></td><td colspan="4"><div id="commitDetailsSummary">';
-    if (isCompareMode) {
-      const fromLabel = escapeHtml(abbrevCommit(this.expandedCommit.hash));
-      const toLabel = escapeHtml(abbrevCommit(this.expandedCommit.compareWithHash!));
-      html += `<span class="commitDetailsSummaryTop"><span class="commitDetailsSummaryTopRow"><span class="commitDetailsSummaryKeyValues">`;
-      html += `<b>Comparing</b> ${fromLabel} &#8596; ${toLabel}`;
-      html += ` (${commitDetails.fileChanges.length} file${commitDetails.fileChanges.length !== 1 ? "s" : ""})`;
-      html += "</span></span></span>";
-    } else if (isUncommitted) {
-      html += `<span class="commitDetailsSummaryTop"><span class="commitDetailsSummaryTopRow"><span class="commitDetailsSummaryKeyValues">`;
-      html += `<b>Uncommitted Changes</b> (${commitDetails.fileChanges.length} file${commitDetails.fileChanges.length !== 1 ? "s" : ""})`;
-      html += "</span></span></span>";
-    } else {
-      html += `<span class="commitDetailsSummaryTop${typeof this.avatars[commitDetails.email] === "string" ? " withAvatar" : ""}"><span class="commitDetailsSummaryTopRow"><span class="commitDetailsSummaryKeyValues">`;
-      html += `<b>Commit: </b>${escapeHtml(commitDetails.hash)}<br>`;
-      html += `<b>Parents: </b>${commitDetails.parents.map(escapeHtml).join(", ")}<br>`;
-      html += `<b>Author: </b>${escapeHtml(commitDetails.author)} &lt;<a href="mailto:${encodeURIComponent(commitDetails.email)}">${escapeHtml(commitDetails.email)}</a>&gt;<br>`;
-      html += `<b>Date: </b>${new Date(commitDetails.date * 1000).toString()}<br>`;
-      html += `<b>Committer: </b>${escapeHtml(commitDetails.committer)}</span>`;
-      if (typeof this.avatars[commitDetails.email] === "string")
-        html += `<span class="commitDetailsSummaryAvatar"><img src="${escapeHtml(this.avatars[commitDetails.email])}"></span>`;
-      html += "</span></span><br><br>";
-      html += `${escapeHtml(commitDetails.body).replace(/\n/g, "<br>")}`;
-    }
-    html += "</div>";
-    html += `<div id="commitDetailsFiles">${generateGitFileTreeHtml(fileTree, commitDetails.fileChanges)}</table></div>`;
-    html += `<div id="commitDetailsClose">${svgIcons.close}</div>`;
-    html += "</td>";
+    const summaryHtml = isCompareMode
+      ? this.buildCompareSummaryHtml(commitDetails, this.expandedCommit.compareWithHash!)
+      : commitDetails.hash === UNCOMMITTED_CHANGES_HASH
+        ? this.buildUncommittedSummaryHtml(commitDetails)
+        : this.buildCommitSummaryHtml(commitDetails);
 
+    const fileViewType = this.getRepoFileViewType();
+    const filesSectionHtml = this.buildFilesSectionHtml(
+      fileViewType,
+      commitDetails.fileChanges,
+      fileTree
+    );
+
+    const html =
+      `<td></td><td colspan="${COMMIT_DETAILS_COLSPAN}">` +
+      `<div id="commitDetailsSummary">${summaryHtml}</div>` +
+      filesSectionHtml +
+      `<div id="commitDetailsClose">${svgIcons.close}</div>` +
+      "</td>";
+
+    const newElem = document.createElement("tr");
     newElem.id = "commitDetails";
     newElem.innerHTML = html;
     insertAfter(newElem, this.expandedCommit.srcElem);
@@ -1151,19 +1220,156 @@ class GitGraphView {
     newElem.style.height = `${cdvHeight}px`;
 
     this.renderGraph();
-
-    const scrollTop = this.scrollContainerElem.scrollTop;
-    const viewHeight = this.scrollContainerElem.clientHeight;
-    if (newElem.offsetTop - CDV_SCROLL_PADDING < scrollTop) {
-      this.scrollContainerElem.scrollTop = newElem.offsetTop - CDV_SCROLL_PADDING;
-    } else if (newElem.offsetTop + this.config.grid.expandY - viewHeight > scrollTop) {
-      const desiredScroll = newElem.offsetTop + this.config.grid.expandY - viewHeight;
-      const maxScroll = this.expandedCommit.srcElem!.offsetTop;
-      this.scrollContainerElem.scrollTop = Math.min(desiredScroll, maxScroll);
-    }
+    this.scrollToExpandedCommit(newElem);
 
     document.getElementById("commitDetailsClose")!.addEventListener("click", () => {
       this.hideCommitDetails();
+    });
+    this.bindFileViewListeners();
+    this.bindParentHashListeners();
+  }
+  private buildCompareSummaryHtml(
+    commitDetails: GG.GitCommitDetails,
+    compareWithHash: string
+  ): string {
+    const fromLabel = escapeHtml(abbrevCommit(this.expandedCommit!.hash));
+    const toLabel = escapeHtml(abbrevCommit(compareWithHash));
+    const fileCount = commitDetails.fileChanges.length;
+    const fileSuffix = fileCount !== 1 ? "s" : "";
+    return (
+      `<span class="commitDetailsSummaryTop"><span class="commitDetailsSummaryTopRow"><span class="commitDetailsSummaryKeyValues">` +
+      `<b>Comparing</b> ${fromLabel} &#8596; ${toLabel} (${fileCount} file${fileSuffix})` +
+      "</span></span></span>"
+    );
+  }
+  private buildUncommittedSummaryHtml(commitDetails: GG.GitCommitDetails): string {
+    const fileCount = commitDetails.fileChanges.length;
+    const fileSuffix = fileCount !== 1 ? "s" : "";
+    return (
+      `<span class="commitDetailsSummaryTop"><span class="commitDetailsSummaryTopRow"><span class="commitDetailsSummaryKeyValues">` +
+      `<b>Uncommitted Changes</b> (${fileCount} file${fileSuffix})` +
+      "</span></span></span>"
+    );
+  }
+  private buildCommitSummaryHtml(commitDetails: GG.GitCommitDetails): string {
+    const parentLinks = this.buildParentLinksHtml(commitDetails.parents);
+    const committerHtml = this.buildCommitterHtml(
+      commitDetails.committer,
+      commitDetails.committerEmail
+    );
+    const hasAvatar = typeof this.avatars[commitDetails.email] === "string";
+    const avatarClass = hasAvatar ? " withAvatar" : "";
+    const avatarHtml = hasAvatar
+      ? `<span class="commitDetailsSummaryAvatar"><img src="${escapeHtml(this.avatars[commitDetails.email])}"></span>`
+      : "";
+
+    return (
+      `<span class="commitDetailsSummaryTop${avatarClass}"><span class="commitDetailsSummaryTopRow"><span class="commitDetailsSummaryKeyValues">` +
+      `<b>Commit: </b>${escapeHtml(commitDetails.hash)}<br>` +
+      `<b>Parents: </b>${parentLinks}<br>` +
+      `<b>Author: </b>${escapeHtml(commitDetails.author)} &lt;<a href="mailto:${encodeURIComponent(commitDetails.email)}">${escapeHtml(commitDetails.email)}</a>&gt;<br>` +
+      `<b>Committer: </b>${committerHtml}<br>` +
+      `<b>Date: </b>${new Date(commitDetails.date * SECONDS_TO_MS).toString()}</span>` +
+      avatarHtml +
+      "</span></span><br><br>" +
+      escapeHtml(commitDetails.body).replace(/\n/g, "<br>")
+    );
+  }
+  private buildParentLinksHtml(parents: string[]): string {
+    if (parents.length === 0) return "None";
+    return parents
+      .map((hash) => {
+        const escapedHash = escapeHtml(hash);
+        return typeof this.commitLookup[hash] === "number"
+          ? `<span class="parentHash" data-hash="${escapedHash}">${escapedHash}</span>`
+          : escapedHash;
+      })
+      .join(", ");
+  }
+  private buildCommitterHtml(committer: string, committerEmail: string): string {
+    if (!committerEmail) return escapeHtml(committer);
+    return `${escapeHtml(committer)} &lt;<a href="mailto:${encodeURIComponent(committerEmail)}">${escapeHtml(committerEmail)}</a>&gt;`;
+  }
+  private getRepoFileViewType(): FileViewType {
+    if (this.currentRepo === null) return DEFAULT_FILE_VIEW_TYPE;
+    return this.gitRepos[this.currentRepo]?.fileViewType ?? DEFAULT_FILE_VIEW_TYPE;
+  }
+  private buildFilesSectionHtml(
+    fileViewType: FileViewType,
+    fileChanges: GG.GitFileChange[],
+    fileTree: GitFolder
+  ): string {
+    const innerHtml = this.buildFilesSectionInnerHtml(fileViewType, fileChanges, fileTree);
+    return `<div id="commitDetailsFiles">${innerHtml}</div>`;
+  }
+  private scrollToExpandedCommit(detailsElem: HTMLElement) {
+    if (this.expandedCommit === null || this.expandedCommit.srcElem === null) return;
+    const scrollTop = this.scrollContainerElem.scrollTop;
+    const viewHeight = this.scrollContainerElem.clientHeight;
+    const headerHeight = (document.getElementById("tableColHeaders")?.clientHeight ?? 0) + 1;
+    const srcElemTop = this.expandedCommit.srcElem.offsetTop;
+    if (srcElemTop < scrollTop + headerHeight + CDV_SCROLL_PADDING) {
+      this.scrollContainerElem.scrollTop = srcElemTop - headerHeight - CDV_SCROLL_PADDING;
+    } else if (detailsElem.offsetTop + this.config.grid.expandY - viewHeight > scrollTop) {
+      const desiredScroll = detailsElem.offsetTop + this.config.grid.expandY - viewHeight;
+      const maxScroll = srcElemTop - headerHeight;
+      this.scrollContainerElem.scrollTop = Math.min(desiredScroll, maxScroll);
+    }
+  }
+  private bindParentHashListeners() {
+    addListenerToClass("parentHash", "click", (e: Event) => {
+      const target = <HTMLElement>e.target;
+      const parentHash = target.dataset.hash;
+      if (parentHash && typeof this.commitLookup[parentHash] === "number") {
+        this.scrollToCommit(parentHash, true, true);
+        const commitElem = document.querySelector<HTMLElement>(
+          `.commit[data-hash="${parentHash}"]`
+        );
+        if (commitElem) {
+          this.loadCommitDetails(commitElem);
+        }
+      }
+    });
+  }
+  private handleFileViewToggle() {
+    if (this.expandedCommit === null || this.currentRepo === null) return;
+    const repo = this.gitRepos[this.currentRepo];
+    if (repo === undefined) return;
+    const currentMode = repo.fileViewType ?? DEFAULT_FILE_VIEW_TYPE;
+    const newMode: FileViewType = currentMode === FILE_VIEW_TREE ? FILE_VIEW_LIST : FILE_VIEW_TREE;
+    const updatedRepo: GG.GitRepoState = { ...repo, fileViewType: newMode };
+    this.gitRepos[this.currentRepo] = updatedRepo;
+    const filesDiv = document.getElementById("commitDetailsFiles");
+    if (filesDiv !== null && this.expandedCommit.commitDetails !== null) {
+      filesDiv.innerHTML = this.buildFilesSectionInnerHtml(
+        newMode,
+        this.expandedCommit.commitDetails.fileChanges,
+        this.expandedCommit.fileTree!
+      );
+      this.bindFileViewListeners();
+    }
+    sendMessage({
+      command: "saveRepoState",
+      repo: this.currentRepo,
+      state: updatedRepo
+    });
+    this.saveState();
+  }
+  private buildFilesSectionInnerHtml(
+    fileViewType: FileViewType,
+    fileChanges: GG.GitFileChange[],
+    fileTree: GitFolder
+  ): string {
+    const fileListHtml =
+      fileViewType === FILE_VIEW_LIST
+        ? generateGitFileListHtml(fileChanges)
+        : generateGitFileTreeHtml(fileTree, fileChanges);
+    const { icon, title } = getFileViewToggle(fileViewType);
+    return `<span id="fileViewToggle" class="fileViewToggleBtn" title="${title}">${icon}</span>${fileListHtml}`;
+  }
+  private bindFileViewListeners() {
+    document.getElementById("fileViewToggle")?.addEventListener("click", () => {
+      this.handleFileViewToggle();
     });
     addListenerToClass("gitFolder", "click", (e) => {
       let sourceElem = <HTMLElement>(<Element>e.target!).closest(".gitFolder");
@@ -1184,18 +1390,17 @@ class GitGraphView {
     addListenerToClass("gitFile", "click", (e) => {
       let sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;
       if (this.expandedCommit === null || !sourceElem.classList.contains("gitDiffPossible")) return;
-      const viewDiffMsg: GG.RequestViewDiff = {
+      sendMessage({
         command: "viewDiff",
         repo: this.currentRepo!,
         commitHash: this.expandedCommit.hash,
         oldFilePath: decodeURIComponent(sourceElem.dataset.oldfilepath!),
         newFilePath: decodeURIComponent(sourceElem.dataset.newfilepath!),
-        type: <GG.GitFileChangeType>sourceElem.dataset.type
-      };
-      if (this.expandedCommit.compareWithHash !== null) {
-        viewDiffMsg.compareWithHash = this.expandedCommit.compareWithHash;
-      }
-      sendMessage(viewDiffMsg);
+        type: <GG.GitFileChangeType>sourceElem.dataset.type,
+        ...(this.expandedCommit.compareWithHash !== null
+          ? { compareWithHash: this.expandedCommit.compareWithHash }
+          : {})
+      });
     });
   }
   public showCompareResult(fileChanges: GG.GitFileChange[], fromHash: string, toHash: string) {
@@ -1211,6 +1416,7 @@ class GitGraphView {
       email: "",
       date: 0,
       committer: "",
+      committerEmail: "",
       body: "",
       fileChanges
     };

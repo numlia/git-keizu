@@ -35,7 +35,11 @@ export const svgIcons = {
     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 4.94L3.47 9.47l.94.94L8 6.82l3.59 3.59.94-.94L8 4.94z"/></svg>',
   arrowDown:
     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 11.06l-4.53-4.53.94-.94L8 9.18l3.59-3.59.94.94L8 11.06z"/></svg>',
-  cdv: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0zM8 4c-2.8 0-5.2 1.6-6.7 4 1.5 2.4 3.9 4 6.7 4s5.2-1.6 6.7-4C13.2 5.6 10.8 4 8 4z"/></svg>'
+  cdv: '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M8 5.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5zM4.5 8a3.5 3.5 0 1 1 7 0 3.5 3.5 0 0 1-7 0zM8 4c-2.8 0-5.2 1.6-6.7 4 1.5 2.4 3.9 4 6.7 4s5.2-1.6 6.7-4C13.2 5.6 10.8 4 8 4z"/></svg>',
+  treeView:
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.5 1h13l.5.5v13l-.5.5h-13l-.5-.5v-13l.5-.5zM2 14h12V2H2v12zm2-2v-1h3v1H4zm0-4V7h5v1H4zm7-2H4V5h7v1z"/></svg>',
+  listView:
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M2 3h12v1H2V3zm0 4h12v1H2V7zm0 4h12v1H2v-1z"/></svg>'
 };
 export const months = [
   "Jan",
