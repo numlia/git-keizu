@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.8] - 2026-03-01
+
+### Fixed
+
+- **2-commit comparison state persistence**: Switching away from the Git Keizu tab and returning while in compare mode no longer reverts to single-commit details — comparison state is now preserved across tab switches
+- **2-commit comparison summary format**: The compare mode header now reads "Displaying all changes from [older commit] to [newer commit]." with commits shown in chronological order, instead of "Comparing X ↔ Y (N files)"
+
 ## [0.2.7] - 2026-03-01
 
 ### Fixed
@@ -119,7 +126,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.7...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.8...HEAD
+[0.2.8]: https://github.com/numlia/git-keizu/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/numlia/git-keizu/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/numlia/git-keizu/compare/v0.2.5...v0.2.6
 [0.2.4]: https://github.com/numlia/git-keizu/compare/v0.2.3...v0.2.4

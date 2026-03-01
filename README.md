@@ -32,7 +32,7 @@ Git Keizu is a personal take on a git history viewer — shaped around the featu
 - **SCM Panel Button**: Open the Git Keizu graph directly from the VS Code Source Control panel title bar; the repository is selected automatically based on the active SCM provider. Button position (Inline or More Actions menu) is configurable
 - **Keyboard Shortcuts**: Configurable shortcuts for Find (Ctrl/Cmd+F), Refresh (Ctrl/Cmd+R), Scroll to HEAD (Ctrl/Cmd+H), and Scroll to Stash (Ctrl/Cmd+S, Shift to go backward); each can be rebound or disabled in settings
 - **Commit Search**: Press Ctrl/Cmd+F to open a search bar with regex mode, case-sensitive mode, match counter (N of M), and prev/next navigation
-- **2-Commit Comparison**: Ctrl/Cmd+click a second commit to compare it with the selected commit side-by-side
+- **2-Commit Comparison**: Ctrl/Cmd+click a second commit to compare it with the selected commit; the panel header shows "Displaying all changes from [older] to [newer]" in chronological order, and comparison state is preserved when switching VS Code tabs
 - **Combined branch/remote labels**: Local and remote branches on the same commit merge into a single pill label — `[main | origin]`. Right-clicking either part opens the appropriate context menu.
 - **Smooth refresh**: Git operations update the graph in the background without blanking the view or losing your scroll position
 - **Auto load more commits**: Commits load automatically as you scroll to the bottom of the list — no manual button press needed (configurable)
