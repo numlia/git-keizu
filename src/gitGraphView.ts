@@ -563,7 +563,6 @@ export class GitGraphView {
     branchName: string,
     remotes: string[]
   ): Promise<void> {
-    this.sendMessage({ command: "refresh" });
     const remoteErrors: string[] = [];
     for (const remote of remotes) {
       const remoteStatus = await this.dataSource.deleteRemoteBranch(repo, remote, branchName);
@@ -577,6 +576,7 @@ export class GitGraphView {
         status: remoteErrors.join("\n")
       });
     }
+    this.sendMessage({ command: "refresh" });
   }
 
   private async viewDiff(
