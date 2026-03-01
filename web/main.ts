@@ -1183,15 +1183,13 @@ class GitGraphView {
     if (typeof elem === "object" && elem !== null) elem.remove();
 
     const isCompareMode = this.expandedCommit.compareWithHash !== null;
-    if (!isCompareMode) {
-      this.expandedCommit.commitDetails = commitDetails;
-      this.expandedCommit.fileTree = fileTree;
-    }
+    this.expandedCommit.commitDetails = commitDetails;
+    this.expandedCommit.fileTree = fileTree;
     this.expandedCommit.srcElem.classList.add("commitDetailsOpen");
     this.saveState();
 
     const summaryHtml = isCompareMode
-      ? this.buildCompareSummaryHtml(commitDetails, this.expandedCommit.compareWithHash!)
+      ? this.buildCompareSummaryHtml(this.expandedCommit.compareWithHash!)
       : commitDetails.hash === UNCOMMITTED_CHANGES_HASH
         ? this.buildUncommittedSummaryHtml(commitDetails)
         : this.buildCommitSummaryHtml(commitDetails);
@@ -1227,17 +1225,13 @@ class GitGraphView {
     this.bindFileViewListeners();
     this.bindParentHashListeners();
   }
-  private buildCompareSummaryHtml(
-    commitDetails: GG.GitCommitDetails,
-    compareWithHash: string
-  ): string {
-    const fromLabel = escapeHtml(abbrevCommit(this.expandedCommit!.hash));
-    const toLabel = escapeHtml(abbrevCommit(compareWithHash));
-    const fileCount = commitDetails.fileChanges.length;
-    const fileSuffix = fileCount !== 1 ? "s" : "";
+  private buildCompareSummaryHtml(compareWithHash: string): string {
+    const order = this.getCommitOrder(this.expandedCommit!.hash, compareWithHash);
+    const fromLabel = escapeHtml(order.from);
+    const toLabel = escapeHtml(order.to);
     return (
       `<span class="commitDetailsSummaryTop"><span class="commitDetailsSummaryTopRow"><span class="commitDetailsSummaryKeyValues">` +
-      `<b>Comparing</b> ${fromLabel} &#8596; ${toLabel} (${fileCount} file${fileSuffix})` +
+      `Displaying all changes from ${fromLabel} to ${toLabel}.` +
       "</span></span></span>"
     );
   }

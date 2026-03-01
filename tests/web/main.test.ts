@@ -1257,10 +1257,10 @@ describe("GitGraphView frontend integration", () => {
         toHash: COMMIT_HASH_2
       });
 
-      // Then: commitDetails DOM element is created with "Comparing" text
+      // Then: commitDetails DOM element is created with "Displaying all changes from ... to ..." text
       const detailsElem = document.getElementById("commitDetails");
       expect(detailsElem).not.toBeNull();
-      expect(detailsElem!.innerHTML).toContain("Comparing");
+      expect(detailsElem!.innerHTML).toContain("Displaying all changes from");
     });
 
     it("ResponseCompareCommits with fileChanges: null shows error dialog (TC-038)", () => {
@@ -1351,7 +1351,7 @@ describe("GitGraphView frontend integration", () => {
       // Then: compare details are shown correctly (set-based validation accepts reordered hashes)
       const detailsElem = document.getElementById("commitDetails");
       expect(detailsElem).not.toBeNull();
-      expect(detailsElem!.innerHTML).toContain("Comparing");
+      expect(detailsElem!.innerHTML).toContain("Displaying all changes from");
     });
 
     it("restores unsavedChanges srcElem after table re-render (TC-041)", () => {
