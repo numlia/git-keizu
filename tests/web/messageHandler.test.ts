@@ -164,3 +164,66 @@ describe("handleMessage selectRepo response (S3)", () => {
     expect(gitGraph.selectRepo).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("handleMessage deleteRemoteBranch/rebaseBranch response (S4)", () => {
+  let gitGraph: GitGraphViewAPI;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitGraph = createMockGitGraphView();
+  });
+
+  it("calls refresh on deleteRemoteBranch success (TC-009)", () => {
+    // Given: A deleteRemoteBranch success response (status = null)
+    const msg: ResponseMessage = { command: "deleteRemoteBranch", status: null };
+
+    // When: handleMessage is called with the success response
+    handleMessage(msg, gitGraph);
+
+    // Then: gitGraph.refresh(false) is called for a soft refresh
+    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
+    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    expect(showErrorDialog).not.toHaveBeenCalled();
+  });
+
+  it("shows error dialog on deleteRemoteBranch failure (TC-010)", () => {
+    // Given: A deleteRemoteBranch error response (status = error message string)
+    const errorMsg = "error: unable to delete 'feature/x': remote ref does not exist";
+    const msg: ResponseMessage = { command: "deleteRemoteBranch", status: errorMsg };
+
+    // When: handleMessage is called with the error response
+    handleMessage(msg, gitGraph);
+
+    // Then: showErrorDialog is called with "Unable to Delete Remote Branch" and the git error message
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Delete Remote Branch", errorMsg, null);
+    expect(gitGraph.refresh).not.toHaveBeenCalled();
+  });
+
+  it("calls refresh on rebaseBranch success (TC-011)", () => {
+    // Given: A rebaseBranch success response (status = null)
+    const msg: ResponseMessage = { command: "rebaseBranch", status: null };
+
+    // When: handleMessage is called with the success response
+    handleMessage(msg, gitGraph);
+
+    // Then: gitGraph.refresh(false) is called for a soft refresh
+    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
+    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    expect(showErrorDialog).not.toHaveBeenCalled();
+  });
+
+  it("shows error dialog on rebaseBranch failure (TC-012)", () => {
+    // Given: A rebaseBranch error response (status = error message string)
+    const errorMsg = "error: could not apply abc1234... Fix typo";
+    const msg: ResponseMessage = { command: "rebaseBranch", status: errorMsg };
+
+    // When: handleMessage is called with the error response
+    handleMessage(msg, gitGraph);
+
+    // Then: showErrorDialog is called with "Unable to Rebase Branch" and the git error message
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Rebase Branch", errorMsg, null);
+    expect(gitGraph.refresh).not.toHaveBeenCalled();
+  });
+});

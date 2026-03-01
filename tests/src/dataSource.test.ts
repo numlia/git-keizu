@@ -1853,3 +1853,307 @@ describe("push command", () => {
     expect(result).toContain("has no upstream branch");
   });
 });
+
+describe("deleteRemoteBranch", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("deletes remote branch with correct args: git push origin --delete feature/x (TC-078)", async () => {
+    // Given: spawn completes successfully
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: deleteRemoteBranch is called with origin and feature/x
+    const result = await ds.deleteRemoteBranch(REPO, "origin", "feature/x");
+
+    // Then: spawn is called with correct args and returns null (success)
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["push", "origin", "--delete", "feature/x"], {
+      cwd: REPO
+    });
+  });
+
+  it("returns error message when git push --delete fails (TC-079)", async () => {
+    // Given: spawn outputs error on stderr with non-zero exit
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({
+        stderr: "error: unable to delete 'feature/x': remote ref does not exist\n",
+        exitCode: 1
+      })
+    );
+
+    // When: deleteRemoteBranch is called
+    const result = await ds.deleteRemoteBranch(REPO, "origin", "feature/x");
+
+    // Then: error message string is returned (not null)
+    expect(result).not.toBeNull();
+    expect(result).toContain("remote ref does not exist");
+  });
+
+  it("deletes branch on non-origin remote: git push upstream --delete fix/bug-123 (TC-080)", async () => {
+    // Given: spawn completes successfully
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: deleteRemoteBranch is called with upstream remote
+    const result = await ds.deleteRemoteBranch(REPO, "upstream", "fix/bug-123");
+
+    // Then: spawn is called with upstream as remote name and returns null
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["push", "upstream", "--delete", "fix/bug-123"], {
+      cwd: REPO
+    });
+  });
+});
+
+describe("rebaseBranch", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("rebases with correct args: git rebase main (TC-081)", async () => {
+    // Given: spawn completes successfully
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: rebaseBranch is called with main
+    const result = await ds.rebaseBranch(REPO, "main");
+
+    // Then: spawn is called with correct args and returns null (success)
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["rebase", "main"], { cwd: REPO });
+  });
+
+  it("returns error message with abort hint on conflict (TC-082)", async () => {
+    // Given: rebase encounters a conflict
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({
+        stderr:
+          'CONFLICT (content): Merge conflict in src/file.ts\nerror: could not apply abc1234... commit message\nhint: Resolve all conflicts manually, mark them as resolved with\nhint: "git add/rm <conflicted_files>", then run "git rebase --continue".\nhint: You can instead skip this commit: "git rebase --skip"\nhint: To abort and get back to the state before "git rebase", run "git rebase --abort".\n',
+        exitCode: 1
+      })
+    );
+
+    // When: rebaseBranch is called
+    const result = await ds.rebaseBranch(REPO, "main");
+
+    // Then: error message contains conflict and abort guidance
+    expect(result).not.toBeNull();
+    expect(result).toContain("CONFLICT");
+  });
+
+  it("returns error message when working tree is dirty (TC-083)", async () => {
+    // Given: working tree has uncommitted changes
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({
+        stderr:
+          "error: cannot rebase: You have unstaged changes.\nerror: Please commit or stash them.\n",
+        exitCode: 1
+      })
+    );
+
+    // When: rebaseBranch is called
+    const result = await ds.rebaseBranch(REPO, "main");
+
+    // Then: error message about unstaged changes is returned
+    expect(result).not.toBeNull();
+    expect(result).toContain("unstaged changes");
+  });
+});
+
+describe("getCommits authorFilter", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("passes --author=John Doe when authorFilter is specified (TC-084)", async () => {
+    // Given: authorFilter is "John Doe"
+    const logOutput = [
+      makeCommitLine("abc123def456", "parent1aaa", "John Doe", "j@t.com", 1700000000, "msg"),
+      ""
+    ].join("\n");
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with authorFilter
+    await ds.getCommits(REPO, "", 10, false, "John Doe");
+
+    // Then: git log args include --author=John Doe
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs).toContain("--author=John Doe");
+  });
+
+  it("does not include --author when authorFilter is undefined (TC-085)", async () => {
+    // Given: authorFilter is not specified
+    const logOutput = [
+      makeCommitLine("abc123def456", "parent1aaa", "Author", "a@t.com", 1700000000, "msg"),
+      ""
+    ].join("\n");
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called without authorFilter
+    await ds.getCommits(REPO, "", 10, false);
+
+    // Then: git log args do not include --author
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs.some((a) => a.startsWith("--author"))).toBe(false);
+  });
+
+  it("does not include --author when authorFilter is empty string (TC-086)", async () => {
+    // Given: authorFilter is an empty string
+    const logOutput = [
+      makeCommitLine("abc123def456", "parent1aaa", "Author", "a@t.com", 1700000000, "msg"),
+      ""
+    ].join("\n");
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with empty authorFilter
+    await ds.getCommits(REPO, "", 10, false, "");
+
+    // Then: git log args do not include --author
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs.some((a) => a.startsWith("--author"))).toBe(false);
+  });
+
+  it("safely passes special characters in authorFilter via spawnGit (TC-087)", async () => {
+    // Given: authorFilter contains special characters
+    const logOutput = [
+      makeCommitLine("abc123def456", "parent1aaa", "Jane O'Brien", "j@t.com", 1700000000, "msg"),
+      ""
+    ].join("\n");
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with special character authorFilter
+    await ds.getCommits(REPO, "", 10, false, "Jane O'Brien");
+
+    // Then: --author flag contains the exact string (no escaping needed with spawn)
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs).toContain("--author=Jane O'Brien");
+  });
+});
+
+describe("commitDetails committerEmail", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function setupSpawnForDetails(detailsOutput: string) {
+    spawnMock.mockImplementation((_cmd: unknown, args: unknown) => {
+      const argArray = args as string[];
+      if (argArray[0] === "show") {
+        return createMockProcess(detailsOutput);
+      }
+      return createMockProcess("");
+    });
+  }
+
+  it("parses committerEmail from %ce field at index 6 (TC-088)", async () => {
+    // Given: git show output includes committer email at index 6
+    const detailsLine = [
+      "abc123def456",
+      "parent111bbb",
+      "Author Name",
+      "author@example.com",
+      "1700000000",
+      "Committer Name",
+      "committer@example.com"
+    ].join(SEP);
+    const detailsOutput = `${detailsLine}\nCommit body message\n`;
+    setupSpawnForDetails(detailsOutput);
+
+    // When: commitDetails is called
+    const result = await ds.commitDetails(REPO, "abc123def456");
+
+    // Then: committerEmail is correctly parsed
+    expect(result).not.toBeNull();
+    expect(result!.committerEmail).toBe("committer@example.com");
+  });
+
+  it("sets committerEmail to empty string when field is empty (TC-089)", async () => {
+    // Given: git show output has empty committer email
+    const detailsLine = [
+      "abc123def456",
+      "parent111bbb",
+      "Author Name",
+      "author@example.com",
+      "1700000000",
+      "Committer Name",
+      ""
+    ].join(SEP);
+    const detailsOutput = `${detailsLine}\nCommit body\n`;
+    setupSpawnForDetails(detailsOutput);
+
+    // When: commitDetails is called
+    const result = await ds.commitDetails(REPO, "abc123def456");
+
+    // Then: committerEmail is an empty string
+    expect(result).not.toBeNull();
+    expect(result!.committerEmail).toBe("");
+  });
+
+  it("preserves existing fields while adding committerEmail (TC-090)", async () => {
+    // Given: git show output with all 7 fields
+    const detailsLine = [
+      "abc123def456",
+      "parent111bbb parent222ccc",
+      "Author Name",
+      "author@example.com",
+      "1700000000",
+      "Committer Name",
+      "committer@example.com"
+    ].join(SEP);
+    const detailsOutput = `${detailsLine}\nCommit body message\nSecond line\n`;
+    setupSpawnForDetails(detailsOutput);
+
+    // When: commitDetails is called
+    const result = await ds.commitDetails(REPO, "abc123def456");
+
+    // Then: all fields are correctly parsed including committerEmail
+    expect(result).not.toBeNull();
+    expect(result!.hash).toBe("abc123def456");
+    expect(result!.parents).toEqual(["parent111bbb", "parent222ccc"]);
+    expect(result!.author).toBe("Author Name");
+    expect(result!.email).toBe("author@example.com");
+    expect(result!.date).toBe(1700000000);
+    expect(result!.committer).toBe("Committer Name");
+    expect(result!.committerEmail).toBe("committer@example.com");
+    expect(result!.body).toContain("Commit body message");
+  });
+});

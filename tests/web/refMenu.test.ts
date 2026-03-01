@@ -5,6 +5,7 @@ vi.mock("../../web/dialogs", () => ({
   showRefInputDialog: vi.fn(),
   showConfirmationDialog: vi.fn(),
   showCheckboxDialog: vi.fn(),
+  showFormDialog: vi.fn(),
   showActionRunningDialog: vi.fn()
 }));
 
@@ -14,8 +15,13 @@ vi.mock("../../web/utils", () => ({
   ELLIPSIS: "&#8230;"
 }));
 
-import { showRefInputDialog } from "../../web/dialogs";
-import { buildRefContextMenuItems, checkoutBranchAction } from "../../web/refMenu";
+import {
+  showCheckboxDialog,
+  showConfirmationDialog,
+  showFormDialog,
+  showRefInputDialog
+} from "../../web/dialogs";
+import { buildRefContextMenuItems, checkoutBranchAction, parseRemoteRef } from "../../web/refMenu";
 import { sendMessage } from "../../web/utils";
 
 function createMockElement(classes: string[]): HTMLElement {
@@ -198,5 +204,299 @@ describe("buildRefContextMenuItems Pull/Push menu items", () => {
       .map((item) => item.title);
     expect(titles).not.toContain("Pull");
     expect(titles).not.toContain("Push");
+  });
+});
+
+// --- S3: parseRemoteRef() utility ---
+
+describe("parseRemoteRef remote name separation", () => {
+  it("splits 'origin/feature/x' at first slash (TC-011)", () => {
+    // Given: A remote ref name with nested branch path
+    // When: parseRemoteRef is called
+    const result = parseRemoteRef("origin/feature/x");
+
+    // Then: remoteName is "origin", branchName is "feature/x"
+    expect(result).toEqual({ remoteName: "origin", branchName: "feature/x" });
+  });
+
+  it("splits 'origin/main' into remote and branch (TC-012)", () => {
+    // Given: A simple remote ref name
+    // When: parseRemoteRef is called
+    const result = parseRemoteRef("origin/main");
+
+    // Then: remoteName is "origin", branchName is "main"
+    expect(result).toEqual({ remoteName: "origin", branchName: "main" });
+  });
+
+  it("preserves deep nesting in branch name for 'upstream/a/b/c' (TC-013)", () => {
+    // Given: A deeply nested remote ref name with non-origin remote
+    // When: parseRemoteRef is called
+    const result = parseRemoteRef("upstream/a/b/c");
+
+    // Then: Only first slash is used as separator
+    expect(result).toEqual({ remoteName: "upstream", branchName: "a/b/c" });
+  });
+
+  it("handles minimal path 'o/x' (TC-014)", () => {
+    // Given: A minimal 1-char remote + 1-char branch ref
+    // When: parseRemoteRef is called
+    const result = parseRemoteRef("o/x");
+
+    // Then: Correctly splits single characters
+    expect(result).toEqual({ remoteName: "o", branchName: "x" });
+  });
+
+  it("returns empty remoteName when no slash is present (TC-015)", () => {
+    // Given: A ref name without a slash separator (edge case)
+    // When: parseRemoteRef is called
+    const result = parseRemoteRef("origin");
+
+    // Then: remoteName is empty, branchName contains original value
+    expect(result).toEqual({ remoteName: "", branchName: "origin" });
+  });
+});
+
+// --- S4: Remote branch menu items ---
+
+describe("buildRefContextMenuItems remote branch menu items", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("includes 'Delete Remote Branch...' for remote branch (TC-016)", () => {
+    // Given: A remote branch element
+    const sourceElem = createMockElement(["remote"]);
+
+    // When: buildRefContextMenuItems is called for a remote branch
+    const menu = buildRefContextMenuItems(REPO, "origin/feature", sourceElem, false, "main");
+
+    // Then: Menu contains "Delete Remote Branch..." item
+    const titles = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .map((item) => item.title);
+    expect(titles).toContain("Delete Remote Branch&#8230;");
+  });
+
+  it("includes 'Merge into current branch...' for remote branch (TC-017)", () => {
+    // Given: A remote branch element
+    const sourceElem = createMockElement(["remote"]);
+
+    // When: buildRefContextMenuItems is called for a remote branch
+    const menu = buildRefContextMenuItems(REPO, "origin/feature", sourceElem, false, "main");
+
+    // Then: Menu contains "Merge into current branch..." item
+    const titles = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .map((item) => item.title);
+    expect(titles).toContain("Merge into current branch&#8230;");
+  });
+
+  it("does not include 'Delete Remote Branch...' for local branch (TC-018)", () => {
+    // Given: A local branch element (non-HEAD)
+    const sourceElem = createMockElement(["head"]);
+
+    // When: buildRefContextMenuItems is called for a local branch
+    const menu = buildRefContextMenuItems(REPO, "feature/x", sourceElem, false, "main");
+
+    // Then: Menu does not contain "Delete Remote Branch..." item
+    const titles = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .map((item) => item.title);
+    expect(titles).not.toContain("Delete Remote Branch&#8230;");
+  });
+
+  it("shows confirmation dialog when Delete Remote Branch is selected (TC-019)", () => {
+    // Given: A remote branch element
+    const sourceElem = createMockElement(["remote"]);
+    const menu = buildRefContextMenuItems(REPO, "origin/feature", sourceElem, false, "main");
+
+    // When: Delete Remote Branch item is clicked
+    const deleteItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Delete Remote Branch&#8230;");
+    deleteItem!.onClick();
+
+    // Then: showConfirmationDialog is called
+    expect(showConfirmationDialog).toHaveBeenCalledTimes(1);
+    const dialogMessage = (showConfirmationDialog as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(dialogMessage).toContain("origin/feature");
+  });
+
+  it("shows checkbox dialog with fast-forward option when Merge (remote) is selected (TC-020)", () => {
+    // Given: A remote branch element
+    const sourceElem = createMockElement(["remote"]);
+    const menu = buildRefContextMenuItems(REPO, "origin/feature", sourceElem, false, "main");
+
+    // When: Merge into current branch item is clicked
+    const mergeItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Merge into current branch&#8230;");
+    mergeItem!.onClick();
+
+    // Then: showCheckboxDialog is called with fast-forward option
+    expect(showCheckboxDialog).toHaveBeenCalledTimes(1);
+    const checkboxLabel = (showCheckboxDialog as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(checkboxLabel).toBe("Create a new commit even if fast-forward is possible");
+  });
+});
+
+// --- S5: Rebase menu items ---
+
+describe("buildRefContextMenuItems Rebase menu items", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("includes 'Rebase current branch on Branch...' for non-HEAD local branch (TC-021)", () => {
+    // Given: A local branch element that is NOT the current branch
+    const sourceElem = createMockElement(["head"]);
+
+    // When: buildRefContextMenuItems is called with different gitBranchHead
+    const menu = buildRefContextMenuItems(REPO, "feature/x", sourceElem, false, "main");
+
+    // Then: Menu contains "Rebase current branch on Branch..." item
+    const titles = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .map((item) => item.title);
+    expect(titles).toContain("Rebase current branch on Branch&#8230;");
+  });
+
+  it("does not include Rebase for HEAD branch (TC-022)", () => {
+    // Given: A local branch element that IS the current branch
+    const sourceElem = createMockElement(["head"]);
+
+    // When: buildRefContextMenuItems is called for current branch
+    const menu = buildRefContextMenuItems(REPO, "main", sourceElem, false, "main");
+
+    // Then: Menu does not contain "Rebase..." item (cannot rebase onto self)
+    const titles = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .map((item) => item.title);
+    expect(titles).not.toContain("Rebase current branch on Branch&#8230;");
+  });
+
+  it("does not include Rebase for remote branch (TC-023)", () => {
+    // Given: A remote branch element
+    const sourceElem = createMockElement(["remote"]);
+
+    // When: buildRefContextMenuItems is called for a remote branch
+    const menu = buildRefContextMenuItems(REPO, "origin/main", sourceElem, false, "main");
+
+    // Then: Menu does not contain "Rebase..." item (only for local branches)
+    const titles = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .map((item) => item.title);
+    expect(titles).not.toContain("Rebase current branch on Branch&#8230;");
+  });
+
+  it("shows confirmation dialog when Rebase is selected (TC-024)", () => {
+    // Given: A non-HEAD local branch element
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(REPO, "feature/x", sourceElem, false, "main");
+
+    // When: Rebase item is clicked
+    const rebaseItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Rebase current branch on Branch&#8230;");
+    rebaseItem!.onClick();
+
+    // Then: showConfirmationDialog is called
+    expect(showConfirmationDialog).toHaveBeenCalledTimes(1);
+    const dialogMessage = (showConfirmationDialog as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(dialogMessage).toContain("feature/x");
+  });
+});
+
+// --- S6: Delete Branch dialog extension ---
+
+describe("buildRefContextMenuItems Delete Branch dialog extension", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("uses showFormDialog with two checkboxes when remotes are provided (TC-025)", () => {
+    // Given: A non-HEAD local branch with remotes
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(REPO, "feature/x", sourceElem, false, "main", ["origin"]);
+
+    // When: Delete Branch item is clicked
+    const deleteItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Delete Branch&#8230;");
+    deleteItem!.onClick();
+
+    // Then: showFormDialog is called with 2 checkbox inputs
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = (showFormDialog as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0]).toEqual({ type: "checkbox", name: "Force Delete", value: false });
+    expect(inputs[1]).toEqual({
+      type: "checkbox",
+      name: "Delete this branch on the remote",
+      value: false
+    });
+  });
+
+  it("uses showCheckboxDialog when remotes is empty (TC-026)", () => {
+    // Given: A non-HEAD local branch without remotes
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(REPO, "feature/x", sourceElem, false, "main", []);
+
+    // When: Delete Branch item is clicked
+    const deleteItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Delete Branch&#8230;");
+    deleteItem!.onClick();
+
+    // Then: showCheckboxDialog is used (backward compatible)
+    expect(showCheckboxDialog).toHaveBeenCalledTimes(1);
+    expect(showFormDialog).not.toHaveBeenCalled();
+  });
+
+  it("sends deleteOnRemotes with remotes when remote checkbox is checked (TC-027)", () => {
+    // Given: A non-HEAD local branch with remotes
+    const sourceElem = createMockElement(["head"]);
+    const remotes = ["origin"];
+    const menu = buildRefContextMenuItems(REPO, "feature/x", sourceElem, false, "main", remotes);
+
+    // When: Delete Branch is clicked and form is submitted with remote delete checked
+    const deleteItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Delete Branch&#8230;");
+    deleteItem!.onClick();
+    const callback = (showFormDialog as ReturnType<typeof vi.fn>).mock.calls[0][3];
+    callback(["checked", "checked"]);
+
+    // Then: sendMessage includes deleteOnRemotes with the remotes array
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "deleteBranch",
+      repo: REPO,
+      branchName: "feature/x",
+      forceDelete: true,
+      deleteOnRemotes: ["origin"]
+    });
+  });
+
+  it("sends deleteOnRemotes as empty array when remote checkbox is unchecked (TC-028)", () => {
+    // Given: A non-HEAD local branch with remotes
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(REPO, "feature/x", sourceElem, false, "main", ["origin"]);
+
+    // When: Delete Branch is clicked and form is submitted with remote delete unchecked
+    const deleteItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Delete Branch&#8230;");
+    deleteItem!.onClick();
+    const callback = (showFormDialog as ReturnType<typeof vi.fn>).mock.calls[0][3];
+    callback(["unchecked", "unchecked"]);
+
+    // Then: sendMessage includes deleteOnRemotes as empty array
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "deleteBranch",
+      repo: REPO,
+      branchName: "feature/x",
+      forceDelete: false,
+      deleteOnRemotes: []
+    });
   });
 });
