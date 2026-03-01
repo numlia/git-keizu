@@ -181,3 +181,58 @@
 | TC-075  | push成功 (exit code 0)                  | Equivalence - normal                 | null を返す (GitCommandStatus)                                 | 成功時はnull         |
 | TC-076  | pushエラー (exit code != 0, stderrあり) | Equivalence - error (push failure)   | stderr メッセージ文字列を返す                                  | upstream未設定等     |
 | TC-077  | push: upstream未設定                    | Equivalence - error (no upstream)    | "fatal: The current branch ... has no upstream branch." を返す | git標準エラー        |
+
+## S11: deleteRemoteBranch() リモートブランチ削除
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**シグネチャ**: `deleteRemoteBranch(repo: string, remoteName: string, branchName: string): Promise<GitCommandStatus>`
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                               | Perspective (Equivalence / Boundary) | Expected Result                                                          | Notes                 |
+| ------- | -------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------ | --------------------- |
+| TC-078  | 有効な remoteName="origin", branchName="feature/x" | Equivalence - normal                 | git args: `["push", "origin", "--delete", "feature/x"]`。null を返す     | spawnGit 引数検証     |
+| TC-079  | git push --delete コマンドが異常終了               | Equivalence - error                  | エラーメッセージ文字列を返す（null ではない）                            | リモート接続失敗等    |
+| TC-080  | remoteName="upstream", branchName="fix/bug-123"    | Equivalence - normal (別リモート)    | git args: `["push", "upstream", "--delete", "fix/bug-123"]`。null を返す | origin 以外のリモート |
+
+## S12: rebaseBranch() リベース実行
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**シグネチャ**: `rebaseBranch(repo: string, branchName: string): Promise<GitCommandStatus>`
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                                     | Perspective (Equivalence / Boundary) | Expected Result                                                               | Notes          |
+| ------- | -------------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------- | -------------- |
+| TC-081  | branchName="main"                                        | Equivalence - normal                 | git args: `["rebase", "main"]`。null を返す                                   | 正常リベース   |
+| TC-082  | リベース中にコンフリクト発生                             | Equivalence - error (conflict)       | エラーメッセージ文字列を返す。git の案内メッセージ（rebase --abort 等）を含む | stderr 出力    |
+| TC-083  | 作業ツリーにコミットされていない変更がある状態でリベース | Equivalence - error (dirty tree)     | エラーメッセージ文字列を返す                                                  | git が拒否する |
+
+## S13: getGitLog()/getCommits() Author 絞り込み拡張
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                       | Perspective (Equivalence / Boundary) | Expected Result                                                                                  | Notes          |
+| ------- | ------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------ | -------------- |
+| TC-084  | authorFilter="John Doe"                    | Equivalence - normal                 | git log 引数に `--author=John Doe` が含まれる                                                    | フィルタ指定時 |
+| TC-085  | authorFilter 未指定（undefined）           | Equivalence - normal (no filter)     | git log 引数に `--author` が含まれない                                                           | 既存動作維持   |
+| TC-086  | authorFilter="" (空文字列)                 | Boundary - empty                     | git log 引数に `--author` が含まれない、または空文字でフィルタなしと同等                         | 空文字の扱い   |
+| TC-087  | authorFilter="Jane O'Brien" (特殊文字含む) | Equivalence - normal (special chars) | git log 引数に `--author=Jane O'Brien` が含まれる。spawnGit 経由のためシェルインジェクションなし | 安全性確認     |
+
+## S14: commitDetails() コミッターメール拡張
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                              | Perspective (Equivalence / Boundary) | Expected Result                                                                                 | Notes                        |
+| ------- | ------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------- | ---------------------------- |
+| TC-088  | git show 出力に %ce（コミッターメール）が含まれる | Equivalence - normal                 | GitCommitDetails.committerEmail に正しいメールアドレスが設定される                              | フォーマットインデックス 6   |
+| TC-089  | コミッターメールが空文字列                        | Boundary - empty                     | GitCommitDetails.committerEmail が空文字列                                                      | noreply アドレスでない場合等 |
+| TC-090  | commitInfo の全7フィールドが正常に設定されている  | Equivalence - normal                 | 既存フィールド（hash, author, email, date, committer）が変更されず、committerEmail が追加される | 後方互換性                   |

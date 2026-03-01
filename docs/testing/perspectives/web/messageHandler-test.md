@@ -40,3 +40,18 @@
 | ------- | ------------------------------------------ | ------------------------------------ | ---------------------------------------- | -------------------- |
 | TC-007  | ResponseSelectRepo: repo = "/path/to/repo" | Equivalence - normal                 | gitGraph.selectRepo(msg.repo) が呼ばれる | 正常ルーティング     |
 | TC-008  | ResponseSelectRepo メッセージ処理          | Equivalence - normal                 | エラーなく処理が完了する                 | switch case 追加検証 |
+
+## S4: handleMessage() deleteRemoteBranch/rebaseBranch レスポンス処理
+
+> Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
+> Added: 2026-03-01
+
+**シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
+**テスト対象パス**: `web/messageHandler.ts`
+
+| Case ID | Input / Precondition                                 | Perspective (Equivalence / Boundary) | Expected Result                                                | Notes                   |
+| ------- | ---------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------- | ----------------------- |
+| TC-009  | ResponseDeleteRemoteBranch: status = null            | Equivalence - normal (success)       | グラフリフレッシュが呼ばれる                                   | refreshOrError パターン |
+| TC-010  | ResponseDeleteRemoteBranch: status = "error message" | Equivalence - error                  | エラーダイアログ "Unable to Delete Remote Branch" が表示される | git メッセージ表示      |
+| TC-011  | ResponseRebaseBranch: status = null                  | Equivalence - normal (success)       | グラフリフレッシュが呼ばれる                                   | refreshOrError パターン |
+| TC-012  | ResponseRebaseBranch: status = "error message"       | Equivalence - error                  | エラーダイアログ "Unable to Rebase Branch" が表示される        | git メッセージ表示      |
