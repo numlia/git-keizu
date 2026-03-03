@@ -66,6 +66,7 @@ vi.mock("../../web/graph", () => ({
       render: vi.fn(),
       clear: vi.fn(),
       getVertexColour: vi.fn(() => 0),
+      getMutedCommits: vi.fn(() => []),
       getWidth: vi.fn(() => 100),
       getHeight: vi.fn(() => 500),
       limitMaxWidth: vi.fn()

@@ -256,3 +256,91 @@ describe("loadMoreCommitsAutomatically", () => {
     expect(result).toBe(false);
   });
 });
+
+// S5: muteCommitsMergeCommits() マージコミット mute 設定
+describe("muteCommitsMergeCommits", () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  // TC-022: default → true
+  it("returns true by default", () => {
+    // Given: no explicit setting configured
+    mockGet.mockImplementation((_key: string, defaultValue: unknown) => defaultValue);
+    // When: reading muteCommitsMergeCommits
+    const config = getConfig();
+    const result = config.muteCommitsMergeCommits();
+    // Then: returns true (mute merge commits enabled by default)
+    expect(result).toBe(true);
+  });
+
+  // TC-023: configured false → false
+  it("returns false when explicitly disabled", () => {
+    // Given: setting configured to false
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "repository.commits.mute.mergeCommits" ? false : defaultValue
+    );
+    // When: reading muteCommitsMergeCommits
+    const config = getConfig();
+    const result = config.muteCommitsMergeCommits();
+    // Then: returns false
+    expect(result).toBe(false);
+  });
+
+  // TC-024: configured true → true
+  it("returns true when explicitly enabled", () => {
+    // Given: setting explicitly set to true
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "repository.commits.mute.mergeCommits" ? true : defaultValue
+    );
+    // When: reading muteCommitsMergeCommits
+    const config = getConfig();
+    const result = config.muteCommitsMergeCommits();
+    // Then: returns true
+    expect(result).toBe(true);
+  });
+});
+
+// S6: muteCommitsNotAncestorsOfHead() 祖先外 mute 設定
+describe("muteCommitsNotAncestorsOfHead", () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  // TC-025: default → false
+  it("returns false by default", () => {
+    // Given: no explicit setting configured
+    mockGet.mockImplementation((_key: string, defaultValue: unknown) => defaultValue);
+    // When: reading muteCommitsNotAncestorsOfHead
+    const config = getConfig();
+    const result = config.muteCommitsNotAncestorsOfHead();
+    // Then: returns false (mute non-ancestors disabled by default)
+    expect(result).toBe(false);
+  });
+
+  // TC-026: configured true → true
+  it("returns true when explicitly enabled", () => {
+    // Given: setting configured to true
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "repository.commits.mute.commitsThatAreNotAncestorsOfHead" ? true : defaultValue
+    );
+    // When: reading muteCommitsNotAncestorsOfHead
+    const config = getConfig();
+    const result = config.muteCommitsNotAncestorsOfHead();
+    // Then: returns true
+    expect(result).toBe(true);
+  });
+
+  // TC-027: configured false → false
+  it("returns false when explicitly disabled", () => {
+    // Given: setting explicitly set to false
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "repository.commits.mute.commitsThatAreNotAncestorsOfHead" ? false : defaultValue
+    );
+    // When: reading muteCommitsNotAncestorsOfHead
+    const config = getConfig();
+    const result = config.muteCommitsNotAncestorsOfHead();
+    // Then: returns false
+    expect(result).toBe(false);
+  });
+});

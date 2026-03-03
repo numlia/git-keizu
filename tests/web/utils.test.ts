@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { arraysEqual, escapeHtml, pad2, svgIcons, unescapeHtml } from "../../web/utils";
+import {
+  arraysEqual,
+  buildCommitRowAttributes,
+  escapeHtml,
+  pad2,
+  svgIcons,
+  UNCOMMITTED_CHANGES_HASH,
+  unescapeHtml
+} from "../../web/utils";
 
 describe("escapeHtml", () => {
   it("escapes ampersand", () => {
@@ -126,5 +134,52 @@ describe("pad2", () => {
     expect(pad2(10)).toBe(10);
     expect(pad2(23)).toBe(23);
     expect(pad2(59)).toBe(59);
+  });
+});
+
+describe("buildCommitRowAttributes muted parameter", () => {
+  it("adds mute class for normal commit when muted is true (TC-003)", () => {
+    // Given: a normal commit hash with no stash and muted=true
+    // When: buildCommitRowAttributes is called
+    const result = buildCommitRowAttributes("abc123", null, true);
+    // Then: class contains "commit mute" and data-hash is set
+    expect(result).toContain('class="commit mute"');
+    expect(result).toContain('data-hash="abc123"');
+  });
+
+  it("does not add mute class when muted is false (TC-004)", () => {
+    // Given: a normal commit hash with no stash and muted=false
+    // When: buildCommitRowAttributes is called
+    const result = buildCommitRowAttributes("abc123", null, false);
+    // Then: class is "commit" without "mute"
+    expect(result).toContain('class="commit"');
+    expect(result).not.toContain("mute");
+  });
+
+  it("does not add mute class for stash commit even when muted is true (TC-005)", () => {
+    // Given: a stash commit with muted=true
+    const stash = { selector: "stash@{0}", baseHash: "base1", untrackedFilesHash: null };
+    // When: buildCommitRowAttributes is called
+    const result = buildCommitRowAttributes("abc123", stash, true);
+    // Then: class is "commit stash" without "mute"
+    expect(result).toContain('class="commit stash"');
+    expect(result).not.toContain("mute");
+  });
+
+  it("does not add mute class for unsavedChanges even when muted is true (TC-006)", () => {
+    // Given: UNCOMMITTED_CHANGES_HASH with muted=true
+    // When: buildCommitRowAttributes is called
+    const result = buildCommitRowAttributes(UNCOMMITTED_CHANGES_HASH, null, true);
+    // Then: class is "unsavedChanges" without "mute"
+    expect(result).toContain('class="unsavedChanges"');
+    expect(result).not.toContain("mute");
+  });
+
+  it("preserves data-hash attribute when muted is true (TC-007)", () => {
+    // Given: a normal commit with muted=true
+    // When: buildCommitRowAttributes is called
+    const result = buildCommitRowAttributes("abc123", null, true);
+    // Then: data-hash attribute is preserved
+    expect(result).toContain('data-hash="abc123"');
   });
 });

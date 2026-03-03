@@ -71,6 +71,8 @@ vi.mock("../../src/config", () => ({
     keyboardShortcutScrollToStash: () => "s",
     loadMoreCommits: () => 100,
     loadMoreCommitsAutomatically: () => true,
+    muteCommitsMergeCommits: () => true,
+    muteCommitsNotAncestorsOfHead: () => false,
     showCurrentBranchByDefault: () => false
   }))
 }));
