@@ -564,6 +564,7 @@ class GitGraphView {
         this.commits.length > 0 && this.commits[0].hash === UNCOMMITTED_CHANGES_HASH
           ? UNCOMMITTED_CHANGES_HASH
           : this.commitHead;
+    const muted = this.graph.getMutedCommits(this.commitHead);
     for (i = 0; i < this.commits.length; i++) {
       let refs = "",
         message = escapeHtml(this.commits[i].message),
@@ -601,7 +602,11 @@ class GitGraphView {
         );
         refs = `<span class="gitRef stash">${svgIcons.stash}${selectorDisplay}</span>${refs}`;
       }
-      let rowClass = buildCommitRowAttributes(this.commits[i].hash, this.commits[i].stash);
+      let rowClass = buildCommitRowAttributes(
+        this.commits[i].hash,
+        this.commits[i].stash,
+        muted[i]
+      );
       html += `<tr ${rowClass} data-id="${i}" data-color="${this.graph.getVertexColour(i)}"><td></td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${
         this.config.fetchAvatars
           ? `<span class="avatar" data-email="${escapeHtml(this.commits[i].email)}">${
@@ -1430,6 +1435,7 @@ let gitGraph = new GitGraphView(
     keybindings: viewState.keybindings,
     loadMoreCommits: viewState.loadMoreCommits,
     loadMoreCommitsAutomatically: viewState.loadMoreCommitsAutomatically,
+    mute: viewState.mute,
     showCurrentBranchByDefault: viewState.showCurrentBranchByDefault
   },
   vscode.getState()

@@ -78,6 +78,11 @@ export interface KeybindingConfig {
   scrollToStash: string | null;
 }
 
+export interface MuteCommitsConfig {
+  readonly mergeCommits: boolean;
+  readonly commitsNotAncestorsOfHead: boolean;
+}
+
 export interface GitGraphViewState {
   dateFormat: DateFormat;
   fetchAvatars: boolean;
@@ -88,6 +93,7 @@ export interface GitGraphViewState {
   lastActiveRepo: string | null;
   loadMoreCommits: number;
   loadMoreCommitsAutomatically: boolean;
+  mute: MuteCommitsConfig;
   repos: GitRepoSet;
   showCurrentBranchByDefault: boolean;
 }

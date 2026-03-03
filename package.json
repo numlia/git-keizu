@@ -245,6 +245,16 @@
           "type": "boolean",
           "default": true,
           "description": "When enabled, automatically loads more commits when scrolling to the bottom of the graph."
+        },
+        "git-keizu.repository.commits.mute.mergeCommits": {
+          "type": "boolean",
+          "default": true,
+          "description": "Display merge commit messages with reduced opacity."
+        },
+        "git-keizu.repository.commits.mute.commitsThatAreNotAncestorsOfHead": {
+          "type": "boolean",
+          "default": false,
+          "description": "Display commit messages that are not ancestors of HEAD with reduced opacity."
         }
       }
     }

@@ -476,6 +476,10 @@ export class GitGraphView {
       lastActiveRepo: this.extensionState.getLastActiveRepo(),
       loadMoreCommits: config.loadMoreCommits(),
       loadMoreCommitsAutomatically: config.loadMoreCommitsAutomatically(),
+      mute: {
+        mergeCommits: config.muteCommitsMergeCommits(),
+        commitsNotAncestorsOfHead: config.muteCommitsNotAncestorsOfHead()
+      },
       repos: this.repoManager.getRepos(),
       showCurrentBranchByDefault: config.showCurrentBranchByDefault()
     };

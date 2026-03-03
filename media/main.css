@@ -790,6 +790,17 @@ svg.fileIcon {
   background-color: rgba(234, 92, 0, 0.25);
 }
 
+/* Muted Commits */
+#commitTable tr.commit.mute td:nth-child(2) {
+  opacity: 0.5;
+}
+#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(2) {
+  opacity: 1;
+}
+#commitTable tr.commit.mute.findCurrentCommit td:nth-child(2) {
+  opacity: 1;
+}
+
 /* FindWidget */
 .findWidget {
   position: fixed;

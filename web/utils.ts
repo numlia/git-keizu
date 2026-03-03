@@ -105,13 +105,17 @@ export function insertAfter(newNode: HTMLElement, referenceNode: HTMLElement) {
   referenceNode.parentNode!.insertBefore(newNode, referenceNode.nextSibling);
 }
 
-export function buildCommitRowAttributes(hash: string, stash: GG.GitCommitStash | null): string {
+export function buildCommitRowAttributes(
+  hash: string,
+  stash: GG.GitCommitStash | null,
+  muted: boolean
+): string {
   if (hash === UNCOMMITTED_CHANGES_HASH) {
     return `class="unsavedChanges" data-hash="${UNCOMMITTED_CHANGES_HASH}"`;
   } else if (stash !== null) {
     return `class="commit stash" data-hash="${hash}"`;
   } else {
-    return `class="commit" data-hash="${hash}"`;
+    return `class="commit${muted ? " mute" : ""}" data-hash="${hash}"`;
   }
 }
 

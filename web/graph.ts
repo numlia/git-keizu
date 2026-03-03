@@ -1,3 +1,5 @@
+export const NULL_VERTEX_ID = -1;
+
 interface UnavailablePoint {
   connectsTo: VertexOrNull;
   onBranch: Branch;
@@ -17,7 +19,7 @@ class Branch {
   public addLine(p1: Point, p2: Point, isCommitted: boolean, lockedFirst: boolean) {
     this.lines.push({ p1: p1, p2: p2, lockedFirst: lockedFirst });
     if (isCommitted) {
-      if (p2.y < this.numUncommitted) this.numUncommitted = p2.y;
+      if (p2.x === 0 && p2.y < this.numUncommitted) this.numUncommitted = p2.y;
     } else {
       this.numUncommitted++;
     }
@@ -165,20 +167,39 @@ class Branch {
   }
 }
 
-class Vertex {
+export class Vertex {
+  private id: number;
   private x: number = 0;
   private y: number;
   private parents: Vertex[] = [];
+  private children: Vertex[] = [];
   private nextParent: number = 0;
   private onBranch: Branch | null = null;
   private isCommitted: boolean = true;
   private isCurrent: boolean = false;
-  private isStash: boolean = false;
+  private _isStash: boolean = false;
   private nextX: number = 0;
   private connections: UnavailablePoint[] = [];
 
-  constructor(y: number) {
-    this.y = y;
+  constructor(id: number) {
+    this.id = id;
+    this.y = id;
+  }
+
+  public getId(): number {
+    return this.id;
+  }
+
+  public addChild(vertex: Vertex) {
+    this.children.push(vertex);
+  }
+
+  public getParents(): Vertex[] {
+    return this.parents;
+  }
+
+  public get isStash(): boolean {
+    return this._isStash;
   }
 
   public addParent(vertex: Vertex) {
@@ -252,7 +273,7 @@ class Vertex {
     this.isCurrent = true;
   }
   public setStash() {
-    this.isStash = true;
+    this._isStash = true;
   }
   public draw(svg: SVGElement, config: Config, expandOffset: boolean) {
     if (this.onBranch === null) return;
@@ -308,6 +329,8 @@ export class Graph {
   private vertices: Vertex[] = [];
   private branches: Branch[] = [];
   private availableColours: number[] = [];
+  private commits: GG.GitCommitNode[] = [];
+  private commitLookup: { [hash: string]: number } = {};
 
   constructor(id: string, config: Config) {
     this.config = config;
@@ -344,7 +367,10 @@ export class Graph {
     this.vertices = [];
     this.branches = [];
     this.availableColours = [];
+    this.commits = commits;
+    this.commitLookup = commitLookup;
 
+    const nullVertex = new Vertex(NULL_VERTEX_ID);
     let i: number, j: number;
     for (i = 0; i < commits.length; i++) {
       let vertex = new Vertex(i);
@@ -356,7 +382,11 @@ export class Graph {
     for (i = 0; i < commits.length; i++) {
       for (j = 0; j < commits[i].parentHashes.length; j++) {
         if (typeof commitLookup[commits[i].parentHashes[j]] === "number") {
-          this.vertices[i].addParent(this.vertices[commitLookup[commits[i].parentHashes[j]]]);
+          const parentVertex = this.vertices[commitLookup[commits[i].parentHashes[j]]];
+          this.vertices[i].addParent(parentVertex);
+          parentVertex.addChild(this.vertices[i]);
+        } else {
+          this.vertices[i].addParent(nullVertex);
         }
       }
     }
@@ -427,6 +457,50 @@ export class Graph {
     return this.vertices[v].getColour() % this.config.graphColours.length;
   }
 
+  public getMutedCommits(currentHash: string | null): boolean[] {
+    const muted = new Array<boolean>(this.commits.length).fill(false);
+    const muteConfig = this.config.mute;
+
+    // Mute merge commits (excluding stash commits)
+    if (muteConfig.mergeCommits) {
+      for (let i = 0; i < this.vertices.length; i++) {
+        if (this.vertices[i].isMerge() && !this.vertices[i].isStash) {
+          muted[i] = true;
+        }
+      }
+    }
+
+    // Mute commits that are not ancestors of HEAD
+    if (muteConfig.commitsNotAncestorsOfHead) {
+      if (currentHash !== null && typeof this.commitLookup[currentHash] === "number") {
+        const reachable = new Set<number>();
+        const queue: number[] = [this.commitLookup[currentHash]];
+
+        while (queue.length > 0) {
+          const idx = queue.shift()!;
+          if (reachable.has(idx)) continue;
+          reachable.add(idx);
+
+          for (const parent of this.vertices[idx].getParents()) {
+            const parentId = parent.getId();
+            if (parentId !== NULL_VERTEX_ID && !reachable.has(parentId)) {
+              queue.push(parentId);
+            }
+          }
+        }
+
+        for (let i = 0; i < this.commits.length; i++) {
+          if (!reachable.has(i)) {
+            muted[i] = true;
+          }
+        }
+      }
+      // If currentHash is null or not in commitLookup, treat all as reachable (no mute)
+    }
+
+    return muted;
+  }
+
   public limitMaxWidth(maxWidth: number) {
     this.maxWidth = maxWidth;
     this.applyMaxWidth(this.getWidth());
@@ -455,6 +529,7 @@ export class Graph {
 
     if (
       parentVertex !== null &&
+      parentVertex.getId() !== NULL_VERTEX_ID &&
       vertex.isMerge() &&
       !vertex.isNotOnBranch() &&
       !parentVertex.isNotOnBranch()
@@ -503,7 +578,15 @@ export class Graph {
           parentVertex.addToBranch(branch, curPoint.x);
           vertex = parentVertex;
           parentVertex = vertex.getNextParent();
-          if (parentVertexOnBranch) break;
+          if (parentVertex === null || parentVertexOnBranch) break;
+        }
+      }
+      // Process remaining nullVertex parents
+      while (vertex.getNextParent() !== null) {
+        if (vertex.getNextParent()!.getId() === NULL_VERTEX_ID) {
+          vertex.registerParentProcessed();
+        } else {
+          break;
         }
       }
       branch.setEnd(i);

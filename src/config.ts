@@ -115,6 +115,17 @@ class Config {
     return this.workspaceConfiguration.get("tabIconColourTheme", "colour");
   }
 
+  public muteCommitsMergeCommits(): boolean {
+    return this.workspaceConfiguration.get("repository.commits.mute.mergeCommits", true);
+  }
+
+  public muteCommitsNotAncestorsOfHead(): boolean {
+    return this.workspaceConfiguration.get(
+      "repository.commits.mute.commitsThatAreNotAncestorsOfHead",
+      false
+    );
+  }
+
   public gitPath(): string {
     let path = vscode.workspace.getConfiguration("git").get("path", null);
     return path !== null ? path : "git";

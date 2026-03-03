@@ -18,6 +18,7 @@ declare global {
     keybindings: GG.KeybindingConfig;
     loadMoreCommits: number;
     loadMoreCommitsAutomatically: boolean;
+    mute: { mergeCommits: boolean; commitsNotAncestorsOfHead: boolean };
     showCurrentBranchByDefault: boolean;
   }
 
