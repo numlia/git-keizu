@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.9] - 2026-03-04
+
+### Added
+
+- **Mute merge commits**: Merge commits are displayed with muted text (50% opacity) by default, making non-merge commits easier to scan in a busy history. Can be disabled via `git-keizu.repository.commits.mute.mergeCommits` (default: true)
+- **Mute non-ancestor commits**: A new opt-in setting `git-keizu.repository.commits.mute.commitsThatAreNotAncestorsOfHead` (default: false) dims commits that are not ancestors of the currently checked-out branch or commit
+
+### Fixed
+
+- **Graph line merging**: Merge commits whose second parent falls outside the loaded commit window now correctly draw the converging branch line instead of rendering as a single straight line
+- **Commit color boundary**: The boundary between committed and uncommitted changes in the graph is now computed correctly in all cases
+
 ## [0.2.8] - 2026-03-01
 
 ### Fixed
@@ -126,7 +138,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.8...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.9...HEAD
+[0.2.9]: https://github.com/numlia/git-keizu/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/numlia/git-keizu/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/numlia/git-keizu/compare/v0.2.6...v0.2.7
 [0.2.6]: https://github.com/numlia/git-keizu/compare/v0.2.5...v0.2.6
