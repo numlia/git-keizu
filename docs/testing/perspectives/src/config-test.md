@@ -66,3 +66,31 @@
 | ------- | ------------------------ | ------------------------------------ | --------------- | -------------- |
 | TC-020  | 設定未指定（デフォルト） | Equivalence - normal (default)       | true を返す     | デフォルト有効 |
 | TC-021  | 設定値=false             | Equivalence - normal                 | false を返す    | 明示的無効化   |
+
+## S5: muteCommitsMergeCommits() マージコミット mute 設定
+
+> Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
+> Added: 2026-03-04
+
+**シグネチャ**: `muteCommitsMergeCommits(): boolean`
+**テスト対象パス**: `src/config.ts`
+
+| Case ID | Input / Precondition     | Perspective (Equivalence / Boundary) | Expected Result | Notes          |
+| ------- | ------------------------ | ------------------------------------ | --------------- | -------------- |
+| TC-022  | 設定未指定（デフォルト） | Equivalence - normal (default)       | true を返す     | デフォルト有効 |
+| TC-023  | 設定値 = false           | Equivalence - normal                 | false を返す    | 明示的無効化   |
+| TC-024  | 設定値 = true            | Equivalence - normal                 | true を返す     | 明示的有効     |
+
+## S6: muteCommitsNotAncestorsOfHead() 祖先外 mute 設定
+
+> Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
+> Added: 2026-03-04
+
+**シグネチャ**: `muteCommitsNotAncestorsOfHead(): boolean`
+**テスト対象パス**: `src/config.ts`
+
+| Case ID | Input / Precondition     | Perspective (Equivalence / Boundary) | Expected Result | Notes          |
+| ------- | ------------------------ | ------------------------------------ | --------------- | -------------- |
+| TC-025  | 設定未指定（デフォルト） | Equivalence - normal (default)       | false を返す    | デフォルト無効 |
+| TC-026  | 設定値 = true            | Equivalence - normal                 | true を返す     | 明示的有効     |
+| TC-027  | 設定値 = false           | Equivalence - normal                 | false を返す    | 明示的無効     |

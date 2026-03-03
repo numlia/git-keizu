@@ -66,6 +66,12 @@ The codebase has been modernized from its 2019 origins: async/await throughout, 
 
 Bug reports and feedback via [GitHub Issues](https://github.com/numlia/git-keizu/issues) are welcome. This is a personal project maintained in spare time — responses and fixes are not guaranteed, but reports are appreciated.
 
+## Acknowledgements
+
+A big thank you to the original author, [mhutchie](https://github.com/mhutchie), for creating this amazing extension.
+
+Thanks also to [asispts](https://github.com/asispts) for carrying the project forward — stripping it down to the essentials and keeping it focused on what matters most.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
