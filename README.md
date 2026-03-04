@@ -18,7 +18,7 @@ Git Keizu is a personal take on a git history viewer — shaped around the featu
 ## Features
 
 - **Graph View**: See all your branches, tags, stash entries, and uncommitted changes in one visual graph. The menu bar and column headers stay fixed as you scroll, so controls are always within reach in long histories.
-- **Muted merge commits**: Merge commits are shown with dimmed text by default, making non-merge commits easier to spot in a busy history. Non-ancestor commits can also be muted via settings (`git-keizu.repository.commits.mute.*`).
+- **Muted merge commits**: Merge commits are shown with dimmed text (commit message, date, author, and hash) by default, making non-merge commits easier to spot in a busy history. Branch labels always render at full opacity regardless of mute state. Non-ancestor commits can also be muted via settings (`git-keizu.repository.commits.mute.*`).
 - **Author Filter**: A dropdown in the toolbar lets you filter commits by author — select any name to show only their commits, or choose "All Authors" to clear the filter. Author options are built automatically from the current commit list.
 - **Commit Details**: Click on a commit to see what changed and view diffs for any file. The panel height adjusts to your viewport size, and the view only scrolls enough to bring the panel into view — no jarring auto-center on every click. Parent hashes are clickable links that jump straight to the parent commit's details.
 - **File View Toggle**: Switch between Tree View (folder hierarchy) and List View (flat alphabetical list of full paths) in the commit details panel; the chosen mode is saved per repository.

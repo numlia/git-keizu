@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-03-05
+
+### Fixed
+
+- **Muted commit branch label visibility**: Branch, remote, and tag labels on muted commits now render at full opacity; previously the mute opacity was applied to the entire commit row cell, causing reference labels to also appear faded
+- **Muted commit column coverage**: The date, author, and commit hash columns now correctly dim when a commit is muted, matching the original Git Graph behavior; previously only the commit message column was affected
+
 ## [0.2.9] - 2026-03-04
 
 ### Added
@@ -138,7 +145,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.9...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.10...HEAD
+[0.2.10]: https://github.com/numlia/git-keizu/compare/v0.2.9...v0.2.10
 [0.2.9]: https://github.com/numlia/git-keizu/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/numlia/git-keizu/compare/v0.2.7...v0.2.8
 [0.2.7]: https://github.com/numlia/git-keizu/compare/v0.2.6...v0.2.7
