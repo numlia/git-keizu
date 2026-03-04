@@ -8,8 +8,9 @@ import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 /* Hoisted mocks (shared references for mock factories + assertions)  */
 /* ------------------------------------------------------------------ */
 
-const { mockFindWidgetInstance, capturedConfig } = vi.hoisted(() => ({
+const { mockFindWidgetInstance, capturedConfig, mockMutedResult } = vi.hoisted(() => ({
   capturedConfig: { ref: null as Record<string, unknown> | null },
+  mockMutedResult: { value: [] as boolean[] },
   mockFindWidgetInstance: {
     show: vi.fn(),
     close: vi.fn(),
@@ -66,7 +67,7 @@ vi.mock("../../web/graph", () => ({
       render: vi.fn(),
       clear: vi.fn(),
       getVertexColour: vi.fn(() => 0),
-      getMutedCommits: vi.fn(() => []),
+      getMutedCommits: vi.fn(() => mockMutedResult.value),
       getWidth: vi.fn(() => 100),
       getHeight: vi.fn(() => 500),
       limitMaxWidth: vi.fn()
@@ -3314,6 +3315,128 @@ describe("Author, details, remotes & parent navigation", () => {
       expect(parentSpans.length).toBe(2);
       expect(parentSpans[0].getAttribute("data-hash")).toBe(COMMIT_HASH_1);
       expect(parentSpans[1].getAttribute("data-hash")).toBe(COMMIT_HASH_2);
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* S20: renderTable() commitMessage wrapper (mute-branch-label-fix) */
+  /* ---------------------------------------------------------------- */
+
+  describe("commitMessage wrapper", () => {
+    beforeEach(() => {
+      resetCommitState();
+      mockMutedResult.value = [];
+    });
+
+    afterEach(() => {
+      mockMutedResult.value = [];
+    });
+
+    it("wraps message text in span.commitMessage for normal commit (TC-123)", () => {
+      // Given: a normal commit (mute=false) — COMMIT_HASH_2 is not HEAD
+      // When: commit rows are rendered via loadCommits
+      // (resetCommitState already loaded MOCK_COMMITS)
+
+      // Then: the non-HEAD commit row contains a .commitMessage span
+      const row = document.querySelector(`.commit[data-hash="${COMMIT_HASH_2}"]`);
+      expect(row).not.toBeNull();
+      const wrapper = row!.querySelector(".commitMessage");
+      expect(wrapper).not.toBeNull();
+      expect(wrapper!.tagName).toBe("SPAN");
+    });
+
+    it("wraps message text in span.commitMessage for muted commit (TC-124)", () => {
+      // Given: getMutedCommits returns [true, false, false] (first commit is muted)
+      mockMutedResult.value = [true, false, false];
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+
+      // When: the muted commit row is examined
+      const row = document.querySelector(`.commit.mute[data-hash="${COMMIT_HASH_1}"]`);
+
+      // Then: the muted row contains a .commitMessage span
+      expect(row).not.toBeNull();
+      const wrapper = row!.querySelector(".commitMessage");
+      expect(wrapper).not.toBeNull();
+      expect(wrapper!.tagName).toBe("SPAN");
+    });
+
+    it("wraps bold message inside commitMessage when currentHash matches (TC-125)", () => {
+      // Given: COMMIT_HASH_1 is commitHead (= currentHash)
+      // When: the HEAD commit row is rendered
+      const row = document.querySelector(`.commit[data-hash="${COMMIT_HASH_1}"]`);
+
+      // Then: message is <span class="commitMessage"><b>message</b></span>
+      expect(row).not.toBeNull();
+      const wrapper = row!.querySelector(".commitMessage");
+      expect(wrapper).not.toBeNull();
+      const bold = wrapper!.querySelector("b");
+      expect(bold).not.toBeNull();
+      expect(bold!.textContent).toBe("First commit");
+    });
+
+    it("wraps plain text inside commitMessage when currentHash does not match (TC-126)", () => {
+      // Given: COMMIT_HASH_2 is not commitHead (not currentHash)
+      // When: the non-HEAD commit row is rendered
+      const row = document.querySelector(`.commit[data-hash="${COMMIT_HASH_2}"]`);
+
+      // Then: message is <span class="commitMessage">message</span> (no <b>)
+      expect(row).not.toBeNull();
+      const wrapper = row!.querySelector(".commitMessage");
+      expect(wrapper).not.toBeNull();
+      expect(wrapper!.querySelector("b")).toBeNull();
+      expect(wrapper!.textContent).toBe("Second commit");
+    });
+
+    it("places gitRef spans outside commitMessage wrapper (TC-127)", () => {
+      // Given: getBranchLabels returns a head branch for COMMIT_HASH_1
+      vi.mocked(getBranchLabels).mockReturnValue({
+        heads: [{ name: "main", remotes: [] }],
+        remotes: [],
+        tags: []
+      });
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+
+      // When: the commit row with refs is examined
+      const row = document.querySelector(`.commit[data-hash="${COMMIT_HASH_1}"]`);
+      expect(row).not.toBeNull();
+      const td = row!.querySelectorAll("td")[1]; // 2nd td = description column
+
+      // Then: .gitRef is a sibling of .commitMessage (not inside it)
+      const gitRef = td.querySelector(".gitRef");
+      const commitMessage = td.querySelector(".commitMessage");
+      expect(gitRef).not.toBeNull();
+      expect(commitMessage).not.toBeNull();
+      expect(commitMessage!.querySelector(".gitRef")).toBeNull();
+
+      // Cleanup
+      vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+    });
+
+    it("places commitHeadDot outside commitMessage wrapper (TC-128)", () => {
+      // Given: COMMIT_HASH_1 is commitHead, so commitHeadDot is rendered
+      // When: the HEAD commit row is examined
+      const row = document.querySelector(`.commit[data-hash="${COMMIT_HASH_1}"]`);
+      expect(row).not.toBeNull();
+      const td = row!.querySelectorAll("td")[1]; // 2nd td = description column
+
+      // Then: .commitHeadDot is a sibling of .commitMessage (not inside it)
+      const headDot = td.querySelector(".commitHeadDot");
+      const commitMessage = td.querySelector(".commitMessage");
+      expect(headDot).not.toBeNull();
+      expect(commitMessage).not.toBeNull();
+      expect(commitMessage!.querySelector(".commitHeadDot")).toBeNull();
     });
   });
 });
