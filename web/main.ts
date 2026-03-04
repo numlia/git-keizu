@@ -607,7 +607,7 @@ class GitGraphView {
         this.commits[i].stash,
         muted[i]
       );
-      html += `<tr ${rowClass} data-id="${i}" data-color="${this.graph.getVertexColour(i)}"><td></td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${
+      html += `<tr ${rowClass} data-id="${i}" data-color="${this.graph.getVertexColour(i)}"><td></td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}<span class="commitMessage">${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</span></td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${
         this.config.fetchAvatars
           ? `<span class="avatar" data-email="${escapeHtml(this.commits[i].email)}">${
               typeof this.avatars[this.commits[i].email] === "string"

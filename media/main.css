@@ -791,13 +791,16 @@ svg.fileIcon {
 }
 
 /* Muted Commits */
-#commitTable tr.commit.mute td:nth-child(2) {
+#commitTable tr.commit.mute td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute td:nth-child(n + 3) {
   opacity: 0.5;
 }
-#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(2) {
+#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(n + 3) {
   opacity: 1;
 }
-#commitTable tr.commit.mute.findCurrentCommit td:nth-child(2) {
+#commitTable tr.commit.mute.findCurrentCommit td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute.findCurrentCommit td:nth-child(n + 3) {
   opacity: 1;
 }
 
