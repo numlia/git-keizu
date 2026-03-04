@@ -317,3 +317,20 @@
 | TC-120  | parent hash クリック（該当コミットがロード済み） | Equivalence - normal                 | 該当コミット行にスクロールし、コミット詳細が表示される                            | loadCommitDetails 呼び出し |
 | TC-121  | parent hash クリック（該当コミットが未ロード）   | Boundary - not found                 | 何も起きない（エラー表示なし）                                                    | 静かに失敗                 |
 | TC-122  | マージコミット（parents が2つ）                  | Equivalence - normal (multiple)      | 両方の parent hash がリンクとして表示される                                       | 複数 parents 対応          |
+
+## S20: renderTable() commitMessage ラッパー生成
+
+> Origin: Feature 010 (mute-branch-label-fix) (aidd-spec-tasks-test)
+> Added: 2026-03-05
+
+**シグネチャ**: `private renderTable(): void`
+**テスト対象パス**: `web/main.ts:610`
+
+| Case ID | Input / Precondition                            | Perspective (Equivalence / Boundary) | Expected Result                                                    | Notes                      |
+| ------- | ----------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------ | -------------------------- |
+| TC-123  | 通常コミット（mute=false）の行HTML生成          | Equivalence - normal                 | メッセージテキストが `<span class="commitMessage">` で囲まれている | 全コミット行に適用         |
+| TC-124  | ミュートコミット（mute=true）の行HTML生成       | Equivalence - normal (muted)         | メッセージテキストが `<span class="commitMessage">` で囲まれている | CSS と連携してミュート表示 |
+| TC-125  | currentHash と一致するコミットの行HTML生成      | Equivalence - normal (current)       | `<span class="commitMessage"><b>メッセージ</b></span>` 形式        | bold がラッパー内側        |
+| TC-126  | currentHash と一致しないコミットの行HTML生成    | Equivalence - normal                 | `<span class="commitMessage">メッセージ</span>` 形式               | plain text                 |
+| TC-127  | リファレンスラベル付きコミットの行HTML生成      | Equivalence - normal (with refs)     | `.gitRef` スパンが `.commitMessage` の外側（直前）にある           | ラベルが wrapper 外        |
+| TC-128  | HEAD コミット（commitHeadDot 付き）の行HTML生成 | Equivalence - normal (HEAD)          | `.commitHeadDot` スパンが `.commitMessage` の外側にある            | HEAD dot が wrapper 外     |
