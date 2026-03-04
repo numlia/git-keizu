@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.11] - 2026-03-05
+
+### Changed
+
+- **Marketplace metadata**: Extension categories updated from `"Other"` to `["SCM Providers", "Visualization"]` for better discoverability; keywords refreshed to more accurately represent the extension's functionality (`action`/`visualise` replaced with `branch`/`commit`/`history`/`visualize`)
+- **Setting descriptions**: Remaining "Git Graph" references in setting descriptions replaced with "Git Keizu"
+- **Activation events**: Removed redundant `onCommand:*` activation events — VS Code 1.74+ activates command contributions automatically without explicit declaration
+
 ## [0.2.10] - 2026-03-05
 
 ### Fixed
@@ -145,7 +153,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.10...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.11...HEAD
+[0.2.11]: https://github.com/numlia/git-keizu/compare/v0.2.10...v0.2.11
 [0.2.10]: https://github.com/numlia/git-keizu/compare/v0.2.9...v0.2.10
 [0.2.9]: https://github.com/numlia/git-keizu/compare/v0.2.8...v0.2.9
 [0.2.8]: https://github.com/numlia/git-keizu/compare/v0.2.7...v0.2.8
