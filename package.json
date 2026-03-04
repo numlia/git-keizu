@@ -4,14 +4,16 @@
   "version": "0.2.10",
   "description": "View your Git history as a graph, and do common Git actions directly from it.",
   "categories": [
-    "Other"
+    "SCM Providers",
+    "Visualization"
   ],
   "keywords": [
-    "action",
-    "diff",
+    "branch",
+    "commit",
     "git",
     "graph",
-    "visualise"
+    "history",
+    "visualize"
   ],
   "homepage": "https://github.com/numlia/git-keizu",
   "bugs": {
@@ -109,7 +111,7 @@
             "Show relative times, for example \"5 minutes ago\""
           ],
           "default": "Date & Time",
-          "description": "Specifies the date format to be used in the date column of Git Graph."
+          "description": "Specifies the date format to be used in the date column of Git Keizu."
         },
         "git-keizu.dateType": {
           "type": "string",
@@ -122,7 +124,7 @@
             "Use the committer date of a commit"
           ],
           "default": "Author Date",
-          "description": "Specifies the date type to be displayed throughout Git Graph."
+          "description": "Specifies the date type to be displayed throughout Git Keizu."
         },
         "git-keizu.fetchAvatars": {
           "type": "boolean",
@@ -183,12 +185,12 @@
         "git-keizu.showCurrentBranchByDefault": {
           "type": "boolean",
           "default": false,
-          "description": "Show the current branch by default when Git Graph is opened. Default: false (show all branches)"
+          "description": "Show the current branch by default when Git Keizu is opened. Default: false (show all branches)"
         },
         "git-keizu.showStatusBarItem": {
           "type": "boolean",
           "default": true,
-          "description": "Show a Status Bar item which opens Git Graph when clicked."
+          "description": "Show a Status Bar item which opens Git Keizu when clicked."
         },
         "git-keizu.showUncommittedChanges": {
           "type": "boolean",
@@ -206,7 +208,7 @@
             "Show a grey icon which suits Visual Studio Code colour themes that are predominantly grayscale"
           ],
           "default": "colour",
-          "description": "Specifies the colour theme of the icon displayed on the Git Graph tab."
+          "description": "Specifies the colour theme of the icon displayed on the Git Keizu tab."
         },
         "git-keizu.sourceCodeProviderIntegrationLocation": {
           "type": "string",
@@ -215,11 +217,11 @@
             "More Actions"
           ],
           "enumDescriptions": [
-            "Show the Git Graph button inline on the SCM title bar",
-            "Show the Git Graph button in the SCM title bar 'More Actions' menu"
+            "Show the Git Keizu button inline on the SCM title bar",
+            "Show the Git Keizu button in the SCM title bar 'More Actions' menu"
           ],
           "default": "Inline",
-          "description": "Specifies where the Git Graph button is shown on the SCM title bar."
+          "description": "Specifies where the Git Keizu button is shown on the SCM title bar."
         },
         "git-keizu.keyboardShortcutFind": {
           "type": "string",
@@ -260,8 +262,6 @@
     }
   },
   "activationEvents": [
-    "onCommand:git-keizu.clearAvatarCache",
-    "onCommand:git-keizu.view",
     "workspaceContains:.git"
   ],
   "icon": "resources/icon.png",
