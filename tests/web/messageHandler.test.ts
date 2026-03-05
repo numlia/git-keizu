@@ -227,3 +227,49 @@ describe("handleMessage deleteRemoteBranch/rebaseBranch response (S4)", () => {
     expect(gitGraph.refresh).not.toHaveBeenCalled();
   });
 });
+
+describe("handleMessage loadCommits authors pass-through (S5)", () => {
+  let gitGraph: GitGraphViewAPI;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitGraph = createMockGitGraphView();
+  });
+
+  it("passes authors array to loadCommits (TC-013)", () => {
+    // Given: A loadCommits response with authors field
+    const msg: ResponseMessage = {
+      command: "loadCommits",
+      commits: [],
+      head: null,
+      moreCommitsAvailable: false,
+      hard: false,
+      authors: ["Alice", "Bob"]
+    };
+
+    // When: handleMessage is called with the loadCommits response
+    handleMessage(msg, gitGraph);
+
+    // Then: gitGraph.loadCommits is called with authors forwarded
+    expect(gitGraph.loadCommits).toHaveBeenCalledTimes(1);
+    expect(gitGraph.loadCommits).toHaveBeenCalledWith([], null, false, false, ["Alice", "Bob"]);
+  });
+
+  it("passes undefined when authors field is absent (TC-014)", () => {
+    // Given: A loadCommits response without authors field
+    const msg: ResponseMessage = {
+      command: "loadCommits",
+      commits: [],
+      head: null,
+      moreCommitsAvailable: false,
+      hard: false
+    };
+
+    // When: handleMessage is called with the loadCommits response
+    handleMessage(msg, gitGraph);
+
+    // Then: gitGraph.loadCommits is called with authors as undefined
+    expect(gitGraph.loadCommits).toHaveBeenCalledTimes(1);
+    expect(gitGraph.loadCommits).toHaveBeenCalledWith([], null, false, false, undefined);
+  });
+});

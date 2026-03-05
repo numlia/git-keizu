@@ -3006,6 +3006,143 @@ describe("Author, details, remotes & parent navigation", () => {
   });
 
   /* ---------------------------------------------------------------- */
+  /* S21: loadCommits() サーバー提供 Author リスト対応                  */
+  /* ---------------------------------------------------------------- */
+
+  describe("loadCommits server-provided authors (S21)", () => {
+    const ALL_AUTHORS_OPTION = { name: "All Authors", value: "" };
+
+    it("uses server-provided authors for dropdown when authorFilter is null (TC-129)", () => {
+      // Given: authorFilter is null (default state)
+      vi.clearAllMocks();
+
+      // When: loadCommits response includes authors array
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true,
+        authors: ["Alice", "Bob"]
+      });
+
+      // Then: dropdown is updated with server-provided authors (not extracted from commits)
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
+        [ALL_AUTHORS_OPTION, { name: "Alice", value: "Alice" }, { name: "Bob", value: "Bob" }],
+        ""
+      );
+    });
+
+    it("falls back to commit extraction when authors is undefined (TC-130)", () => {
+      // Given: authorFilter is null (default state)
+      vi.clearAllMocks();
+
+      // When: loadCommits response does NOT include authors field
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+
+      // Then: dropdown is updated with authors extracted from commits (sorted, deduplicated)
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
+        [
+          ALL_AUTHORS_OPTION,
+          { name: "Alice", value: "Alice" },
+          { name: "Bob", value: "Bob" },
+          { name: "Carol", value: "Carol" }
+        ],
+        ""
+      );
+    });
+
+    it("shows only All Authors when authors is empty array (TC-131)", () => {
+      // Given: authorFilter is null
+      vi.clearAllMocks();
+
+      // When: loadCommits response includes empty authors array
+      dispatchMessage({
+        command: "loadCommits",
+        commits: [],
+        head: null,
+        moreCommitsAvailable: false,
+        hard: true,
+        authors: []
+      });
+
+      // Then: dropdown shows only "All Authors"
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith([ALL_AUTHORS_OPTION], "");
+
+      // Cleanup: restore normal commits
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+
+    it("skips dropdown update when authorFilter is set (TC-132)", () => {
+      // Given: authorFilter is set via dropdown callback
+      expect(capturedAuthorCallback).not.toBeNull();
+      capturedAuthorCallback!("Alice");
+      vi.clearAllMocks();
+
+      // When: loadCommits response includes authors array
+      dispatchMessage({
+        command: "loadCommits",
+        commits: [MOCK_COMMITS[0]],
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true,
+        authors: ["Alice", "Bob"]
+      });
+
+      // Then: authorDropdown.setOptions is NOT called (filter active, list stays stable)
+      expect(mockAuthorDropdownInstance.setOptions).not.toHaveBeenCalled();
+
+      // Cleanup: reset authorFilter
+      capturedAuthorCallback!("");
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+
+    it("preserves server-provided order without re-sorting (TC-133)", () => {
+      // Given: authorFilter is null
+      vi.clearAllMocks();
+
+      // When: loadCommits response includes authors in non-alphabetical order
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true,
+        authors: ["Charlie", "Alice", "Bob"]
+      });
+
+      // Then: dropdown options preserve the exact server-provided order
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
+        [
+          ALL_AUTHORS_OPTION,
+          { name: "Charlie", value: "Charlie" },
+          { name: "Alice", value: "Alice" },
+          { name: "Bob", value: "Bob" }
+        ],
+        ""
+      );
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
   /* S17: コミット詳細表示改善                                         */
   /* ---------------------------------------------------------------- */
 

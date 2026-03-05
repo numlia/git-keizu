@@ -31,6 +31,7 @@ const REPO = "/test/repo";
 
 type DataSourceWithPrivate = DataSource & {
   getStashes: (repo: string) => Promise<GitStash[]>;
+  getAuthors: (repo: string) => Promise<string[]>;
 };
 
 function createMockProcess(stdoutData: string, exitCode = 0, emitError = false) {
@@ -90,6 +91,7 @@ function setupSpawnForCommits(options: {
   logOutput: string;
   refOutput?: string;
   stashOutput: string;
+  authorsOutput?: string;
 }) {
   const mock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
   mock.mockImplementation((_cmd: unknown, args: unknown) => {
@@ -103,6 +105,9 @@ function setupSpawnForCommits(options: {
     }
     if (subcommand === "reflog") {
       return createMockProcess(options.stashOutput);
+    }
+    if (subcommand === "shortlog") {
+      return createMockProcess(options.authorsOutput ?? "");
     }
     return createMockProcess("");
   });
@@ -2155,5 +2160,177 @@ describe("commitDetails committerEmail", () => {
     expect(result!.committer).toBe("Committer Name");
     expect(result!.committerEmail).toBe("committer@example.com");
     expect(result!.body).toContain("Commit body message");
+  });
+});
+
+describe("getAuthors", () => {
+  let ds: DataSourceWithPrivate;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource() as DataSourceWithPrivate;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns 5 authors in alphabetical order (TC-091)", async () => {
+    // Given: Repository has 5 authors in git shortlog output (unsorted)
+    const output = "     3\tCharlie\n    12\tAlice\n     1\tEve\n     5\tBob\n     2\tDave\n";
+    setupSpawnForStash(output);
+
+    // When: getAuthors is called
+    const result = await ds.getAuthors(REPO);
+
+    // Then: 5 author names are returned in alphabetical order
+    expect(result).toEqual(["Alice", "Bob", "Charlie", "Dave", "Eve"]);
+  });
+
+  it("returns empty array when HEAD is absent (TC-092)", async () => {
+    // Given: Empty repository where git shortlog fails (exit code 128)
+    setupSpawnForStash("", 128);
+
+    // When: getAuthors is called
+    const result = await ds.getAuthors(REPO);
+
+    // Then: Empty array is returned via spawnGit errorValue fallback
+    expect(result).toEqual([]);
+  });
+
+  it("returns single-element array for 1 author (TC-093)", async () => {
+    // Given: Repository has only 1 author
+    const output = "    42\tAlice\n";
+    setupSpawnForStash(output);
+
+    // When: getAuthors is called
+    const result = await ds.getAuthors(REPO);
+
+    // Then: 1-element array is returned
+    expect(result).toEqual(["Alice"]);
+  });
+
+  it("returns empty array when git shortlog command fails (TC-094)", async () => {
+    // Given: git shortlog command exits with non-zero code
+    setupSpawnForStash("", 1);
+
+    // When: getAuthors is called
+    const result = await ds.getAuthors(REPO);
+
+    // Then: Empty array is returned via spawnGit errorValue fallback
+    expect(result).toEqual([]);
+  });
+
+  it("parses tab-separated count and author name correctly (TC-095)", async () => {
+    // Given: shortlog output with tab-separated count and name
+    const output = "     5\tAlice\n    12\tBob\n";
+    setupSpawnForStash(output);
+
+    // When: getAuthors is called
+    const result = await ds.getAuthors(REPO);
+
+    // Then: Count prefix is removed, only author names returned
+    expect(result).toEqual(["Alice", "Bob"]);
+  });
+
+  it("returns empty array when shortlog output is empty (TC-096)", async () => {
+    // Given: shortlog output is empty string (zero commits)
+    setupSpawnForStash("");
+
+    // When: getAuthors is called
+    const result = await ds.getAuthors(REPO);
+
+    // Then: Empty array is returned
+    expect(result).toEqual([]);
+  });
+
+  it("preserves special characters in author names (TC-097)", async () => {
+    // Given: Author names contain spaces and special characters
+    const output = "     3\tJane O'Brien\n     1\tJohn Doe Jr.\n     2\tName With  Extra Spaces\n";
+    setupSpawnForStash(output);
+
+    // When: getAuthors is called
+    const result = await ds.getAuthors(REPO);
+
+    // Then: Special characters are preserved in author names
+    expect(result).toEqual(["Jane O'Brien", "John Doe Jr.", "Name With  Extra Spaces"]);
+  });
+
+  it("returns empty array when spawn emits error event (TC-094 variant)", async () => {
+    // Given: spawn emits an error event (e.g., git binary not found)
+    setupSpawnForStash("", 0, true);
+
+    // When: getAuthors is called
+    const result = await ds.getAuthors(REPO);
+
+    // Then: Empty array is returned via spawnGit errorValue fallback
+    expect(result).toEqual([]);
+  });
+
+  it("calls spawnGit with correct arguments (TC-095 variant)", async () => {
+    // Given: A valid repository path
+    const spawnMock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+    setupSpawnForStash("");
+
+    // When: getAuthors is called
+    await ds.getAuthors(REPO);
+
+    // Then: spawn is called with ["shortlog", "-s", "HEAD"] and correct cwd
+    expect(spawnMock).toHaveBeenCalledWith("git", ["shortlog", "-s", "HEAD"], { cwd: REPO });
+  });
+});
+
+describe("getCommits authors integration", () => {
+  let ds: DataSource;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("includes authors field in getCommits return value (TC-098)", async () => {
+    // Given: getAuthors returns a list of authors via shortlog output
+    const logOutput =
+      makeCommitLine("abc111", "", "Alice", "alice@test.com", 1700000001, "initial") + "\n";
+    const authorsOutput = "     3\tAlice\n     1\tBob\n     2\tCharlie\n";
+    setupSpawnForCommits({ logOutput, stashOutput: "", authorsOutput });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, "", 10, false);
+
+    // Then: Return value contains authors field with sorted author list
+    expect(result.authors).toEqual(["Alice", "Bob", "Charlie"]);
+  });
+
+  it("returns empty authors without affecting other results (TC-099)", async () => {
+    // Given: getAuthors returns empty array (error fallback) while other data is valid
+    const logOutput =
+      makeCommitLine("abc111", "", "Alice", "alice@test.com", 1700000001, "initial") + "\n";
+    const spawnMock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+    spawnMock.mockImplementation((_cmd: unknown, args: unknown) => {
+      const argArray = args as string[];
+      const subcommand = argArray[0];
+      if (subcommand === "log") {
+        return createMockProcess(logOutput);
+      }
+      if (subcommand === "shortlog") {
+        // Simulate error: non-zero exit code
+        return createMockProcess("", 128);
+      }
+      return createMockProcess("");
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, "", 10, false);
+
+    // Then: commits/head/moreCommitsAvailable are normal, authors is empty array
+    expect(result.commits).toHaveLength(1);
+    expect(result.commits[0].hash).toBe("abc111");
+    expect(result.moreCommitsAvailable).toBe(false);
+    expect(result.authors).toEqual([]);
   });
 });
