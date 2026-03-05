@@ -334,3 +334,19 @@
 | TC-126  | currentHash と一致しないコミットの行HTML生成    | Equivalence - normal                 | `<span class="commitMessage">メッセージ</span>` 形式               | plain text                 |
 | TC-127  | リファレンスラベル付きコミットの行HTML生成      | Equivalence - normal (with refs)     | `.gitRef` スパンが `.commitMessage` の外側（直前）にある           | ラベルが wrapper 外        |
 | TC-128  | HEAD コミット（commitHeadDot 付き）の行HTML生成 | Equivalence - normal (HEAD)          | `.commitHeadDot` スパンが `.commitMessage` の外側にある            | HEAD dot が wrapper 外     |
+
+## S21: loadCommits() サーバー提供 Author リスト対応
+
+> Origin: Feature 011 (author-filter-fix) (aidd-spec-tasks-test)
+> Added: 2026-03-05
+
+**シグネチャ**: `public loadCommits(commits, commitHead, moreAvailable, hard, authors?)`
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                             | Perspective (Equivalence / Boundary) | Expected Result                                                                | Notes                                    |
+| ------- | ---------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------ | ---------------------------------------- |
+| TC-129  | authorFilter=null, authors=["Alice","Bob"]                       | Equivalence - normal                 | ドロップダウンが authors リスト（サーバー提供）で更新される                    | サーバー側ソート済みリストをそのまま使用 |
+| TC-130  | authorFilter=null, authors=undefined                             | Equivalence - normal (fallback)      | commits から Author を抽出・重複排除・ソートしてドロップダウン更新（従来方式） | フォールバック動作の確認                 |
+| TC-131  | authorFilter=null, authors=[]                                    | Boundary - empty authors             | ドロップダウンに "All Authors" のみ表示される                                  | 空リポジトリ等のケース                   |
+| TC-132  | authorFilter="Alice", authors=["Alice","Bob"]                    | Equivalence - normal (filtered)      | ドロップダウン更新がスキップされる（authorFilter !== null のため）             | フィルタ選択時はリスト安定性を維持       |
+| TC-133  | authorFilter=null, authors=["Charlie","Alice","Bob"]（順序付き） | Equivalence - normal (order)         | authors がそのままドロップダウンに設定される（クライアント側で再ソートしない） | サーバー提供の順序を信頼する設計         |

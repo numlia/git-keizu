@@ -55,3 +55,16 @@
 | TC-010  | ResponseDeleteRemoteBranch: status = "error message" | Equivalence - error                  | エラーダイアログ "Unable to Delete Remote Branch" が表示される | git メッセージ表示      |
 | TC-011  | ResponseRebaseBranch: status = null                  | Equivalence - normal (success)       | グラフリフレッシュが呼ばれる                                   | refreshOrError パターン |
 | TC-012  | ResponseRebaseBranch: status = "error message"       | Equivalence - error                  | エラーダイアログ "Unable to Rebase Branch" が表示される        | git メッセージ表示      |
+
+## S5: handleMessage() loadCommits authors 受け渡し
+
+> Origin: Feature 011 (author-filter-fix) (aidd-spec-tasks-test)
+> Added: 2026-03-05
+
+**シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
+**テスト対象パス**: `web/messageHandler.ts`
+
+| Case ID | Input / Precondition                                     | Perspective (Equivalence / Boundary) | Expected Result                                                            | Notes                        |
+| ------- | -------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------- | ---------------------------- |
+| TC-013  | ResponseLoadCommits: authors=["Alice","Bob"]             | Equivalence - normal                 | gitGraph.loadCommits が authors=["Alice","Bob"] を含むパラメータで呼ばれる | authors フィールドの転送検証 |
+| TC-014  | ResponseLoadCommits: authors フィールドなし（undefined） | Equivalence - normal (no authors)    | gitGraph.loadCommits が authors=undefined で呼ばれる                       | optional フィールド未設定時  |

@@ -236,3 +236,33 @@
 | TC-088  | git show 出力に %ce（コミッターメール）が含まれる | Equivalence - normal                 | GitCommitDetails.committerEmail に正しいメールアドレスが設定される                              | フォーマットインデックス 6   |
 | TC-089  | コミッターメールが空文字列                        | Boundary - empty                     | GitCommitDetails.committerEmail が空文字列                                                      | noreply アドレスでない場合等 |
 | TC-090  | commitInfo の全7フィールドが正常に設定されている  | Equivalence - normal                 | 既存フィールド（hash, author, email, date, committer）が変更されず、committerEmail が追加される | 後方互換性                   |
+
+## S15: getAuthors() Author リスト取得
+
+> Origin: Feature 011 (author-filter-fix) (aidd-spec-tasks-test)
+> Added: 2026-03-05
+
+**シグネチャ**: `getAuthors(repo: string): Promise<string[]>`
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                                      | Perspective (Equivalence / Boundary) | Expected Result                                    | Notes                                    |
+| ------- | --------------------------------------------------------- | ------------------------------------ | -------------------------------------------------- | ---------------------------------------- |
+| TC-091  | リポジトリに 5 人の Author のコミットが存在               | Equivalence - normal                 | 5 人の Author 名がアルファベット順の配列で返される | git shortlog 正常出力のパース            |
+| TC-092  | 空リポジトリ（HEAD 不在、git shortlog がエラー終了）      | Boundary - empty (no HEAD)           | 空配列 `[]` を返す                                 | spawnGit の errorValue フォールバック    |
+| TC-093  | Author が 1 人のみのリポジトリ                            | Boundary - min (single author)       | 1 要素の配列を返す                                 | 最小有効件数                             |
+| TC-094  | git shortlog コマンドが異常終了（exit code 非 0）         | Equivalence - error                  | 空配列 `[]` を返す                                 | spawnGit の errorValue フォールバック    |
+| TC-095  | shortlog 出力: `"    5\tAlice\n   12\tBob\n"` 形式        | Equivalence - normal (parse)         | `["Alice", "Bob"]` を返す（カウント部分を除去）    | タブ区切りパースの検証                   |
+| TC-096  | shortlog 出力が空文字列（コミットゼロ）                   | Boundary - empty output              | 空配列 `[]` を返す                                 | パーサが空入力を処理できること           |
+| TC-097  | Author 名にスペースや特殊文字を含む（例: "Jane O'Brien"） | Equivalence - normal (special chars) | 特殊文字を含む Author 名がそのまま返される         | パーサがタブ以降の全文字列を保持すること |
+
+## S16: getCommits() authors 統合
+
+> Origin: Feature 011 (author-filter-fix) (aidd-spec-tasks-test)
+> Added: 2026-03-05
+
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                                       | Perspective (Equivalence / Boundary) | Expected Result                                                                  | Notes                                      |
+| ------- | ---------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------ |
+| TC-098  | getCommits() 正常実行（getAuthors が Author リストを返す） | Equivalence - normal                 | 戻り値オブジェクトに `authors` フィールドが含まれ、Author リストが設定されている | Promise.all に getAuthors が統合されている |
+| TC-099  | getAuthors がエラーで空配列を返す                          | Equivalence - error fallback         | commits/head/moreCommitsAvailable は正常に取得され、authors が空配列で返される   | 他の Promise.all 結果に影響しないこと      |
