@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.12] - 2026-03-05
+
+### Fixed
+
+- **Author filter completeness**: The Author dropdown now lists all authors reachable from HEAD (via `git shortlog`) rather than only those in the currently visible commits — authors on older commits beyond the loaded page are no longer missing
+- **Author filter excludes "Uncommitted Changes" entry**: The pseudo-commit for uncommitted changes (author `*`) is no longer included in the Author dropdown options
+
 ## [0.2.11] - 2026-03-05
 
 ### Changed
@@ -153,7 +160,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.11...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.12...HEAD
+[0.2.12]: https://github.com/numlia/git-keizu/compare/v0.2.11...v0.2.12
 [0.2.11]: https://github.com/numlia/git-keizu/compare/v0.2.10...v0.2.11
 [0.2.10]: https://github.com/numlia/git-keizu/compare/v0.2.9...v0.2.10
 [0.2.9]: https://github.com/numlia/git-keizu/compare/v0.2.8...v0.2.9
