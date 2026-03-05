@@ -19,7 +19,8 @@ export interface GitGraphViewAPI {
     commits: GitCommitNode[],
     head: string | null,
     moreAvailable: boolean,
-    hard: boolean
+    hard: boolean,
+    authors?: string[]
   ): void;
   loadRepos(repos: GitRepoSet, lastActiveRepo: string | null): void;
   refresh(hard: boolean): void;
@@ -96,7 +97,7 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
       gitGraph.loadBranches(msg.branches, msg.head, msg.hard, msg.isRepo);
       break;
     case "loadCommits":
-      gitGraph.loadCommits(msg.commits, msg.head, msg.moreCommitsAvailable, msg.hard);
+      gitGraph.loadCommits(msg.commits, msg.head, msg.moreCommitsAvailable, msg.hard, msg.authors);
       break;
     case "loadRepos":
       gitGraph.loadRepos(msg.repos, msg.lastActiveRepo);

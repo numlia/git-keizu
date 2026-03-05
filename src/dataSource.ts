@@ -125,10 +125,11 @@ export class DataSource {
     showRemoteBranches: boolean,
     authorFilter?: string
   ) {
-    const [commits, refData, stashes] = await Promise.all([
+    const [commits, refData, stashes, authors] = await Promise.all([
       this.getGitLog(repo, branch, maxCommits + 1, showRemoteBranches, authorFilter),
       this.getRefs(repo, showRemoteBranches),
-      this.getStashes(repo)
+      this.getStashes(repo),
+      this.getAuthors(repo)
     ]);
 
     const moreCommitsAvailable = commits.length === maxCommits + 1;
@@ -214,7 +215,8 @@ export class DataSource {
     return {
       commits: commitNodes,
       head: refData.head,
-      moreCommitsAvailable: moreCommitsAvailable
+      moreCommitsAvailable: moreCommitsAvailable,
+      authors
     };
   }
 
@@ -801,6 +803,27 @@ export class DataSource {
           : null;
       },
       null
+    );
+  }
+
+  private getAuthors(repo: string) {
+    return this.spawnGit<string[]>(
+      ["shortlog", "-s", "HEAD"],
+      repo,
+      (stdout) => {
+        const lines = stdout.split(eolRegex);
+        const authors: string[] = [];
+        for (let i = 0; i < lines.length; i++) {
+          const tabIndex = lines[i].indexOf("\t");
+          if (tabIndex === -1) continue;
+          const name = lines[i].substring(tabIndex + 1);
+          if (name !== "") {
+            authors.push(name);
+          }
+        }
+        return authors.sort();
+      },
+      []
     );
   }
 

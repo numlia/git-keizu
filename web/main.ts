@@ -336,7 +336,8 @@ class GitGraphView {
     commits: GG.GitCommitNode[],
     commitHead: string | null,
     moreAvailable: boolean,
-    hard: boolean
+    hard: boolean,
+    authors?: string[]
   ) {
     if (
       !hard &&
@@ -396,8 +397,9 @@ class GitGraphView {
     this.render();
 
     if (this.authorFilter === null) {
-      const uniqueAuthors = [...new Set(this.commits.map((c) => c.author))].sort();
-      const { options, selected } = buildAuthorOptions(uniqueAuthors, ALL_AUTHORS_VALUE);
+      const authorList =
+        authors !== undefined ? authors : [...new Set(this.commits.map((c) => c.author))].sort();
+      const { options, selected } = buildAuthorOptions(authorList, ALL_AUTHORS_VALUE);
       this.authorDropdown.setOptions(options, selected);
     }
 

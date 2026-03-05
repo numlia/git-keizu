@@ -289,6 +289,7 @@ export interface ResponseLoadCommits {
   head: string | null;
   moreCommitsAvailable: boolean;
   hard: boolean;
+  authors?: string[];
 }
 
 export interface RequestLoadRepos {
