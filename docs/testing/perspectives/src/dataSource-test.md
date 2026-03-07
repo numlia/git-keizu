@@ -266,3 +266,35 @@
 | ------- | ---------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------- | ------------------------------------------ |
 | TC-098  | getCommits() 正常実行（getAuthors が Author リストを返す） | Equivalence - normal                 | 戻り値オブジェクトに `authors` フィールドが含まれ、Author リストが設定されている | Promise.all に getAuthors が統合されている |
 | TC-099  | getAuthors がエラーで空配列を返す                          | Equivalence - error fallback         | commits/head/moreCommitsAvailable は正常に取得され、authors が空配列で返される   | 他の Promise.all 結果に影響しないこと      |
+
+## S17: getGitLog branches 配列パラメータ
+
+> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+
+**シグネチャ**: `private getGitLog(repo: string, branches: string[], num: number, showRemoteBranches: boolean, authors: string[])`
+**テスト対象パス**: `src/dataSource.ts:753-758`
+
+| Case ID | Input / Precondition                             | Perspective (Equivalence / Boundary) | Expected Result                                                     | Notes                         |
+| ------- | ------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------- | ----------------------------- |
+| TC-100  | branches=["main","dev"]                          | Equivalence - normal                 | git log 引数に "main" と "dev" が含まれる（--branches/--tags なし） | 複数ブランチ指定              |
+| TC-101  | branches=[]                                      | Equivalence - normal (show all)      | git log 引数に --branches --tags が含まれる                         | 全ブランチ表示（従来相当）    |
+| TC-102  | branches=["feature/x"]                           | Equivalence - normal (single)        | git log 引数に "feature/x" が含まれる                               | 単一ブランチ指定              |
+| TC-103  | branches=["main","dev"], showRemoteBranches=true | Equivalence - normal                 | git log 引数に "main" と "dev" が含まれ、--remotes は含まれない     | ブランチ指定時は remotes 不要 |
+| TC-104  | branches=[], showRemoteBranches=true             | Equivalence - normal (all + remotes) | git log 引数に --branches --tags --remotes が含まれる               | 全ブランチ + リモート         |
+| TC-105  | branches=[], showRemoteBranches=false            | Boundary - all without remotes       | git log 引数に --branches --tags が含まれ、--remotes は含まれない   | リモート非表示                |
+
+## S18: getGitLog/getCommits authors 配列パラメータ
+
+> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+
+**シグネチャ**: `private getGitLog(repo: string, branches: string[], num: number, showRemoteBranches: boolean, authors: string[])`
+**テスト対象パス**: `src/dataSource.ts:753-758`
+
+| Case ID | Input / Precondition     | Perspective (Equivalence / Boundary) | Expected Result                                                                            | Notes                       |
+| ------- | ------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------------ | --------------------------- |
+| TC-106  | authors=["Alice","Bob"]  | Equivalence - normal                 | git log 引数に --author=Alice と --author=Bob の両方が含まれる                             | 複数著者フィルタ（OR 論理） |
+| TC-107  | authors=[]               | Equivalence - normal (no filter)     | git log 引数に --author フラグが含まれない                                                 | フィルタなし（従来相当）    |
+| TC-108  | authors=["Jane O'Brien"] | Equivalence - normal (special chars) | git log 引数に --author=Jane O'Brien が含まれる。spawnGit 経由でシェルインジェクションなし | 特殊文字の安全性            |
+| TC-109  | authors=["Alice"]        | Equivalence - normal (single)        | git log 引数に --author=Alice が含まれる                                                   | 単一著者フィルタ            |

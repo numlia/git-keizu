@@ -350,3 +350,77 @@
 | TC-131  | authorFilter=null, authors=[]                                    | Boundary - empty authors             | ドロップダウンに "All Authors" のみ表示される                                  | 空リポジトリ等のケース                   |
 | TC-132  | authorFilter="Alice", authors=["Alice","Bob"]                    | Equivalence - normal (filtered)      | ドロップダウン更新がスキップされる（authorFilter !== null のため）             | フィルタ選択時はリスト安定性を維持       |
 | TC-133  | authorFilter=null, authors=["Charlie","Alice","Bob"]（順序付き） | Equivalence - normal (order)         | authors がそのままドロップダウンに設定される（クライアント側で再ソートしない） | サーバー提供の順序を信頼する設計         |
+
+## S22: Branch マルチセレクト状態管理
+
+> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                           | Perspective (Equivalence / Boundary) | Expected Result                                                               | Notes           |
+| ------- | -------------------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------- | --------------- |
+| TC-134  | 初期状態（selectedBranches 未設定）                            | Equivalence - normal                 | selectedBranches が空配列 []（"Show All" 相当）                               | デフォルト値    |
+| TC-135  | Branch ドロップダウンコールバックに ["main", "dev"] が渡される | Equivalence - normal                 | selectedBranches が ["main", "dev"] に更新され、requestLoadCommits が呼ばれる | 複数選択        |
+| TC-136  | Branch ドロップダウンコールバックに [] が渡される              | Equivalence - normal                 | selectedBranches が [] に更新され、requestLoadCommits が呼ばれる              | "Show All" 選択 |
+| TC-137  | requestLoadCommits 呼び出し（selectedBranches=["main"]）       | Equivalence - normal                 | 送信メッセージに branches: ["main"] が含まれる                                | 配列パラメータ  |
+| TC-138  | requestLoadCommits 呼び出し（selectedBranches=[]）             | Boundary - empty                     | 送信メッセージに branches: [] が含まれる                                      | 全ブランチ表示  |
+
+## S23: Author マルチセレクト状態管理
+
+> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                            | Perspective (Equivalence / Boundary) | Expected Result                                                               | Notes                  |
+| ------- | --------------------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------- | ---------------------- |
+| TC-139  | 初期状態（selectedAuthors 未設定）                              | Equivalence - normal                 | selectedAuthors が空配列 []（"Show All" 相当）                                | デフォルト値           |
+| TC-140  | Author ドロップダウンコールバックに ["Alice", "Bob"] が渡される | Equivalence - normal                 | selectedAuthors が ["Alice", "Bob"] に更新され、requestLoadCommits が呼ばれる | 複数選択               |
+| TC-141  | Author ドロップダウンコールバックに [] が渡される               | Equivalence - normal                 | selectedAuthors が [] に更新され、requestLoadCommits が呼ばれる               | "Show All" 選択        |
+| TC-142  | requestLoadCommits 呼び出し（selectedAuthors=["Alice"]）        | Equivalence - normal                 | 送信メッセージに authors: ["Alice"] が含まれる                                | 配列パラメータ         |
+| TC-143  | loadCommits 受信（selectedAuthors=[]）                          | Equivalence - normal                 | Author ドロップダウンが受信した著者リストで更新される                         | 空配列 = フィルタなし  |
+| TC-144  | loadCommits 受信（selectedAuthors=["Alice"]）                   | Equivalence - normal (filtered)      | Author ドロップダウンが更新されない（リスト安定性維持）                       | フィルタ選択中は非更新 |
+
+## S24: WebViewState 後方互換マイグレーション
+
+> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                           | Perspective (Equivalence / Boundary) | Expected Result                                                  | Notes                |
+| ------- | -------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------- | -------------------- |
+| TC-145  | getState が旧フォーマット（currentBranch: "main"）を返す       | Equivalence - normal (migration)     | selectedBranches が ["main"] に変換される                        | string → [string]    |
+| TC-146  | getState が旧フォーマット（currentBranch: null）を返す         | Boundary - null migration            | selectedBranches が [] に変換される                              | null → []            |
+| TC-147  | getState が旧フォーマット（authorFilter: "Alice"）を返す       | Equivalence - normal (migration)     | selectedAuthors が ["Alice"] に変換される                        | string → [string]    |
+| TC-148  | getState が旧フォーマット（authorFilter: null）を返す          | Boundary - null migration            | selectedAuthors が [] に変換される                               | null → []            |
+| TC-149  | getState が新フォーマット（selectedBranches: ["a","b"]）を返す | Equivalence - normal (new format)    | selectedBranches がそのまま ["a","b"] として使用される           | マイグレーション不要 |
+| TC-150  | setState 呼び出し                                              | Equivalence - normal                 | selectedBranches と selectedAuthors が新フォーマットで保存される | -                    |
+
+## S25: ブランチドロップダウン定数
+
+> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                 | Perspective (Equivalence / Boundary) | Expected Result                                                 | Notes                     |
+| ------- | ------------------------------------ | ------------------------------------ | --------------------------------------------------------------- | ------------------------- |
+| TC-151  | ALL_BRANCHES_LABEL 定数              | Equivalence - normal                 | 値が "Show All" と一致する                                      | マジックストリング排除    |
+| TC-152  | ALL_BRANCHES_VALUE 定数              | Equivalence - normal                 | 値が "" と一致する                                              | マジックストリング排除    |
+| TC-153  | REMOTE_BRANCH_PREFIX 定数            | Equivalence - normal                 | 値が "remotes/" と一致する                                      | マジックストリング排除    |
+| TC-154  | リモートブランチのサブストリング処理 | Equivalence - normal                 | REMOTE_BRANCH_PREFIX.length が substring の引数に使用されている | マジックナンバー 8 の排除 |
+
+## S26: loadBranches レスポンスのブランチ整合性チェック
+
+> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                                | Perspective (Equivalence / Boundary) | Expected Result                                             | Notes            |
+| ------- | ------------------------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------- | ---------------- |
+| TC-155  | selectedBranches=["main","dev"], gitBranches に両方存在             | Equivalence - normal                 | selectedBranches が ["main","dev"] のまま変化しない         | 整合性OK         |
+| TC-156  | selectedBranches=["main","deleted-branch"], "deleted-branch" が不在 | Equivalence - normal (removed)       | selectedBranches が ["main"] にフィルタリングされる         | 消滅ブランチ除去 |
+| TC-157  | selectedBranches 全てが gitBranches に不在（全消滅）                | Boundary - all removed               | showCurrentBranchByDefault に応じて HEAD ブランチ or 空配列 | フォールバック   |

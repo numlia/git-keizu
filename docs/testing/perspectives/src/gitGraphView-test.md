@@ -129,3 +129,31 @@
 | ------- | ---------------------------- | ------------------------------------ | ----------------------------------------------------------------------- | -------- |
 | TC-029  | msg.authorFilter = "Alice"   | Equivalence - normal                 | dataSource.getCommits() の authorFilter パラメータに "Alice" が渡される | -        |
 | TC-030  | msg.authorFilter = undefined | Equivalence - normal (no filter)     | dataSource.getCommits() が authorFilter なしで呼ばれる（既存動作維持）  | 後方互換 |
+
+## S11: createBranch + checkout オーケストレーション
+
+> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+
+**テスト対象パス**: `src/gitGraphView.ts:223-228`
+
+| Case ID | Input / Precondition                                  | Perspective (Equivalence / Boundary) | Expected Result                                                            | Notes                  |
+| ------- | ----------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------- | ---------------------- |
+| TC-031  | checkout=true, createBranch 成功                      | Equivalence - normal                 | checkoutBranch(repo, branchName, null) が呼ばれる                          | -                      |
+| TC-032  | checkout=true, createBranch 成功, checkoutBranch 成功 | Equivalence - normal                 | status: null が返される（完全成功）                                        | -                      |
+| TC-033  | checkout=true, createBranch 成功, checkoutBranch 失敗 | Equivalence - partial success        | status に部分成功メッセージが返される（ブランチは作成済み、checkout 失敗） | -                      |
+| TC-034  | checkout=false, createBranch 成功                     | Equivalence - normal                 | checkoutBranch が呼ばれない、status: null                                  | -                      |
+| TC-035  | createBranch 失敗（エラーメッセージ返却）             | Equivalence - error                  | status にエラーメッセージ、checkoutBranch は呼ばれない                     | -                      |
+| TC-036  | checkout 未指定（undefined）                          | Boundary - legacy compat             | checkoutBranch が呼ばれない（後方互換、従来動作）                          | レガシーメッセージ対応 |
+
+## S12: loadCommits branches/authors 配列パススルー
+
+> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+
+**テスト対象パス**: `src/gitGraphView.ts:279-291`
+
+| Case ID | Input / Precondition                               | Perspective (Equivalence / Boundary) | Expected Result                                                     | Notes          |
+| ------- | -------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------- | -------------- |
+| TC-037  | msg.branches=["main","dev"], msg.authors=["Alice"] | Equivalence - normal                 | getCommits が branches=["main","dev"], authors=["Alice"] で呼ばれる | 配列パススルー |
+| TC-038  | msg.branches=[], msg.authors=[]                    | Boundary - empty arrays              | getCommits が branches=[], authors=[] で呼ばれる（全件表示）        | 空配列         |
