@@ -107,19 +107,24 @@ const DROPDOWN_INSTANCES = [
   mockAuthorDropdownInstance
 ];
 let dropdownCallCount = 0;
-let capturedAuthorCallback: ((value: string) => void) | null = null;
+let capturedBranchCallback: ((values: string[]) => void) | null = null;
+let capturedAuthorCallback: ((values: string[]) => void) | null = null;
 vi.mock("../../web/dropdown", () => ({
   Dropdown: vi.fn(function (
     _id: string,
     _showInfo: boolean,
     _type: string,
-    callback?: (value: string) => void
+    callback?: ((value: string) => void) | ((values: string[]) => void),
+    _multipleAllowed?: boolean
   ) {
     const index = dropdownCallCount % DROPDOWN_INSTANCES.length;
     dropdownCallCount++;
     // 1st=repoDropdown, 2nd=branchDropdown, 3rd=authorDropdown
+    if (index === 1 && callback) {
+      capturedBranchCallback = callback as (values: string[]) => void;
+    }
     if (index === 2 && callback) {
-      capturedAuthorCallback = callback;
+      capturedAuthorCallback = callback as (values: string[]) => void;
     }
     return DROPDOWN_INSTANCES[index];
   })
@@ -810,7 +815,7 @@ const MOCK_PREV_STATE: WebViewState = {
   commits: MOCK_COMMITS,
   commitHead: COMMIT_HASH_1,
   avatars: {},
-  currentBranch: "",
+  selectedBranches: [],
   currentRepo: TEST_REPO,
   moreCommitsAvailable: false,
   maxCommits: 300,
@@ -823,7 +828,7 @@ const MOCK_PREV_STATE: WebViewState = {
     caseSensitive: false,
     regex: false
   },
-  authorFilter: null
+  selectedAuthors: []
 };
 
 function setupTestDOM(): void {
@@ -2882,7 +2887,7 @@ describe("Author, details, remotes & parent navigation", () => {
     const ALL_AUTHORS_OPTION = { name: "All Authors", value: "" };
 
     it("builds unique sorted author list on loadCommits (TC-107)", () => {
-      // Given: commits with authors Alice, Bob, Carol (authorFilter is null)
+      // Given: commits with authors Alice, Bob, Carol (selectedAuthors is empty)
       vi.clearAllMocks();
 
       // When: loadCommits response is dispatched
@@ -2894,7 +2899,7 @@ describe("Author, details, remotes & parent navigation", () => {
         hard: true
       });
 
-      // Then: authorDropdown.setOptions is called with sorted unique authors
+      // Then: authorDropdown.setOptions is called with sorted unique authors and empty array
       expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
         [
           ALL_AUTHORS_OPTION,
@@ -2902,31 +2907,31 @@ describe("Author, details, remotes & parent navigation", () => {
           { name: "Bob", value: "Bob" },
           { name: "Carol", value: "Carol" }
         ],
-        ""
+        []
       );
     });
 
-    it("sends loadCommits with authorFilter on author selection (TC-108)", () => {
+    it("sends loadCommits with authors on author selection (TC-108)", () => {
       // Given: authorDropdown callback was captured during construction
       expect(capturedAuthorCallback).not.toBeNull();
       vi.clearAllMocks();
 
-      // When: user selects "Alice" from the author dropdown
-      capturedAuthorCallback!("Alice");
+      // When: user selects ["Alice"] from the author dropdown (multiselect)
+      capturedAuthorCallback!(["Alice"]);
 
-      // Then: loadCommits message is sent with authorFilter
+      // Then: loadCommits message is sent with authors array
       expect(liveVscode.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           command: "loadCommits",
-          authorFilter: "Alice"
+          authors: ["Alice"]
         })
       );
     });
 
-    it("sends loadCommits without authorFilter on All Authors selection (TC-109)", () => {
-      // Given: authorFilter was previously set
+    it("sends loadCommits with empty authors on All Authors selection (TC-109)", () => {
+      // Given: authors was previously set
       expect(capturedAuthorCallback).not.toBeNull();
-      capturedAuthorCallback!("Alice");
+      capturedAuthorCallback!(["Alice"]);
       // Complete the pending loadCommits to clear loadCommitsCallback
       dispatchMessage({
         command: "loadCommits",
@@ -2937,22 +2942,22 @@ describe("Author, details, remotes & parent navigation", () => {
       });
       vi.clearAllMocks();
 
-      // When: user selects "All Authors" (empty value)
-      capturedAuthorCallback!("");
+      // When: user selects "All Authors" (empty array)
+      capturedAuthorCallback!([]);
 
-      // Then: loadCommits message does NOT contain authorFilter
+      // Then: loadCommits message contains authors: []
       const sentMessage = vi.mocked(liveVscode.postMessage).mock.calls[0][0] as Record<
         string,
         unknown
       >;
       expect(sentMessage.command).toBe("loadCommits");
-      expect(sentMessage).not.toHaveProperty("authorFilter");
+      expect(sentMessage).toHaveProperty("authors", []);
     });
 
-    it("does not update author list when authorFilter is set (TC-110)", () => {
-      // Given: authorFilter is set via dropdown callback
+    it("does not update author list when selectedAuthors is non-empty (TC-110)", () => {
+      // Given: selectedAuthors is set via dropdown callback
       expect(capturedAuthorCallback).not.toBeNull();
-      capturedAuthorCallback!("Alice");
+      capturedAuthorCallback!(["Alice"]);
       vi.clearAllMocks();
 
       // When: loadCommits response is dispatched (filtered commits)
@@ -2967,8 +2972,8 @@ describe("Author, details, remotes & parent navigation", () => {
       // Then: authorDropdown.setOptions is NOT called (list stays stable)
       expect(mockAuthorDropdownInstance.setOptions).not.toHaveBeenCalled();
 
-      // Cleanup: reset authorFilter by selecting All Authors
-      capturedAuthorCallback!("");
+      // Cleanup: reset authors by selecting All Authors
+      capturedAuthorCallback!([]);
       dispatchMessage({
         command: "loadCommits",
         commits: MOCK_COMMITS,
@@ -2979,7 +2984,7 @@ describe("Author, details, remotes & parent navigation", () => {
     });
 
     it("shows only All Authors for empty commits (TC-111)", () => {
-      // Given: authorFilter is null (reset by previous test cleanup)
+      // Given: selectedAuthors is empty (reset by previous test cleanup)
       vi.clearAllMocks();
 
       // When: loadCommits response with empty commits array
@@ -2991,8 +2996,8 @@ describe("Author, details, remotes & parent navigation", () => {
         hard: true
       });
 
-      // Then: dropdown shows only "All Authors"
-      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith([ALL_AUTHORS_OPTION], "");
+      // Then: dropdown shows only "All Authors" with empty selected array
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith([ALL_AUTHORS_OPTION], []);
 
       // Cleanup: restore normal commits
       dispatchMessage({
@@ -3012,8 +3017,8 @@ describe("Author, details, remotes & parent navigation", () => {
   describe("loadCommits server-provided authors (S21)", () => {
     const ALL_AUTHORS_OPTION = { name: "All Authors", value: "" };
 
-    it("uses server-provided authors for dropdown when authorFilter is null (TC-129)", () => {
-      // Given: authorFilter is null (default state)
+    it("uses server-provided authors for dropdown when selectedAuthors is empty (TC-129)", () => {
+      // Given: selectedAuthors is empty (default state)
       vi.clearAllMocks();
 
       // When: loadCommits response includes authors array
@@ -3029,12 +3034,12 @@ describe("Author, details, remotes & parent navigation", () => {
       // Then: dropdown is updated with server-provided authors (not extracted from commits)
       expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
         [ALL_AUTHORS_OPTION, { name: "Alice", value: "Alice" }, { name: "Bob", value: "Bob" }],
-        ""
+        []
       );
     });
 
     it("falls back to commit extraction when authors is undefined (TC-130)", () => {
-      // Given: authorFilter is null (default state)
+      // Given: selectedAuthors is empty (default state)
       vi.clearAllMocks();
 
       // When: loadCommits response does NOT include authors field
@@ -3054,12 +3059,12 @@ describe("Author, details, remotes & parent navigation", () => {
           { name: "Bob", value: "Bob" },
           { name: "Carol", value: "Carol" }
         ],
-        ""
+        []
       );
     });
 
     it("shows only All Authors when authors is empty array (TC-131)", () => {
-      // Given: authorFilter is null
+      // Given: selectedAuthors is empty
       vi.clearAllMocks();
 
       // When: loadCommits response includes empty authors array
@@ -3072,8 +3077,8 @@ describe("Author, details, remotes & parent navigation", () => {
         authors: []
       });
 
-      // Then: dropdown shows only "All Authors"
-      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith([ALL_AUTHORS_OPTION], "");
+      // Then: dropdown shows only "All Authors" with empty selected array
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith([ALL_AUTHORS_OPTION], []);
 
       // Cleanup: restore normal commits
       dispatchMessage({
@@ -3085,10 +3090,10 @@ describe("Author, details, remotes & parent navigation", () => {
       });
     });
 
-    it("skips dropdown update when authorFilter is set (TC-132)", () => {
-      // Given: authorFilter is set via dropdown callback
+    it("skips dropdown update when selectedAuthors is non-empty (TC-132)", () => {
+      // Given: selectedAuthors is set via dropdown callback
       expect(capturedAuthorCallback).not.toBeNull();
-      capturedAuthorCallback!("Alice");
+      capturedAuthorCallback!(["Alice"]);
       vi.clearAllMocks();
 
       // When: loadCommits response includes authors array
@@ -3104,8 +3109,8 @@ describe("Author, details, remotes & parent navigation", () => {
       // Then: authorDropdown.setOptions is NOT called (filter active, list stays stable)
       expect(mockAuthorDropdownInstance.setOptions).not.toHaveBeenCalled();
 
-      // Cleanup: reset authorFilter
-      capturedAuthorCallback!("");
+      // Cleanup: reset selectedAuthors
+      capturedAuthorCallback!([]);
       dispatchMessage({
         command: "loadCommits",
         commits: MOCK_COMMITS,
@@ -3116,7 +3121,7 @@ describe("Author, details, remotes & parent navigation", () => {
     });
 
     it("preserves server-provided order without re-sorting (TC-133)", () => {
-      // Given: authorFilter is null
+      // Given: selectedAuthors is empty
       vi.clearAllMocks();
 
       // When: loadCommits response includes authors in non-alphabetical order
@@ -3137,7 +3142,7 @@ describe("Author, details, remotes & parent navigation", () => {
           { name: "Alice", value: "Alice" },
           { name: "Bob", value: "Bob" }
         ],
-        ""
+        []
       );
     });
   });
@@ -3575,5 +3580,636 @@ describe("Author, details, remotes & parent navigation", () => {
       expect(commitMessage).not.toBeNull();
       expect(commitMessage!.querySelector(".commitHeadDot")).toBeNull();
     });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S22-S26: Multi-select filter tests (Task 4.4)                       */
+/* ------------------------------------------------------------------ */
+
+describe("Multi-select filter state management", () => {
+  let liveVscode: typeof vscode;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    capturedBranchCallback = null;
+    capturedAuthorCallback = null;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    liveVscode = utilsMod.vscode;
+    vi.mocked(liveVscode.getState).mockReturnValueOnce(null);
+
+    await import("../../web/main");
+    loadTestCommits();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* S22: Branch multi-select state management                         */
+  /* ---------------------------------------------------------------- */
+
+  describe("Branch multi-select state (S22)", () => {
+    it("initializes selectedBranches as empty array (TC-134)", () => {
+      // Given: GitGraphView was constructed with no prevState
+      // When: saveState is called (implicit on construction)
+      // Then: setState includes selectedBranches: []
+      const lastSetState = vi.mocked(liveVscode.setState).mock.calls;
+      const latestState = lastSetState[lastSetState.length - 1]?.[0] as Record<string, unknown>;
+      expect(latestState).toHaveProperty("selectedBranches");
+      expect(latestState.selectedBranches).toEqual([]);
+    });
+
+    it("updates selectedBranches on branch dropdown callback (TC-135)", () => {
+      // Given: branch dropdown callback was captured
+      expect(capturedBranchCallback).not.toBeNull();
+      vi.clearAllMocks();
+
+      // When: branch dropdown fires with ["main", "dev"]
+      capturedBranchCallback!(["main", "dev"]);
+
+      // Then: requestLoadCommits is sent with branches: ["main", "dev"]
+      expect(liveVscode.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: "loadCommits",
+          branches: ["main", "dev"]
+        })
+      );
+
+      // Cleanup: complete the loadCommits request
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+
+    it("updates selectedBranches to empty on Show All selection (TC-136)", () => {
+      // Given: branch dropdown callback was captured
+      expect(capturedBranchCallback).not.toBeNull();
+      vi.clearAllMocks();
+
+      // When: branch dropdown fires with [] (Show All)
+      capturedBranchCallback!([]);
+
+      // Then: requestLoadCommits is sent with branches: []
+      expect(liveVscode.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: "loadCommits",
+          branches: []
+        })
+      );
+
+      // Cleanup
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+
+    it("sends branches array in requestLoadCommits (TC-137)", () => {
+      // Given: selectedBranches is ["main"]
+      expect(capturedBranchCallback).not.toBeNull();
+      vi.clearAllMocks();
+
+      // When: branch callback is called with ["main"]
+      capturedBranchCallback!(["main"]);
+
+      // Then: sent message contains branches: ["main"]
+      const msg = vi.mocked(liveVscode.postMessage).mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(msg.branches).toEqual(["main"]);
+
+      // Cleanup
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+
+    it("sends empty branches array for show-all (TC-138)", () => {
+      // Given: selectedBranches is []
+      expect(capturedBranchCallback).not.toBeNull();
+      vi.clearAllMocks();
+
+      // When: branch callback is called with []
+      capturedBranchCallback!([]);
+
+      // Then: sent message contains branches: []
+      const msg = vi.mocked(liveVscode.postMessage).mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(msg.branches).toEqual([]);
+
+      // Cleanup
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* S23: Author multi-select state management                         */
+  /* ---------------------------------------------------------------- */
+
+  describe("Author multi-select state (S23)", () => {
+    it("initializes selectedAuthors as empty array (TC-139)", () => {
+      // Given: GitGraphView was constructed with no prevState
+      // When: author callback fires with [] (Show All = default)
+      capturedAuthorCallback!([]);
+      const msg = vi.mocked(liveVscode.postMessage).mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(msg).toBeDefined();
+      expect(msg.command).toBe("loadCommits");
+      expect(msg.authors).toEqual([]);
+
+      // Cleanup
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+
+    it("updates selectedAuthors on author dropdown callback (TC-140)", () => {
+      // Given: author dropdown callback was captured
+      expect(capturedAuthorCallback).not.toBeNull();
+      vi.clearAllMocks();
+
+      // When: author dropdown fires with ["Alice", "Bob"]
+      capturedAuthorCallback!(["Alice", "Bob"]);
+
+      // Then: requestLoadCommits is sent with authors: ["Alice", "Bob"]
+      expect(liveVscode.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: "loadCommits",
+          authors: ["Alice", "Bob"]
+        })
+      );
+
+      // Cleanup
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+
+    it("updates selectedAuthors to empty on Show All selection (TC-141)", () => {
+      // Given: author dropdown callback
+      expect(capturedAuthorCallback).not.toBeNull();
+      vi.clearAllMocks();
+
+      // When: author dropdown fires with [] (Show All)
+      capturedAuthorCallback!([]);
+
+      // Then: requestLoadCommits is sent with authors: []
+      expect(liveVscode.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          command: "loadCommits",
+          authors: []
+        })
+      );
+
+      // Cleanup
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+
+    it("sends authors array in requestLoadCommits (TC-142)", () => {
+      // Given: selectedAuthors is ["Alice"]
+      expect(capturedAuthorCallback).not.toBeNull();
+      vi.clearAllMocks();
+
+      // When: author callback is called with ["Alice"]
+      capturedAuthorCallback!(["Alice"]);
+
+      // Then: sent message contains authors: ["Alice"]
+      const msg = vi.mocked(liveVscode.postMessage).mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(msg.authors).toEqual(["Alice"]);
+
+      // Cleanup
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+
+    it("updates author dropdown when selectedAuthors is empty (TC-143)", () => {
+      // Given: selectedAuthors is [] (reset to Show All)
+      capturedAuthorCallback!([]);
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+      vi.clearAllMocks();
+
+      // When: loadCommits response is received with authors
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true,
+        authors: ["Alice", "Bob"]
+      });
+
+      // Then: author dropdown is updated
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalled();
+    });
+
+    it("skips author dropdown update when selectedAuthors is non-empty (TC-144)", () => {
+      // Given: selectedAuthors is ["Alice"]
+      expect(capturedAuthorCallback).not.toBeNull();
+      capturedAuthorCallback!(["Alice"]);
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+      vi.clearAllMocks();
+
+      // When: loadCommits response is received
+      dispatchMessage({
+        command: "loadCommits",
+        commits: [MOCK_COMMITS[0]],
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true,
+        authors: ["Alice", "Bob"]
+      });
+
+      // Then: author dropdown is NOT updated
+      expect(mockAuthorDropdownInstance.setOptions).not.toHaveBeenCalled();
+
+      // Cleanup
+      capturedAuthorCallback!([]);
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* S25: Branch dropdown constants                                    */
+  /* ---------------------------------------------------------------- */
+
+  describe("Branch dropdown constants (S25)", () => {
+    it("ALL_BRANCHES_LABEL is 'Show All' (TC-151)", () => {
+      // Given/When: loadBranches response is dispatched
+      vi.clearAllMocks();
+      dispatchMessage({
+        command: "loadBranches",
+        branches: ["main"],
+        head: "main",
+        hard: true,
+        isRepo: true
+      });
+
+      // Then: first option name is "Show All"
+      const call = mockBranchDropdownInstance.setOptions.mock.calls[0];
+      expect(call).toBeDefined();
+      const options = call[0] as { name: string; value: string }[];
+      expect(options[0].name).toBe("Show All");
+    });
+
+    it("ALL_BRANCHES_VALUE is empty string (TC-152)", () => {
+      // Given/When: loadBranches response is dispatched
+      vi.clearAllMocks();
+      dispatchMessage({
+        command: "loadBranches",
+        branches: ["main"],
+        head: "main",
+        hard: true,
+        isRepo: true
+      });
+
+      // Then: first option value is ""
+      const call = mockBranchDropdownInstance.setOptions.mock.calls[0];
+      expect(call).toBeDefined();
+      const options = call[0] as { name: string; value: string }[];
+      expect(options[0].value).toBe("");
+    });
+
+    it("REMOTE_BRANCH_PREFIX strips 'remotes/' from display name (TC-153)", () => {
+      // Given: branch list includes a remote branch
+      vi.clearAllMocks();
+      dispatchMessage({
+        command: "loadBranches",
+        branches: ["main", "remotes/origin/feature"],
+        head: "main",
+        hard: true,
+        isRepo: true
+      });
+
+      // Then: remote branch display name strips "remotes/" prefix
+      const call = mockBranchDropdownInstance.setOptions.mock.calls[0];
+      const options = call[0] as { name: string; value: string }[];
+      const remoteOption = options.find((o) => o.value === "remotes/origin/feature");
+      expect(remoteOption).toBeDefined();
+      expect(remoteOption!.name).toBe("origin/feature");
+    });
+
+    it("uses REMOTE_BRANCH_PREFIX.length instead of magic number 8 (TC-154)", () => {
+      // Given: branch list includes a remote branch with long prefix
+      vi.clearAllMocks();
+      dispatchMessage({
+        command: "loadBranches",
+        branches: ["remotes/upstream/main"],
+        head: null,
+        hard: true,
+        isRepo: true
+      });
+
+      // Then: display name correctly strips "remotes/" (8 chars) via constant
+      const call = mockBranchDropdownInstance.setOptions.mock.calls[0];
+      const options = call[0] as { name: string; value: string }[];
+      const remoteOption = options.find((o) => o.value === "remotes/upstream/main");
+      expect(remoteOption).toBeDefined();
+      expect(remoteOption!.name).toBe("upstream/main");
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* S26: loadBranches branch integrity check                          */
+  /* ---------------------------------------------------------------- */
+
+  describe("loadBranches branch integrity check (S26)", () => {
+    it("preserves selected branches that still exist (TC-155)", () => {
+      // Given: selectedBranches=["main","dev"], both exist in gitBranches
+      expect(capturedBranchCallback).not.toBeNull();
+      capturedBranchCallback!(["main", "dev"]);
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+      vi.clearAllMocks();
+
+      // When: loadBranches response includes both branches
+      dispatchMessage({
+        command: "loadBranches",
+        branches: ["main", "dev", "feature"],
+        head: "main",
+        hard: true,
+        isRepo: true
+      });
+
+      // Then: branchDropdown.setOptions is called with selectedBranches=["main","dev"]
+      expect(mockBranchDropdownInstance.setOptions).toHaveBeenCalledWith(expect.any(Array), [
+        "main",
+        "dev"
+      ]);
+    });
+
+    it("filters out branches that no longer exist (TC-156)", () => {
+      // Given: selectedBranches=["main","deleted-branch"]
+      capturedBranchCallback!(["main", "deleted-branch"]);
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+      vi.clearAllMocks();
+
+      // When: loadBranches response excludes "deleted-branch"
+      dispatchMessage({
+        command: "loadBranches",
+        branches: ["main", "dev"],
+        head: "main",
+        hard: true,
+        isRepo: true
+      });
+
+      // Then: branchDropdown.setOptions is called with only ["main"]
+      expect(mockBranchDropdownInstance.setOptions).toHaveBeenCalledWith(expect.any(Array), [
+        "main"
+      ]);
+    });
+
+    it("falls back to empty when all selected branches disappear (TC-157)", () => {
+      // Given: selectedBranches=["gone1","gone2"], neither exist
+      capturedBranchCallback!(["gone1", "gone2"]);
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+      vi.clearAllMocks();
+
+      // When: loadBranches response has none of the selected branches
+      // (showCurrentBranchByDefault=false in setupViewState)
+      dispatchMessage({
+        command: "loadBranches",
+        branches: ["main", "dev"],
+        head: "main",
+        hard: true,
+        isRepo: true
+      });
+
+      // Then: branchDropdown.setOptions is called with [] (empty = Show All fallback)
+      expect(mockBranchDropdownInstance.setOptions).toHaveBeenCalledWith(expect.any(Array), []);
+    });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S24: WebViewState backward compatibility migration                  */
+/* ------------------------------------------------------------------ */
+
+describe("WebViewState backward compatibility migration (S24)", () => {
+  it("converts legacy currentBranch string to selectedBranches array (TC-145)", async () => {
+    // Given: prevState has old format with currentBranch: "main"
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    const freshVscode = utilsMod.vscode;
+    vi.mocked(freshVscode.getState).mockReturnValueOnce({
+      ...MOCK_PREV_STATE,
+      currentBranch: "main",
+      selectedBranches: undefined
+    } as unknown as ReturnType<typeof freshVscode.getState>);
+
+    // When: main module is imported
+    await import("../../web/main");
+
+    // Then: setState is called with selectedBranches: ["main"]
+    const setStateCalls = vi.mocked(freshVscode.setState).mock.calls;
+    const states = setStateCalls.map((c) => c[0] as Record<string, unknown>);
+    const withBranches = states.find((s) => s.selectedBranches !== undefined);
+    expect(withBranches).toBeDefined();
+    expect(withBranches!.selectedBranches).toEqual(["main"]);
+  });
+
+  it("converts legacy null currentBranch to empty selectedBranches (TC-146)", async () => {
+    // Given: prevState has old format with currentBranch: null
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    const freshVscode = utilsMod.vscode;
+    vi.mocked(freshVscode.getState).mockReturnValueOnce({
+      ...MOCK_PREV_STATE,
+      currentBranch: null,
+      selectedBranches: undefined
+    } as unknown as ReturnType<typeof freshVscode.getState>);
+
+    // When: main module is imported
+    await import("../../web/main");
+
+    // Then: setState is called with selectedBranches: []
+    const setStateCalls = vi.mocked(freshVscode.setState).mock.calls;
+    const states = setStateCalls.map((c) => c[0] as Record<string, unknown>);
+    const withBranches = states.find((s) => s.selectedBranches !== undefined);
+    expect(withBranches).toBeDefined();
+    expect(withBranches!.selectedBranches).toEqual([]);
+  });
+
+  it("converts legacy authorFilter string to selectedAuthors array (TC-147)", async () => {
+    // Given: prevState has old format with authorFilter: "Alice"
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    const freshVscode = utilsMod.vscode;
+    vi.mocked(freshVscode.getState).mockReturnValueOnce({
+      ...MOCK_PREV_STATE,
+      authorFilter: "Alice",
+      selectedAuthors: undefined
+    } as unknown as ReturnType<typeof freshVscode.getState>);
+
+    // When: main module is imported
+    await import("../../web/main");
+
+    // Then: setState is called with selectedAuthors: ["Alice"]
+    const setStateCalls = vi.mocked(freshVscode.setState).mock.calls;
+    const states = setStateCalls.map((c) => c[0] as Record<string, unknown>);
+    const withAuthors = states.find((s) => s.selectedAuthors !== undefined);
+    expect(withAuthors).toBeDefined();
+    expect(withAuthors!.selectedAuthors).toEqual(["Alice"]);
+  });
+
+  it("converts legacy null authorFilter to empty selectedAuthors (TC-148)", async () => {
+    // Given: prevState has old format with authorFilter: null
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    const freshVscode = utilsMod.vscode;
+    vi.mocked(freshVscode.getState).mockReturnValueOnce({
+      ...MOCK_PREV_STATE,
+      authorFilter: null,
+      selectedAuthors: undefined
+    } as unknown as ReturnType<typeof freshVscode.getState>);
+
+    // When: main module is imported
+    await import("../../web/main");
+
+    // Then: setState is called with selectedAuthors: []
+    const setStateCalls = vi.mocked(freshVscode.setState).mock.calls;
+    const states = setStateCalls.map((c) => c[0] as Record<string, unknown>);
+    const withAuthors = states.find((s) => s.selectedAuthors !== undefined);
+    expect(withAuthors).toBeDefined();
+    expect(withAuthors!.selectedAuthors).toEqual([]);
+  });
+
+  it("preserves new format selectedBranches as-is (TC-149)", async () => {
+    // Given: prevState has new format with selectedBranches: ["main"] (exists in gitBranches)
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    const freshVscode = utilsMod.vscode;
+    vi.mocked(freshVscode.getState).mockReturnValueOnce({
+      ...MOCK_PREV_STATE,
+      selectedBranches: ["main"]
+    } as unknown as ReturnType<typeof freshVscode.getState>);
+
+    // When: main module is imported
+    await import("../../web/main");
+
+    // Then: setState includes selectedBranches: ["main"] (preserved, not migrated)
+    const setStateCalls = vi.mocked(freshVscode.setState).mock.calls;
+    const states = setStateCalls.map((c) => c[0] as Record<string, unknown>);
+    const withBranches = states.find(
+      (s) => Array.isArray(s.selectedBranches) && (s.selectedBranches as string[]).length === 1
+    );
+    expect(withBranches).toBeDefined();
+    expect(withBranches!.selectedBranches).toEqual(["main"]);
+  });
+
+  it("saves state in new format with selectedBranches and selectedAuthors (TC-150)", async () => {
+    // Given: normal construction
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    const freshVscode = utilsMod.vscode;
+    vi.mocked(freshVscode.getState).mockReturnValueOnce(null);
+
+    // When: main module is imported
+    await import("../../web/main");
+
+    // Then: setState is called with selectedBranches and selectedAuthors (not currentBranch/authorFilter)
+    const setStateCalls = vi.mocked(freshVscode.setState).mock.calls;
+    expect(setStateCalls.length).toBeGreaterThan(0);
+    const lastState = setStateCalls[setStateCalls.length - 1][0] as Record<string, unknown>;
+    expect(lastState).toHaveProperty("selectedBranches");
+    expect(lastState).toHaveProperty("selectedAuthors");
+    expect(lastState).not.toHaveProperty("currentBranch");
+    expect(lastState).not.toHaveProperty("authorFilter");
   });
 });

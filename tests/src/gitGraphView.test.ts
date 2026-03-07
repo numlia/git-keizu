@@ -10,6 +10,8 @@ const mocks = vi.hoisted(() => ({
   resetUncommitted: vi.fn(),
   cleanUntrackedFiles: vi.fn(),
   getCommitComparison: vi.fn(),
+  createBranch: vi.fn(),
+  checkoutBranch: vi.fn(),
   deleteRemoteBranch: vi.fn(),
   rebaseBranch: vi.fn(),
   deleteBranch: vi.fn(),
@@ -1294,38 +1296,311 @@ describe("GitGraphView loadCommits authorFilter (S10)", () => {
     GitGraphView.currentPanel = undefined;
   });
 
-  it("passes authorFilter to dataSource.getCommits when specified (TC-029)", async () => {
-    // Given: loadCommits message with authorFilter
-    // When: RequestLoadCommits message with authorFilter is received
+  it("passes authors array to dataSource.getCommits when specified (TC-029)", async () => {
+    // Given: loadCommits message with authors array
+    // When: RequestLoadCommits message with authors is received
     await mocks.messageHandler.current!({
       command: "loadCommits",
       repo: TEST_REPO,
-      branchName: "main",
+      branches: ["main"],
       maxCommits: 300,
       showRemoteBranches: true,
       hard: false,
-      authorFilter: "Alice"
+      authors: ["Alice"]
     });
 
-    // Then: getCommits is called with authorFilter "Alice"
+    // Then: getCommits is called with branches and authors arrays
     expect(mocks.getCommits).toHaveBeenCalledTimes(1);
-    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, "main", 300, true, "Alice");
+    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, ["main"], 300, true, ["Alice"]);
   });
 
-  it("passes undefined authorFilter to dataSource.getCommits when not specified (TC-030)", async () => {
-    // Given: loadCommits message without authorFilter
-    // When: RequestLoadCommits message without authorFilter is received
+  it("passes empty arrays to dataSource.getCommits when no filter (TC-030)", async () => {
+    // Given: loadCommits message with empty arrays
+    // When: RequestLoadCommits message with empty branches/authors is received
     await mocks.messageHandler.current!({
       command: "loadCommits",
       repo: TEST_REPO,
-      branchName: "main",
+      branches: [],
       maxCommits: 300,
       showRemoteBranches: true,
-      hard: false
+      hard: false,
+      authors: []
     });
 
-    // Then: getCommits is called without authorFilter (undefined)
+    // Then: getCommits is called with empty arrays
     expect(mocks.getCommits).toHaveBeenCalledTimes(1);
-    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, "main", 300, true, undefined);
+    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, [], 300, true, []);
+  });
+});
+
+describe("GitGraphView createBranch + checkout orchestration (S11)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitGraphView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.createBranch.mockResolvedValue(null);
+    mocks.checkoutBranch.mockResolvedValue(null);
+
+    const mockDataSource = {
+      applyStash: mocks.applyStash,
+      popStash: mocks.popStash,
+      dropStash: mocks.dropStash,
+      branchFromStash: mocks.branchFromStash,
+      pushStash: mocks.pushStash,
+      resetUncommitted: mocks.resetUncommitted,
+      cleanUntrackedFiles: mocks.cleanUntrackedFiles,
+      getCommitComparison: mocks.getCommitComparison,
+      createBranch: mocks.createBranch,
+      checkoutBranch: mocks.checkoutBranch,
+      deleteRemoteBranch: mocks.deleteRemoteBranch,
+      rebaseBranch: mocks.rebaseBranch,
+      deleteBranch: mocks.deleteBranch,
+      getCommits: mocks.getCommits
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitGraphView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitGraphView.currentPanel?.dispose();
+    GitGraphView.currentPanel = undefined;
+  });
+
+  it("calls checkoutBranch after successful createBranch when checkout=true (TC-031)", async () => {
+    // Given: createBranch succeeds
+    mocks.createBranch.mockResolvedValue(null);
+
+    // When: createBranch message with checkout=true is received
+    await mocks.messageHandler.current!({
+      command: "createBranch",
+      repo: TEST_REPO,
+      branchName: "feature/x",
+      commitHash: "abc123",
+      checkout: true
+    });
+
+    // Then: checkoutBranch is called with branchName
+    expect(mocks.createBranch).toHaveBeenCalledTimes(1);
+    expect(mocks.createBranch).toHaveBeenCalledWith(TEST_REPO, "feature/x", "abc123");
+    expect(mocks.checkoutBranch).toHaveBeenCalledTimes(1);
+    expect(mocks.checkoutBranch).toHaveBeenCalledWith(TEST_REPO, "feature/x", null);
+  });
+
+  it("returns status null on full success (createBranch + checkoutBranch) (TC-032)", async () => {
+    // Given: both createBranch and checkoutBranch succeed
+    mocks.createBranch.mockResolvedValue(null);
+    mocks.checkoutBranch.mockResolvedValue(null);
+
+    // When: createBranch message with checkout=true is received
+    await mocks.messageHandler.current!({
+      command: "createBranch",
+      repo: TEST_REPO,
+      branchName: "feature/x",
+      commitHash: "abc123",
+      checkout: true
+    });
+
+    // Then: status is null (complete success)
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "createBranch",
+      status: null
+    });
+  });
+
+  it("returns partial success message when createBranch succeeds but checkoutBranch fails (TC-033)", async () => {
+    // Given: createBranch succeeds, checkoutBranch fails
+    mocks.createBranch.mockResolvedValue(null);
+    mocks.checkoutBranch.mockResolvedValue("checkout error");
+
+    // When: createBranch message with checkout=true is received
+    await mocks.messageHandler.current!({
+      command: "createBranch",
+      repo: TEST_REPO,
+      branchName: "feature/x",
+      commitHash: "abc123",
+      checkout: true
+    });
+
+    // Then: status contains partial success message
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "createBranch",
+      status: "Branch 'feature/x' was created, but checkout failed: checkout error"
+    });
+  });
+
+  it("does not call checkoutBranch when checkout=false (TC-034)", async () => {
+    // Given: createBranch succeeds
+    mocks.createBranch.mockResolvedValue(null);
+
+    // When: createBranch message with checkout=false is received
+    await mocks.messageHandler.current!({
+      command: "createBranch",
+      repo: TEST_REPO,
+      branchName: "feature/x",
+      commitHash: "abc123",
+      checkout: false
+    });
+
+    // Then: checkoutBranch is NOT called, status is null
+    expect(mocks.checkoutBranch).not.toHaveBeenCalled();
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "createBranch",
+      status: null
+    });
+  });
+
+  it("returns error and skips checkout when createBranch fails (TC-035)", async () => {
+    // Given: createBranch fails
+    const errorMsg = "branch already exists";
+    mocks.createBranch.mockResolvedValue(errorMsg);
+
+    // When: createBranch message with checkout=true is received
+    await mocks.messageHandler.current!({
+      command: "createBranch",
+      repo: TEST_REPO,
+      branchName: "feature/x",
+      commitHash: "abc123",
+      checkout: true
+    });
+
+    // Then: checkoutBranch is NOT called, error status is returned
+    expect(mocks.checkoutBranch).not.toHaveBeenCalled();
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "createBranch",
+      status: errorMsg
+    });
+  });
+
+  it("does not call checkoutBranch when checkout is undefined - legacy compat (TC-036)", async () => {
+    // Given: createBranch succeeds
+    mocks.createBranch.mockResolvedValue(null);
+
+    // When: createBranch message without checkout field (legacy message)
+    await mocks.messageHandler.current!({
+      command: "createBranch",
+      repo: TEST_REPO,
+      branchName: "feature/x",
+      commitHash: "abc123"
+    });
+
+    // Then: checkoutBranch is NOT called (undefined is falsy), status is null
+    expect(mocks.checkoutBranch).not.toHaveBeenCalled();
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "createBranch",
+      status: null
+    });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S12: loadCommits branches/authors array passthrough                  */
+/* ------------------------------------------------------------------ */
+
+describe("GitGraphView loadCommits branches/authors array passthrough (S12)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitGraphView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.getCommits.mockResolvedValue({
+      commits: [],
+      head: null,
+      moreCommitsAvailable: false,
+      authors: []
+    });
+
+    const ds = {
+      getCommits: mocks.getCommits
+    } as unknown as DataSource;
+
+    const es = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const am = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const rm = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitGraphView.createOrShow("/test/extension", ds, es, am, rm);
+  });
+
+  afterEach(() => {
+    GitGraphView.currentPanel?.dispose();
+    GitGraphView.currentPanel = undefined;
+  });
+
+  it("passes branches and authors arrays to getCommits (TC-037)", async () => {
+    // Given: loadCommits message with branches=["main","dev"] and authors=["Alice"]
+    // When: message is received
+    await mocks.messageHandler.current!({
+      command: "loadCommits",
+      repo: TEST_REPO,
+      branches: ["main", "dev"],
+      maxCommits: 300,
+      showRemoteBranches: true,
+      hard: false,
+      authors: ["Alice"]
+    });
+
+    // Then: getCommits is called with the exact arrays
+    expect(mocks.getCommits).toHaveBeenCalledTimes(1);
+    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, ["main", "dev"], 300, true, ["Alice"]);
+  });
+
+  it("passes empty arrays to getCommits for show-all mode (TC-038)", async () => {
+    // Given: loadCommits message with empty branches and authors
+    // When: message is received
+    await mocks.messageHandler.current!({
+      command: "loadCommits",
+      repo: TEST_REPO,
+      branches: [],
+      maxCommits: 300,
+      showRemoteBranches: true,
+      hard: false,
+      authors: []
+    });
+
+    // Then: getCommits is called with empty arrays
+    expect(mocks.getCommits).toHaveBeenCalledTimes(1);
+    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, [], 300, true, []);
   });
 });

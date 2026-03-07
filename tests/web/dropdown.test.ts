@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   Dropdown,
@@ -234,5 +234,355 @@ describe("magic number constants", () => {
     // When: its value is checked
     // Then: it equals 297
     expect(MAX_DROPDOWN_HEIGHT).toBe(297);
+  });
+});
+
+/* ======================================================================
+ * S6–S10: Multi-select mode tests (Feature 012 ui-enhancements)
+ * ====================================================================== */
+
+const MULTI_SELECT_OPTIONS = [
+  { name: "Show All", value: "" },
+  { name: "main", value: "main" },
+  { name: "develop", value: "develop" },
+  { name: "feature-a", value: "feature-a" },
+  { name: "feature-b", value: "feature-b" },
+  { name: "feature-c", value: "feature-c" }
+];
+
+function createMultiDropdown(selected: string[] = []): {
+  dropdown: Dropdown;
+  elem: HTMLElement;
+  callback: ReturnType<typeof vi.fn>;
+} {
+  const elem = createDropdownElement("multiDropdown");
+  const callback = vi.fn();
+  const dropdown = new Dropdown("multiDropdown", false, "Branches", callback, true);
+  dropdown.setOptions([...MULTI_SELECT_OPTIONS], selected);
+  return { dropdown, elem, callback };
+}
+
+function clickOption(elem: HTMLElement, index: number): void {
+  const options = elem.querySelectorAll(".dropdownOption");
+  (options[index] as HTMLElement).click();
+}
+
+function clickOutside(): void {
+  const outside = document.createElement("div");
+  document.body.appendChild(outside);
+  outside.click();
+}
+
+describe("S6: Multi-select mode initialization", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("enables multi-select mode with multipleAllowed=true (TC-016)", () => {
+    // Given: Dropdown created with multipleAllowed=true
+    const { elem } = createMultiDropdown();
+    // When: options are rendered
+    const options = elem.querySelectorAll(".dropdownOption");
+    // Then: checkboxes are present in each option
+    expect(options.length).toBe(MULTI_SELECT_OPTIONS.length);
+    expect(options[0].querySelector('input[type="checkbox"]')).not.toBeNull();
+  });
+
+  it("maintains single-select mode with multipleAllowed=false (TC-017)", () => {
+    // Given: Dropdown created without multipleAllowed (defaults to false)
+    const elem = createDropdownElement("singleDropdown");
+    const dropdown = new Dropdown("singleDropdown", false, "Branches", () => {});
+    dropdown.setOptions([...MULTI_SELECT_OPTIONS], "");
+    // When: options are rendered
+    const options = elem.querySelectorAll(".dropdownOption");
+    // Then: no checkboxes are present
+    for (let i = 0; i < options.length; i++) {
+      expect(options[i].querySelector('input[type="checkbox"]')).toBeNull();
+    }
+  });
+
+  it("renders checkbox elements for each option in multi-select mode (TC-018)", () => {
+    // Given: Multi-select dropdown with options set
+    const { elem } = createMultiDropdown();
+    // When: render() was called via setOptions
+    const options = elem.querySelectorAll(".dropdownOption");
+    // Then: every option contains a checkbox input and customCheckbox span
+    for (let i = 0; i < options.length; i++) {
+      const checkbox = options[i].querySelector('input[type="checkbox"]');
+      const customCheckbox = options[i].querySelector(".customCheckbox");
+      expect(checkbox).not.toBeNull();
+      expect(customCheckbox).not.toBeNull();
+    }
+  });
+
+  it("does not render checkboxes in single-select mode (TC-019)", () => {
+    // Given: Single-select dropdown
+    const elem = createDropdownElement("noCheckbox");
+    const dropdown = new Dropdown("noCheckbox", false, "Branches", () => {});
+    dropdown.setOptions([...MULTI_SELECT_OPTIONS], "main");
+    // When: render() was called via setOptions
+    const options = elem.querySelectorAll(".dropdownOption");
+    // Then: no option contains a checkbox
+    for (let i = 0; i < options.length; i++) {
+      expect(options[i].querySelector('input[type="checkbox"]')).toBeNull();
+    }
+  });
+});
+
+describe("S7: Show All exclusive control", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("clears all individual selections when Show All is clicked (TC-020)", () => {
+    // Given: Dropdown with individual options selected
+    const { dropdown, elem } = createMultiDropdown(["main", "develop"]);
+    openDropdown(dropdown, elem);
+    // When: "Show All" (index 0) is clicked
+    clickOption(elem, 0);
+    // Then: "Show All" is selected, individual options are not
+    const options = elem.querySelectorAll(".dropdownOption");
+    expect(options[0].classList.contains("selected")).toBe(true);
+    expect(options[1].classList.contains("selected")).toBe(false);
+    expect(options[2].classList.contains("selected")).toBe(false);
+  });
+
+  it("unchecks Show All and toggles individual option on click (TC-021)", () => {
+    // Given: Dropdown with "Show All" selected (default)
+    const { dropdown, elem } = createMultiDropdown();
+    openDropdown(dropdown, elem);
+    // When: Individual option "main" (index 1) is clicked
+    clickOption(elem, 1);
+    // Then: "Show All" is unchecked, "main" is checked
+    const options = elem.querySelectorAll(".dropdownOption");
+    expect(options[0].classList.contains("selected")).toBe(false);
+    expect(options[1].classList.contains("selected")).toBe(true);
+  });
+
+  it("auto-reverts to Show All when all individuals are deselected (TC-022)", () => {
+    // Given: Dropdown with one individual option selected
+    const { dropdown, elem } = createMultiDropdown(["main"]);
+    openDropdown(dropdown, elem);
+    // When: The selected option is toggled off
+    clickOption(elem, 1);
+    // Then: "Show All" is automatically selected
+    const options = elem.querySelectorAll(".dropdownOption");
+    expect(options[0].classList.contains("selected")).toBe(true);
+    expect(options[1].classList.contains("selected")).toBe(false);
+  });
+
+  it("switches from Show All to individual on click (TC-023)", () => {
+    // Given: Dropdown with "Show All" selected
+    const { dropdown, elem } = createMultiDropdown();
+    openDropdown(dropdown, elem);
+    // When: "develop" (index 2) is clicked
+    clickOption(elem, 2);
+    // Then: "Show All" is unchecked, "develop" is checked
+    const options = elem.querySelectorAll(".dropdownOption");
+    expect(options[0].classList.contains("selected")).toBe(false);
+    expect(options[2].classList.contains("selected")).toBe(true);
+  });
+
+  it("resets all individual selections when Show All is clicked (TC-024)", () => {
+    // Given: Dropdown with multiple individual options selected
+    const { dropdown, elem } = createMultiDropdown(["main", "develop", "feature-a"]);
+    openDropdown(dropdown, elem);
+    // When: "Show All" is clicked
+    clickOption(elem, 0);
+    // Then: Only "Show All" is selected, all individuals are cleared
+    const options = elem.querySelectorAll(".dropdownOption");
+    expect(options[0].classList.contains("selected")).toBe(true);
+    for (let i = 1; i < options.length; i++) {
+      expect(options[i].classList.contains("selected")).toBe(false);
+    }
+  });
+});
+
+describe("S8: Close and callback behavior", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("fires callback with values array when selection changed on close (TC-025)", () => {
+    // Given: Multi-select dropdown opened
+    const { dropdown, elem, callback } = createMultiDropdown();
+    openDropdown(dropdown, elem);
+    // When: "main" is selected and dropdown is closed
+    clickOption(elem, 1);
+    clickOutside();
+    // Then: Callback fires with ["main"]
+    expect(callback).toHaveBeenCalledTimes(1);
+    expect(callback).toHaveBeenCalledWith(["main"]);
+  });
+
+  it("does not fire callback when no selection change on close (TC-026)", () => {
+    // Given: Multi-select dropdown opened with "Show All" selected
+    const { dropdown, elem, callback } = createMultiDropdown();
+    openDropdown(dropdown, elem);
+    // When: No changes made, dropdown is closed
+    clickOutside();
+    // Then: Callback is not fired
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("passes empty array when Show All is selected on close (TC-027)", () => {
+    // Given: Dropdown with individual selection
+    const { dropdown, elem, callback } = createMultiDropdown(["main"]);
+    openDropdown(dropdown, elem);
+    // When: "Show All" is clicked (clears individual) and dropdown closes
+    clickOption(elem, 0);
+    clickOutside();
+    // Then: Callback fires with empty array
+    expect(callback).toHaveBeenCalledWith([]);
+  });
+
+  it("passes single-element array for one selected item (TC-028)", () => {
+    // Given: Multi-select dropdown opened
+    const { dropdown, elem, callback } = createMultiDropdown();
+    openDropdown(dropdown, elem);
+    // When: One option selected and dropdown closed
+    clickOption(elem, 3);
+    clickOutside();
+    // Then: Callback fires with ["feature-a"]
+    expect(callback).toHaveBeenCalledWith(["feature-a"]);
+  });
+
+  it("passes three-element array for three selected items (TC-029)", () => {
+    // Given: Multi-select dropdown opened
+    const { dropdown, elem, callback } = createMultiDropdown();
+    openDropdown(dropdown, elem);
+    // When: Three options selected and dropdown closed
+    clickOption(elem, 1);
+    clickOption(elem, 2);
+    clickOption(elem, 3);
+    clickOutside();
+    // Then: Callback fires with values sorted by option index
+    expect(callback).toHaveBeenCalledWith(["main", "develop", "feature-a"]);
+  });
+
+  it("does not fire callback when selection reverted to original (TC-030)", () => {
+    // Given: Dropdown with "main" selected
+    const { dropdown, elem, callback } = createMultiDropdown(["main"]);
+    openDropdown(dropdown, elem);
+    // When: Toggle "main" off then back on
+    clickOption(elem, 1);
+    clickOption(elem, 1);
+    clickOutside();
+    // Then: No net change, callback is not fired
+    expect(callback).not.toHaveBeenCalled();
+  });
+});
+
+describe("S9: Display label", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("shows Show All name when Show All is selected (TC-031)", () => {
+    // Given: Multi-select dropdown with "Show All" selected (empty array)
+    const { elem } = createMultiDropdown();
+    // When: Display label is rendered
+    const currentValue = elem.querySelector(".dropdownCurrentValue") as HTMLElement;
+    // Then: Label shows "Show All"
+    expect(currentValue.textContent).toBe("Show All");
+  });
+
+  it("shows option name when one item is selected (TC-032)", () => {
+    // Given: Multi-select dropdown with one item selected
+    const { elem } = createMultiDropdown(["develop"]);
+    // When: Display label is rendered
+    const currentValue = elem.querySelector(".dropdownCurrentValue") as HTMLElement;
+    // Then: Label shows the selected option name
+    expect(currentValue.textContent).toBe("develop");
+  });
+
+  it("shows count when two items are selected (TC-033)", () => {
+    // Given: Multi-select dropdown with two items selected
+    const { elem } = createMultiDropdown(["main", "develop"]);
+    // When: Display label is rendered
+    const currentValue = elem.querySelector(".dropdownCurrentValue") as HTMLElement;
+    // Then: Label shows count
+    expect(currentValue.textContent).toBe("2 selected");
+  });
+
+  it("shows count when five items are selected (TC-034)", () => {
+    // Given: Multi-select dropdown with all five individual items selected
+    const { elem } = createMultiDropdown([
+      "main",
+      "develop",
+      "feature-a",
+      "feature-b",
+      "feature-c"
+    ]);
+    // When: Display label is rendered
+    const currentValue = elem.querySelector(".dropdownCurrentValue") as HTMLElement;
+    // Then: Label shows count
+    expect(currentValue.textContent).toBe("5 selected");
+  });
+});
+
+describe("S10: Event handling", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("does not close dropdown on option click in multi-select (TC-035)", () => {
+    // Given: Multi-select dropdown opened
+    const { dropdown, elem } = createMultiDropdown();
+    openDropdown(dropdown, elem);
+    expect(dropdown.isOpen()).toBe(true);
+    // When: An option is clicked
+    clickOption(elem, 1);
+    // Then: Dropdown remains open
+    expect(dropdown.isOpen()).toBe(true);
+  });
+
+  it("closes dropdown on option click in single-select (TC-036)", () => {
+    // Given: Single-select dropdown opened
+    const elem = createDropdownElement("singleSelect");
+    const dropdown = new Dropdown("singleSelect", false, "Branches", () => {});
+    dropdown.setOptions([...MULTI_SELECT_OPTIONS], "");
+    openDropdown(dropdown, elem);
+    expect(dropdown.isOpen()).toBe(true);
+    // When: An option is clicked
+    clickOption(elem, 1);
+    // Then: Dropdown closes
+    expect(dropdown.isOpen()).toBe(false);
+  });
+
+  it("filters options by text input in multi-select mode (TC-037)", () => {
+    // Given: Multi-select dropdown opened
+    const { dropdown, elem } = createMultiDropdown();
+    openDropdown(dropdown, elem);
+    // When: Filter text "feature" is entered
+    const filterInput = elem.querySelector(".dropdownFilterInput") as HTMLInputElement;
+    filterInput.value = "feature";
+    filterInput.dispatchEvent(new Event("keyup"));
+    // Then: Only matching options are visible
+    const options = elem.querySelectorAll(".dropdownOption");
+    expect((options[0] as HTMLElement).style.display).toBe("none");
+    expect((options[1] as HTMLElement).style.display).toBe("none");
+    expect((options[2] as HTMLElement).style.display).toBe("none");
+    expect((options[3] as HTMLElement).style.display).toBe("block");
+    expect((options[4] as HTMLElement).style.display).toBe("block");
+    expect((options[5] as HTMLElement).style.display).toBe("block");
+  });
+
+  it("shows no results when filter matches nothing in multi-select (TC-038)", () => {
+    // Given: Multi-select dropdown opened
+    const { dropdown, elem } = createMultiDropdown();
+    openDropdown(dropdown, elem);
+    // When: Filter text that matches nothing is entered
+    const filterInput = elem.querySelector(".dropdownFilterInput") as HTMLInputElement;
+    filterInput.value = "zzzzzzz";
+    filterInput.dispatchEvent(new Event("keyup"));
+    // Then: All options are hidden
+    const options = elem.querySelectorAll(".dropdownOption");
+    for (let i = 0; i < options.length; i++) {
+      expect((options[i] as HTMLElement).style.display).toBe("none");
+    }
+    // And: "No results found" message is displayed
+    const noResults = elem.querySelector(".dropdownNoResults") as HTMLElement;
+    expect(noResults.style.display).toBe("block");
   });
 });

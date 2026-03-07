@@ -352,7 +352,7 @@ describe("stash integration in getCommits", () => {
     setupSpawnForCommits({ logOutput, stashOutput });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, "", 10, false);
+    const result = await ds.getCommits(REPO, [], 10, false, []);
 
     // Then: The matching commit node has stash info attached
     const stashCommit = result.commits.find((c) => c.hash === commitHash);
@@ -390,7 +390,7 @@ describe("stash integration in getCommits", () => {
     setupSpawnForCommits({ logOutput, stashOutput });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, "", 10, false);
+    const result = await ds.getCommits(REPO, [], 10, false, []);
 
     // Then: Stash node is inserted before the base commit
     expect(result.commits).toHaveLength(3);
@@ -430,7 +430,7 @@ describe("stash integration in getCommits", () => {
     setupSpawnForCommits({ logOutput, stashOutput });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, "", 10, false);
+    const result = await ds.getCommits(REPO, [], 10, false, []);
 
     // Then: Commit array is unchanged (stash is skipped)
     expect(result.commits).toHaveLength(1);
@@ -475,7 +475,7 @@ describe("stash integration in getCommits", () => {
     setupSpawnForCommits({ logOutput, stashOutput });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, "", 10, false);
+    const result = await ds.getCommits(REPO, [], 10, false, []);
 
     // Then: Newer stash appears before older stash (date descending)
     expect(result.commits).toHaveLength(3);
@@ -494,7 +494,7 @@ describe("stash integration in getCommits", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, "", 10, false);
+    const result = await ds.getCommits(REPO, [], 10, false, []);
 
     // Then: Commits are returned as-is with no stash info
     expect(result.commits).toHaveLength(2);
@@ -556,7 +556,7 @@ describe("stash integration in getCommits", () => {
     setupSpawnForCommits({ logOutput, stashOutput });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, "", 10, false);
+    const result = await ds.getCommits(REPO, [], 10, false, []);
 
     // Then: Each stash is inserted before its respective base commit
     expect(result.commits).toHaveLength(6);
@@ -2002,7 +2002,7 @@ describe("getCommits authorFilter", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with authorFilter
-    await ds.getCommits(REPO, "", 10, false, "John Doe");
+    await ds.getCommits(REPO, [], 10, false, ["John Doe"]);
 
     // Then: git log args include --author=John Doe
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2020,7 +2020,7 @@ describe("getCommits authorFilter", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called without authorFilter
-    await ds.getCommits(REPO, "", 10, false);
+    await ds.getCommits(REPO, [], 10, false, []);
 
     // Then: git log args do not include --author
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2038,7 +2038,7 @@ describe("getCommits authorFilter", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with empty authorFilter
-    await ds.getCommits(REPO, "", 10, false, "");
+    await ds.getCommits(REPO, [], 10, false, []);
 
     // Then: git log args do not include --author
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2056,7 +2056,7 @@ describe("getCommits authorFilter", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with special character authorFilter
-    await ds.getCommits(REPO, "", 10, false, "Jane O'Brien");
+    await ds.getCommits(REPO, [], 10, false, ["Jane O'Brien"]);
 
     // Then: --author flag contains the exact string (no escaping needed with spawn)
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2300,7 +2300,7 @@ describe("getCommits authors integration", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "", authorsOutput });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, "", 10, false);
+    const result = await ds.getCommits(REPO, [], 10, false, []);
 
     // Then: Return value contains authors field with sorted author list
     expect(result.authors).toEqual(["Alice", "Bob", "Charlie"]);
@@ -2325,12 +2325,211 @@ describe("getCommits authors integration", () => {
     });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, "", 10, false);
+    const result = await ds.getCommits(REPO, [], 10, false, []);
 
     // Then: commits/head/moreCommitsAvailable are normal, authors is empty array
     expect(result.commits).toHaveLength(1);
     expect(result.commits[0].hash).toBe("abc111");
     expect(result.moreCommitsAvailable).toBe(false);
     expect(result.authors).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S17: getGitLog branches array parameter                             */
+/* ------------------------------------------------------------------ */
+
+describe("getGitLog branches array parameter (S17)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("passes multiple branch names as git log arguments (TC-100)", async () => {
+    // Given: branches=["main","dev"]
+    const logOutput = makeCommitLine("abc111", "", "Alice", "a@t.com", 1700000001, "msg") + "\n";
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with multiple branches
+    await ds.getCommits(REPO, ["main", "dev"], 10, false, []);
+
+    // Then: git log args contain "main" and "dev" but not --branches/--tags
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs).toContain("main");
+    expect(logArgs).toContain("dev");
+    expect(logArgs).not.toContain("--branches");
+    expect(logArgs).not.toContain("--tags");
+  });
+
+  it("uses --branches --tags for empty branches array (TC-101)", async () => {
+    // Given: branches=[]
+    const logOutput = makeCommitLine("abc111", "", "Alice", "a@t.com", 1700000001, "msg") + "\n";
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with empty branches
+    await ds.getCommits(REPO, [], 10, false, []);
+
+    // Then: git log args contain --branches --tags
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs).toContain("--branches");
+    expect(logArgs).toContain("--tags");
+  });
+
+  it("passes single branch name as git log argument (TC-102)", async () => {
+    // Given: branches=["feature/x"]
+    const logOutput = makeCommitLine("abc111", "", "Alice", "a@t.com", 1700000001, "msg") + "\n";
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with single branch
+    await ds.getCommits(REPO, ["feature/x"], 10, false, []);
+
+    // Then: git log args contain "feature/x"
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs).toContain("feature/x");
+  });
+
+  it("does not include --remotes when branches are specified (TC-103)", async () => {
+    // Given: branches=["main","dev"], showRemoteBranches=true
+    const logOutput = makeCommitLine("abc111", "", "Alice", "a@t.com", 1700000001, "msg") + "\n";
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with branches and showRemoteBranches=true
+    await ds.getCommits(REPO, ["main", "dev"], 10, true, []);
+
+    // Then: git log args contain branch names but NOT --remotes
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs).toContain("main");
+    expect(logArgs).toContain("dev");
+    expect(logArgs).not.toContain("--remotes");
+  });
+
+  it("includes --remotes for empty branches with showRemoteBranches=true (TC-104)", async () => {
+    // Given: branches=[], showRemoteBranches=true
+    const logOutput = makeCommitLine("abc111", "", "Alice", "a@t.com", 1700000001, "msg") + "\n";
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with empty branches and showRemoteBranches=true
+    await ds.getCommits(REPO, [], 10, true, []);
+
+    // Then: git log args contain --branches --tags --remotes
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs).toContain("--branches");
+    expect(logArgs).toContain("--tags");
+    expect(logArgs).toContain("--remotes");
+  });
+
+  it("does not include --remotes for empty branches with showRemoteBranches=false (TC-105)", async () => {
+    // Given: branches=[], showRemoteBranches=false
+    const logOutput = makeCommitLine("abc111", "", "Alice", "a@t.com", 1700000001, "msg") + "\n";
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with empty branches and showRemoteBranches=false
+    await ds.getCommits(REPO, [], 10, false, []);
+
+    // Then: git log args contain --branches --tags but NOT --remotes
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs).toContain("--branches");
+    expect(logArgs).toContain("--tags");
+    expect(logArgs).not.toContain("--remotes");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S18: getGitLog/getCommits authors array parameter                   */
+/* ------------------------------------------------------------------ */
+
+describe("getGitLog/getCommits authors array parameter (S18)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("passes multiple --author flags for multiple authors (TC-106)", async () => {
+    // Given: authors=["Alice","Bob"]
+    const logOutput = makeCommitLine("abc111", "", "Alice", "a@t.com", 1700000001, "msg") + "\n";
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with multiple authors
+    await ds.getCommits(REPO, [], 10, false, ["Alice", "Bob"]);
+
+    // Then: git log args contain both --author=Alice and --author=Bob
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs).toContain("--author=Alice");
+    expect(logArgs).toContain("--author=Bob");
+  });
+
+  it("does not include --author when authors is empty (TC-107)", async () => {
+    // Given: authors=[]
+    const logOutput = makeCommitLine("abc111", "", "Alice", "a@t.com", 1700000001, "msg") + "\n";
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with empty authors
+    await ds.getCommits(REPO, [], 10, false, []);
+
+    // Then: git log args do not contain --author
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs.some((a) => a.startsWith("--author"))).toBe(false);
+  });
+
+  it("safely passes special characters via spawnGit (TC-108)", async () => {
+    // Given: authors=["Jane O'Brien"]
+    const logOutput =
+      makeCommitLine("abc111", "", "Jane O'Brien", "j@t.com", 1700000001, "msg") + "\n";
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with special character author
+    await ds.getCommits(REPO, [], 10, false, ["Jane O'Brien"]);
+
+    // Then: --author flag contains exact string (no shell injection via spawn)
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs).toContain("--author=Jane O'Brien");
+  });
+
+  it("passes single --author flag for single author (TC-109)", async () => {
+    // Given: authors=["Alice"]
+    const logOutput = makeCommitLine("abc111", "", "Alice", "a@t.com", 1700000001, "msg") + "\n";
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called with single author
+    await ds.getCommits(REPO, [], 10, false, ["Alice"]);
+
+    // Then: git log args contain exactly one --author=Alice
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs).toContain("--author=Alice");
+    expect(logArgs.filter((a) => a.startsWith("--author")).length).toBe(1);
   });
 });
