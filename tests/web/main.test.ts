@@ -1591,6 +1591,58 @@ describe("GitGraphView frontend integration", () => {
   });
 
   /* ---------------------------------------------------------------- */
+  /* saveState() scrollTop (S27)                                      */
+  /* ---------------------------------------------------------------- */
+
+  describe("saveState() scrollTop (S27)", () => {
+    let scrollContainer: HTMLElement;
+
+    beforeEach(() => {
+      scrollContainer = document.getElementById("scrollContainer")!;
+    });
+
+    afterEach(() => {
+      delete (scrollContainer as Record<string, unknown>).scrollTop;
+    });
+
+    it("saves scrollTop value in vscode.setState (TC-158)", () => {
+      // Given: scrollContainerElem.scrollTop = 500
+      Object.defineProperty(scrollContainer, "scrollTop", {
+        value: 500,
+        writable: true,
+        configurable: true
+      });
+
+      // When: an action that triggers saveState occurs
+      clickCommit(COMMIT_HASH_1);
+
+      // Then: vscode.setState was called with scrollTop: 500
+      const lastCall = vi.mocked(vscode.setState).mock.calls.at(-1);
+      expect(lastCall).toBeDefined();
+      const savedState = lastCall![0] as WebViewState;
+      expect(savedState.scrollTop).toBe(500);
+    });
+
+    it("saves scrollTop: 0 when at top position (TC-159)", () => {
+      // Given: scrollContainerElem.scrollTop = 0 (top position)
+      Object.defineProperty(scrollContainer, "scrollTop", {
+        value: 0,
+        writable: true,
+        configurable: true
+      });
+
+      // When: an action that triggers saveState occurs
+      clickCommit(COMMIT_HASH_1);
+
+      // Then: vscode.setState was called with scrollTop: 0
+      const lastCall = vi.mocked(vscode.setState).mock.calls.at(-1);
+      expect(lastCall).toBeDefined();
+      const savedState = lastCall![0] as WebViewState;
+      expect(savedState.scrollTop).toBe(0);
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
   /* calculateCdvHeight() — CDV height calculation (S7)               */
   /* ---------------------------------------------------------------- */
 
@@ -4050,6 +4102,130 @@ describe("Multi-select filter state management", () => {
       // Then: branchDropdown.setOptions is called with [] (empty = Show All fallback)
       expect(mockBranchDropdownInstance.setOptions).toHaveBeenCalledWith(expect.any(Array), []);
     });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S28: prevState scrollTop restoration                                */
+/* ------------------------------------------------------------------ */
+
+describe("prevState scrollTop restoration (S28)", () => {
+  it("restores scrollTop from prevState when repo is valid (TC-160)", async () => {
+    // Given: prevState with scrollTop = 300 and valid repo
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const scrollContainer = document.getElementById("scrollContainer")!;
+    Object.defineProperty(scrollContainer, "scrollTop", {
+      value: 0,
+      writable: true,
+      configurable: true
+    });
+
+    const { vscode: freshVscode } = await import("../../web/utils");
+    vi.mocked(freshVscode.getState).mockReturnValueOnce({
+      ...MOCK_PREV_STATE,
+      scrollTop: 300
+    } as ReturnType<typeof freshVscode.getState>);
+
+    // When: main module is imported (creates GitGraphView)
+    await import("../../web/main");
+
+    // Then: scrollContainerElem.scrollTop is set to 300
+    expect(scrollContainer.scrollTop).toBe(300);
+  });
+
+  it("does not change scrollTop when prevState has no scrollTop (TC-161)", async () => {
+    // Given: prevState without scrollTop (old version data)
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const scrollContainer = document.getElementById("scrollContainer")!;
+    const scrollTopSetter = vi.fn();
+    let currentScrollTop = 0;
+    Object.defineProperty(scrollContainer, "scrollTop", {
+      get: () => currentScrollTop,
+      set: (v: number) => {
+        currentScrollTop = v;
+        scrollTopSetter(v);
+      },
+      configurable: true
+    });
+
+    const { vscode: freshVscode } = await import("../../web/utils");
+    const prevStateNoScrollTop = { ...MOCK_PREV_STATE };
+    vi.mocked(freshVscode.getState).mockReturnValueOnce(
+      prevStateNoScrollTop as ReturnType<typeof freshVscode.getState>
+    );
+
+    // When: main module is imported (creates GitGraphView)
+    await import("../../web/main");
+
+    // Then: scrollTop setter was never called with a restoration value from prevState
+    const restorationCalls = scrollTopSetter.mock.calls.filter((call: [number]) => call[0] !== 0);
+    expect(restorationCalls).toHaveLength(0);
+    expect(currentScrollTop).toBe(0);
+  });
+
+  it("skips scrollTop restoration when prevState is null (TC-162)", async () => {
+    // Given: prevState is null (first-time display)
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const scrollContainer = document.getElementById("scrollContainer")!;
+    Object.defineProperty(scrollContainer, "scrollTop", {
+      value: 0,
+      writable: true,
+      configurable: true
+    });
+
+    const { vscode: freshVscode } = await import("../../web/utils");
+    vi.mocked(freshVscode.getState).mockReturnValueOnce(null);
+
+    // When: main module is imported (creates GitGraphView)
+    await import("../../web/main");
+
+    // Then: scrollTop remains 0 (no restoration attempted)
+    expect(scrollContainer.scrollTop).toBe(0);
+  });
+
+  it("explicitly sets scrollTop to 0 when prevState.scrollTop is 0 (TC-163)", async () => {
+    // Given: prevState with scrollTop = 0 and valid repo
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const scrollContainer = document.getElementById("scrollContainer")!;
+    const scrollTopSetter = vi.fn();
+    let currentScrollTop = 999;
+    Object.defineProperty(scrollContainer, "scrollTop", {
+      get: () => currentScrollTop,
+      set: (v: number) => {
+        currentScrollTop = v;
+        scrollTopSetter(v);
+      },
+      configurable: true
+    });
+
+    const { vscode: freshVscode } = await import("../../web/utils");
+    vi.mocked(freshVscode.getState).mockReturnValueOnce({
+      ...MOCK_PREV_STATE,
+      scrollTop: 0
+    } as ReturnType<typeof freshVscode.getState>);
+
+    // When: main module is imported (creates GitGraphView)
+    await import("../../web/main");
+
+    // Then: scrollTop is explicitly set to 0
+    expect(scrollTopSetter).toHaveBeenCalledWith(0);
+    expect(currentScrollTop).toBe(0);
   });
 });
 
