@@ -120,13 +120,13 @@ export class DataSource {
 
   public async getCommits(
     repo: string,
-    branch: string,
+    branches: string[],
     maxCommits: number,
     showRemoteBranches: boolean,
-    authorFilter?: string
+    authors: string[]
   ) {
-    const [commits, refData, stashes, authors] = await Promise.all([
-      this.getGitLog(repo, branch, maxCommits + 1, showRemoteBranches, authorFilter),
+    const [commits, refData, stashes, authorList] = await Promise.all([
+      this.getGitLog(repo, branches, maxCommits + 1, showRemoteBranches, authors),
       this.getRefs(repo, showRemoteBranches),
       this.getStashes(repo),
       this.getAuthors(repo)
@@ -216,7 +216,7 @@ export class DataSource {
       commits: commitNodes,
       head: refData.head,
       moreCommitsAvailable: moreCommitsAvailable,
-      authors
+      authors: authorList
     };
   }
 
@@ -752,17 +752,17 @@ export class DataSource {
 
   private getGitLog(
     repo: string,
-    branch: string,
+    branches: string[],
     num: number,
     showRemoteBranches: boolean,
-    authorFilter?: string
+    authors: string[]
   ) {
     const args = ["log", `--max-count=${num}`, `--format=${this.gitLogFormat}`, "--date-order"];
-    if (authorFilter) {
-      args.push(`--author=${authorFilter}`);
+    for (const author of authors) {
+      args.push(`--author=${author}`);
     }
-    if (branch !== "") {
-      args.push(branch);
+    if (branches.length > 0) {
+      args.push(...branches);
     } else {
       args.push("--branches", "--tags");
       if (showRemoteBranches) args.push("--remotes");

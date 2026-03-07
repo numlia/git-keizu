@@ -3,7 +3,6 @@ import {
   showCheckboxDialog,
   showConfirmationDialog,
   showFormDialog,
-  showRefInputDialog,
   showSelectDialog
 } from "./dialogs";
 import { abbrevCommit, ELLIPSIS, sendMessage } from "./utils";
@@ -58,16 +57,20 @@ export function buildCommitContextMenuItems(
     {
       title: `Create Branch${ELLIPSIS}`,
       onClick: () => {
-        showRefInputDialog(
+        showFormDialog(
           `Enter the name of the branch you would like to create from commit <b><i>${abbrevCommit(hash)}</i></b>:`,
-          "",
+          [
+            { type: "text-ref" as const, name: "Name: ", default: "" },
+            { type: "checkbox" as const, name: "Check out", value: true }
+          ],
           "Create Branch",
-          (name) => {
+          (values) => {
             sendMessage({
               command: "createBranch",
               repo: repo,
-              branchName: name,
-              commitHash: hash
+              branchName: values[0],
+              commitHash: hash,
+              checkout: values[1] === "checked"
             });
           },
           sourceElem

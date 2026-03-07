@@ -101,6 +101,15 @@ body.singleRepo .dropdownCurrentValue {
 .dropdown.dropdownOpen .dropdownMenu {
   display: block;
 }
+.dropdown.dropdownOpen .dropdownMenuMulti {
+  display: flex;
+  flex-direction: column;
+}
+.dropdownScrollWrapper {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
 
 .dropdownFilter {
   position: relative;
@@ -122,9 +131,46 @@ body.singleRepo .dropdownCurrentValue {
   color: var(--vscode-menu-foreground);
 }
 
+.dropdownCheckbox {
+  margin-right: 6px;
+  pointer-events: none;
+}
+
 .dropdownNoResults {
   position: relative;
   padding: 4px 10px;
   user-select: none;
   font-style: italic;
+}
+
+.dropdownHint {
+  flex-shrink: 0;
+  padding: 4px 6px;
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+  border-top: 1px solid rgba(128, 128, 128, 0.3);
+  user-select: none;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+}
+.dropdownHintBtn {
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  background-color: rgba(128, 128, 128, 0.1);
+}
+.dropdownHintBtn:hover {
+  background-color: rgba(128, 128, 128, 0.25);
+}
+.dropdownHintKey {
+  background-color: rgba(128, 128, 128, 0.2);
+  border: 1px solid rgba(128, 128, 128, 0.4);
+  border-radius: 3px;
+  padding: 0 4px;
+  font-size: 10px;
+  font-family: var(--vscode-editor-font-family);
+  margin-right: 2px;
 }

@@ -52,6 +52,9 @@ const COMMIT_DETAILS_COLSPAN = 4;
 const SECONDS_TO_MS = 1000;
 const ALL_AUTHORS_LABEL = "All Authors";
 const ALL_AUTHORS_VALUE = "";
+const ALL_BRANCHES_LABEL = "Show All";
+const ALL_BRANCHES_VALUE = "";
+const REMOTE_BRANCH_PREFIX = "remotes/";
 const GRAPH_AUTO_LAYOUT_MAX_RATIO = 0.4;
 const GRAPH_COL_MIN_WIDTH = 64;
 const FILE_VIEW_LIST = "list" as const;
@@ -67,13 +70,13 @@ function getFileViewToggle(mode: FileViewType): { icon: string; title: string } 
 
 function buildAuthorOptions(
   authors: string[],
-  selectedValue: string
-): { options: { name: string; value: string }[]; selected: string } {
+  selectedAuthors: string[]
+): { options: { name: string; value: string }[]; selected: string[] } {
   const options = [
     { name: ALL_AUTHORS_LABEL, value: ALL_AUTHORS_VALUE },
     ...authors.map((author) => ({ name: author, value: author }))
   ];
-  return { options, selected: selectedValue };
+  return { options, selected: selectedAuthors };
 }
 
 class GitGraphView {
@@ -84,7 +87,7 @@ class GitGraphView {
   private commitHead: string | null = null;
   private commitLookup: { [hash: string]: number } = {};
   private avatars: AvatarImageCollection = {};
-  private currentBranch: string | null = null;
+  private selectedBranches: string[] = [];
   private currentRepo!: string;
 
   private graph: Graph;
@@ -107,7 +110,7 @@ class GitGraphView {
   private loadBranchesCallback: ((changes: boolean, isRepo: boolean) => void) | null = null;
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
 
-  private authorFilter: string | null = null;
+  private selectedAuthors: string[] = [];
 
   private stashNavigationIndex: number = -1;
   private stashNavigationTimer: ReturnType<typeof setTimeout> | null = null;
@@ -130,26 +133,38 @@ class GitGraphView {
       this.currentRepo = value;
       this.maxCommits = this.config.initialLoadCommits;
       this.expandedCommit = null;
-      this.currentBranch = null;
+      this.selectedBranches = [];
       this.saveState();
       this.refresh(true);
     });
-    this.branchDropdown = new Dropdown("branchSelect", false, "Branches", (value) => {
-      this.currentBranch = value;
-      this.maxCommits = this.config.initialLoadCommits;
-      this.expandedCommit = null;
-      this.saveState();
-      this.renderShowLoading();
-      this.requestLoadCommits(true, () => {});
-    });
-    this.authorDropdown = new Dropdown("authorSelect", false, "Authors", (value) => {
-      this.authorFilter = value === ALL_AUTHORS_VALUE ? null : value;
-      this.maxCommits = this.config.initialLoadCommits;
-      this.expandedCommit = null;
-      this.saveState();
-      this.renderShowLoading();
-      this.requestLoadCommits(true, () => {});
-    });
+    this.branchDropdown = new Dropdown(
+      "branchSelect",
+      false,
+      "Branches",
+      (values: string[]) => {
+        this.selectedBranches = values;
+        this.maxCommits = this.config.initialLoadCommits;
+        this.expandedCommit = null;
+        this.saveState();
+        this.renderShowLoading();
+        this.requestLoadCommits(true, () => {});
+      },
+      true
+    );
+    this.authorDropdown = new Dropdown(
+      "authorSelect",
+      false,
+      "Authors",
+      (values: string[]) => {
+        this.selectedAuthors = values;
+        this.maxCommits = this.config.initialLoadCommits;
+        this.expandedCommit = null;
+        this.saveState();
+        this.renderShowLoading();
+        this.requestLoadCommits(true, () => {});
+      },
+      true
+    );
     this.showRemoteBranchesElem = <HTMLInputElement>(
       document.getElementById("showRemoteBranchesCheckbox")!
     );
@@ -205,7 +220,18 @@ class GitGraphView {
 
     this.renderShowLoading();
     if (prevState) {
-      this.currentBranch = prevState.currentBranch;
+      // Backward compatibility: convert legacy single-value format to array format
+      const legacyState = prevState as unknown as Record<string, unknown>;
+      this.selectedBranches = Array.isArray(prevState.selectedBranches)
+        ? prevState.selectedBranches
+        : typeof legacyState["currentBranch"] === "string"
+          ? [legacyState["currentBranch"] as string]
+          : [];
+      this.selectedAuthors = Array.isArray(prevState.selectedAuthors)
+        ? prevState.selectedAuthors
+        : typeof legacyState["authorFilter"] === "string"
+          ? [legacyState["authorFilter"] as string]
+          : [];
       this.showRemoteBranches = prevState.showRemoteBranches;
       this.showRemoteBranchesElem.checked = this.showRemoteBranches;
       if (this.gitRepos[prevState.currentRepo] !== undefined) {
@@ -224,9 +250,11 @@ class GitGraphView {
       if (prevState.findWidgetState !== null && prevState.findWidgetState !== undefined) {
         this.findWidget.restoreState(prevState.findWidgetState);
       }
-      this.authorFilter = prevState.authorFilter ?? null;
-      if (this.authorFilter !== null) {
-        const { options, selected } = buildAuthorOptions([this.authorFilter], this.authorFilter);
+      if (this.selectedAuthors.length > 0) {
+        const { options, selected } = buildAuthorOptions(
+          this.selectedAuthors,
+          this.selectedAuthors
+        );
         this.authorDropdown.setOptions(options, selected);
       }
     }
@@ -301,27 +329,30 @@ class GitGraphView {
 
     this.gitBranches = branchOptions;
     this.gitBranchHead = branchHead;
-    if (
-      this.currentBranch === null ||
-      (this.currentBranch !== "" && !this.gitBranches.includes(this.currentBranch))
-    ) {
-      this.currentBranch =
+
+    // Filter out branches that no longer exist
+    const validBranches = this.selectedBranches.filter((b) => this.gitBranches.includes(b));
+    if (validBranches.length === 0 && this.selectedBranches.length > 0) {
+      // All selected branches disappeared — fallback
+      this.selectedBranches =
         this.config.showCurrentBranchByDefault && this.gitBranchHead !== null
-          ? this.gitBranchHead
-          : "";
+          ? [this.gitBranchHead]
+          : [];
+    } else {
+      this.selectedBranches = validBranches;
     }
     this.saveState();
 
-    let options = [{ name: "Show All", value: "" }];
+    const options = [{ name: ALL_BRANCHES_LABEL, value: ALL_BRANCHES_VALUE }];
     for (let i = 0; i < this.gitBranches.length; i++) {
       options.push({
-        name: this.gitBranches[i].startsWith("remotes/")
-          ? this.gitBranches[i].substring(8)
+        name: this.gitBranches[i].startsWith(REMOTE_BRANCH_PREFIX)
+          ? this.gitBranches[i].substring(REMOTE_BRANCH_PREFIX.length)
           : this.gitBranches[i],
         value: this.gitBranches[i]
       });
     }
-    this.branchDropdown.setOptions(options, this.currentBranch);
+    this.branchDropdown.setOptions(options, this.selectedBranches);
 
     this.triggerLoadBranchesCallback(true, isRepo);
   }
@@ -396,10 +427,10 @@ class GitGraphView {
     }
     this.render();
 
-    if (this.authorFilter === null) {
+    if (this.selectedAuthors.length === 0) {
       const authorList =
         authors !== undefined ? authors : [...new Set(this.commits.map((c) => c.author))].sort();
-      const { options, selected } = buildAuthorOptions(authorList, ALL_AUTHORS_VALUE);
+      const { options, selected } = buildAuthorOptions(authorList, this.selectedAuthors);
       this.authorDropdown.setOptions(options, selected);
     }
 
@@ -458,11 +489,11 @@ class GitGraphView {
     sendMessage({
       command: "loadCommits",
       repo: this.currentRepo!,
-      branchName: this.currentBranch !== null ? this.currentBranch : "",
+      branches: this.selectedBranches,
       maxCommits: this.maxCommits,
       showRemoteBranches: this.showRemoteBranches,
       hard: hard,
-      ...(this.authorFilter !== null ? { authorFilter: this.authorFilter } : {})
+      authors: this.selectedAuthors
     });
   }
   private requestLoadBranchesAndCommits(hard: boolean) {
@@ -500,14 +531,14 @@ class GitGraphView {
       commits: this.commits,
       commitHead: this.commitHead,
       avatars: this.avatars,
-      currentBranch: this.currentBranch,
+      selectedBranches: this.selectedBranches,
       currentRepo: this.currentRepo,
       moreCommitsAvailable: this.moreCommitsAvailable,
       maxCommits: this.maxCommits,
       showRemoteBranches: this.showRemoteBranches,
       expandedCommit: this.expandedCommit,
       findWidgetState: this.findWidget.getState(),
-      authorFilter: this.authorFilter
+      selectedAuthors: this.selectedAuthors
     });
   }
 

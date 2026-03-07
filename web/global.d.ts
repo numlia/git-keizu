@@ -119,14 +119,14 @@ declare global {
     commits: GG.GitCommitNode[];
     commitHead: string | null;
     avatars: AvatarImageCollection;
-    currentBranch: string | null;
+    selectedBranches: string[];
     currentRepo: string;
     moreCommitsAvailable: boolean;
     maxCommits: number;
     showRemoteBranches: boolean;
     expandedCommit: ExpandedCommit | null;
     findWidgetState: FindWidgetState | null;
-    authorFilter: string | null;
+    selectedAuthors: string[];
   }
 }
 

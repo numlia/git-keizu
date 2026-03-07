@@ -11,6 +11,7 @@ import { ExtensionState } from "./extensionState";
 import { RepoFileWatcher } from "./repoFileWatcher";
 import { RepoManager } from "./repoManager";
 import {
+  type GitCommandStatus,
   GitFileChangeType,
   GitGraphViewState,
   GitRepoSet,
@@ -220,12 +221,26 @@ export class GitGraphView {
               success: await copyToClipboard(msg.data)
             });
             break;
-          case "createBranch":
-            this.sendMessage({
-              command: "createBranch",
-              status: await this.dataSource.createBranch(msg.repo, msg.branchName, msg.commitHash)
-            });
+          case "createBranch": {
+            const createStatus = await this.dataSource.createBranch(
+              msg.repo,
+              msg.branchName,
+              msg.commitHash
+            );
+            let status: GitCommandStatus = createStatus;
+            if (createStatus === null && msg.checkout) {
+              const checkoutStatus = await this.dataSource.checkoutBranch(
+                msg.repo,
+                msg.branchName,
+                null
+              );
+              if (checkoutStatus !== null) {
+                status = `Branch '${msg.branchName}' was created, but checkout failed: ${checkoutStatus}`;
+              }
+            }
+            this.sendMessage({ command: "createBranch", status });
             break;
+          }
           case "deleteBranch": {
             const localStatus = await this.dataSource.deleteBranch(
               msg.repo,
@@ -281,10 +296,10 @@ export class GitGraphView {
               command: "loadCommits",
               ...(await this.dataSource.getCommits(
                 msg.repo,
-                msg.branchName,
+                msg.branches,
                 msg.maxCommits,
                 msg.showRemoteBranches,
-                msg.authorFilter
+                msg.authors
               )),
               hard: msg.hard
             });
@@ -496,8 +511,8 @@ export class GitGraphView {
       body = `<body style="${colorVars}">
 			<div id="controls">
 				<span id="repoControl"><span class="unselectable">Repo: </span><div id="repoSelect" class="dropdown"></div></span>
-				<span id="branchControl"><span class="unselectable">Branch: </span><div id="branchSelect" class="dropdown"></div></span>
-				<span id="authorControl"><span class="unselectable">Author: </span><div id="authorSelect" class="dropdown"></div></span>
+				<span id="branchControl"><span class="unselectable">Branches: </span><div id="branchSelect" class="dropdown"></div></span>
+				<span id="authorControl"><span class="unselectable">Authors: </span><div id="authorSelect" class="dropdown"></div></span>
 				<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" value="1" checked><span class="customCheckbox"></span>Show Remote Branches</label>
 				<div id="searchBtn" title="Search"></div>
 				<div id="fetchBtn" title="Fetch --prune"></div>

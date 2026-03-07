@@ -199,6 +199,7 @@ export interface RequestCreateBranch {
   repo: string;
   commitHash: string;
   branchName: string;
+  checkout: boolean;
 }
 export interface ResponseCreateBranch {
   command: "createBranch";
@@ -277,11 +278,11 @@ export interface ResponseLoadBranches {
 export interface RequestLoadCommits {
   command: "loadCommits";
   repo: string;
-  branchName: string;
+  branches: string[];
   maxCommits: number;
   showRemoteBranches: boolean;
   hard: boolean;
-  authorFilter?: string;
+  authors: string[];
 }
 export interface ResponseLoadCommits {
   command: "loadCommits";
