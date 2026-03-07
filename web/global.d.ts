@@ -127,6 +127,7 @@ declare global {
     expandedCommit: ExpandedCommit | null;
     findWidgetState: FindWidgetState | null;
     selectedAuthors: string[];
+    scrollTop?: number;
   }
 }
 

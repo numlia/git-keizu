@@ -246,6 +246,9 @@ class GitGraphView {
           prevState.moreCommitsAvailable,
           true
         );
+        if (typeof prevState.scrollTop === "number") {
+          this.scrollContainerElem.scrollTop = prevState.scrollTop;
+        }
       }
       if (prevState.findWidgetState !== null && prevState.findWidgetState !== undefined) {
         this.findWidget.restoreState(prevState.findWidgetState);
@@ -538,7 +541,8 @@ class GitGraphView {
       showRemoteBranches: this.showRemoteBranches,
       expandedCommit: this.expandedCommit,
       findWidgetState: this.findWidget.getState(),
-      selectedAuthors: this.selectedAuthors
+      selectedAuthors: this.selectedAuthors,
+      scrollTop: this.scrollContainerElem.scrollTop
     });
   }
 
