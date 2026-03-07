@@ -43,6 +43,40 @@ Git Keizu is a personal take on a git history viewer — shaped around the featu
 - **Multi-Repository**: Support for multiple Git repositories in one workspace
 - **Configurable**: Customize graph colors, style, date format, and more
 
+## Extension Commands
+
+| Command                               | Description                            |
+| ------------------------------------- | -------------------------------------- |
+| `Git Keizu: View Git Keizu (git log)` | Open the Git Keizu graph view          |
+| `Git Keizu: Clear Avatar Cache`       | Clear all cached commit author avatars |
+
+## Extension Settings
+
+All settings are under the `git-keizu.*` namespace.
+
+| Setting                                                    | Default        | Description                                                     |
+| ---------------------------------------------------------- | -------------- | --------------------------------------------------------------- |
+| `dateFormat`                                               | `Date & Time`  | Date format: `Date & Time`, `Date Only`, or `Relative`          |
+| `dateType`                                                 | `Author Date`  | Date type: `Author Date` or `Commit Date`                       |
+| `fetchAvatars`                                             | `false`        | Fetch commit author avatars from GitHub, GitLab, or Gravatar    |
+| `graphColours`                                             | _(12 colours)_ | Colours used on the graph (HEX or RGB array)                    |
+| `graphStyle`                                               | `rounded`      | Graph line style: `rounded` or `angular`                        |
+| `initialLoadCommits`                                       | `300`          | Number of commits to initially load                             |
+| `loadMoreCommits`                                          | `100`          | Number of additional commits to load at a time                  |
+| `loadMoreCommitsAutomatically`                             | `true`         | Automatically load more commits when scrolling to the bottom    |
+| `maxDepthOfRepoSearch`                                     | `0`            | Maximum depth of subfolders to search for repositories          |
+| `showCurrentBranchByDefault`                               | `false`        | Show only the current branch when the graph is opened           |
+| `showStatusBarItem`                                        | `true`         | Show a Status Bar item to open Git Keizu                        |
+| `showUncommittedChanges`                                   | `true`         | Show uncommitted changes row in the graph                       |
+| `tabIconColourTheme`                                       | `colour`       | Tab icon theme: `colour` or `grey`                              |
+| `sourceCodeProviderIntegrationLocation`                    | `Inline`       | SCM title bar button position: `Inline` or `More Actions`       |
+| `keyboardShortcutFind`                                     | `CTRL/CMD + F` | Keyboard shortcut for Find (`UNASSIGNED` to disable)            |
+| `keyboardShortcutRefresh`                                  | `CTRL/CMD + R` | Keyboard shortcut for Refresh (`UNASSIGNED` to disable)         |
+| `keyboardShortcutScrollToHead`                             | `CTRL/CMD + H` | Keyboard shortcut for Scroll to HEAD (`UNASSIGNED` to disable)  |
+| `keyboardShortcutScrollToStash`                            | `CTRL/CMD + S` | Keyboard shortcut for Scroll to Stash (`UNASSIGNED` to disable) |
+| `repository.commits.mute.mergeCommits`                     | `true`         | Display merge commits with reduced opacity                      |
+| `repository.commits.mute.commitsThatAreNotAncestorsOfHead` | `false`        | Display non-ancestor-of-HEAD commits with reduced opacity       |
+
 ## Security
 
 Git Keizu has undergone a full security audit and remediation (27 issues fixed):
