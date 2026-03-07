@@ -424,3 +424,30 @@
 | TC-155  | selectedBranches=["main","dev"], gitBranches に両方存在             | Equivalence - normal                 | selectedBranches が ["main","dev"] のまま変化しない         | 整合性OK         |
 | TC-156  | selectedBranches=["main","deleted-branch"], "deleted-branch" が不在 | Equivalence - normal (removed)       | selectedBranches が ["main"] にフィルタリングされる         | 消滅ブランチ除去 |
 | TC-157  | selectedBranches 全てが gitBranches に不在（全消滅）                | Boundary - all removed               | showCurrentBranchByDefault に応じて HEAD ブランチ or 空配列 | フォールバック   |
+
+## S27: saveState() scrollTop 保存
+
+> Origin: Feature 013 (scroll-position-restore) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+
+**シグネチャ**: `private saveState(): void`
+**テスト対象パス**: `web/main.ts:526-542`
+
+| Case ID | Input / Precondition                                              | Perspective (Equivalence / Boundary) | Expected Result                                        | Notes      |
+| ------- | ----------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------ | ---------- |
+| TC-158  | scrollContainerElem.scrollTop = 500 の状態で saveState() 呼び出し | Equivalence - normal                 | 保存される状態オブジェクトに scrollTop: 500 が含まれる | -          |
+| TC-159  | scrollContainerElem.scrollTop = 0 の状態で saveState() 呼び出し   | Boundary - zero                      | 保存される状態オブジェクトに scrollTop: 0 が含まれる   | トップ位置 |
+
+## S28: prevState scrollTop 復元
+
+> Origin: Feature 013 (scroll-position-restore) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+
+**テスト対象パス**: `web/main.ts:222-260`
+
+| Case ID | Input / Precondition                                   | Perspective (Equivalence / Boundary) | Expected Result                                                 | Notes          |
+| ------- | ------------------------------------------------------ | ------------------------------------ | --------------------------------------------------------------- | -------------- |
+| TC-160  | prevState.scrollTop = 300, リポジトリが有効            | Equivalence - normal                 | scrollContainerElem.scrollTop が 300 に設定される               | -              |
+| TC-161  | prevState.scrollTop が undefined（旧バージョンデータ） | Boundary - backward compat           | scrollContainerElem.scrollTop が変更されない（0のまま）         | 後方互換       |
+| TC-162  | prevState が null（初回表示）                          | Boundary - no prevState              | scrollTop 復元処理がスキップされる                              | 新規ウィンドウ |
+| TC-163  | prevState.scrollTop = 0                                | Boundary - zero value                | scrollContainerElem.scrollTop が 0 に設定される（明示的にゼロ） | 保存値ゼロ     |
