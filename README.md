@@ -36,6 +36,7 @@ Git Keizu is a personal take on a git history viewer — shaped around the featu
 - **Commit Search**: Press Ctrl/Cmd+F to open a search bar with regex mode, case-sensitive mode, match counter (N of M), and prev/next navigation
 - **2-Commit Comparison**: Ctrl/Cmd+click a second commit to compare it with the selected commit; the panel header shows "Displaying all changes from [older] to [newer]" in chronological order, and comparison state is preserved when switching VS Code tabs
 - **Combined branch/remote labels**: Local and remote branches on the same commit merge into a single pill label — `[main | origin]`. Right-clicking either part opens the appropriate context menu.
+- **Scroll position restore**: When you switch away from the Git Keizu tab and return, the graph scrolls back to where you left off. The position is saved whenever a user action (clicking a commit, toggling a filter, etc.) triggers a state save; passively scrolling without any action does not trigger a save.
 - **Smooth refresh**: Git operations update the graph in the background without blanking the view or losing your scroll position
 - **Auto load more commits**: Commits load automatically as you scroll to the bottom of the list — no manual button press needed (configurable)
 - **Dropdown overflow handling**: Long branch and repository names are truncated with an ellipsis; hover to see the full name in a tooltip

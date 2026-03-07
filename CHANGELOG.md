@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-03-07
+
+### Added
+
+- **Scroll position restore on tab switch**: When you switch away from the Git Keizu tab and return, the graph now scrolls back to where you left off. The position is saved as part of the webview state whenever a user action triggers a state save (e.g. clicking a commit, expanding details, toggling a filter). Note: passively scrolling the list without performing any action does not trigger a save — if you scroll and immediately switch tabs, the position will revert to the last saved state. Backward-compatible with older saved states (defaults to top).
+
 ## [0.5.0] - 2026-03-07
 
 ### Added
@@ -168,7 +174,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/numlia/git-keizu/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/numlia/git-keizu/compare/v0.2.12...v0.5.0
 [0.2.12]: https://github.com/numlia/git-keizu/compare/v0.2.11...v0.2.12
 [0.2.11]: https://github.com/numlia/git-keizu/compare/v0.2.10...v0.2.11
