@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-03-07
+
+### Added
+
+- **Checkout on branch create**: The Create Branch dialog now includes a "Check out" checkbox (checked by default) — when checked, Git Keizu automatically checks out the new branch immediately after creating it; uncheck to create the branch without switching away from the current branch
+- **Multi-select Branch filter**: The Branch dropdown now supports selecting multiple branches simultaneously; each item has a checkbox, "Show All" is the default state, and deselecting all individual branches automatically returns to "Show All"
+- **Multi-select Author filter**: The Author dropdown now supports selecting multiple authors simultaneously; each item has a checkbox, "Show All" is the default state, and deselecting all individual authors automatically returns to "Show All"
+
 ## [0.2.12] - 2026-03-05
 
 ### Fixed
@@ -160,7 +168,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.2.12...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/numlia/git-keizu/compare/v0.2.12...v0.5.0
 [0.2.12]: https://github.com/numlia/git-keizu/compare/v0.2.11...v0.2.12
 [0.2.11]: https://github.com/numlia/git-keizu/compare/v0.2.10...v0.2.11
 [0.2.10]: https://github.com/numlia/git-keizu/compare/v0.2.9...v0.2.10
