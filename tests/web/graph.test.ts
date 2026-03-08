@@ -906,3 +906,328 @@ describe("Graph.getMutedCommits() combined settings", () => {
     expect(muted[1]).toBe(false);
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* S13: Vertex.getChildren() child vertex read accessor               */
+/* ------------------------------------------------------------------ */
+
+describe("Vertex.getChildren() child vertex read accessor", () => {
+  it("returns empty array when no children added (TC-042)", () => {
+    // Given: a newly created vertex with no children
+    const vertex = new Vertex(0);
+
+    // When: getChildren() is called
+    const children = vertex.getChildren();
+
+    // Then: returns empty array
+    expect(children).toEqual([]);
+    expect(children).toHaveLength(0);
+  });
+
+  it("returns single child after one addChild call (TC-043)", () => {
+    // Given: a vertex with one child added via addChild
+    const parent = new Vertex(0);
+    const child = new Vertex(1);
+    parent.addChild(child);
+
+    // When: getChildren() is called
+    const children = parent.getChildren();
+
+    // Then: returns array with one element matching the added child
+    expect(children).toHaveLength(1);
+    expect(children[0]).toBe(child);
+  });
+
+  it("returns children in addChild call order (TC-044)", () => {
+    // Given: a vertex with three children added via addChild in order
+    const parent = new Vertex(0);
+    const child1 = new Vertex(1);
+    const child2 = new Vertex(2);
+    const child3 = new Vertex(3);
+    parent.addChild(child1);
+    parent.addChild(child2);
+    parent.addChild(child3);
+
+    // When: getChildren() is called
+    const children = parent.getChildren();
+
+    // Then: returns array of 3 elements in addChild call order
+    expect(children).toHaveLength(3);
+    expect(children[0]).toBe(child1);
+    expect(children[1]).toBe(child2);
+    expect(children[2]).toBe(child3);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S14: Graph.getFirstParentIndex()                                   */
+/* ------------------------------------------------------------------ */
+
+describe("Graph.getFirstParentIndex()", () => {
+  beforeEach(() => {
+    allCreatedElements = [];
+    containerElement = createMockElement("div");
+    vi.clearAllMocks();
+  });
+
+  it("returns parent index for commit with one parent (TC-045)", () => {
+    // Given: a linear chain a→b
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("aaa", ["bbb"], null), makeCommit("bbb", [], null)];
+    graph.loadCommits(commits, null, { aaa: 0, bbb: 1 });
+
+    // When: getFirstParentIndex is called for vertex 0
+    const result = graph.getFirstParentIndex(0);
+
+    // Then: returns index of the single parent
+    expect(result).toBe(1);
+  });
+
+  it("returns first parent index for merge commit (TC-046)", () => {
+    // Given: a merge commit with two parents
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [
+      makeCommit("merge", ["aaa", "bbb"], null),
+      makeCommit("aaa", [], null),
+      makeCommit("bbb", [], null)
+    ];
+    graph.loadCommits(commits, null, { merge: 0, aaa: 1, bbb: 2 });
+
+    // When: getFirstParentIndex is called for the merge vertex
+    const result = graph.getFirstParentIndex(0);
+
+    // Then: returns index of parents[0] (first parent)
+    expect(result).toBe(1);
+  });
+
+  it("returns -1 for root commit with no parents (TC-047)", () => {
+    // Given: a root commit with no parents
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("root", [], null)];
+    graph.loadCommits(commits, null, { root: 0 });
+
+    // When: getFirstParentIndex is called for the root
+    const result = graph.getFirstParentIndex(0);
+
+    // Then: returns -1 (no parent exists)
+    expect(result).toBe(-1);
+  });
+
+  it("returns -1 when only parent is nullVertex (TC-048)", () => {
+    // Given: a commit whose parent is not in commitLookup (becomes nullVertex)
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("aaa", ["missing"], null)];
+    graph.loadCommits(commits, null, { aaa: 0 });
+
+    // When: getFirstParentIndex is called
+    const result = graph.getFirstParentIndex(0);
+
+    // Then: returns -1 (nullVertex id === NULL_VERTEX_ID === -1)
+    expect(result).toBe(-1);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S15: Graph.getFirstChildIndex()                                    */
+/* ------------------------------------------------------------------ */
+
+describe("Graph.getFirstChildIndex()", () => {
+  beforeEach(() => {
+    allCreatedElements = [];
+    containerElement = createMockElement("div");
+    vi.clearAllMocks();
+  });
+
+  it("returns child index for commit with one child (TC-049)", () => {
+    // Given: a chain where vertex 1 (parent) has one child vertex 0
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("child", ["parent"], null), makeCommit("parent", [], null)];
+    graph.loadCommits(commits, null, { child: 0, parent: 1 });
+
+    // When: getFirstChildIndex is called for the parent
+    const result = graph.getFirstChildIndex(1);
+
+    // Then: returns index of the single child
+    expect(result).toBe(0);
+  });
+
+  it("returns same-branch child index when multiple children exist (TC-050)", () => {
+    // Given: vertex "root" has two children, c1 (same branch) and c2 (different branch)
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [
+      makeCommit("c1", ["root"], null),
+      makeCommit("c2", ["root"], null),
+      makeCommit("root", [], null)
+    ];
+    graph.loadCommits(commits, null, { c1: 0, c2: 1, root: 2 });
+
+    // When: getFirstChildIndex is called for root (index 2)
+    const result = graph.getFirstChildIndex(2);
+
+    // Then: returns same-branch child (index 0), not max-index child (index 1)
+    expect(result).toBe(0);
+  });
+
+  it("returns max-index child when no child is on the same branch (TC-051)", () => {
+    // Given: vertex "root" has two children, but getBranch returns null (defensive fallback)
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [
+      makeCommit("c1", ["root"], null),
+      makeCommit("c2", ["root"], null),
+      makeCommit("root", [], null)
+    ];
+    graph.loadCommits(commits, null, { c1: 0, c2: 1, root: 2 });
+
+    // When: getBranch returns null, triggering the max-index fallback
+    const spy = vi.spyOn(Vertex.prototype, "getBranch").mockReturnValue(null);
+    const result = graph.getFirstChildIndex(2);
+    spy.mockRestore();
+
+    // Then: returns max index among children (max(0, 1) = 1)
+    expect(result).toBe(1);
+  });
+
+  it("returns -1 for commit with no children (TC-052)", () => {
+    // Given: vertex 0 (newest commit) has no children
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("newest", ["older"], null), makeCommit("older", [], null)];
+    graph.loadCommits(commits, null, { newest: 0, older: 1 });
+
+    // When: getFirstChildIndex is called for the newest commit
+    const result = graph.getFirstChildIndex(0);
+
+    // Then: returns -1 (no children)
+    expect(result).toBe(-1);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S16: Graph.getAlternativeParentIndex()                             */
+/* ------------------------------------------------------------------ */
+
+describe("Graph.getAlternativeParentIndex()", () => {
+  beforeEach(() => {
+    allCreatedElements = [];
+    containerElement = createMockElement("div");
+    vi.clearAllMocks();
+  });
+
+  it("returns second parent index for merge commit (TC-053)", () => {
+    // Given: a merge commit with two in-range parents
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [
+      makeCommit("merge", ["aaa", "bbb"], null),
+      makeCommit("aaa", [], null),
+      makeCommit("bbb", [], null)
+    ];
+    graph.loadCommits(commits, null, { merge: 0, aaa: 1, bbb: 2 });
+
+    // When: getAlternativeParentIndex is called for the merge vertex
+    const result = graph.getAlternativeParentIndex(0);
+
+    // Then: returns index of parents[1] (second parent, merge source)
+    expect(result).toBe(2);
+  });
+
+  it("falls back to single parent index when only one parent exists (TC-054)", () => {
+    // Given: a commit with one parent
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("aaa", ["bbb"], null), makeCommit("bbb", [], null)];
+    graph.loadCommits(commits, null, { aaa: 0, bbb: 1 });
+
+    // When: getAlternativeParentIndex is called
+    const result = graph.getAlternativeParentIndex(0);
+
+    // Then: returns the single parent's index (fallback)
+    expect(result).toBe(1);
+  });
+
+  it("returns -1 for root commit with no parents (TC-055)", () => {
+    // Given: a root commit with no parents
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("root", [], null)];
+    graph.loadCommits(commits, null, { root: 0 });
+
+    // When: getAlternativeParentIndex is called
+    const result = graph.getAlternativeParentIndex(0);
+
+    // Then: returns -1 (no parents)
+    expect(result).toBe(-1);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S17: Graph.getAlternativeChildIndex()                              */
+/* ------------------------------------------------------------------ */
+
+describe("Graph.getAlternativeChildIndex()", () => {
+  beforeEach(() => {
+    allCreatedElements = [];
+    containerElement = createMockElement("div");
+    vi.clearAllMocks();
+  });
+
+  it("returns max-index non-same-branch child when same-branch child exists (TC-056)", () => {
+    // Given: vertex "root" has three children: c1 (same branch), c2 and c3 (different branches)
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [
+      makeCommit("c1", ["root"], null),
+      makeCommit("c2", ["root"], null),
+      makeCommit("c3", ["root"], null),
+      makeCommit("root", [], null)
+    ];
+    graph.loadCommits(commits, null, { c1: 0, c2: 1, c3: 2, root: 3 });
+
+    // When: getAlternativeChildIndex is called for root (index 3)
+    const result = graph.getAlternativeChildIndex(3);
+
+    // Then: excludes same-branch child (0), returns max of remaining (max(1, 2) = 2)
+    expect(result).toBe(2);
+  });
+
+  it("returns second-largest-index child when no child is on same branch (TC-057)", () => {
+    // Given: vertex "root" has three children, but getBranch returns null (defensive fallback)
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [
+      makeCommit("c1", ["root"], null),
+      makeCommit("c2", ["root"], null),
+      makeCommit("c3", ["root"], null),
+      makeCommit("root", [], null)
+    ];
+    graph.loadCommits(commits, null, { c1: 0, c2: 1, c3: 2, root: 3 });
+
+    // When: getBranch returns null, triggering the second-largest-index fallback
+    const spy = vi.spyOn(Vertex.prototype, "getBranch").mockReturnValue(null);
+    const result = graph.getAlternativeChildIndex(3);
+    spy.mockRestore();
+
+    // Then: sorted indices [0, 1, 2], second-largest = 1
+    expect(result).toBe(1);
+  });
+
+  it("falls back to single child index when only one child exists (TC-058)", () => {
+    // Given: vertex 1 (parent) has exactly one child (vertex 0)
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("child", ["parent"], null), makeCommit("parent", [], null)];
+    graph.loadCommits(commits, null, { child: 0, parent: 1 });
+
+    // When: getAlternativeChildIndex is called for the parent
+    const result = graph.getAlternativeChildIndex(1);
+
+    // Then: returns the single child's index (fallback)
+    expect(result).toBe(0);
+  });
+
+  it("returns -1 for commit with no children (TC-059)", () => {
+    // Given: vertex 0 (newest commit) has no children
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("newest", ["older"], null), makeCommit("older", [], null)];
+    graph.loadCommits(commits, null, { newest: 0, older: 1 });
+
+    // When: getAlternativeChildIndex is called for the newest commit
+    const result = graph.getAlternativeChildIndex(0);
+
+    // Then: returns -1 (no children)
+    expect(result).toBe(-1);
+  });
+});

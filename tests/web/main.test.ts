@@ -8,26 +8,34 @@ import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 /* Hoisted mocks (shared references for mock factories + assertions)  */
 /* ------------------------------------------------------------------ */
 
-const { mockFindWidgetInstance, capturedConfig, mockMutedResult } = vi.hoisted(() => ({
-  capturedConfig: { ref: null as Record<string, unknown> | null },
-  mockMutedResult: { value: [] as boolean[] },
-  mockFindWidgetInstance: {
-    show: vi.fn(),
-    close: vi.fn(),
-    isVisible: vi.fn(() => false),
-    refresh: vi.fn(),
-    setInputEnabled: vi.fn(),
-    getState: vi.fn(() => ({
-      text: "",
-      currentHash: null,
-      visible: false,
-      caseSensitive: false,
-      regex: false
-    })),
-    restoreState: vi.fn(),
-    getCurrentHash: vi.fn(() => null)
-  }
-}));
+const { mockFindWidgetInstance, capturedConfig, mockMutedResult, mockGraphNavigation } = vi.hoisted(
+  () => ({
+    capturedConfig: { ref: null as Record<string, unknown> | null },
+    mockMutedResult: { value: [] as boolean[] },
+    mockGraphNavigation: {
+      getFirstParentIndex: vi.fn((): number => -1),
+      getFirstChildIndex: vi.fn((): number => -1),
+      getAlternativeParentIndex: vi.fn((): number => -1),
+      getAlternativeChildIndex: vi.fn((): number => -1)
+    },
+    mockFindWidgetInstance: {
+      show: vi.fn(),
+      close: vi.fn(),
+      isVisible: vi.fn(() => false),
+      refresh: vi.fn(),
+      setInputEnabled: vi.fn(),
+      getState: vi.fn(() => ({
+        text: "",
+        currentHash: null,
+        visible: false,
+        caseSensitive: false,
+        regex: false
+      })),
+      restoreState: vi.fn(),
+      getCurrentHash: vi.fn(() => null)
+    }
+  })
+);
 
 /* ------------------------------------------------------------------ */
 /* Mock: dialogs module (prevents document.getElementById side effect) */
@@ -52,7 +60,20 @@ vi.mock("../../web/dialogs", () => ({
 vi.mock("../../web/findWidget", () => ({
   FindWidget: vi.fn(function () {
     return mockFindWidgetInstance;
-  })
+  }),
+  getCommitElems: vi.fn(
+    () => document.getElementsByClassName("commit") as HTMLCollectionOf<HTMLElement>
+  ),
+  findCommitElemWithId: vi.fn(
+    (elems: HTMLCollectionOf<HTMLElement>, id: number | null): HTMLElement | null => {
+      if (id === null) return null;
+      const idStr = id.toString();
+      for (let i = 0; i < elems.length; i++) {
+        if (idStr === elems[i].dataset.id) return elems[i];
+      }
+      return null;
+    }
+  )
 }));
 
 /* ------------------------------------------------------------------ */
@@ -68,6 +89,10 @@ vi.mock("../../web/graph", () => ({
       clear: vi.fn(),
       getVertexColour: vi.fn(() => 0),
       getMutedCommits: vi.fn(() => mockMutedResult.value),
+      getFirstParentIndex: mockGraphNavigation.getFirstParentIndex,
+      getFirstChildIndex: mockGraphNavigation.getFirstChildIndex,
+      getAlternativeParentIndex: mockGraphNavigation.getAlternativeParentIndex,
+      getAlternativeChildIndex: mockGraphNavigation.getAlternativeChildIndex,
       getWidth: vi.fn(() => 100),
       getHeight: vi.fn(() => 500),
       limitMaxWidth: vi.fn()
@@ -2215,6 +2240,360 @@ describe("GitGraphView frontend integration", () => {
 
       // Cleanup: restore original keybinding
       keybindings.find = originalFind;
+    });
+  });
+
+  /* ---------------------------------------------------------------- */
+  /* handleKeyboardShortcut() Arrow key navigation (S29-S33)         */
+  /* ---------------------------------------------------------------- */
+
+  describe("handleKeyboardShortcut() Arrow key navigation", () => {
+    interface ArrowKeySpies {
+      preventDefault: ReturnType<typeof vi.spyOn>;
+      stopPropagation: ReturnType<typeof vi.spyOn>;
+    }
+
+    function dispatchArrowKey(
+      key: string,
+      options?: {
+        ctrlKey?: boolean;
+        metaKey?: boolean;
+        shiftKey?: boolean;
+        altKey?: boolean;
+        isComposing?: boolean;
+      }
+    ): ArrowKeySpies {
+      const event = new KeyboardEvent("keydown", {
+        key,
+        ctrlKey: options?.ctrlKey ?? false,
+        metaKey: options?.metaKey ?? false,
+        shiftKey: options?.shiftKey ?? false,
+        altKey: options?.altKey ?? false,
+        bubbles: true,
+        cancelable: true
+      });
+      if (options?.isComposing) {
+        Object.defineProperty(event, "isComposing", { value: true });
+      }
+      const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+      const stopPropagationSpy = vi.spyOn(event, "stopPropagation");
+      document.dispatchEvent(event);
+      return { preventDefault: preventDefaultSpy, stopPropagation: stopPropagationSpy };
+    }
+
+    beforeEach(() => {
+      vi.clearAllMocks();
+      mockGraphNavigation.getFirstParentIndex.mockReturnValue(-1);
+      mockGraphNavigation.getFirstChildIndex.mockReturnValue(-1);
+      mockGraphNavigation.getAlternativeParentIndex.mockReturnValue(-1);
+      mockGraphNavigation.getAlternativeChildIndex.mockReturnValue(-1);
+    });
+
+    /* S29: table order navigation */
+
+    describe("table order navigation (S29)", () => {
+      it("ArrowDown moves to next commit (TC-164)", () => {
+        // Given: commit at index 1 (COMMIT_HASH_2) is expanded
+        expandCommit(COMMIT_HASH_2);
+
+        // When: ArrowDown pressed with no modifiers
+        dispatchArrowKey("ArrowDown");
+
+        // Then: loadCommitDetails is called for index 2 (COMMIT_HASH_3)
+        expect(vscode.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ command: "commitDetails", commitHash: COMMIT_HASH_3 })
+        );
+      });
+
+      it("ArrowUp moves to previous commit (TC-165)", () => {
+        // Given: commit at index 1 (COMMIT_HASH_2) is expanded
+        expandCommit(COMMIT_HASH_2);
+
+        // When: ArrowUp pressed with no modifiers
+        dispatchArrowKey("ArrowUp");
+
+        // Then: loadCommitDetails is called for index 0 (COMMIT_HASH_1)
+        expect(vscode.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ command: "commitDetails", commitHash: COMMIT_HASH_1 })
+        );
+      });
+
+      it("ArrowUp at table start does nothing (TC-166)", () => {
+        // Given: commit at index 0 (COMMIT_HASH_1, first in table) is expanded
+        expandCommit(COMMIT_HASH_1);
+
+        // When: ArrowUp pressed
+        const spies = dispatchArrowKey("ArrowUp");
+
+        // Then: no navigation occurs
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+      });
+
+      it("ArrowDown at table end does nothing (TC-167)", () => {
+        // Given: commit at index 2 (COMMIT_HASH_3, last in table) is expanded
+        expandCommit(COMMIT_HASH_3);
+
+        // When: ArrowDown pressed
+        const spies = dispatchArrowKey("ArrowDown");
+
+        // Then: no navigation occurs
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+      });
+    });
+
+    /* S30: branch tracking navigation */
+
+    describe("branch tracking navigation (S30)", () => {
+      it("Ctrl+ArrowDown navigates to first parent (TC-168)", () => {
+        // Given: commit at index 1 is expanded, getFirstParentIndex returns 2
+        expandCommit(COMMIT_HASH_2);
+        mockGraphNavigation.getFirstParentIndex.mockReturnValue(2);
+
+        // When: Ctrl+ArrowDown pressed
+        dispatchArrowKey("ArrowDown", { ctrlKey: true });
+
+        // Then: loadCommitDetails is called for index 2 (COMMIT_HASH_3)
+        expect(vscode.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ command: "commitDetails", commitHash: COMMIT_HASH_3 })
+        );
+        expect(mockGraphNavigation.getFirstParentIndex).toHaveBeenCalledWith(1);
+      });
+
+      it("Ctrl+ArrowUp navigates to first child (TC-169)", () => {
+        // Given: commit at index 1 is expanded, getFirstChildIndex returns 0
+        expandCommit(COMMIT_HASH_2);
+        mockGraphNavigation.getFirstChildIndex.mockReturnValue(0);
+
+        // When: Ctrl+ArrowUp pressed
+        dispatchArrowKey("ArrowUp", { ctrlKey: true });
+
+        // Then: loadCommitDetails is called for index 0 (COMMIT_HASH_1)
+        expect(vscode.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ command: "commitDetails", commitHash: COMMIT_HASH_1 })
+        );
+        expect(mockGraphNavigation.getFirstChildIndex).toHaveBeenCalledWith(1);
+      });
+
+      it("Ctrl+ArrowDown at branch end does nothing (TC-170)", () => {
+        // Given: commit at index 2 is expanded, getFirstParentIndex returns -1
+        expandCommit(COMMIT_HASH_3);
+        mockGraphNavigation.getFirstParentIndex.mockReturnValue(-1);
+
+        // When: Ctrl+ArrowDown pressed
+        const spies = dispatchArrowKey("ArrowDown", { ctrlKey: true });
+
+        // Then: no navigation occurs
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+      });
+
+      it("Ctrl+ArrowUp at branch start does nothing (TC-171)", () => {
+        // Given: commit at index 0 is expanded, getFirstChildIndex returns -1
+        expandCommit(COMMIT_HASH_1);
+        mockGraphNavigation.getFirstChildIndex.mockReturnValue(-1);
+
+        // When: Ctrl+ArrowUp pressed
+        const spies = dispatchArrowKey("ArrowUp", { ctrlKey: true });
+
+        // Then: no navigation occurs
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+      });
+    });
+
+    /* S31: alternative branch navigation */
+
+    describe("alternative branch navigation (S31)", () => {
+      it("Ctrl+Shift+ArrowDown navigates to alternative parent (TC-172)", () => {
+        // Given: commit at index 1 is expanded, getAlternativeParentIndex returns 2
+        expandCommit(COMMIT_HASH_2);
+        mockGraphNavigation.getAlternativeParentIndex.mockReturnValue(2);
+
+        // When: Ctrl+Shift+ArrowDown pressed
+        dispatchArrowKey("ArrowDown", { ctrlKey: true, shiftKey: true });
+
+        // Then: loadCommitDetails is called for index 2 (COMMIT_HASH_3)
+        expect(vscode.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ command: "commitDetails", commitHash: COMMIT_HASH_3 })
+        );
+        expect(mockGraphNavigation.getAlternativeParentIndex).toHaveBeenCalledWith(1);
+      });
+
+      it("Ctrl+Shift+ArrowUp navigates to alternative child (TC-173)", () => {
+        // Given: commit at index 1 is expanded, getAlternativeChildIndex returns 0
+        expandCommit(COMMIT_HASH_2);
+        mockGraphNavigation.getAlternativeChildIndex.mockReturnValue(0);
+
+        // When: Ctrl+Shift+ArrowUp pressed
+        dispatchArrowKey("ArrowUp", { ctrlKey: true, shiftKey: true });
+
+        // Then: loadCommitDetails is called for index 0 (COMMIT_HASH_1)
+        expect(vscode.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ command: "commitDetails", commitHash: COMMIT_HASH_1 })
+        );
+        expect(mockGraphNavigation.getAlternativeChildIndex).toHaveBeenCalledWith(1);
+      });
+
+      it("Ctrl+Shift+ArrowDown with no alternative falls back (TC-174)", () => {
+        // Given: commit at index 1 is expanded, getAlternativeParentIndex returns -1 (no alt)
+        expandCommit(COMMIT_HASH_2);
+        mockGraphNavigation.getAlternativeParentIndex.mockReturnValue(-1);
+
+        // When: Ctrl+Shift+ArrowDown pressed
+        const spies = dispatchArrowKey("ArrowDown", { ctrlKey: true, shiftKey: true });
+
+        // Then: no navigation occurs (fallback: -1 means nothing to navigate to)
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+      });
+    });
+
+    /* S32: precondition checks */
+
+    describe("precondition checks (S32)", () => {
+      it("expandedCommit null skips Arrow processing (TC-175)", () => {
+        // Given: no commit is expanded (expandedCommit === null)
+        resetCommitState();
+
+        // When: ArrowDown pressed
+        const spies = dispatchArrowKey("ArrowDown");
+
+        // Then: no navigation occurs
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+      });
+
+      it("compareWithHash non-null skips Arrow processing (TC-176)", () => {
+        // Given: commit is expanded in comparison mode
+        expandCommitWithCompare(COMMIT_HASH_2, COMMIT_HASH_3);
+
+        // When: ArrowDown pressed
+        const spies = dispatchArrowKey("ArrowDown");
+
+        // Then: Arrow navigation is skipped (compare mode active)
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+      });
+
+      it("hash not in commitLookup skips navigation (TC-177)", () => {
+        // Given: expand a commit, then reload with different commits so hash is stale
+        expandCommit(COMMIT_HASH_2);
+        // Load different commits that don't include COMMIT_HASH_2
+        const differentCommits: GitCommitNode[] = [
+          {
+            hash: COMMIT_HASH_1,
+            parentHashes: [],
+            author: "Alice",
+            email: "alice@test.com",
+            date: 1700000000,
+            message: "First commit",
+            refs: [],
+            stash: null
+          }
+        ];
+        dispatchMessage({
+          command: "loadCommits",
+          commits: differentCommits,
+          head: COMMIT_HASH_1,
+          moreCommitsAvailable: false,
+          hard: true
+        });
+        vi.clearAllMocks();
+
+        // When: ArrowDown pressed (expandedCommit hash not in new commitLookup)
+        const spies = dispatchArrowKey("ArrowDown");
+
+        // Then: no navigation (hash not found in commitLookup)
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+
+        // Cleanup: restore original commits
+        dispatchMessage({
+          command: "loadCommits",
+          commits: MOCK_COMMITS,
+          head: COMMIT_HASH_1,
+          moreCommitsAvailable: false,
+          hard: true
+        });
+      });
+
+      it("isComposing true skips all processing (TC-178)", () => {
+        // Given: commit is expanded
+        expandCommit(COMMIT_HASH_2);
+
+        // When: ArrowDown pressed during IME composition
+        const spies = dispatchArrowKey("ArrowDown", { isComposing: true });
+
+        // Then: entire handler is skipped
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+      });
+
+      it("ArrowLeft key skips Arrow processing (TC-179)", () => {
+        // Given: commit is expanded
+        expandCommit(COMMIT_HASH_2);
+
+        // When: ArrowLeft pressed
+        const spies = dispatchArrowKey("ArrowLeft");
+
+        // Then: Arrow navigation is not triggered
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+      });
+    });
+
+    /* S33: event control */
+
+    describe("event control (S33)", () => {
+      it("successful navigation calls preventDefault and stopPropagation (TC-180)", () => {
+        // Given: commit at index 1 is expanded
+        expandCommit(COMMIT_HASH_2);
+
+        // When: ArrowDown pressed (navigates to index 2)
+        const spies = dispatchArrowKey("ArrowDown");
+
+        // Then: event is consumed
+        expect(spies.preventDefault).toHaveBeenCalledTimes(1);
+        expect(spies.stopPropagation).toHaveBeenCalledTimes(1);
+      });
+
+      it("failed navigation does not consume event (TC-181)", () => {
+        // Given: commit at index 0 is expanded (table start)
+        expandCommit(COMMIT_HASH_1);
+
+        // When: ArrowUp pressed (no previous commit)
+        const spies = dispatchArrowKey("ArrowUp");
+
+        // Then: event is not consumed
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
+      });
+
+      it("Shift-only + ArrowUp skips Arrow processing (TC-182)", () => {
+        // Given: commit is expanded
+        expandCommit(COMMIT_HASH_2);
+
+        // When: Shift+ArrowUp pressed (no Ctrl/Cmd)
+        const spies = dispatchArrowKey("ArrowUp", { shiftKey: true });
+
+        // Then: Arrow processing is skipped (modifier pattern mismatch)
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+      });
+
+      it("Alt + ArrowUp skips Arrow processing (TC-183)", () => {
+        // Given: commit is expanded
+        expandCommit(COMMIT_HASH_2);
+
+        // When: Alt+ArrowUp pressed
+        const spies = dispatchArrowKey("ArrowUp", { altKey: true });
+
+        // Then: Arrow processing is skipped (modifier pattern mismatch)
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+      });
     });
   });
 
