@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-03-08
+
+### Added
+
+- **Arrow key commit navigation**: With a commit's detail panel open, navigate between commits using Arrow keys — no modifier for table order (one row at a time), Ctrl/Cmd for branch-tracking (parent or child on the same branch), and Ctrl/Cmd+Shift to jump to an alternative branch (the merge source on a merge commit, or the alternate child at a branch point). Navigation is disabled in commit comparison mode; key events are consumed to prevent the graph from scrolling while navigating
+
 ## [0.5.1] - 2026-03-07
 
 ### Added
@@ -174,7 +180,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.2...HEAD
+[0.5.2]: https://github.com/numlia/git-keizu/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/numlia/git-keizu/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/numlia/git-keizu/compare/v0.2.12...v0.5.0
 [0.2.12]: https://github.com/numlia/git-keizu/compare/v0.2.11...v0.2.12
