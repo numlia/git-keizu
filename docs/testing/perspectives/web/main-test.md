@@ -451,3 +451,73 @@
 | TC-161  | prevState.scrollTop が undefined（旧バージョンデータ） | Boundary - backward compat           | scrollContainerElem.scrollTop が変更されない（0のまま）         | 後方互換       |
 | TC-162  | prevState が null（初回表示）                          | Boundary - no prevState              | scrollTop 復元処理がスキップされる                              | 新規ウィンドウ |
 | TC-163  | prevState.scrollTop = 0                                | Boundary - zero value                | scrollContainerElem.scrollTop が 0 に設定される（明示的にゼロ） | 保存値ゼロ     |
+
+## S29: handleKeyboardShortcut() Arrow キー テーブル順ナビゲーション
+
+> Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
+> Added: 2026-03-08
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                           | Perspective (Equivalence / Boundary) | Expected Result                                          | Notes       |
+| ------- | -------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------- | ----------- |
+| TC-164  | expandedCommit あり、index=2、ArrowDown（修飾キーなし）        | Equivalence - normal                 | index=3 のコミット詳細を表示（loadCommitDetails 呼出）   | REQ-2.1     |
+| TC-165  | expandedCommit あり、index=2、ArrowUp（修飾キーなし）          | Equivalence - normal                 | index=1 のコミット詳細を表示（loadCommitDetails 呼出）   | REQ-2.1     |
+| TC-166  | expandedCommit あり、index=0（先頭）、ArrowUp                  | Boundary - table start               | 何も起きない（loadCommitDetails 未呼出、イベント未消費） | newIndex=-1 |
+| TC-167  | expandedCommit あり、index=commits.length-1（末尾）、ArrowDown | Boundary - table end                 | 何も起きない（loadCommitDetails 未呼出、イベント未消費） | 範囲外      |
+
+## S30: handleKeyboardShortcut() Arrow キー ブランチ追跡ナビゲーション
+
+> Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
+> Added: 2026-03-08
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                     | Perspective (Equivalence / Boundary) | Expected Result                                          | Notes   |
+| ------- | -------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------- | ------- |
+| TC-168  | expandedCommit あり、Ctrl+ArrowDown                      | Equivalence - normal                 | getFirstParentIndex で同一ブランチの親へ移動             | REQ-2.2 |
+| TC-169  | expandedCommit あり、Ctrl+ArrowUp                        | Equivalence - normal                 | getFirstChildIndex で同一ブランチの子へ移動              | REQ-2.2 |
+| TC-170  | ブランチ終端、Ctrl+ArrowDown（getFirstParentIndex → -1） | Boundary - branch end                | 何も起きない（loadCommitDetails 未呼出、イベント未消費） | -       |
+| TC-171  | ブランチ始端、Ctrl+ArrowUp（getFirstChildIndex → -1）    | Boundary - branch start              | 何も起きない（loadCommitDetails 未呼出、イベント未消費） | -       |
+
+## S31: handleKeyboardShortcut() Arrow キー 代替ブランチナビゲーション
+
+> Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
+> Added: 2026-03-08
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                     | Perspective (Equivalence / Boundary) | Expected Result                                               | Notes   |
+| ------- | -------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------- | ------- |
+| TC-172  | マージコミット展開中、Ctrl+Shift+ArrowDown               | Equivalence - normal                 | getAlternativeParentIndex で代替親コミットへ移動              | REQ-2.3 |
+| TC-173  | 展開中、Ctrl+Shift+ArrowUp                               | Equivalence - normal                 | getAlternativeChildIndex で代替子コミットへ移動               | REQ-2.3 |
+| TC-174  | 代替ブランチなし（親/子が1つ以下）、Ctrl+Shift+ArrowDown | Equivalence - normal (fallback)      | フォールバック動作（親が1つならその親、なしなら何も起きない） | -       |
+
+## S32: handleKeyboardShortcut() Arrow キー 前提条件チェック
+
+> Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
+> Added: 2026-03-08
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                   | Perspective (Equivalence / Boundary) | Expected Result                                      | Notes      |
+| ------- | ------------------------------------------------------ | ------------------------------------ | ---------------------------------------------------- | ---------- |
+| TC-175  | expandedCommit が null の状態で ArrowDown              | Equivalence - abnormal               | Arrow キー処理スキップ（loadCommitDetails 未呼出）   | REQ-2.4    |
+| TC-176  | expandedCommit.compareWithHash が非 null で ArrowDown  | Equivalence - abnormal               | Arrow キー処理スキップ（比較モード中）               | REQ-2.4    |
+| TC-177  | commitLookup に expandedCommit.hash が不在で ArrowDown | Boundary - unknown hash              | ナビゲーション処理スキップ                           | -          |
+| TC-178  | isComposing=true の状態で ArrowDown                    | Equivalence - abnormal               | handleKeyboardShortcut 全体が即座に return           | IME 入力中 |
+| TC-179  | expandedCommit あり、ArrowLeft キー                    | Equivalence - abnormal               | Arrow キー処理スキップ（ArrowUp/ArrowDown のみ対象） | -          |
+
+## S33: handleKeyboardShortcut() Arrow キー イベント制御
+
+> Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
+> Added: 2026-03-08
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                 | Perspective (Equivalence / Boundary) | Expected Result                                        | Notes          |
+| ------- | ---------------------------------------------------- | ------------------------------------ | ------------------------------------------------------ | -------------- |
+| TC-180  | ナビゲーション成功（有効な newIndex + DOM 要素あり） | Equivalence - normal                 | preventDefault() と stopPropagation() が呼び出される   | REQ-2.5        |
+| TC-181  | ナビゲーション失敗（newIndex=-1 or DOM 要素なし）    | Equivalence - normal (no nav)        | preventDefault() と stopPropagation() が呼び出されない | イベント透過   |
+| TC-182  | Shift のみ + ArrowUp（Ctrl/Cmd なし）                | Equivalence - abnormal               | Arrow キー処理スキップ（修飾キーパターン不一致）       | フォールスルー |
+| TC-183  | Alt + ArrowUp（Ctrl/Cmd なし）                       | Equivalence - abnormal               | Arrow キー処理スキップ（修飾キーパターン不一致）       | フォールスルー |

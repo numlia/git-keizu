@@ -55,28 +55,40 @@ Git Keizu is a personal take on a git history viewer — shaped around the featu
 
 All settings are under the `git-keizu.*` namespace.
 
-| Setting                                                    | Default        | Description                                                     |
-| ---------------------------------------------------------- | -------------- | --------------------------------------------------------------- |
-| `dateFormat`                                               | `Date & Time`  | Date format: `Date & Time`, `Date Only`, or `Relative`          |
-| `dateType`                                                 | `Author Date`  | Date type: `Author Date` or `Commit Date`                       |
-| `fetchAvatars`                                             | `false`        | Fetch commit author avatars from GitHub, GitLab, or Gravatar    |
-| `graphColours`                                             | _(12 colours)_ | Colours used on the graph (HEX or RGB array)                    |
-| `graphStyle`                                               | `rounded`      | Graph line style: `rounded` or `angular`                        |
-| `initialLoadCommits`                                       | `300`          | Number of commits to initially load                             |
-| `loadMoreCommits`                                          | `100`          | Number of additional commits to load at a time                  |
-| `loadMoreCommitsAutomatically`                             | `true`         | Automatically load more commits when scrolling to the bottom    |
-| `maxDepthOfRepoSearch`                                     | `0`            | Maximum depth of subfolders to search for repositories          |
-| `showCurrentBranchByDefault`                               | `false`        | Show only the current branch when the graph is opened           |
-| `showStatusBarItem`                                        | `true`         | Show a Status Bar item to open Git Keizu                        |
-| `showUncommittedChanges`                                   | `true`         | Show uncommitted changes row in the graph                       |
-| `tabIconColourTheme`                                       | `colour`       | Tab icon theme: `colour` or `grey`                              |
-| `sourceCodeProviderIntegrationLocation`                    | `Inline`       | SCM title bar button position: `Inline` or `More Actions`       |
-| `keyboardShortcutFind`                                     | `CTRL/CMD + F` | Keyboard shortcut for Find (`UNASSIGNED` to disable)            |
-| `keyboardShortcutRefresh`                                  | `CTRL/CMD + R` | Keyboard shortcut for Refresh (`UNASSIGNED` to disable)         |
-| `keyboardShortcutScrollToHead`                             | `CTRL/CMD + H` | Keyboard shortcut for Scroll to HEAD (`UNASSIGNED` to disable)  |
-| `keyboardShortcutScrollToStash`                            | `CTRL/CMD + S` | Keyboard shortcut for Scroll to Stash (`UNASSIGNED` to disable) |
-| `repository.commits.mute.mergeCommits`                     | `true`         | Display merge commits with reduced opacity                      |
-| `repository.commits.mute.commitsThatAreNotAncestorsOfHead` | `false`        | Display non-ancestor-of-HEAD commits with reduced opacity       |
+### General
+
+| Setting                                 | Default        | Description                                                  |
+| --------------------------------------- | -------------- | ------------------------------------------------------------ |
+| `dateFormat`                            | `Date & Time`  | Date format: `Date & Time`, `Date Only`, or `Relative`       |
+| `dateType`                              | `Author Date`  | Date type: `Author Date` or `Commit Date`                    |
+| `fetchAvatars`                          | `false`        | Fetch commit author avatars from GitHub, GitLab, or Gravatar |
+| `graphColours`                          | _(12 colours)_ | Colours used on the graph (HEX or RGB array)                 |
+| `graphStyle`                            | `rounded`      | Graph line style: `rounded` or `angular`                     |
+| `initialLoadCommits`                    | `300`          | Number of commits to initially load                          |
+| `loadMoreCommits`                       | `100`          | Number of additional commits to load at a time               |
+| `loadMoreCommitsAutomatically`          | `true`         | Automatically load more commits when scrolling to the bottom |
+| `maxDepthOfRepoSearch`                  | `0`            | Maximum depth of subfolders to search for repositories       |
+| `showCurrentBranchByDefault`            | `false`        | Show only the current branch when the graph is opened        |
+| `showStatusBarItem`                     | `true`         | Show a Status Bar item to open Git Keizu                     |
+| `showUncommittedChanges`                | `true`         | Show uncommitted changes row in the graph                    |
+| `tabIconColourTheme`                    | `colour`       | Tab icon theme: `colour` or `grey`                           |
+| `sourceCodeProviderIntegrationLocation` | `Inline`       | SCM title bar button position: `Inline` or `More Actions`    |
+
+### Keyboard Shortcuts (`keyboardShortcut*`)
+
+| Setting            | Default        | Description                                                     |
+| ------------------ | -------------- | --------------------------------------------------------------- |
+| `...Find`          | `CTRL/CMD + F` | Keyboard shortcut for Find (`UNASSIGNED` to disable)            |
+| `...Refresh`       | `CTRL/CMD + R` | Keyboard shortcut for Refresh (`UNASSIGNED` to disable)         |
+| `...ScrollToHead`  | `CTRL/CMD + H` | Keyboard shortcut for Scroll to HEAD (`UNASSIGNED` to disable)  |
+| `...ScrollToStash` | `CTRL/CMD + S` | Keyboard shortcut for Scroll to Stash (`UNASSIGNED` to disable) |
+
+### Commit Muting (`repository.commits.mute.*`)
+
+| Setting                               | Default | Description                                               |
+| ------------------------------------- | ------- | --------------------------------------------------------- |
+| `...mergeCommits`                     | `true`  | Display merge commits with reduced opacity                |
+| `...commitsThatAreNotAncestorsOfHead` | `false` | Display non-ancestor-of-HEAD commits with reduced opacity |
 
 ## Security
 

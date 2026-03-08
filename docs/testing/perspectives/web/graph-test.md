@@ -167,3 +167,76 @@
 | TC-039  | 両設定 true、非マージ + 祖先コミット | Equivalence - combined               | muted[i] === false                     | -            |
 | TC-040  | 返却配列の長さ                       | Equivalence - normal                 | commits.length と同一                  | 全コミット分 |
 | TC-041  | nullVertex 親は ancestor 探索対象外  | Equivalence - special                | nullVertex を辿らず安全に探索完了      | -            |
+
+## S13: Vertex.getChildren() 子頂点読み取りアクセサ
+
+> Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
+> Added: 2026-03-08
+
+**シグネチャ**: `getChildren(): Vertex[]`
+**テスト対象パス**: `web/graph.ts`
+
+| Case ID | Input / Precondition                   | Perspective (Equivalence / Boundary) | Expected Result                 | Notes               |
+| ------- | -------------------------------------- | ------------------------------------ | ------------------------------- | ------------------- |
+| TC-042  | children 未追加時に getChildren() 呼出 | Boundary - empty                     | 空配列を返す                    | デフォルト状態      |
+| TC-043  | addChild で子を1つ追加後に getChildren | Equivalence - normal                 | 1要素の配列（追加した子を含む） | -                   |
+| TC-044  | addChild で子を3つ追加後に getChildren | Equivalence - normal                 | 追加順に3要素の配列             | addChild 呼出順維持 |
+
+## S14: Graph.getFirstParentIndex() 最初の親インデックス取得
+
+> Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
+> Added: 2026-03-08
+
+**シグネチャ**: `getFirstParentIndex(i: number): number`
+**テスト対象パス**: `web/graph.ts`
+
+| Case ID | Input / Precondition                    | Perspective (Equivalence / Boundary) | Expected Result                      | Notes          |
+| ------- | --------------------------------------- | ------------------------------------ | ------------------------------------ | -------------- |
+| TC-045  | 親が1つのコミット                       | Equivalence - normal                 | その親のインデックスを返す           | -              |
+| TC-046  | 親が複数のマージコミット                | Equivalence - normal                 | 最初の親（parents[0]）のインデックス | -              |
+| TC-047  | 親なしのルートコミット                  | Boundary - no parents                | -1 を返す                            | -              |
+| TC-048  | 親が commitLookup 外（nullVertex のみ） | Boundary - nullVertex                | -1 を返す                            | 表示範囲外の親 |
+
+## S15: Graph.getFirstChildIndex() 最初の子インデックス取得
+
+> Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
+> Added: 2026-03-08
+
+**シグネチャ**: `getFirstChildIndex(i: number): number`
+**テスト対象パス**: `web/graph.ts`
+
+| Case ID | Input / Precondition               | Perspective (Equivalence / Boundary) | Expected Result                | Notes               |
+| ------- | ---------------------------------- | ------------------------------------ | ------------------------------ | ------------------- |
+| TC-049  | 子が1つのコミット                  | Equivalence - normal                 | その子のインデックスを返す     | -                   |
+| TC-050  | 子が複数で同一ブランチの子あり     | Equivalence - normal                 | 同一ブランチの子のインデックス | isOnThisBranch 優先 |
+| TC-051  | 子が複数で同一ブランチの子なし     | Equivalence - normal (fallback)      | 最大インデックスの子を返す     | -                   |
+| TC-052  | 子なしのコミット（ブランチの先頭） | Boundary - no children               | -1 を返す                      | -                   |
+
+## S16: Graph.getAlternativeParentIndex() 代替親インデックス取得
+
+> Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
+> Added: 2026-03-08
+
+**シグネチャ**: `getAlternativeParentIndex(i: number): number`
+**テスト対象パス**: `web/graph.ts`
+
+| Case ID | Input / Precondition        | Perspective (Equivalence / Boundary) | Expected Result                      | Notes            |
+| ------- | --------------------------- | ------------------------------------ | ------------------------------------ | ---------------- |
+| TC-053  | 親が2つ以上のマージコミット | Equivalence - normal                 | 2番目の親のインデックスを返す        | マージ元ブランチ |
+| TC-054  | 親が1つのみの通常コミット   | Equivalence - normal (fallback)      | その親のインデックスにフォールバック | -                |
+| TC-055  | 親なしのルートコミット      | Boundary - no parents                | -1 を返す                            | -                |
+
+## S17: Graph.getAlternativeChildIndex() 代替子インデックス取得
+
+> Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
+> Added: 2026-03-08
+
+**シグネチャ**: `getAlternativeChildIndex(i: number): number`
+**テスト対象パス**: `web/graph.ts`
+
+| Case ID | Input / Precondition           | Perspective (Equivalence / Boundary) | Expected Result                                | Notes |
+| ------- | ------------------------------ | ------------------------------------ | ---------------------------------------------- | ----- |
+| TC-056  | 子が複数で同一ブランチの子あり | Equivalence - normal                 | 同一ブランチ除外後の最大インデックスの子を返す | -     |
+| TC-057  | 子が複数で同一ブランチの子なし | Equivalence - normal (fallback)      | 2番目に大きいインデックスの子を返す            | -     |
+| TC-058  | 子が1つのみ                    | Equivalence - normal (fallback)      | その子にフォールバック                         | -     |
+| TC-059  | 子なしのコミット               | Boundary - no children               | -1 を返す                                      | -     |
