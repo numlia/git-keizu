@@ -15,7 +15,7 @@ import {
   generateGitFileTree,
   generateGitFileTreeHtml
 } from "./fileTree";
-import { FindWidget } from "./findWidget";
+import { findCommitElemWithId, FindWidget, getCommitElems } from "./findWidget";
 import { Graph } from "./graph";
 import { handleMessage } from "./messageHandler";
 import { buildRefContextMenuItems, checkoutBranchAction } from "./refMenu";
@@ -1072,6 +1072,49 @@ class GitGraphView {
   /* Keyboard Shortcuts */
   private handleKeyboardShortcut(e: KeyboardEvent) {
     if (e.isComposing) return;
+
+    // Arrow key navigation (REQ-2.1, REQ-2.2, REQ-2.3, REQ-2.4, REQ-2.5)
+    if (
+      this.expandedCommit !== null &&
+      (e.key === "ArrowUp" || e.key === "ArrowDown") &&
+      this.expandedCommit.compareWithHash === null
+    ) {
+      const curIndex = this.commitLookup[this.expandedCommit.hash];
+      if (typeof curIndex === "number") {
+        let newIndex = -1;
+
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {
+          // Ctrl/Cmd+Shift: alternative branch navigation
+          newIndex =
+            e.key === "ArrowUp"
+              ? this.graph.getAlternativeChildIndex(curIndex)
+              : this.graph.getAlternativeParentIndex(curIndex);
+        } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+          // Ctrl/Cmd: branch tracking navigation
+          newIndex =
+            e.key === "ArrowUp"
+              ? this.graph.getFirstChildIndex(curIndex)
+              : this.graph.getFirstParentIndex(curIndex);
+        } else if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+          // No modifier: table order navigation
+          if (e.key === "ArrowUp" && curIndex > 0) {
+            newIndex = curIndex - 1;
+          } else if (e.key === "ArrowDown" && curIndex < this.commits.length - 1) {
+            newIndex = curIndex + 1;
+          }
+        }
+        // Other modifier combinations: fall through to existing shortcuts
+
+        if (newIndex > -1) {
+          e.preventDefault();
+          e.stopPropagation();
+          const elem = findCommitElemWithId(getCommitElems(), newIndex);
+          if (elem !== null) this.loadCommitDetails(elem);
+          return;
+        }
+      }
+    }
+
     if (!(e.ctrlKey || e.metaKey)) return;
 
     const key = e.key.toLowerCase();

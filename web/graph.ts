@@ -198,6 +198,10 @@ export class Vertex {
     return this.parents;
   }
 
+  public getChildren(): Vertex[] {
+    return this.children;
+  }
+
   public get isStash(): boolean {
     return this._isStash;
   }
@@ -499,6 +503,59 @@ export class Graph {
     }
 
     return muted;
+  }
+
+  public getFirstParentIndex(i: number): number {
+    const parents = this.vertices[i].getParents();
+    return parents.length > 0 ? parents[0].getId() : -1;
+  }
+
+  public getFirstChildIndex(i: number): number {
+    const children = this.vertices[i].getChildren();
+    if (children.length > 1) {
+      const branch = this.vertices[i].getBranch();
+      let childOnSameBranch: Vertex | undefined;
+      if (
+        branch !== null &&
+        (childOnSameBranch = children.find((child) => child.isOnThisBranch(branch)))
+      ) {
+        return childOnSameBranch.getId();
+      } else {
+        return Math.max(...children.map((child) => child.getId()));
+      }
+    } else if (children.length === 1) {
+      return children[0].getId();
+    } else {
+      return -1;
+    }
+  }
+
+  public getAlternativeParentIndex(i: number): number {
+    const parents = this.vertices[i].getParents();
+    return parents.length > 1 ? parents[1].getId() : parents.length === 1 ? parents[0].getId() : -1;
+  }
+
+  public getAlternativeChildIndex(i: number): number {
+    const children = this.vertices[i].getChildren();
+    if (children.length > 1) {
+      const branch = this.vertices[i].getBranch();
+      let childOnSameBranch: Vertex | undefined;
+      if (
+        branch !== null &&
+        (childOnSameBranch = children.find((child) => child.isOnThisBranch(branch)))
+      ) {
+        return Math.max(
+          ...children.filter((child) => child !== childOnSameBranch).map((child) => child.getId())
+        );
+      } else {
+        const childIndexes = children.map((child) => child.getId()).sort((a, b) => a - b);
+        return childIndexes[childIndexes.length - 2];
+      }
+    } else if (children.length === 1) {
+      return children[0].getId();
+    } else {
+      return -1;
+    }
   }
 
   public limitMaxWidth(maxWidth: number) {

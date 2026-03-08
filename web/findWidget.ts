@@ -19,7 +19,7 @@ const ZERO_LENGTH_MATCH_ERROR = "Cannot use a regular expression which has zero 
 
 /* === DOM Helpers === */
 
-function getCommitElems(): HTMLCollectionOf<HTMLElement> {
+export function getCommitElems(): HTMLCollectionOf<HTMLElement> {
   return document.getElementsByClassName("commit") as HTMLCollectionOf<HTMLElement>;
 }
 
@@ -47,7 +47,7 @@ function getChildrenWithClassName(elem: Element, className: string): Element[] {
   return children;
 }
 
-function findCommitElemWithId(
+export function findCommitElemWithId(
   elems: HTMLCollectionOf<HTMLElement>,
   id: number | null
 ): HTMLElement | null {
