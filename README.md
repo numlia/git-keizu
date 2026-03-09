@@ -23,12 +23,13 @@ Git Keizu is a personal take on a git history viewer — shaped around the featu
 - **Commit Details**: Click on a commit to see what changed and view diffs for any file. The panel height adjusts to your viewport size, and the view only scrolls enough to bring the panel into view — no jarring auto-center on every click. Parent hashes are clickable links that jump straight to the parent commit's details.
 - **File View Toggle**: Switch between Tree View (folder hierarchy) and List View (flat alphabetical list of full paths) in the commit details panel; the chosen mode is saved per repository.
 - **Branch filter**: A multi-select dropdown in the toolbar lets you filter the graph to one or more branches simultaneously; selecting no individual branch returns to "Show All" (all branches visible).
-- **Branch Actions**: Right-click to create, checkout, delete, rename, merge, or rebase branches. The Create Branch dialog includes a "Check out" checkbox (on by default) to automatically switch to the new branch after creation. When deleting a local branch, an optional checkbox lets you also delete the corresponding remote branch in one step.
+- **Branch Actions**: Right-click to create, checkout, delete, rename, merge, or rebase branches. The Create Branch dialog includes a "Check out" checkbox (on by default) to automatically switch to the new branch after creation. The Merge dialog exposes "Squash Commits" and "No Commit" options in addition to the existing "No Fast Forward" checkbox. When deleting a local branch, an optional checkbox lets you also delete the corresponding remote branch in one step.
 - **Remote Branch Actions**: Right-click a remote branch label to delete it on the remote, merge it into the current branch, or check it out as a new local branch.
 - **Tag Actions**: Add, delete, and push tags directly from the graph
-- **Commit Actions**: Checkout, cherry-pick, revert, or reset to any commit
+- **Commit Actions**: Checkout, cherry-pick, revert, or reset to any commit. The Cherry-pick dialog now includes "Record Origin" and "No Commit" checkboxes; merge-commit cherry-picks also show a parent selector
 - **Stash Support**: Stash entries appear in the graph with a distinct visual style; right-click to apply, pop, drop, or create a branch from a stash
 - **Uncommitted Changes Actions**: Right-click the Uncommitted Changes row to stash, reset (Mixed/Hard), or clean untracked files
+- **Configurable dialog defaults**: Set the initial checkbox state for Merge ("No Fast Forward", "Squash Commits", "No Commit"), Cherry-pick ("Record Origin", "No Commit"), and Stash ("Include Untracked") dialogs via `git-keizu.dialog.*` settings — your preferred options are pre-selected each time a dialog opens
 - **Pull/Push for current branch**: Right-click the currently checked-out branch to run `git pull` or `git push` directly from the graph
 - **Fetch with automatic prune**: The Fetch button runs `git fetch --prune` — stale remote-tracking references are cleaned up automatically on every fetch
 - **SCM Panel Button**: Open the Git Keizu graph directly from the VS Code Source Control panel title bar; the repository is selected automatically based on the active SCM provider. Button position (Inline or More Actions menu) is configurable
@@ -83,6 +84,17 @@ All settings are under the `git-keizu.*` namespace.
 | `...Refresh`       | `CTRL/CMD + R` | Keyboard shortcut for Refresh (`UNASSIGNED` to disable)         |
 | `...ScrollToHead`  | `CTRL/CMD + H` | Keyboard shortcut for Scroll to HEAD (`UNASSIGNED` to disable)  |
 | `...ScrollToStash` | `CTRL/CMD + S` | Keyboard shortcut for Scroll to Stash (`UNASSIGNED` to disable) |
+
+### Dialog Defaults (`dialog.*`)
+
+| Setting                                           | Default | Description                                                                     |
+| ------------------------------------------------- | ------- | ------------------------------------------------------------------------------- |
+| `dialog.merge.noFastForward`                      | `true`  | Default state of "Create a new commit even if fast-forward is possible" (Merge) |
+| `dialog.merge.squashCommits`                      | `false` | Default state of "Squash Commits" checkbox (Merge)                              |
+| `dialog.merge.noCommit`                           | `false` | Default state of "No Commit" checkbox (Merge)                                   |
+| `dialog.cherryPick.recordOrigin`                  | `false` | Default state of "Record Origin" checkbox (Cherry-pick)                         |
+| `dialog.cherryPick.noCommit`                      | `false` | Default state of "No Commit" checkbox (Cherry-pick)                             |
+| `dialog.stashUncommittedChanges.includeUntracked` | `false` | Default state of "Include Untracked" checkbox (Stash Uncommitted Changes)       |
 
 ### Commit Muting (`repository.commits.mute.*`)
 

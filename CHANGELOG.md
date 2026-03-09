@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-03-09
+
+### Added
+
+- **Merge dialog: Squash Commits and No Commit options**: Merge operations (from both branch and commit context menus) now show three checkboxes — "Create a new commit even if fast-forward is possible" (on by default), "Squash Commits" (squashes all incoming commits into one), and "No Commit" (stages the merge result without auto-committing); when Squash is checked, No Fast Forward is automatically suppressed as required by Git. Tooltip icons on Squash and No Commit explain what each option does
+- **Cherry-pick dialog: Record Origin and No Commit options**: Cherry-pick now shows a form dialog with two checkboxes — "Record Origin" (`-x`, appends a `(cherry picked from ...)` line to the commit message) and "No Commit" (stages the changes without auto-committing); merge-commit cherry-picks continue to show the parent selector alongside the new options. Both checkboxes include tooltip explanations
+- **Configurable dialog defaults**: Six new settings under `git-keizu.dialog.*` let you set the initial checkbox state for Merge, Cherry-pick, and Stash dialogs — your preferred options are pre-selected each time a dialog opens (`git-keizu.dialog.merge.noFastForward` / `squashCommits` / `noCommit`, `git-keizu.dialog.cherryPick.recordOrigin` / `noCommit`, `git-keizu.dialog.stashUncommittedChanges.includeUntracked`)
+- **Stash dialog default for Include Untracked**: The "Include Untracked" checkbox in the Stash Uncommitted Changes dialog now reads its initial state from `git-keizu.dialog.stashUncommittedChanges.includeUntracked` (default: off) instead of always starting unchecked
+
 ## [0.5.2] - 2026-03-08
 
 ### Added
@@ -180,7 +189,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.2...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.3...HEAD
+[0.5.3]: https://github.com/numlia/git-keizu/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/numlia/git-keizu/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/numlia/git-keizu/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/numlia/git-keizu/compare/v0.2.12...v0.5.0
