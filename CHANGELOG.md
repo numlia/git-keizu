@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-03-10
+
+### Fixed
+
+- **Stash commit details — file list explosion with "Include Untracked"**: Stash entries created with "Include Untracked" no longer show an inflated list of unrelated files in the commit details panel; the diff now correctly reflects only the files actually changed in that stash
+
 ## [0.5.3] - 2026-03-09
 
 ### Added
@@ -189,7 +195,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.3...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.4...HEAD
+[0.5.4]: https://github.com/numlia/git-keizu/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/numlia/git-keizu/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/numlia/git-keizu/compare/v0.5.1...v0.5.2
 [0.5.1]: https://github.com/numlia/git-keizu/compare/v0.5.0...v0.5.1
