@@ -2066,6 +2066,150 @@ describe("getCommits authorFilter", () => {
   });
 });
 
+describe("commitDetails stash diff handling", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("uses stash show -u for stash commits and returns untracked diff (TC-100)", async () => {
+    // Given: commitHash exists in refs/stash and stash has untracked files
+    const stashHash = "abc123def456";
+    const detailsLine = [
+      stashHash,
+      "parent111 parent222 parent333",
+      "Author Name",
+      "author@example.com",
+      "1700000000",
+      "Committer Name",
+      "committer@example.com"
+    ].join(SEP);
+    const detailsOutput = `${detailsLine}\nWIP on main: abc message\n`;
+    const stashOutput = [
+      makeStashLine(
+        stashHash,
+        "parent111",
+        "parent222",
+        "parent333",
+        "stash@{0}",
+        "Author Name",
+        "author@example.com",
+        1700000000,
+        "WIP on main: abc message"
+      ),
+      ""
+    ].join("\n");
+    const nameStatusOutput = "A\tuntracked.txt\n";
+    const numStatOutput = "1\t0\tuntracked.txt\n";
+
+    spawnMock.mockImplementation((_cmd: unknown, args: unknown) => {
+      const argArray = args as string[];
+      if (argArray[0] === "show") return createMockProcess(detailsOutput);
+      if (argArray[0] === "reflog") return createMockProcess(stashOutput);
+      if (argArray[2] === "stash" && argArray.includes("--name-status")) {
+        return createMockProcess(nameStatusOutput);
+      }
+      if (argArray[2] === "stash" && argArray.includes("--numstat")) {
+        return createMockProcess(numStatOutput);
+      }
+      return createMockProcess("");
+    });
+
+    // When: commitDetails is called for a stash hash
+    const result = await ds.commitDetails(REPO, stashHash);
+
+    // Then: stash show output is parsed (single untracked file only)
+    expect(result).not.toBeNull();
+    expect(result!.fileChanges).toEqual([
+      {
+        oldFilePath: "untracked.txt",
+        newFilePath: "untracked.txt",
+        type: "A",
+        additions: 1,
+        deletions: 0
+      }
+    ]);
+
+    const stashShowCalls = spawnMock.mock.calls.filter((call) => {
+      const argArray = call[1] as string[];
+      return argArray[2] === "stash" && argArray[3] === "show";
+    });
+    expect(stashShowCalls).toHaveLength(2);
+    expect(stashShowCalls[0][1] as string[]).toContain("-u");
+    expect(stashShowCalls[1][1] as string[]).toContain("-u");
+
+    const diffTreeCalls = spawnMock.mock.calls.filter((call) => {
+      const argArray = call[1] as string[];
+      return argArray[2] === "diff-tree";
+    });
+    expect(diffTreeCalls).toHaveLength(0);
+  });
+
+  it("uses diff-tree for non-stash commits and ignores commit hash header lines (TC-101)", async () => {
+    // Given: commitHash is not in refs/stash
+    const commitHash = "def456abc123";
+    const detailsLine = [
+      commitHash,
+      "parent111",
+      "Author Name",
+      "author@example.com",
+      "1700000000",
+      "Committer Name",
+      "committer@example.com"
+    ].join(SEP);
+    const detailsOutput = `${detailsLine}\nregular commit\n`;
+    const nameStatusOutput = `${commitHash}\nM\ttracked.txt\n`;
+    const numStatOutput = `${commitHash}\n1\t1\ttracked.txt\n`;
+
+    spawnMock.mockImplementation((_cmd: unknown, args: unknown) => {
+      const argArray = args as string[];
+      if (argArray[0] === "show") return createMockProcess(detailsOutput);
+      if (argArray[0] === "reflog") return createMockProcess("");
+      if (argArray[2] === "diff-tree" && argArray.includes("--name-status")) {
+        return createMockProcess(nameStatusOutput);
+      }
+      if (argArray[2] === "diff-tree" && argArray.includes("--numstat")) {
+        return createMockProcess(numStatOutput);
+      }
+      return createMockProcess("");
+    });
+
+    // When: commitDetails is called for a regular commit
+    const result = await ds.commitDetails(REPO, commitHash);
+
+    // Then: diff-tree output is parsed, while hash header lines are ignored
+    expect(result).not.toBeNull();
+    expect(result!.fileChanges).toEqual([
+      {
+        oldFilePath: "tracked.txt",
+        newFilePath: "tracked.txt",
+        type: "M",
+        additions: 1,
+        deletions: 1
+      }
+    ]);
+
+    const diffTreeCalls = spawnMock.mock.calls.filter((call) => {
+      const argArray = call[1] as string[];
+      return argArray[2] === "diff-tree";
+    });
+    expect(diffTreeCalls).toHaveLength(2);
+
+    const stashShowCalls = spawnMock.mock.calls.filter((call) => {
+      const argArray = call[1] as string[];
+      return argArray[2] === "stash" && argArray[3] === "show";
+    });
+    expect(stashShowCalls).toHaveLength(0);
+  });
+});
+
 describe("commitDetails committerEmail", () => {
   let ds: DataSource;
   const spawnMock = vi.mocked(cp.spawn);

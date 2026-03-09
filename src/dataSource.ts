@@ -25,6 +25,20 @@ const COMMIT_HASH_PATTERN = /^[0-9a-f]{4,40}$/i;
 const NO_QUOTE_PATH_CONFIG = ["-c", "core.quotePath=false"];
 const LOG_FORMAT_FIELD_COUNT = 6;
 const STASH_FORMAT_FIELD_COUNT = 7;
+const STASH_SHOW_INCLUDE_UNTRACKED_OPTION = "-u";
+const DIFF_FILTER_AMDR_OPTION = "--diff-filter=AMDR";
+const DIFF_FIND_RENAMES_OPTION = "--find-renames";
+const NAME_STATUS_OPTION = "--name-status";
+const NUMSTAT_OPTION = "--numstat";
+const TAB_SEPARATOR = "\t";
+const NAME_STATUS_MIN_COLUMN_COUNT = 2;
+const NUMSTAT_COLUMN_COUNT = 3;
+const FILE_CHANGE_TYPE_INDEX = 0;
+const NAME_STATUS_OLD_FILE_PATH_INDEX = 1;
+const NUMSTAT_ADDITIONS_INDEX = 0;
+const NUMSTAT_DELETIONS_INDEX = 1;
+const NUMSTAT_FILE_NAME_INDEX = 2;
+const VALID_FILE_CHANGE_TYPES: ReadonlySet<string> = new Set(["A", "M", "D", "R"]);
 
 /**
  * Commit details format field indices (used in gitCommitDetailsFormat and commitDetails parser).
@@ -225,7 +239,7 @@ export class DataSource {
       return null;
     }
     try {
-      const [details, nameStatus, numStat] = await Promise.all([
+      const [details, stashes] = await Promise.all([
         this.spawnGit<GitCommitDetails | null>(
           ["show", "--quiet", commitHash, `--format=${this.gitCommitDetailsFormat}`],
           repo,
@@ -248,65 +262,104 @@ export class DataSource {
           },
           null
         ),
-        this.spawnGit<string[]>(
-          [
-            ...NO_QUOTE_PATH_CONFIG,
-            "diff-tree",
-            "--name-status",
-            "-r",
-            "-m",
-            "--root",
-            "--find-renames",
-            "--diff-filter=AMDR",
-            commitHash
-          ],
-          repo,
-          (stdout) => stdout.split(eolRegex),
-          []
-        ),
-        this.spawnGit<string[]>(
-          [
-            ...NO_QUOTE_PATH_CONFIG,
-            "diff-tree",
-            "--numstat",
-            "-r",
-            "-m",
-            "--root",
-            "--find-renames",
-            "--diff-filter=AMDR",
-            commitHash
-          ],
-          repo,
-          (stdout) => stdout.split(eolRegex),
-          []
-        )
+        this.getStashes(repo)
       ]);
 
       if (details === null) return null;
+      const stash = stashes.find((entry) => entry.hash === commitHash) ?? null;
+      const nameStatusArgs =
+        stash === null
+          ? [
+              ...NO_QUOTE_PATH_CONFIG,
+              "diff-tree",
+              NAME_STATUS_OPTION,
+              "-r",
+              "-m",
+              "--root",
+              DIFF_FIND_RENAMES_OPTION,
+              DIFF_FILTER_AMDR_OPTION,
+              commitHash
+            ]
+          : [
+              ...NO_QUOTE_PATH_CONFIG,
+              "stash",
+              "show",
+              STASH_SHOW_INCLUDE_UNTRACKED_OPTION,
+              NAME_STATUS_OPTION,
+              DIFF_FIND_RENAMES_OPTION,
+              DIFF_FILTER_AMDR_OPTION,
+              commitHash
+            ];
+      const numStatArgs =
+        stash === null
+          ? [
+              ...NO_QUOTE_PATH_CONFIG,
+              "diff-tree",
+              NUMSTAT_OPTION,
+              "-r",
+              "-m",
+              "--root",
+              DIFF_FIND_RENAMES_OPTION,
+              DIFF_FILTER_AMDR_OPTION,
+              commitHash
+            ]
+          : [
+              ...NO_QUOTE_PATH_CONFIG,
+              "stash",
+              "show",
+              STASH_SHOW_INCLUDE_UNTRACKED_OPTION,
+              NUMSTAT_OPTION,
+              DIFF_FIND_RENAMES_OPTION,
+              DIFF_FILTER_AMDR_OPTION,
+              commitHash
+            ];
+      const [nameStatus, numStat] = await Promise.all([
+        this.spawnGit<string[]>(nameStatusArgs, repo, (stdout) => stdout.split(eolRegex), []),
+        this.spawnGit<string[]>(numStatArgs, repo, (stdout) => stdout.split(eolRegex), [])
+      ]);
       const fileLookup: { [file: string]: number } = {};
 
-      for (let i = 1; i < nameStatus.length - 1; i++) {
-        let line = nameStatus[i].split("\t");
-        if (line.length < 2) break;
-        let oldFilePath = getPathFromStr(line[1]),
-          newFilePath = getPathFromStr(line[line.length - 1]);
+      for (let i = 0; i < nameStatus.length; i++) {
+        let line = nameStatus[i].split(TAB_SEPARATOR);
+        const statusToken = line[FILE_CHANGE_TYPE_INDEX] ?? "";
+        const changeType = statusToken[FILE_CHANGE_TYPE_INDEX] ?? "";
+        if (
+          line.length < NAME_STATUS_MIN_COLUMN_COUNT ||
+          !VALID_FILE_CHANGE_TYPES.has(changeType)
+        ) {
+          continue;
+        }
+        let oldFilePath = getPathFromStr(line[NAME_STATUS_OLD_FILE_PATH_INDEX] ?? ""),
+          newFilePath = getPathFromStr(line[line.length - 1] ?? "");
         fileLookup[newFilePath] = details.fileChanges.length;
         details.fileChanges.push({
           oldFilePath: oldFilePath,
           newFilePath: newFilePath,
-          type: <GitFileChangeType>line[0][0],
+          type: <GitFileChangeType>changeType,
           additions: null,
           deletions: null
         });
       }
 
-      for (let i = 1; i < numStat.length - 1; i++) {
-        let line = numStat[i].split("\t");
-        if (line.length !== 3) break;
-        let fileName = line[2].replace(/(.*){.* => (.*)}/, "$1$2").replace(/.* => (.*)/, "$1");
-        if (typeof fileLookup[fileName] === "number") {
-          details.fileChanges[fileLookup[fileName]].additions = parseInt(line[0], 10);
-          details.fileChanges[fileLookup[fileName]].deletions = parseInt(line[1], 10);
+      for (let i = 0; i < numStat.length; i++) {
+        let line = numStat[i].split(TAB_SEPARATOR);
+        if (line.length !== NUMSTAT_COLUMN_COUNT) continue;
+        let fileName = (line[NUMSTAT_FILE_NAME_INDEX] ?? "")
+          .replace(/(.*){.* => (.*)}/, "$1$2")
+          .replace(/.* => (.*)/, "$1");
+        const fileChangeIndex = fileLookup[fileName];
+        if (
+          typeof fileChangeIndex === "number" &&
+          details.fileChanges[fileChangeIndex] !== undefined
+        ) {
+          const additions = parseInt(line[NUMSTAT_ADDITIONS_INDEX] ?? "", 10);
+          const deletions = parseInt(line[NUMSTAT_DELETIONS_INDEX] ?? "", 10);
+          details.fileChanges[fileChangeIndex].additions = Number.isNaN(additions)
+            ? null
+            : additions;
+          details.fileChanges[fileChangeIndex].deletions = Number.isNaN(deletions)
+            ? null
+            : deletions;
         }
       }
       return details;
