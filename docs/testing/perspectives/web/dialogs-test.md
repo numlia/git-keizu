@@ -32,3 +32,18 @@
 | TC-009  | Escapeキー押下                         | Equivalence - wrong key              | アクションボタンのclickがトリガーされない | Enter以外のキー                          |
 | TC-010  | Tabキー押下                            | Equivalence - wrong key              | アクションボタンのclickがトリガーされない | Enter以外のキー                          |
 | TC-011  | ダイアログ有効状態 + Shift+Enterキー   | Boundary - modifier key              | テスト環境に応じた動作確認                | 修飾キー付きの場合の考慮が必要か設計確認 |
+
+## S3: showFormDialog() info ツールチップ描画
+
+> Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
+> Added: 2026-03-09
+
+**テスト対象パス**: `web/dialogs.ts`
+
+| Case ID | Input / Precondition                               | Perspective (Equivalence / Boundary) | Expected Result                                                      | Notes          |
+| ------- | -------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------- | -------------- |
+| TC-012  | checkbox に info="説明テキスト" プロパティあり     | Equivalence - normal                 | info icon (SVG) が描画され、title 属性に "説明テキスト" が設定される | -              |
+| TC-013  | checkbox に info プロパティなし（undefined）       | Equivalence - normal (no info)       | info icon が描画されない                                             | 既存動作維持   |
+| TC-014  | info テキストに HTML 特殊文字 `<script>&"'` を含む | Boundary - special chars (XSS)       | title 属性内で HTML エスケープされる                                 | XSS 防止       |
+| TC-015  | multi フォーム（text + checkbox with info）        | Equivalence - normal (multi layout)  | checkbox 行の適切な位置に info icon が配置される                     | レイアウト確認 |
+| TC-016  | single フォーム（checkbox with info のみ）         | Equivalence - normal (single layout) | checkbox label 直後に info icon が配置される                         | レイアウト確認 |

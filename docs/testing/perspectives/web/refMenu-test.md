@@ -90,3 +90,17 @@
 | TC-026  | remotes = [] (リモートなし)         | Equivalence - normal (no remote)     | showCheckboxDialog: "Force Delete" のみ（既存動作維持）                                 | 後方互換            |
 | TC-027  | リモート削除チェック ON             | Equivalence - normal                 | sendMessage に deleteOnRemotes: remotes が含まれる                                      | -                   |
 | TC-028  | リモート削除チェック OFF            | Equivalence - normal                 | sendMessage に deleteOnRemotes: [] が含まれる                                           | デフォルト動作      |
+
+## S7: Merge ダイアログ拡張（3 checkbox フォーム）
+
+> Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
+> Added: 2026-03-09
+
+**テスト対象パス**: `web/refMenu.ts:30-55`
+
+| Case ID | Input / Precondition                 | Perspective (Equivalence / Boundary) | Expected Result                                                      | Notes                         |
+| ------- | ------------------------------------ | ------------------------------------ | -------------------------------------------------------------------- | ----------------------------- |
+| TC-029  | buildMergeBranchMenuItem 選択        | Equivalence - normal                 | showFormDialog が 3 checkbox（No FF / Squash / No Commit）で呼ばれる | showCheckboxDialog からの変更 |
+| TC-030  | 3 checkbox のデフォルト値            | Equivalence - normal                 | viewState.dialogDefaults.merge の各フィールド値を反映                | commitMenu と同一構成         |
+| TC-031  | callback で 3 値取得、確定ボタン押下 | Equivalence - normal                 | RequestMergeBranch に createNewCommit, squash, noCommit が含まれる   | sendMessage 検証              |
+| TC-032  | Squash / No Commit checkbox の構成   | Equivalence - normal                 | info プロパティ（ツールチップテキスト）が設定されている              | commitMenu と同一テキスト     |

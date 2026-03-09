@@ -94,3 +94,21 @@
 | TC-025  | 設定未指定（デフォルト） | Equivalence - normal (default)       | false を返す    | デフォルト無効 |
 | TC-026  | 設定値 = true            | Equivalence - normal                 | true を返す     | 明示的有効     |
 | TC-027  | 設定値 = false           | Equivalence - normal                 | false を返す    | 明示的無効     |
+
+## S7: dialogDefaults() ダイアログデフォルト設定
+
+> Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
+> Added: 2026-03-09
+
+**シグネチャ**: `dialogDefaults(): DialogDefaults`
+**テスト対象パス**: `src/config.ts`
+
+| Case ID | Input / Precondition                                 | Perspective (Equivalence / Boundary) | Expected Result                                                                                                                                                                            | Notes        |
+| ------- | ---------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------ |
+| TC-028  | 全設定未指定（デフォルト）                           | Equivalence - normal (default)       | merge.noFastForward=true, merge.squashCommits=false, merge.noCommit=false, cherryPick.recordOrigin=false, cherryPick.noCommit=false, stashUncommittedChanges.includeUntracked=false を返す | 全デフォルト |
+| TC-029  | dialog.merge.noFastForward=false                     | Equivalence - normal (custom)        | merge.noFastForward=false を返す                                                                                                                                                           | カスタム値   |
+| TC-030  | dialog.merge.squashCommits=true                      | Equivalence - normal (custom)        | merge.squashCommits=true を返す                                                                                                                                                            | カスタム値   |
+| TC-031  | dialog.merge.noCommit=true                           | Equivalence - normal (custom)        | merge.noCommit=true を返す                                                                                                                                                                 | カスタム値   |
+| TC-032  | dialog.cherryPick.recordOrigin=true                  | Equivalence - normal (custom)        | cherryPick.recordOrigin=true を返す                                                                                                                                                        | カスタム値   |
+| TC-033  | dialog.cherryPick.noCommit=true                      | Equivalence - normal (custom)        | cherryPick.noCommit=true を返す                                                                                                                                                            | カスタム値   |
+| TC-034  | dialog.stashUncommittedChanges.includeUntracked=true | Equivalence - normal (custom)        | stashUncommittedChanges.includeUntracked=true を返す                                                                                                                                       | カスタム値   |

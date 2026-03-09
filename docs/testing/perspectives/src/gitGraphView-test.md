@@ -157,3 +157,18 @@
 | ------- | -------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------- | -------------- |
 | TC-037  | msg.branches=["main","dev"], msg.authors=["Alice"] | Equivalence - normal                 | getCommits が branches=["main","dev"], authors=["Alice"] で呼ばれる | 配列パススルー |
 | TC-038  | msg.branches=[], msg.authors=[]                    | Boundary - empty arrays              | getCommits が branches=[], authors=[] で呼ばれる（全件表示）        | 空配列         |
+
+## S13: merge/cherry-pick ハンドラ拡張 + viewState dialogDefaults
+
+> Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
+> Added: 2026-03-09
+
+**テスト対象パス**: `src/gitGraphView.ts`
+
+| Case ID | Input / Precondition                                         | Perspective (Equivalence / Boundary) | Expected Result                                                                  | Notes            |
+| ------- | ------------------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------------------------- | ---------------- |
+| TC-039  | getHtmlForWebview() 呼び出し                                 | Equivalence - normal                 | viewState に dialogDefaults が含まれ、Config.dialogDefaults() の返却値と一致する | 設定パイプライン |
+| TC-040  | RequestMergeBranch (squash=true, noCommit=false)             | Equivalence - normal                 | DataSource.mergeBranch に squash=true, noCommit=false が渡される                 | -                |
+| TC-041  | RequestMergeCommit (squash=false, noCommit=true)             | Equivalence - normal                 | DataSource.mergeCommit に squash=false, noCommit=true が渡される                 | -                |
+| TC-042  | RequestCherrypickCommit (recordOrigin=true, noCommit=true)   | Equivalence - normal                 | DataSource.cherrypickCommit に recordOrigin=true, noCommit=true が渡される       | -                |
+| TC-043  | RequestCherrypickCommit (recordOrigin=false, noCommit=false) | Equivalence - normal                 | DataSource.cherrypickCommit に recordOrigin=false, noCommit=false が渡される     | 従来互換         |

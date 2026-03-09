@@ -298,3 +298,41 @@
 | TC-107  | authors=[]               | Equivalence - normal (no filter)     | git log 引数に --author フラグが含まれない                                                 | フィルタなし（従来相当）    |
 | TC-108  | authors=["Jane O'Brien"] | Equivalence - normal (special chars) | git log 引数に --author=Jane O'Brien が含まれる。spawnGit 経由でシェルインジェクションなし | 特殊文字の安全性            |
 | TC-109  | authors=["Alice"]        | Equivalence - normal (single)        | git log 引数に --author=Alice が含まれる                                                   | 単一著者フィルタ            |
+
+## S19: mergeBranch/mergeCommit squash/noCommit 拡張
+
+> Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
+> Added: 2026-03-09
+
+**シグネチャ**: `mergeBranch(repo: string, branchName: string, createNewCommit: boolean, squash: boolean, noCommit: boolean): Promise<GitCommandStatus>`
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                                            | Perspective (Equivalence / Boundary)   | Expected Result                                                       | Notes                    |
+| ------- | --------------------------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------- | ------------------------ |
+| TC-110  | createNewCommit=true, squash=false, noCommit=false              | Equivalence - normal                   | git args: `["merge", "--no-ff", ref]`                                 | 従来動作                 |
+| TC-111  | createNewCommit=false, squash=false, noCommit=false             | Equivalence - normal                   | git args: `["merge", ref]`                                            | フラグなし               |
+| TC-112  | createNewCommit=true, squash=true, noCommit=false               | Equivalence - normal (squash override) | git args: `["merge", "--squash", ref]`（--no-ff なし）                | squash が no-ff を上書き |
+| TC-113  | createNewCommit=false, squash=true, noCommit=false              | Equivalence - normal                   | git args: `["merge", "--squash", ref]`                                | squash のみ              |
+| TC-114  | createNewCommit=true, squash=false, noCommit=true               | Equivalence - normal                   | git args: `["merge", "--no-ff", "--no-commit", ref]`                  | 独立オプション           |
+| TC-115  | createNewCommit=false, squash=false, noCommit=true              | Equivalence - normal                   | git args: `["merge", "--no-commit", ref]`                             | noCommit のみ            |
+| TC-116  | createNewCommit=true, squash=true, noCommit=true                | Equivalence - normal (all flags)       | git args: `["merge", "--squash", "--no-commit", ref]`（--no-ff なし） | 全フラグ、squash 優先    |
+| TC-117  | createNewCommit=false, squash=true, noCommit=true               | Equivalence - normal                   | git args: `["merge", "--squash", "--no-commit", ref]`                 | squash + noCommit        |
+| TC-118  | mergeCommit: 不正なコミットハッシュ, squash=true, noCommit=true | Boundary - invalid hash                | INVALID_COMMIT_HASH_MESSAGE を返す                                    | 入力バリデーション維持   |
+
+## S20: cherrypickCommit recordOrigin/noCommit 拡張
+
+> Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
+> Added: 2026-03-09
+
+**シグネチャ**: `cherrypickCommit(repo: string, commitHash: string, parentIndex: number, recordOrigin: boolean, noCommit: boolean): Promise<GitCommandStatus>`
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                                      | Perspective (Equivalence / Boundary) | Expected Result                                                   | Notes                    |
+| ------- | --------------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------- | ------------------------ |
+| TC-119  | parentIndex=0, recordOrigin=false, noCommit=false         | Equivalence - normal                 | git args: `["cherry-pick", hash]`                                 | 従来動作                 |
+| TC-120  | parentIndex=0, recordOrigin=true, noCommit=false          | Equivalence - normal                 | git args: `["cherry-pick", "-x", hash]`                           | recordOrigin のみ        |
+| TC-121  | parentIndex=0, recordOrigin=false, noCommit=true          | Equivalence - normal                 | git args: `["cherry-pick", "--no-commit", hash]`                  | noCommit のみ            |
+| TC-122  | parentIndex=0, recordOrigin=true, noCommit=true           | Equivalence - normal (both flags)    | git args: `["cherry-pick", "-x", "--no-commit", hash]`            | 独立オプション           |
+| TC-123  | parentIndex=2, recordOrigin=true, noCommit=true           | Equivalence - normal (merge commit)  | git args: `["cherry-pick", "-m", "2", "-x", "--no-commit", hash]` | マージコミットの全フラグ |
+| TC-124  | 不正なコミットハッシュ, recordOrigin=true, noCommit=false | Boundary - invalid hash              | INVALID_COMMIT_HASH_MESSAGE を返す                                | バリデーション維持       |
+| TC-125  | parentIndex=-1, recordOrigin=false, noCommit=false        | Boundary - invalid parentIndex       | "Invalid parent index." を返す                                    | バリデーション維持       |
