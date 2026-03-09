@@ -261,6 +261,13 @@ describe("parseRemoteRef remote name separation", () => {
 describe("buildRefContextMenuItems remote branch menu items", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false }
+      }
+    };
   });
 
   it("includes 'Delete Remote Branch...' for remote branch (TC-016)", () => {
@@ -322,7 +329,7 @@ describe("buildRefContextMenuItems remote branch menu items", () => {
     expect(dialogMessage).toContain("origin/feature");
   });
 
-  it("shows checkbox dialog with fast-forward option when Merge (remote) is selected (TC-020)", () => {
+  it("shows form dialog with 3 checkboxes when Merge (remote) is selected (TC-020)", () => {
     // Given: A remote branch element
     const sourceElem = createMockElement(["remote"]);
     const menu = buildRefContextMenuItems(REPO, "origin/feature", sourceElem, false, "main");
@@ -333,10 +340,13 @@ describe("buildRefContextMenuItems remote branch menu items", () => {
       .find((item) => item.title === "Merge into current branch&#8230;");
     mergeItem!.onClick();
 
-    // Then: showCheckboxDialog is called with fast-forward option
-    expect(showCheckboxDialog).toHaveBeenCalledTimes(1);
-    const checkboxLabel = (showCheckboxDialog as ReturnType<typeof vi.fn>).mock.calls[0][1];
-    expect(checkboxLabel).toBe("Create a new commit even if fast-forward is possible");
+    // Then: showFormDialog is called with 3 checkboxes (No FF, Squash, No Commit)
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = (showFormDialog as ReturnType<typeof vi.fn>).mock.calls[0][1];
+    expect(inputs).toHaveLength(3);
+    expect(inputs[0].name).toBe("Create a new commit even if fast-forward is possible");
+    expect(inputs[1].name).toBe("Squash Commits");
+    expect(inputs[2].name).toBe("No Commit");
   });
 });
 
@@ -498,5 +508,104 @@ describe("buildRefContextMenuItems Delete Branch dialog extension", () => {
       forceDelete: false,
       deleteOnRemotes: []
     });
+  });
+});
+
+// --- S7: Merge ダイアログ拡張（3 checkbox フォーム） ---
+
+describe("buildMergeBranchMenuItem Merge dialog (S7)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false }
+      }
+    };
+  });
+
+  function getMergeItem(refName = "feature/x") {
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(REPO, refName, sourceElem, false, "main");
+    return menu.find((item) => item !== null && item.title === "Merge into current branch&#8230;")!;
+  }
+
+  it("calls showFormDialog with 3 checkboxes (No FF / Squash / No Commit) (TC-029)", () => {
+    // Given: A non-HEAD local branch
+    const item = getMergeItem();
+
+    // When: Merge into current branch is clicked
+    item.onClick();
+
+    // Then: showFormDialog is called with 3 checkbox inputs
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs).toHaveLength(3);
+    expect(inputs[0].type).toBe("checkbox");
+    expect(inputs[0].name).toBe("Create a new commit even if fast-forward is possible");
+    expect(inputs[1].type).toBe("checkbox");
+    expect(inputs[1].name).toBe("Squash Commits");
+    expect(inputs[2].type).toBe("checkbox");
+    expect(inputs[2].name).toBe("No Commit");
+  });
+
+  it("3 checkboxes reflect viewState.dialogDefaults.merge values (TC-030)", () => {
+    // Given: Custom dialog defaults
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: false, squashCommits: true, noCommit: true },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false }
+      }
+    };
+    const item = getMergeItem();
+
+    // When: Merge into current branch is clicked
+    item.onClick();
+
+    // Then: checkbox defaults reflect the custom settings
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect((inputs[0] as DialogCheckboxInput).value).toBe(false);
+    expect((inputs[1] as DialogCheckboxInput).value).toBe(true);
+    expect((inputs[2] as DialogCheckboxInput).value).toBe(true);
+  });
+
+  it("callback sends RequestMergeBranch with createNewCommit, squash, noCommit (TC-031)", () => {
+    // Given: Merge dialog is shown
+    const item = getMergeItem("feature/x");
+    item.onClick();
+
+    // When: form is submitted with createNewCommit=true, squash=false, noCommit=true
+    const actioned = vi.mocked(showFormDialog).mock.calls[0][3];
+    actioned(["checked", "unchecked", "checked"]);
+
+    // Then: sendMessage includes all merge flags
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "mergeBranch",
+      repo: REPO,
+      branchName: "feature/x",
+      createNewCommit: true,
+      squash: false,
+      noCommit: true
+    });
+  });
+
+  it("Squash and No Commit checkboxes have info tooltip text (TC-032)", () => {
+    // Given: Merge menu item
+    const item = getMergeItem();
+
+    // When: Merge into current branch is clicked
+    item.onClick();
+
+    // Then: Squash and No Commit checkboxes have info properties
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const squashInput = inputs[1] as DialogCheckboxInput;
+    const noCommitInput = inputs[2] as DialogCheckboxInput;
+    expect(squashInput.info).toBeDefined();
+    expect(squashInput.info).toContain("single commit");
+    expect(noCommitInput.info).toBeDefined();
+    expect(noCommitInput.info).toContain("staged but not committed");
   });
 });

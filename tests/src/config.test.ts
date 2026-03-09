@@ -344,3 +344,114 @@ describe("muteCommitsNotAncestorsOfHead", () => {
     expect(result).toBe(false);
   });
 });
+
+// S7: dialogDefaults() ダイアログデフォルト設定
+describe("dialogDefaults", () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  // TC-028: all defaults
+  it("returns all default values when no settings configured", () => {
+    // Given: no dialog settings configured (get returns provided defaults)
+    mockGet.mockImplementation((_key: string, defaultValue: unknown) => defaultValue);
+    // When: reading dialogDefaults
+    const config = getConfig();
+    const result = config.dialogDefaults();
+    // Then: returns all default values
+    expect(result).toEqual({
+      merge: {
+        noFastForward: true,
+        squashCommits: false,
+        noCommit: false
+      },
+      cherryPick: {
+        recordOrigin: false,
+        noCommit: false
+      },
+      stashUncommittedChanges: {
+        includeUntracked: false
+      }
+    });
+  });
+
+  // TC-029: dialog.merge.noFastForward=false
+  it("returns merge.noFastForward=false when configured", () => {
+    // Given: dialog.merge.noFastForward set to false
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "dialog.merge.noFastForward" ? false : defaultValue
+    );
+    // When: reading dialogDefaults
+    const config = getConfig();
+    const result = config.dialogDefaults();
+    // Then: merge.noFastForward is false, others unchanged
+    expect(result.merge.noFastForward).toBe(false);
+    expect(result.merge.squashCommits).toBe(false);
+    expect(result.merge.noCommit).toBe(false);
+  });
+
+  // TC-030: dialog.merge.squashCommits=true
+  it("returns merge.squashCommits=true when configured", () => {
+    // Given: dialog.merge.squashCommits set to true
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "dialog.merge.squashCommits" ? true : defaultValue
+    );
+    // When: reading dialogDefaults
+    const config = getConfig();
+    const result = config.dialogDefaults();
+    // Then: merge.squashCommits is true
+    expect(result.merge.squashCommits).toBe(true);
+  });
+
+  // TC-031: dialog.merge.noCommit=true
+  it("returns merge.noCommit=true when configured", () => {
+    // Given: dialog.merge.noCommit set to true
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "dialog.merge.noCommit" ? true : defaultValue
+    );
+    // When: reading dialogDefaults
+    const config = getConfig();
+    const result = config.dialogDefaults();
+    // Then: merge.noCommit is true
+    expect(result.merge.noCommit).toBe(true);
+  });
+
+  // TC-032: dialog.cherryPick.recordOrigin=true
+  it("returns cherryPick.recordOrigin=true when configured", () => {
+    // Given: dialog.cherryPick.recordOrigin set to true
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "dialog.cherryPick.recordOrigin" ? true : defaultValue
+    );
+    // When: reading dialogDefaults
+    const config = getConfig();
+    const result = config.dialogDefaults();
+    // Then: cherryPick.recordOrigin is true
+    expect(result.cherryPick.recordOrigin).toBe(true);
+  });
+
+  // TC-033: dialog.cherryPick.noCommit=true
+  it("returns cherryPick.noCommit=true when configured", () => {
+    // Given: dialog.cherryPick.noCommit set to true
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "dialog.cherryPick.noCommit" ? true : defaultValue
+    );
+    // When: reading dialogDefaults
+    const config = getConfig();
+    const result = config.dialogDefaults();
+    // Then: cherryPick.noCommit is true
+    expect(result.cherryPick.noCommit).toBe(true);
+  });
+
+  // TC-034: dialog.stashUncommittedChanges.includeUntracked=true
+  it("returns stashUncommittedChanges.includeUntracked=true when configured", () => {
+    // Given: dialog.stashUncommittedChanges.includeUntracked set to true
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "dialog.stashUncommittedChanges.includeUntracked" ? true : defaultValue
+    );
+    // When: reading dialogDefaults
+    const config = getConfig();
+    const result = config.dialogDefaults();
+    // Then: stashUncommittedChanges.includeUntracked is true
+    expect(result.stashUncommittedChanges.includeUntracked).toBe(true);
+  });
+});

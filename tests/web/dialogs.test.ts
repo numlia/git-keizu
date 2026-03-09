@@ -4,8 +4,10 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 vi.mock("../../web/utils", () => ({
   escapeHtml: vi.fn((s: string) => s),
   refInvalid: /[\s~^:?*[\]\\]/,
-  svgIcons: { alert: "<svg></svg>", loading: "<svg></svg>" }
+  svgIcons: { alert: "<svg></svg>", loading: "<svg></svg>", info: '<svg class="infoIcon"></svg>' }
 }));
+
+import { escapeHtml } from "../../web/utils";
 
 let showFormDialog: typeof import("../../web/dialogs").showFormDialog;
 let hideDialog: typeof import("../../web/dialogs").hideDialog;
@@ -215,5 +217,103 @@ describe("showFormDialog Enter key handling", () => {
 
     // Then: actioned callback IS invoked (handler only checks e.key, not modifiers)
     expect(actioned).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("showFormDialog info tooltip rendering", () => {
+  it("renders info icon with title when info property is set (TC-012)", () => {
+    // Given: a single checkbox with info property
+    const inputs: DialogInput[] = [
+      { type: "checkbox", name: "Test Option", value: false, info: "Explanation text" }
+    ];
+
+    // When: showFormDialog is called
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+
+    // Then: info icon is rendered with title attribute
+    const infoSpan = dialogEl.querySelector(".dialogInfo");
+    expect(infoSpan).not.toBeNull();
+    expect(infoSpan!.getAttribute("title")).toBe("Explanation text");
+    expect(infoSpan!.innerHTML).toContain("svg");
+  });
+
+  it("does not render info icon when info property is not set (TC-013)", () => {
+    // Given: a single checkbox without info property
+    const inputs: DialogInput[] = [{ type: "checkbox", name: "Test Option", value: false }];
+
+    // When: showFormDialog is called
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+
+    // Then: no info icon is rendered
+    const infoSpan = dialogEl.querySelector(".dialogInfo");
+    expect(infoSpan).toBeNull();
+  });
+
+  it("escapes HTML special characters in info text (TC-014)", () => {
+    // Given: a checkbox with info containing HTML special characters
+    const specialChars = "<script>&\"'";
+    const escapedText = "&lt;script&gt;&amp;&quot;&#x27;";
+    vi.mocked(escapeHtml).mockClear();
+    vi.mocked(escapeHtml).mockReturnValueOnce(escapedText);
+    const inputs: DialogInput[] = [
+      { type: "checkbox", name: "Test", value: false, info: specialChars }
+    ];
+
+    // When: showFormDialog is called
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+
+    // Then: escapeHtml is called with the special characters to prevent XSS
+    expect(escapeHtml).toHaveBeenCalledWith(specialChars);
+
+    // And: the title attribute contains the full original text decoded from escaped entities
+    // (without escaping, the " would break the attribute and truncate the value)
+    const infoSpan = dialogEl.querySelector(".dialogInfo");
+    expect(infoSpan).not.toBeNull();
+    expect(infoSpan!.getAttribute("title")).toBe(specialChars);
+  });
+
+  it("places info icon in the name column for multi form layout (TC-015)", () => {
+    // Given: a multi-element form with text + checkbox with info
+    const inputs: DialogInput[] = [
+      { type: "text", name: "Branch", default: "", placeholder: null },
+      { type: "checkbox", name: "Option", value: false, info: "Help text" }
+    ];
+
+    // When: showFormDialog is called
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+
+    // Then: the table has "multi" class (multi-element form)
+    const table = dialogEl.querySelector("table.dialogForm");
+    expect(table!.classList.contains("multi")).toBe(true);
+
+    // And: info icon is in the name column (last td of checkbox row)
+    const rows = dialogEl.querySelectorAll("tr");
+    const checkboxRow = rows[1];
+    const lastTd = checkboxRow.querySelectorAll("td");
+    const nameCell = lastTd[lastTd.length - 1];
+    expect(nameCell.textContent).toContain("Option");
+    const infoSpan = nameCell.querySelector(".dialogInfo");
+    expect(infoSpan).not.toBeNull();
+    expect(infoSpan!.getAttribute("title")).toBe("Help text");
+  });
+
+  it("places info icon after label for single form layout (TC-016)", () => {
+    // Given: a single checkbox with info
+    const inputs: DialogInput[] = [
+      { type: "checkbox", name: "Option", value: false, info: "Help text" }
+    ];
+
+    // When: showFormDialog is called
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+
+    // Then: the table has "single" class
+    const table = dialogEl.querySelector("table.dialogForm");
+    expect(table!.classList.contains("single")).toBe(true);
+
+    // And: info icon is inside the dialogFormCheckbox span, after the label
+    const checkboxSpan = dialogEl.querySelector(".dialogFormCheckbox");
+    const infoSpan = checkboxSpan!.querySelector(".dialogInfo");
+    expect(infoSpan).not.toBeNull();
+    expect(infoSpan!.getAttribute("title")).toBe("Help text");
   });
 });

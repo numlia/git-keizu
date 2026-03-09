@@ -535,6 +535,13 @@ describe("buildUncommittedContextMenuItems", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(vscode.postMessage).mockClear();
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false }
+      }
+    };
   });
 
   it("returns 3 items (Stash, Reset, Clean) for uncommitted context menu (TC-017)", () => {
@@ -887,7 +894,12 @@ function setupViewState(): void {
     keybindings: { find: "f", refresh: "r", scrollToHead: "h", scrollToStash: "s" },
     loadMoreCommits: 100,
     loadMoreCommitsAutomatically: true,
-    showCurrentBranchByDefault: false
+    showCurrentBranchByDefault: false,
+    dialogDefaults: {
+      merge: { noFastForward: true, squashCommits: false, noCommit: false },
+      cherryPick: { recordOrigin: false, noCommit: false },
+      stashUncommittedChanges: { includeUntracked: false }
+    }
   };
 }
 

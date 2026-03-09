@@ -129,3 +129,351 @@ describe("Create Branch dialog (S1)", () => {
     expect(inputs[0].type).toBe("text-ref");
   });
 });
+
+// --- S2: Merge ダイアログ拡張（3 checkbox フォーム） ---
+
+describe("Merge dialog (S2)", () => {
+  const DEFAULT_DIALOG_DEFAULTS = {
+    merge: { noFastForward: true, squashCommits: false, noCommit: false },
+    cherryPick: { recordOrigin: false, noCommit: false },
+    stashUncommittedChanges: { includeUntracked: false }
+  };
+
+  function setupViewState(overrides?: Partial<typeof DEFAULT_DIALOG_DEFAULTS.merge>) {
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        ...DEFAULT_DIALOG_DEFAULTS,
+        merge: { ...DEFAULT_DIALOG_DEFAULTS.merge, ...overrides }
+      }
+    };
+  }
+
+  function getMergeItem() {
+    const items = buildCommitContextMenuItems(
+      REPO,
+      HASH,
+      PARENT_HASHES,
+      [],
+      {},
+      createMockElement()
+    );
+    // "Merge into current branch..." is after the second null separator
+    return items.find((item) => item !== null && item.title.includes("Merge into current branch"))!;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupViewState();
+  });
+
+  it("calls showFormDialog with 3 checkboxes (TC-007)", () => {
+    // Given: Merge menu item exists
+    const item = getMergeItem();
+
+    // When: onClick is triggered
+    item.onClick();
+
+    // Then: showFormDialog is called with 3 checkbox inputs
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs).toHaveLength(3);
+    expect(inputs[0].type).toBe("checkbox");
+    expect(inputs[1].type).toBe("checkbox");
+    expect(inputs[2].type).toBe("checkbox");
+  });
+
+  it("No FF checkbox defaults to viewState.dialogDefaults.merge.noFastForward (TC-008)", () => {
+    // Given: viewState.dialogDefaults.merge.noFastForward = true
+    setupViewState({ noFastForward: true });
+    const item = getMergeItem();
+
+    // When: onClick is triggered
+    item.onClick();
+
+    // Then: first checkbox value reflects noFastForward setting
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs[0].type).toBe("checkbox");
+    expect((inputs[0] as DialogCheckboxInput).value).toBe(true);
+  });
+
+  it("Squash checkbox defaults to viewState.dialogDefaults.merge.squashCommits (TC-009)", () => {
+    // Given: viewState.dialogDefaults.merge.squashCommits = false
+    setupViewState({ squashCommits: false });
+    const item = getMergeItem();
+
+    // When: onClick is triggered
+    item.onClick();
+
+    // Then: second checkbox value reflects squashCommits setting
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect((inputs[1] as DialogCheckboxInput).value).toBe(false);
+  });
+
+  it("No Commit checkbox defaults to viewState.dialogDefaults.merge.noCommit (TC-010)", () => {
+    // Given: viewState.dialogDefaults.merge.noCommit = false
+    setupViewState({ noCommit: false });
+    const item = getMergeItem();
+
+    // When: onClick is triggered
+    item.onClick();
+
+    // Then: third checkbox value reflects noCommit setting
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect((inputs[2] as DialogCheckboxInput).value).toBe(false);
+  });
+
+  it("callback sends RequestMergeCommit with createNewCommit, squash, noCommit (TC-011)", () => {
+    // Given: Merge dialog is shown
+    const item = getMergeItem();
+    item.onClick();
+
+    // When: form is submitted with all options checked
+    const actioned = vi.mocked(showFormDialog).mock.calls[0][3];
+    actioned(["checked", "checked", "checked"]);
+
+    // Then: sendMessage includes createNewCommit, squash, noCommit
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "mergeCommit",
+      repo: REPO,
+      commitHash: HASH,
+      createNewCommit: true,
+      squash: true,
+      noCommit: true
+    });
+  });
+
+  it("Squash checkbox has info tooltip text (TC-012)", () => {
+    // Given: Merge menu item
+    const item = getMergeItem();
+
+    // When: onClick is triggered
+    item.onClick();
+
+    // Then: Squash checkbox has info property with tooltip text
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const squashInput = inputs[1] as DialogCheckboxInput;
+    expect(squashInput.info).toBeDefined();
+    expect(squashInput.info).toContain("single commit");
+  });
+
+  it("No Commit checkbox has info tooltip text (TC-013)", () => {
+    // Given: Merge menu item
+    const item = getMergeItem();
+
+    // When: onClick is triggered
+    item.onClick();
+
+    // Then: No Commit checkbox has info property with tooltip text
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const noCommitInput = inputs[2] as DialogCheckboxInput;
+    expect(noCommitInput.info).toBeDefined();
+    expect(noCommitInput.info).toContain("staged but not committed");
+  });
+
+  it("afterCreate callback disables No FF when Squash is initially checked (TC-014)", () => {
+    // Given: Squash default is ON
+    setupViewState({ squashCommits: true });
+    const item = getMergeItem();
+    item.onClick();
+
+    // When: afterCreate callback is invoked with mock dialog element
+    const afterCreate = vi.mocked(showFormDialog).mock.calls[0][5];
+    expect(afterCreate).toBeDefined();
+
+    const mockNoFfInput = { checked: true, disabled: false, addEventListener: vi.fn() };
+    const mockSquashInput = {
+      checked: true,
+      disabled: false,
+      addEventListener: vi.fn()
+    };
+    const mockDialogEl = {
+      querySelector: vi.fn((selector: string) => {
+        if (selector === "#dialogInput0") return mockNoFfInput;
+        if (selector === "#dialogInput1") return mockSquashInput;
+        return null;
+      })
+    } as unknown as HTMLElement;
+
+    afterCreate!(mockDialogEl);
+
+    // Then: No FF is disabled and unchecked
+    expect(mockNoFfInput.checked).toBe(false);
+    expect(mockNoFfInput.disabled).toBe(true);
+  });
+
+  it("Squash OFF restores No FF to enabled with default value (TC-015)", () => {
+    // Given: Squash default is OFF, noFastForward default is true
+    setupViewState({ noFastForward: true, squashCommits: false });
+    const item = getMergeItem();
+    item.onClick();
+
+    const afterCreate = vi.mocked(showFormDialog).mock.calls[0][5];
+    expect(afterCreate).toBeDefined();
+
+    const mockNoFfInput = { checked: true, disabled: false, addEventListener: vi.fn() };
+    const mockSquashInput = {
+      checked: false,
+      disabled: false,
+      addEventListener: vi.fn()
+    };
+    const mockDialogEl = {
+      querySelector: vi.fn((selector: string) => {
+        if (selector === "#dialogInput0") return mockNoFfInput;
+        if (selector === "#dialogInput1") return mockSquashInput;
+        return null;
+      })
+    } as unknown as HTMLElement;
+
+    afterCreate!(mockDialogEl);
+
+    // When: Squash is toggled ON then OFF
+    const changeHandler = mockSquashInput.addEventListener.mock.calls[0][1] as () => void;
+    mockSquashInput.checked = true;
+    changeHandler();
+    expect(mockNoFfInput.disabled).toBe(true);
+
+    mockSquashInput.checked = false;
+    changeHandler();
+
+    // Then: No FF is re-enabled with default value
+    expect(mockNoFfInput.disabled).toBe(false);
+    expect(mockNoFfInput.checked).toBe(true);
+  });
+});
+
+// --- S3: Cherry-pick ダイアログ拡張（2 checkbox フォーム） ---
+
+describe("Cherry-pick dialog (S3)", () => {
+  const MERGE_PARENT_HASHES = ["parent1234567890", "parent2234567890"];
+  const MOCK_COMMITS = [
+    { message: "first commit" },
+    { message: "second commit" }
+  ] as unknown as import("../../src/types").GitCommitNode[];
+  const MOCK_LOOKUP: { [hash: string]: number } = {
+    parent1234567890: 0,
+    parent2234567890: 1
+  };
+
+  function setupViewState(overrides?: Partial<{ recordOrigin: boolean; noCommit: boolean }>) {
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false, ...overrides },
+        stashUncommittedChanges: { includeUntracked: false }
+      }
+    };
+  }
+
+  function getCherryPickItem(parentHashes: string[] = PARENT_HASHES) {
+    const items = buildCommitContextMenuItems(
+      REPO,
+      HASH,
+      parentHashes,
+      MOCK_COMMITS,
+      MOCK_LOOKUP,
+      createMockElement()
+    );
+    return items.find((item) => item !== null && item.title.includes("Cherry Pick"))!;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupViewState();
+  });
+
+  it("normal commit shows showFormDialog with 2 checkboxes (TC-016)", () => {
+    // Given: A commit with a single parent
+    const item = getCherryPickItem(PARENT_HASHES);
+
+    // When: Cherry Pick is clicked
+    item.onClick();
+
+    // Then: showFormDialog is called with 2 checkbox inputs
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0].type).toBe("checkbox");
+    expect(inputs[1].type).toBe("checkbox");
+  });
+
+  it("merge commit shows showFormDialog with select + 2 checkboxes (TC-017)", () => {
+    // Given: A merge commit with multiple parents
+    const item = getCherryPickItem(MERGE_PARENT_HASHES);
+
+    // When: Cherry Pick is clicked
+    item.onClick();
+
+    // Then: showFormDialog is called with 1 select + 2 checkbox inputs
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs).toHaveLength(3);
+    expect(inputs[0].type).toBe("select");
+    expect(inputs[1].type).toBe("checkbox");
+    expect(inputs[2].type).toBe("checkbox");
+  });
+
+  it("Record Origin checkbox defaults to viewState.dialogDefaults.cherryPick.recordOrigin (TC-018)", () => {
+    // Given: viewState.dialogDefaults.cherryPick.recordOrigin = true
+    setupViewState({ recordOrigin: true });
+    const item = getCherryPickItem(PARENT_HASHES);
+
+    // When: Cherry Pick is clicked
+    item.onClick();
+
+    // Then: Record Origin checkbox value is true
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect((inputs[0] as DialogCheckboxInput).value).toBe(true);
+  });
+
+  it("No Commit checkbox defaults to viewState.dialogDefaults.cherryPick.noCommit (TC-019)", () => {
+    // Given: viewState.dialogDefaults.cherryPick.noCommit = true
+    setupViewState({ noCommit: true });
+    const item = getCherryPickItem(PARENT_HASHES);
+
+    // When: Cherry Pick is clicked
+    item.onClick();
+
+    // Then: No Commit checkbox value is true
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect((inputs[1] as DialogCheckboxInput).value).toBe(true);
+  });
+
+  it("callback sends RequestCherrypickCommit with recordOrigin and noCommit (TC-020)", () => {
+    // Given: Cherry Pick dialog is shown for normal commit
+    const item = getCherryPickItem(PARENT_HASHES);
+    item.onClick();
+
+    // When: form is submitted with both options checked
+    const actioned = vi.mocked(showFormDialog).mock.calls[0][3];
+    actioned(["checked", "checked"]);
+
+    // Then: sendMessage includes recordOrigin=true and noCommit=true
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "cherrypickCommit",
+      repo: REPO,
+      commitHash: HASH,
+      parentIndex: 0,
+      recordOrigin: true,
+      noCommit: true
+    });
+  });
+
+  it("both checkboxes have info tooltip text (TC-021)", () => {
+    // Given: Cherry Pick menu item
+    const item = getCherryPickItem(PARENT_HASHES);
+
+    // When: Cherry Pick is clicked
+    item.onClick();
+
+    // Then: both checkboxes have info properties with tooltip text
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const recordOriginInput = inputs[0] as DialogCheckboxInput;
+    const noCommitInput = inputs[1] as DialogCheckboxInput;
+    expect(recordOriginInput.info).toBeDefined();
+    expect(recordOriginInput.info).toContain("origin of the cherry pick");
+    expect(noCommitInput.info).toBeDefined();
+    expect(noCommitInput.info).toContain("staged but not committed");
+  });
+});

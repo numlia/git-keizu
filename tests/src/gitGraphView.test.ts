@@ -21,6 +21,9 @@ const mocks = vi.hoisted(() => ({
   mute: vi.fn(),
   unmute: vi.fn(),
   getRepos: vi.fn(),
+  mergeBranch: vi.fn(),
+  mergeCommit: vi.fn(),
+  cherrypickCommit: vi.fn(),
   messageHandler: { current: null as ((msg: unknown) => Promise<void>) | null }
 }));
 
@@ -75,7 +78,12 @@ vi.mock("../../src/config", () => ({
     loadMoreCommitsAutomatically: () => true,
     muteCommitsMergeCommits: () => true,
     muteCommitsNotAncestorsOfHead: () => false,
-    showCurrentBranchByDefault: () => false
+    showCurrentBranchByDefault: () => false,
+    dialogDefaults: () => ({
+      merge: { noFastForward: true, squashCommits: false, noCommit: false },
+      cherryPick: { recordOrigin: false, noCommit: false },
+      stashUncommittedChanges: { includeUntracked: false }
+    })
   }))
 }));
 
@@ -1602,5 +1610,182 @@ describe("GitGraphView loadCommits branches/authors array passthrough (S12)", ()
     // Then: getCommits is called with empty arrays
     expect(mocks.getCommits).toHaveBeenCalledTimes(1);
     expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, [], 300, true, []);
+  });
+});
+
+describe("GitGraphView merge/cherry-pick handler and viewState dialogDefaults (S13)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitGraphView.currentPanel = undefined;
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.mergeBranch.mockResolvedValue(null);
+    mocks.mergeCommit.mockResolvedValue(null);
+    mocks.cherrypickCommit.mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    GitGraphView.currentPanel?.dispose();
+    GitGraphView.currentPanel = undefined;
+  });
+
+  function createPanel(): void {
+    const ds = {
+      applyStash: mocks.applyStash,
+      popStash: mocks.popStash,
+      dropStash: mocks.dropStash,
+      branchFromStash: mocks.branchFromStash,
+      pushStash: mocks.pushStash,
+      resetUncommitted: mocks.resetUncommitted,
+      cleanUntrackedFiles: mocks.cleanUntrackedFiles,
+      getCommitComparison: mocks.getCommitComparison,
+      mergeBranch: mocks.mergeBranch,
+      mergeCommit: mocks.mergeCommit,
+      cherrypickCommit: mocks.cherrypickCommit
+    } as unknown as DataSource;
+
+    const es = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const am = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const rm = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitGraphView.createOrShow("/test/extension", ds, es, am, rm);
+  }
+
+  function getPanelHtml(): string {
+    const panelMock = vi.mocked(vscode.window.createWebviewPanel).mock.results[0].value as {
+      webview: { html: string };
+    };
+    return panelMock.webview.html;
+  }
+
+  function parseViewState(html: string): Record<string, unknown> {
+    const match = html.match(/var viewState = (.+?);/);
+    expect(match).not.toBeNull();
+    return JSON.parse(match![1]);
+  }
+
+  it("includes dialogDefaults in viewState from Config (TC-039)", async () => {
+    // Given: config.dialogDefaults() returns default values
+    // When: panel is created
+    createPanel();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Then: viewState in HTML contains dialogDefaults matching Config.dialogDefaults()
+    const viewState = parseViewState(getPanelHtml());
+    expect(viewState.dialogDefaults).toEqual({
+      merge: { noFastForward: true, squashCommits: false, noCommit: false },
+      cherryPick: { recordOrigin: false, noCommit: false },
+      stashUncommittedChanges: { includeUntracked: false }
+    });
+  });
+
+  it("passes squash=true noCommit=false to DataSource.mergeBranch (TC-040)", async () => {
+    // Given: GitGraphView instance with mocked DataSource
+    createPanel();
+
+    // When: RequestMergeBranch message is received with squash=true, noCommit=false
+    await mocks.messageHandler.current!({
+      command: "mergeBranch",
+      repo: TEST_REPO,
+      branchName: "feature-branch",
+      createNewCommit: true,
+      squash: true,
+      noCommit: false
+    });
+
+    // Then: DataSource.mergeBranch is called with squash=true, noCommit=false
+    expect(mocks.mergeBranch).toHaveBeenCalledTimes(1);
+    expect(mocks.mergeBranch).toHaveBeenCalledWith(TEST_REPO, "feature-branch", true, true, false);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "mergeBranch",
+      status: null
+    });
+  });
+
+  it("passes squash=false noCommit=true to DataSource.mergeCommit (TC-041)", async () => {
+    // Given: GitGraphView instance with mocked DataSource
+    createPanel();
+    const commitHash = "abc1234567890abcdef1234567890abcdef123456";
+
+    // When: RequestMergeCommit message is received with squash=false, noCommit=true
+    await mocks.messageHandler.current!({
+      command: "mergeCommit",
+      repo: TEST_REPO,
+      commitHash,
+      createNewCommit: false,
+      squash: false,
+      noCommit: true
+    });
+
+    // Then: DataSource.mergeCommit is called with squash=false, noCommit=true
+    expect(mocks.mergeCommit).toHaveBeenCalledTimes(1);
+    expect(mocks.mergeCommit).toHaveBeenCalledWith(TEST_REPO, commitHash, false, false, true);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "mergeCommit",
+      status: null
+    });
+  });
+
+  it("passes recordOrigin=true noCommit=true to DataSource.cherrypickCommit (TC-042)", async () => {
+    // Given: GitGraphView instance with mocked DataSource
+    createPanel();
+    const commitHash = "def4567890abcdef1234567890abcdef12345678";
+
+    // When: RequestCherrypickCommit message is received with recordOrigin=true, noCommit=true
+    await mocks.messageHandler.current!({
+      command: "cherrypickCommit",
+      repo: TEST_REPO,
+      commitHash,
+      parentIndex: 1,
+      recordOrigin: true,
+      noCommit: true
+    });
+
+    // Then: DataSource.cherrypickCommit is called with recordOrigin=true, noCommit=true
+    expect(mocks.cherrypickCommit).toHaveBeenCalledTimes(1);
+    expect(mocks.cherrypickCommit).toHaveBeenCalledWith(TEST_REPO, commitHash, 1, true, true);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "cherrypickCommit",
+      status: null
+    });
+  });
+
+  it("passes recordOrigin=false noCommit=false for legacy compat (TC-043)", async () => {
+    // Given: GitGraphView instance with mocked DataSource
+    createPanel();
+    const commitHash = "1234567890abcdef1234567890abcdef12345678";
+
+    // When: RequestCherrypickCommit message is received with recordOrigin=false, noCommit=false
+    await mocks.messageHandler.current!({
+      command: "cherrypickCommit",
+      repo: TEST_REPO,
+      commitHash,
+      parentIndex: 0,
+      recordOrigin: false,
+      noCommit: false
+    });
+
+    // Then: DataSource.cherrypickCommit is called with recordOrigin=false, noCommit=false
+    expect(mocks.cherrypickCommit).toHaveBeenCalledTimes(1);
+    expect(mocks.cherrypickCommit).toHaveBeenCalledWith(TEST_REPO, commitHash, 0, false, false);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "cherrypickCommit",
+      status: null
+    });
   });
 });

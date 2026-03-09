@@ -2533,3 +2533,240 @@ describe("getGitLog/getCommits authors array parameter (S18)", () => {
     expect(logArgs.filter((a) => a.startsWith("--author")).length).toBe(1);
   });
 });
+
+describe("mergeBranch/mergeCommit squash/noCommit", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+  const BRANCH = "feature/test";
+  const COMMIT = "abc123def456";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("mergeBranch: createNewCommit=true, squash=false, noCommit=false → --no-ff (TC-110)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: mergeBranch with createNewCommit=true, no squash, no noCommit
+    const result = await ds.mergeBranch(REPO, BRANCH, true, false, false);
+
+    // Then: git merge --no-ff <branch>
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-ff"], { cwd: REPO });
+  });
+
+  it("mergeBranch: createNewCommit=false, squash=false, noCommit=false → no flags (TC-111)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: mergeBranch with all flags false
+    const result = await ds.mergeBranch(REPO, BRANCH, false, false, false);
+
+    // Then: git merge <branch> (no flags)
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH], { cwd: REPO });
+  });
+
+  it("mergeBranch: createNewCommit=true, squash=true → --squash overrides --no-ff (TC-112)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: mergeBranch with squash=true overriding createNewCommit=true
+    const result = await ds.mergeBranch(REPO, BRANCH, true, true, false);
+
+    // Then: git merge --squash <branch> (no --no-ff)
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash"], { cwd: REPO });
+  });
+
+  it("mergeBranch: createNewCommit=false, squash=true → --squash only (TC-113)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: mergeBranch with squash=true, createNewCommit=false
+    const result = await ds.mergeBranch(REPO, BRANCH, false, true, false);
+
+    // Then: git merge --squash <branch>
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash"], { cwd: REPO });
+  });
+
+  it("mergeBranch: createNewCommit=true, noCommit=true → --no-ff --no-commit (TC-114)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: mergeBranch with createNewCommit=true, noCommit=true
+    const result = await ds.mergeBranch(REPO, BRANCH, true, false, true);
+
+    // Then: git merge --no-ff --no-commit <branch>
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-ff", "--no-commit"], {
+      cwd: REPO
+    });
+  });
+
+  it("mergeBranch: createNewCommit=false, noCommit=true → --no-commit only (TC-115)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: mergeBranch with noCommit=true only
+    const result = await ds.mergeBranch(REPO, BRANCH, false, false, true);
+
+    // Then: git merge --no-commit <branch>
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-commit"], { cwd: REPO });
+  });
+
+  it("mergeBranch: createNewCommit=true, squash=true, noCommit=true → --squash --no-commit (TC-116)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: mergeBranch with all flags true
+    const result = await ds.mergeBranch(REPO, BRANCH, true, true, true);
+
+    // Then: git merge --squash --no-commit <branch> (no --no-ff)
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash", "--no-commit"], {
+      cwd: REPO
+    });
+  });
+
+  it("mergeBranch: squash=true, noCommit=true, createNewCommit=false → --squash --no-commit (TC-117)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: mergeBranch with squash + noCommit, createNewCommit=false
+    const result = await ds.mergeBranch(REPO, BRANCH, false, true, true);
+
+    // Then: git merge --squash --no-commit <branch>
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash", "--no-commit"], {
+      cwd: REPO
+    });
+  });
+
+  it("mergeCommit: invalid commit hash with squash=true returns error (TC-118)", async () => {
+    // Given: DataSource instance with invalid commit hash
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: mergeCommit with invalid hash
+    const result = await ds.mergeCommit(REPO, "not-a-valid-hash!", true, true, true);
+
+    // Then: Returns INVALID_COMMIT_HASH_MESSAGE without calling spawn
+    expect(result).toBe("Invalid commit hash.");
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("cherrypickCommit recordOrigin/noCommit", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+  const COMMIT = "abc123def456";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("parentIndex=0, recordOrigin=false, noCommit=false → basic cherry-pick (TC-119)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: cherrypickCommit with all defaults
+    const result = await ds.cherrypickCommit(REPO, COMMIT, 0, false, false);
+
+    // Then: git cherry-pick <hash>
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT], { cwd: REPO });
+  });
+
+  it("parentIndex=0, recordOrigin=true → -x flag (TC-120)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: cherrypickCommit with recordOrigin=true
+    const result = await ds.cherrypickCommit(REPO, COMMIT, 0, true, false);
+
+    // Then: git cherry-pick -x <hash>
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT, "-x"], { cwd: REPO });
+  });
+
+  it("parentIndex=0, noCommit=true → --no-commit flag (TC-121)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: cherrypickCommit with noCommit=true
+    const result = await ds.cherrypickCommit(REPO, COMMIT, 0, false, true);
+
+    // Then: git cherry-pick --no-commit <hash>
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT, "--no-commit"], {
+      cwd: REPO
+    });
+  });
+
+  it("parentIndex=0, recordOrigin=true, noCommit=true → both flags (TC-122)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: cherrypickCommit with both flags true
+    const result = await ds.cherrypickCommit(REPO, COMMIT, 0, true, true);
+
+    // Then: git cherry-pick -x --no-commit <hash>
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT, "-x", "--no-commit"], {
+      cwd: REPO
+    });
+  });
+
+  it("parentIndex=2, recordOrigin=true, noCommit=true → merge commit full flags (TC-123)", async () => {
+    // Given: DataSource instance
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: cherrypickCommit with merge commit (parentIndex=2) and all flags
+    const result = await ds.cherrypickCommit(REPO, COMMIT, 2, true, true);
+
+    // Then: git cherry-pick -m 2 -x --no-commit <hash>
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["cherry-pick", COMMIT, "-m", "2", "-x", "--no-commit"],
+      { cwd: REPO }
+    );
+  });
+
+  it("invalid commit hash with recordOrigin=true returns error (TC-124)", async () => {
+    // Given: DataSource instance with invalid commit hash
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: cherrypickCommit with invalid hash
+    const result = await ds.cherrypickCommit(REPO, "not-valid!", 0, true, false);
+
+    // Then: Returns INVALID_COMMIT_HASH_MESSAGE without calling spawn
+    expect(result).toBe("Invalid commit hash.");
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  it("parentIndex=-1 returns invalid parent index error (TC-125)", async () => {
+    // Given: DataSource instance with negative parentIndex
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: cherrypickCommit with parentIndex=-1
+    const result = await ds.cherrypickCommit(REPO, COMMIT, -1, false, false);
+
+    // Then: Returns "Invalid parent index." without calling spawn
+    expect(result).toBe("Invalid parent index.");
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+});
