@@ -248,6 +248,36 @@
           "default": true,
           "description": "When enabled, automatically loads more commits when scrolling to the bottom of the graph."
         },
+        "git-keizu.dialog.merge.noFastForward": {
+          "type": "boolean",
+          "default": true,
+          "description": "Default state of \"Create a new commit even if fast-forward is possible\" checkbox in the Merge dialog."
+        },
+        "git-keizu.dialog.merge.squashCommits": {
+          "type": "boolean",
+          "default": false,
+          "description": "Default state of \"Squash Commits\" checkbox in the Merge dialog."
+        },
+        "git-keizu.dialog.merge.noCommit": {
+          "type": "boolean",
+          "default": false,
+          "description": "Default state of \"No Commit\" checkbox in the Merge dialog."
+        },
+        "git-keizu.dialog.cherryPick.noCommit": {
+          "type": "boolean",
+          "default": false,
+          "description": "Default state of \"No Commit\" checkbox in the Cherry Pick dialog."
+        },
+        "git-keizu.dialog.cherryPick.recordOrigin": {
+          "type": "boolean",
+          "default": false,
+          "description": "Default state of \"Record Origin\" checkbox in the Cherry Pick dialog."
+        },
+        "git-keizu.dialog.stashUncommittedChanges.includeUntracked": {
+          "type": "boolean",
+          "default": false,
+          "description": "Default state of \"Include Untracked\" checkbox in the Stash Uncommitted Changes dialog."
+        },
         "git-keizu.repository.commits.mute.mergeCommits": {
           "type": "boolean",
           "default": true,
