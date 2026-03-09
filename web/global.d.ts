@@ -50,6 +50,7 @@ declare global {
     type: "checkbox";
     name: string;
     value: boolean;
+    info?: string;
   }
   type DialogInput = DialogTextInput | DialogTextRefInput | DialogSelectInput | DialogCheckboxInput;
   type DialogInputValue = string | boolean;

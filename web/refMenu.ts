@@ -31,20 +31,57 @@ function buildMergeBranchMenuItem(repo: string, refName: string): ContextMenuIte
   return {
     title: `Merge into current branch${ELLIPSIS}`,
     onClick: () => {
-      showCheckboxDialog(
+      const noFfDefault = viewState.dialogDefaults.merge.noFastForward;
+      showFormDialog(
         `Are you sure you want to merge branch <b><i>${escapeHtml(refName)}</i></b> into the current branch?`,
-        "Create a new commit even if fast-forward is possible",
-        true,
+        [
+          {
+            type: "checkbox",
+            name: "Create a new commit even if fast-forward is possible",
+            value: noFfDefault
+          },
+          {
+            type: "checkbox",
+            name: "Squash Commits",
+            value: viewState.dialogDefaults.merge.squashCommits,
+            info: "Create a single commit on the current branch whose effect is the same as merging this branch. Squash does not create a commit automatically, so the No Commit option has no additional effect when Squash is enabled."
+          },
+          {
+            type: "checkbox",
+            name: "No Commit",
+            value: viewState.dialogDefaults.merge.noCommit,
+            info: "The changes of the merge will be staged but not committed, so that you can review and/or modify the merge result before committing."
+          }
+        ],
         "Yes, merge",
-        (createNewCommit) => {
+        (values) => {
           sendMessage({
             command: "mergeBranch",
             repo: repo,
             branchName: refName,
-            createNewCommit: createNewCommit
+            createNewCommit: values[0] === "checked",
+            squash: values[1] === "checked",
+            noCommit: values[2] === "checked"
           });
         },
-        null
+        null,
+        (dialogEl) => {
+          const squashInput = dialogEl.querySelector("#dialogInput1") as HTMLInputElement;
+          const noFfInput = dialogEl.querySelector("#dialogInput0") as HTMLInputElement;
+          if (squashInput.checked) {
+            noFfInput.checked = false;
+            noFfInput.disabled = true;
+          }
+          squashInput.addEventListener("change", () => {
+            if (squashInput.checked) {
+              noFfInput.checked = false;
+              noFfInput.disabled = true;
+            } else {
+              noFfInput.disabled = false;
+              noFfInput.checked = noFfDefault;
+            }
+          });
+        }
       );
     }
   };

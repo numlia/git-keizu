@@ -1,10 +1,5 @@
 import type { GitCommitNode, GitResetMode } from "../src/types";
-import {
-  showCheckboxDialog,
-  showConfirmationDialog,
-  showFormDialog,
-  showSelectDialog
-} from "./dialogs";
+import { showConfirmationDialog, showFormDialog, showSelectDialog } from "./dialogs";
 import { abbrevCommit, ELLIPSIS, sendMessage } from "./utils";
 
 export function buildCommitContextMenuItems(
@@ -97,15 +92,33 @@ export function buildCommitContextMenuItems(
     {
       title: `Cherry Pick${ELLIPSIS}`,
       onClick: () => {
+        const cherryPickCheckboxes: DialogCheckboxInput[] = [
+          {
+            type: "checkbox",
+            name: "Record Origin",
+            value: viewState.dialogDefaults.cherryPick.recordOrigin,
+            info: "Record that this commit was the origin of the cherry pick by appending a line to the original commit message that indicates where it was cherry picked from."
+          },
+          {
+            type: "checkbox",
+            name: "No Commit",
+            value: viewState.dialogDefaults.cherryPick.noCommit,
+            info: "Cherry picked changes will be staged but not committed, so that you can review and/or modify the result before committing."
+          }
+        ];
         if (parentHashes.length === 1) {
-          showConfirmationDialog(
+          showFormDialog(
             `Are you sure you want to cherry pick commit <b><i>${abbrevCommit(hash)}</i></b>?`,
-            () => {
+            cherryPickCheckboxes,
+            "Yes, cherry pick commit",
+            (values) => {
               sendMessage({
                 command: "cherrypickCommit",
                 repo: repo,
                 commitHash: hash,
-                parentIndex: 0
+                parentIndex: 0,
+                recordOrigin: values[0] === "checked",
+                noCommit: values[1] === "checked"
               });
             },
             sourceElem
@@ -119,17 +132,26 @@ export function buildCommitContextMenuItems(
             }`,
             value: (index + 1).toString()
           }));
-          showSelectDialog(
+          showFormDialog(
             `Are you sure you want to cherry pick merge commit <b><i>${abbrevCommit(hash)}</i></b>? Choose the parent hash on the main branch, to cherry pick the commit relative to:`,
-            "1",
-            options,
+            [
+              {
+                type: "select" as const,
+                name: "Parent: ",
+                options: options,
+                default: "1"
+              },
+              ...cherryPickCheckboxes
+            ],
             "Yes, cherry pick commit",
-            (parentIndex) => {
+            (values) => {
               sendMessage({
                 command: "cherrypickCommit",
                 repo: repo,
                 commitHash: hash,
-                parentIndex: parseInt(parentIndex, 10)
+                parentIndex: parseInt(values[0], 10),
+                recordOrigin: values[1] === "checked",
+                noCommit: values[2] === "checked"
               });
             },
             sourceElem
@@ -184,20 +206,57 @@ export function buildCommitContextMenuItems(
     {
       title: `Merge into current branch${ELLIPSIS}`,
       onClick: () => {
-        showCheckboxDialog(
+        const noFfDefault = viewState.dialogDefaults.merge.noFastForward;
+        showFormDialog(
           `Are you sure you want to merge commit <b><i>${abbrevCommit(hash)}</i></b> into the current branch?`,
-          "Create a new commit even if fast-forward is possible",
-          true,
+          [
+            {
+              type: "checkbox",
+              name: "Create a new commit even if fast-forward is possible",
+              value: noFfDefault
+            },
+            {
+              type: "checkbox",
+              name: "Squash Commits",
+              value: viewState.dialogDefaults.merge.squashCommits,
+              info: "Create a single commit on the current branch whose effect is the same as merging this branch. Squash does not create a commit automatically, so the No Commit option has no additional effect when Squash is enabled."
+            },
+            {
+              type: "checkbox",
+              name: "No Commit",
+              value: viewState.dialogDefaults.merge.noCommit,
+              info: "The changes of the merge will be staged but not committed, so that you can review and/or modify the merge result before committing."
+            }
+          ],
           "Yes, merge",
-          (createNewCommit) => {
+          (values) => {
             sendMessage({
               command: "mergeCommit",
               repo: repo,
               commitHash: hash,
-              createNewCommit: createNewCommit
+              createNewCommit: values[0] === "checked",
+              squash: values[1] === "checked",
+              noCommit: values[2] === "checked"
             });
           },
-          null
+          null,
+          (dialogEl) => {
+            const squashInput = dialogEl.querySelector("#dialogInput1") as HTMLInputElement;
+            const noFfInput = dialogEl.querySelector("#dialogInput0") as HTMLInputElement;
+            if (squashInput.checked) {
+              noFfInput.checked = false;
+              noFfInput.disabled = true;
+            }
+            squashInput.addEventListener("change", () => {
+              if (squashInput.checked) {
+                noFfInput.checked = false;
+                noFfInput.disabled = true;
+              } else {
+                noFfInput.disabled = false;
+                noFfInput.checked = noFfDefault;
+              }
+            });
+          }
         );
       }
     },

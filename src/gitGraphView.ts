@@ -189,7 +189,9 @@ export class GitGraphView {
               status: await this.dataSource.cherrypickCommit(
                 msg.repo,
                 msg.commitHash,
-                msg.parentIndex
+                msg.parentIndex,
+                msg.recordOrigin,
+                msg.noCommit
               )
             });
             break;
@@ -316,7 +318,9 @@ export class GitGraphView {
               status: await this.dataSource.mergeBranch(
                 msg.repo,
                 msg.branchName,
-                msg.createNewCommit
+                msg.createNewCommit,
+                msg.squash,
+                msg.noCommit
               )
             });
             break;
@@ -326,7 +330,9 @@ export class GitGraphView {
               status: await this.dataSource.mergeCommit(
                 msg.repo,
                 msg.commitHash,
-                msg.createNewCommit
+                msg.createNewCommit,
+                msg.squash,
+                msg.noCommit
               )
             });
             break;
@@ -478,6 +484,7 @@ export class GitGraphView {
       nonce = getNonce();
     const viewState: GitGraphViewState = {
       dateFormat: config.dateFormat(),
+      dialogDefaults: config.dialogDefaults(),
       fetchAvatars: config.fetchAvatars() && this.extensionState.isAvatarStorageAvailable(),
       graphColours: config.graphColours(),
       graphStyle: config.graphStyle(),

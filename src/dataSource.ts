@@ -595,11 +595,23 @@ export class DataSource {
     return this.runGitCommandSpawn(["branch", "-m", oldName, newName], repo);
   }
 
-  public mergeBranch(repo: string, branchName: string, createNewCommit: boolean) {
-    return this.runGitCommandSpawn(
-      ["merge", branchName, ...(createNewCommit ? ["--no-ff"] : [])],
-      repo
-    );
+  public mergeBranch(
+    repo: string,
+    branchName: string,
+    createNewCommit: boolean,
+    squash: boolean,
+    noCommit: boolean
+  ) {
+    const args = ["merge", branchName];
+    if (squash) {
+      args.push("--squash");
+    } else if (createNewCommit) {
+      args.push("--no-ff");
+    }
+    if (noCommit) {
+      args.push("--no-commit");
+    }
+    return this.runGitCommandSpawn(args, repo);
   }
 
   public deleteRemoteBranch(repo: string, remoteName: string, branchName: string) {
@@ -610,27 +622,52 @@ export class DataSource {
     return this.runGitCommandSpawn(["rebase", branchName], repo);
   }
 
-  public mergeCommit(repo: string, commitHash: string, createNewCommit: boolean) {
+  public mergeCommit(
+    repo: string,
+    commitHash: string,
+    createNewCommit: boolean,
+    squash: boolean,
+    noCommit: boolean
+  ) {
     if (!isValidCommitHash(commitHash)) {
       return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
     }
-    return this.runGitCommandSpawn(
-      ["merge", commitHash, ...(createNewCommit ? ["--no-ff"] : [])],
-      repo
-    );
+    const args = ["merge", commitHash];
+    if (squash) {
+      args.push("--squash");
+    } else if (createNewCommit) {
+      args.push("--no-ff");
+    }
+    if (noCommit) {
+      args.push("--no-commit");
+    }
+    return this.runGitCommandSpawn(args, repo);
   }
 
-  public cherrypickCommit(repo: string, commitHash: string, parentIndex: number) {
+  public cherrypickCommit(
+    repo: string,
+    commitHash: string,
+    parentIndex: number,
+    recordOrigin: boolean,
+    noCommit: boolean
+  ) {
     if (!isValidCommitHash(commitHash)) {
       return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
     }
     if (!Number.isInteger(parentIndex) || parentIndex < 0) {
       return Promise.resolve("Invalid parent index.");
     }
-    return this.runGitCommandSpawn(
-      ["cherry-pick", commitHash, ...(parentIndex > 0 ? ["-m", String(parentIndex)] : [])],
-      repo
-    );
+    const args = ["cherry-pick", commitHash];
+    if (parentIndex > 0) {
+      args.push("-m", String(parentIndex));
+    }
+    if (recordOrigin) {
+      args.push("-x");
+    }
+    if (noCommit) {
+      args.push("--no-commit");
+    }
+    return this.runGitCommandSpawn(args, repo);
   }
 
   public revertCommit(repo: string, commitHash: string, parentIndex: number) {

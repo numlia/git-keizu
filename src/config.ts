@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
 
-import { DateFormat, DateType, GraphStyle, TabIconColourTheme } from "./types";
+import { DateFormat, DateType, DialogDefaults, GraphStyle, TabIconColourTheme } from "./types";
 
 const KEYBINDING_PATTERN = /^CTRL\/CMD \+ [A-Z]$/;
 const UNASSIGNED = "UNASSIGNED";
@@ -30,6 +30,26 @@ class Config {
 
   constructor() {
     this.workspaceConfiguration = vscode.workspace.getConfiguration("git-keizu");
+  }
+
+  public dialogDefaults(): DialogDefaults {
+    return {
+      merge: {
+        noFastForward: this.workspaceConfiguration.get("dialog.merge.noFastForward", true),
+        squashCommits: this.workspaceConfiguration.get("dialog.merge.squashCommits", false),
+        noCommit: this.workspaceConfiguration.get("dialog.merge.noCommit", false)
+      },
+      cherryPick: {
+        recordOrigin: this.workspaceConfiguration.get("dialog.cherryPick.recordOrigin", false),
+        noCommit: this.workspaceConfiguration.get("dialog.cherryPick.noCommit", false)
+      },
+      stashUncommittedChanges: {
+        includeUntracked: this.workspaceConfiguration.get(
+          "dialog.stashUncommittedChanges.includeUntracked",
+          false
+        )
+      }
+    };
   }
 
   public dateFormat(): DateFormat {

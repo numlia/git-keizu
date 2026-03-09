@@ -83,8 +83,24 @@ export interface MuteCommitsConfig {
   readonly commitsNotAncestorsOfHead: boolean;
 }
 
+export interface DialogDefaults {
+  readonly merge: {
+    readonly noFastForward: boolean;
+    readonly squashCommits: boolean;
+    readonly noCommit: boolean;
+  };
+  readonly cherryPick: {
+    readonly recordOrigin: boolean;
+    readonly noCommit: boolean;
+  };
+  readonly stashUncommittedChanges: {
+    readonly includeUntracked: boolean;
+  };
+}
+
 export interface GitGraphViewState {
   dateFormat: DateFormat;
+  dialogDefaults: DialogDefaults;
   fetchAvatars: boolean;
   graphColours: string[];
   graphStyle: GraphStyle;
@@ -167,6 +183,8 @@ export interface RequestCherrypickCommit {
   repo: string;
   commitHash: string;
   parentIndex: number;
+  recordOrigin: boolean;
+  noCommit: boolean;
 }
 export interface ResponseCherrypickCommit {
   command: "cherrypickCommit";
@@ -308,6 +326,8 @@ export interface RequestMergeBranch {
   repo: string;
   branchName: string;
   createNewCommit: boolean;
+  squash: boolean;
+  noCommit: boolean;
 }
 export interface ResponseMergeBranch {
   command: "mergeBranch";
@@ -319,6 +339,8 @@ export interface RequestMergeCommit {
   repo: string;
   commitHash: string;
   createNewCommit: boolean;
+  squash: boolean;
+  noCommit: boolean;
 }
 export interface ResponseMergeCommit {
   command: "mergeCommit";

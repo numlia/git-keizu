@@ -85,7 +85,8 @@ export function showFormDialog(
   inputs: DialogInput[],
   actionName: string,
   actioned: (values: string[]) => void,
-  sourceElem: HTMLElement | null
+  sourceElem: HTMLElement | null,
+  afterCreate?: (dialogElement: HTMLElement) => void
 ) {
   let textRefInput = -1,
     multiElementForm = inputs.length > 1;
@@ -93,6 +94,10 @@ export function showFormDialog(
   for (let i = 0; i < inputs.length; i++) {
     let input = inputs[i];
     let isCheckbox = input.type === "checkbox";
+    let infoHtml = "";
+    if (input.type === "checkbox" && input.info) {
+      infoHtml = `<span class="dialogInfo" title="${escapeHtml(input.info)}">${svgIcons.info}</span>`;
+    }
     html += `<tr>${multiElementForm && !isCheckbox ? `<td>${input.name}</td>` : ""}<td>`;
     if (input.type === "select") {
       html += `<select id="dialogInput${i}">`;
@@ -101,7 +106,7 @@ export function showFormDialog(
       }
       html += "</select>";
     } else if (input.type === "checkbox") {
-      html += `<span class="dialogFormCheckbox"><label><input id="dialogInput${i}" type="checkbox"${input.value ? " checked" : ""}/><span class="customCheckbox"></span>${multiElementForm ? "" : input.name}</label></span>`;
+      html += `<span class="dialogFormCheckbox"><label><input id="dialogInput${i}" type="checkbox"${input.value ? " checked" : ""}/><span class="customCheckbox"></span>${multiElementForm ? "" : input.name}</label>${multiElementForm ? "" : infoHtml}</span>`;
     } else {
       let placeholder =
         input.type === "text" && input.placeholder !== null
@@ -110,7 +115,7 @@ export function showFormDialog(
       html += `<input id="dialogInput${i}" type="text" value="${input.default}"${placeholder}/>`;
       if (input.type === "text-ref") textRefInput = i;
     }
-    html += `</td>${multiElementForm && isCheckbox ? `<td>${input.name}</td>` : ""}</tr>`;
+    html += `</td>${multiElementForm && isCheckbox ? `<td>${input.name}${infoHtml}</td>` : ""}</tr>`;
   }
   html += "</table>";
   showDialog(
@@ -136,6 +141,10 @@ export function showFormDialog(
     },
     sourceElem
   );
+
+  if (afterCreate) {
+    afterCreate(dialog);
+  }
 
   let dialogActionBtn = document.getElementById("dialogAction")!;
 

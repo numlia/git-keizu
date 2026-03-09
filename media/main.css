@@ -712,6 +712,21 @@ svg.fileIcon {
   line-height: 20px;
   vertical-align: sub;
 }
+.dialogInfo {
+  cursor: help;
+  display: inline-block;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+#dialog .dialogInfo svg {
+  fill: var(--vscode-menu-foreground);
+  opacity: 0.6;
+  margin-right: 0;
+  vertical-align: middle;
+}
+#dialog .dialogInfo:hover svg {
+  opacity: 1;
+}
 #actionRunning {
   margin: 0 16px;
   line-height: 24px;

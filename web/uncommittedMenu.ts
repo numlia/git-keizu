@@ -26,7 +26,7 @@ export function buildUncommittedContextMenuItems(
             {
               type: "checkbox" as const,
               name: "Include Untracked",
-              value: false
+              value: viewState.dialogDefaults.stashUncommittedChanges.includeUntracked
             }
           ],
           "Stash Changes",
