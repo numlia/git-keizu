@@ -2538,7 +2538,6 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
   let ds: DataSource;
   const spawnMock = vi.mocked(cp.spawn);
   const BRANCH = "feature/test";
-  const COMMIT = "abc123def456";
 
   beforeEach(() => {
     vi.clearAllMocks();

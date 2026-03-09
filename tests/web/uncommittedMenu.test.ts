@@ -14,8 +14,8 @@ vi.mock("../../web/utils", () => ({
   ELLIPSIS: "&#8230;"
 }));
 
-import { buildUncommittedContextMenuItems } from "../../web/uncommittedMenu";
 import { showFormDialog } from "../../web/dialogs";
+import { buildUncommittedContextMenuItems } from "../../web/uncommittedMenu";
 
 const REPO = "/test/repo";
 
