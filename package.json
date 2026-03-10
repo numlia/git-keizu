@@ -2,17 +2,29 @@
   "name": "git-keizu",
   "displayName": "Git Keizu",
   "version": "0.5.4",
-  "description": "View your Git history as a graph, and do common Git actions directly from it.",
+  "description": "A modern git history graph for VS Code — view branches, commits, stashes, and tags in one visual graph, and perform git actions (checkout, merge, rebase, cherry-pick, stash) directly from it. Actively maintained successor to Git Graph.",
   "categories": [
     "SCM Providers",
     "Visualization"
   ],
   "keywords": [
     "branch",
+    "cherry-pick",
     "commit",
     "git",
+    "git graph",
+    "git history",
+    "git log",
+    "git tree",
+    "git viewer",
     "graph",
     "history",
+    "merge",
+    "rebase",
+    "scm",
+    "stash",
+    "tag",
+    "version control",
     "visualize"
   ],
   "homepage": "https://github.com/numlia/git-keizu",
@@ -277,6 +289,21 @@
           "type": "boolean",
           "default": false,
           "description": "Default state of \"Include Untracked\" checkbox in the Stash Uncommitted Changes dialog."
+        },
+        "git-keizu.repository.commits.order": {
+          "type": "string",
+          "enum": [
+            "date",
+            "topo",
+            "author-date"
+          ],
+          "enumDescriptions": [
+            "Sort commits by committer date (timestamp descending, parents always after children)",
+            "Sort commits topologically (commits on the same branch appear consecutively)",
+            "Sort commits by author date (author timestamp descending, parents always after children)"
+          ],
+          "default": "date",
+          "description": "Specifies the display order of commits in the graph."
         },
         "git-keizu.repository.commits.mute.mergeCommits": {
           "type": "boolean",
