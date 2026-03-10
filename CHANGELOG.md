@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-03-10
+
+### Added
+
+- **Configurable commit display order**: Choose how commits are sorted in the graph — by committer date (default), topologically (same-branch commits appear consecutively), or by author date. Set the global default via `git-keizu.repository.commits.order` in VS Code settings; override per repository by right-clicking the table header and picking a sort order from the context menu. The per-repository choice is persisted and takes priority over the global setting
+- **Screenshots in README**: The extension README now includes annotated screenshots showing the graph view, commit actions, branch filter, and 2-commit comparison
+
+### Changed
+
+- **Marketplace metadata**: Extension description rewritten to better convey the core value proposition; keywords expanded for improved discoverability in VS Code Marketplace and Open VSX
+
 ## [0.5.4] - 2026-03-10
 
 ### Fixed
@@ -195,7 +206,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.4...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.5...HEAD
+[0.5.5]: https://github.com/numlia/git-keizu/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/numlia/git-keizu/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/numlia/git-keizu/compare/v0.5.2...v0.5.3
 [0.5.2]: https://github.com/numlia/git-keizu/compare/v0.5.1...v0.5.2

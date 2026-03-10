@@ -32,6 +32,7 @@ An actively maintained fork of [Git Graph](https://github.com/mhutchie/vscode-gi
 ## Features
 
 - **Graph View**: See all your branches, tags, stash entries, and uncommitted changes in one visual graph. The menu bar and column headers stay fixed as you scroll, so controls are always within reach in long histories.
+- **Commit display order**: Choose how commits are sorted in the graph — Date (default, by committer date), Topological (same-branch commits appear consecutively), or Author Date. Set the global default in settings (`git-keizu.repository.commits.order`); override per repository via the table header right-click context menu. The current order is indicated with a checkmark.
 - **Muted merge commits**: Merge commits are shown with dimmed text (commit message, date, author, and hash) by default, making non-merge commits easier to spot in a busy history. Branch labels always render at full opacity regardless of mute state. Non-ancestor commits can also be muted via settings (`git-keizu.repository.commits.mute.*`).
 - **Author Filter**: A multi-select dropdown in the toolbar lets you filter commits by author — select one or more names to show only their commits, or choose "Show All" to clear the filter. The author list covers all authors reachable from HEAD (not just the currently loaded commits), so no one is missed even in long histories.
 - **Commit Details**: Click on a commit to see what changed and view diffs for any file. The panel height adjusts to your viewport size, and the view only scrolls enough to bring the panel into view — no jarring auto-center on every click. Parent hashes are clickable links that jump straight to the parent commit's details.
@@ -109,6 +110,14 @@ All settings are under the `git-keizu.*` namespace.
 | `dialog.cherryPick.recordOrigin`                  | `false` | Default state of "Record Origin" checkbox (Cherry-pick)                         |
 | `dialog.cherryPick.noCommit`                      | `false` | Default state of "No Commit" checkbox (Cherry-pick)                             |
 | `dialog.stashUncommittedChanges.includeUntracked` | `false` | Default state of "Include Untracked" checkbox (Stash Uncommitted Changes)       |
+
+### Commit Ordering (`repository.commits.order`)
+
+| Setting                    | Default | Description                                                                                                 |
+| -------------------------- | ------- | ----------------------------------------------------------------------------------------------------------- |
+| `repository.commits.order` | `date`  | Commit sort order: `date` (committer date), `topo` (topological, same-branch consecutive), or `author-date` |
+
+Per-repository override is available via the table header right-click context menu.
 
 ### Commit Muting (`repository.commits.mute.*`)
 
