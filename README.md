@@ -11,9 +11,23 @@
 [![vscode installs](https://img.shields.io/visual-studio-marketplace/i/numlia-vs.git-keizu?label=install)](https://marketplace.visualstudio.com/items?itemName=numlia-vs.git-keizu)
 [![open-vsx downloads](https://img.shields.io/open-vsx/dt/numlia-vs/git-keizu?label=open-vsx)](https://open-vsx.org/extension/numlia-vs/git-keizu)
 
-A fork of [neo-git-graph](https://github.com/asispts/neo-git-graph) by asispts, which is itself a fork of [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, based on commit [4af8583](https://github.com/mhutchie/vscode-git-graph/commit/4af8583a42082b2c230d2c0187d4eaff4b69c665) (May 9, 2019) — the last version released under the MIT license.
+**Git Keizu** is a fast, focused **git history graph** for Visual Studio Code. View all your branches, commits, stashes, and tags in one interactive visual graph — and perform git actions (checkout, merge, rebase, cherry-pick, stash) directly from it, without ever opening a terminal.
 
-Git Keizu is a personal take on a git history viewer — shaped around the features I actually use every day. The goal is a focused, dependable tool, not the most feature-complete one.
+An actively maintained fork of [Git Graph](https://github.com/mhutchie/vscode-git-graph) (MIT, 2019), intentionally kept focused on the essentials. If the core graph experience is what you're after, this is for you.
+
+## Screenshots
+
+**Graph view** — all branches, tags, stashes, and uncommitted changes in one visual graph. Merge commits are dimmed by default to keep the important commits easy to spot:
+![Graph overview](./resources/screenshots/graph-overview.gif)
+
+**Commit actions** — right-click any commit to checkout, cherry-pick, revert, merge, reset, or add a tag, without ever opening a terminal:
+![Commit actions](./resources/screenshots/commit-actions.png)
+
+**Branch filter** — narrow the graph to one or more branches with a multi-select dropdown:
+![Branch filter](./resources/screenshots/branch-filter.png)
+
+**2-commit comparison** — Ctrl/Cmd+click a second commit to see all changes between the two:
+![2-commit comparison](./resources/screenshots/commit-comparison.png)
 
 ## Features
 
