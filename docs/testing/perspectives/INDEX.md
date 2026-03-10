@@ -1,17 +1,17 @@
 # テスト観点表インデックス
 
-> Auto-generated: 2026-03-09T15:00:00+09:00
+> Auto-generated: 2026-03-10T12:00:00+09:00
 > Total files: 17
-> Total sections: 130
-> Total cases: 612
+> Total sections: 134
+> Total cases: 635
 
 ## ソースファイル → 観点表（正引き）
 
 | Source File            | Perspectives File           | Sections | Cases | Last Updated |
 | ---------------------- | --------------------------- | -------- | ----- | ------------ |
-| src/config.ts          | src/config-test.md          | 7        | 34    | 2026-03-09   |
-| src/dataSource.ts      | src/dataSource-test.md      | 20       | 125   | 2026-03-09   |
-| src/gitGraphView.ts    | src/gitGraphView-test.md    | 13       | 43    | 2026-03-09   |
+| src/config.ts          | src/config-test.md          | 8        | 37    | 2026-03-10   |
+| src/dataSource.ts      | src/dataSource-test.md      | 21       | 131   | 2026-03-10   |
+| src/gitGraphView.ts    | src/gitGraphView-test.md    | 14       | 47    | 2026-03-10   |
 | src/repoManager.ts     | src/repoManager-test.md     | 1        | 3     | 2026-02-27   |
 | src/types.ts           | src/types-test.md           | 1        | 7     | 2026-02-25   |
 | web/commitMenu.ts      | web/commitMenu-test.md      | 3        | 21    | 2026-03-09   |
@@ -21,7 +21,7 @@
 | web/fileTree.ts        | web/fileTree-test.md        | 1        | 10    | 2026-03-01   |
 | web/findWidget.ts      | web/findWidget-test.md      | 7        | 32    | 2026-02-25   |
 | web/graph.ts           | web/graph-test.md           | 17       | 59    | 2026-03-08   |
-| web/main.ts            | web/main-test.md            | 33       | 183   | 2026-03-08   |
+| web/main.ts            | web/main-test.md            | 34       | 193   | 2026-03-10   |
 | web/messageHandler.ts  | web/messageHandler-test.md  | 5        | 14    | 2026-03-05   |
 | web/refMenu.ts         | web/refMenu-test.md         | 7        | 32    | 2026-03-09   |
 | web/uncommittedMenu.ts | web/uncommittedMenu-test.md | 1        | 3     | 2026-03-09   |
@@ -44,4 +44,5 @@
 | Feature 013 (scroll-position-restore)   | web/main-test.md                                                                                                                                                    |
 | Feature 013 (arrow-key-navigation)      | web/graph-test.md, web/main-test.md                                                                                                                                 |
 | Feature 014 (dialog-defaults)           | src/config-test.md, src/dataSource-test.md, src/gitGraphView-test.md, web/commitMenu-test.md, web/dialogs-test.md, web/refMenu-test.md, web/uncommittedMenu-test.md |
+| Feature 015 (commit-sort-order)         | src/config-test.md, src/dataSource-test.md, src/gitGraphView-test.md, web/main-test.md                                                                              |
 | test-plan (既存テスト)                  | src/dataSource-test.md                                                                                                                                              |

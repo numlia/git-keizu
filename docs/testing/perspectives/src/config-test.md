@@ -112,3 +112,17 @@
 | TC-032  | dialog.cherryPick.recordOrigin=true                  | Equivalence - normal (custom)        | cherryPick.recordOrigin=true を返す                                                                                                                                                        | カスタム値   |
 | TC-033  | dialog.cherryPick.noCommit=true                      | Equivalence - normal (custom)        | cherryPick.noCommit=true を返す                                                                                                                                                            | カスタム値   |
 | TC-034  | dialog.stashUncommittedChanges.includeUntracked=true | Equivalence - normal (custom)        | stashUncommittedChanges.includeUntracked=true を返す                                                                                                                                       | カスタム値   |
+
+## S8: commitOrdering() コミット表示順序設定
+
+> Origin: Feature 015 (commit-sort-order) (aidd-spec-tasks-test)
+> Added: 2026-03-10
+
+**シグネチャ**: `commitOrdering(): CommitOrdering`
+**テスト対象パス**: `src/config.ts`
+
+| Case ID | Input / Precondition     | Perspective (Equivalence / Boundary) | Expected Result      | Notes        |
+| ------- | ------------------------ | ------------------------------------ | -------------------- | ------------ |
+| TC-035  | 設定未指定（デフォルト） | Equivalence - normal (default)       | "date" を返す        | デフォルト値 |
+| TC-036  | 設定値="topo"            | Equivalence - normal                 | "topo" を返す        | 有効な代替値 |
+| TC-037  | 設定値="author-date"     | Equivalence - normal                 | "author-date" を返す | 有効な代替値 |

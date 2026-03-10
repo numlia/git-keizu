@@ -521,3 +521,23 @@
 | TC-181  | ナビゲーション失敗（newIndex=-1 or DOM 要素なし）    | Equivalence - normal (no nav)        | preventDefault() と stopPropagation() が呼び出されない | イベント透過   |
 | TC-182  | Shift のみ + ArrowUp（Ctrl/Cmd なし）                | Equivalence - abnormal               | Arrow キー処理スキップ（修飾キーパターン不一致）       | フォールスルー |
 | TC-183  | Alt + ArrowUp（Ctrl/Cmd なし）                       | Equivalence - abnormal               | Arrow キー処理スキップ（修飾キーパターン不一致）       | フォールスルー |
+
+## S34: コミット表示順序 ソート順解決・コンテキストメニュー
+
+> Origin: Feature 015 (commit-sort-order) (aidd-spec-tasks-test)
+> Added: 2026-03-10
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                      | Perspective (Equivalence / Boundary) | Expected Result                                                                    | Notes                      |
+| ------- | --------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------- | -------------------------- |
+| TC-184  | repoState.commitOrdering="topo", グローバル="date"        | Equivalence - normal                 | 有効ソート順は "topo"（リポジトリ設定優先）                                        | REQ-9.2 オーバーライド     |
+| TC-185  | repoState.commitOrdering="default", グローバル="topo"     | Equivalence - normal (fallback)      | 有効ソート順は "topo"（グローバルにフォールバック）                                | "default" はグローバル使用 |
+| TC-186  | repoState.commitOrdering=undefined, グローバル="date"     | Equivalence - normal (unset)         | 有効ソート順は "date"（グローバルにフォールバック）                                | 未設定時のフォールバック   |
+| TC-187  | repoState.commitOrdering="author-date", グローバル="date" | Equivalence - normal                 | 有効ソート順は "author-date"（リポジトリ設定優先）                                 | 3番目の選択肢確認          |
+| TC-188  | viewState.commitOrdering="topo" で初期化                  | Equivalence - normal (init)          | グローバルデフォルトが "topo" に設定される                                         | viewState からの初期化     |
+| TC-189  | requestLoadCommits() 呼び出し                             | Equivalence - normal                 | リクエストメッセージに有効ソート順が commitOrdering フィールドとして含まれる       | メッセージプロトコル       |
+| TC-190  | テーブルヘッダー右クリック                                | Equivalence - normal                 | コンテキストメニューに "Date", "Author Date", "Topological" の 3 項目が表示される  | REQ-2.2 メニュー構成       |
+| TC-191  | 現在の有効ソート順が "topo"                               | Equivalence - normal (checkmark)     | "Topological" にチェックマーク（"✓ " プレフィックス）が表示される                  | 視覚的識別                 |
+| TC-192  | コンテキストメニューで "Author Date" を選択               | Equivalence - normal (select)        | repoState.commitOrdering が "author-date" に更新され、saveRepoState メッセージ送信 | 永続化                     |
+| TC-193  | コンテキストメニューでソート順を選択                      | Equivalence - normal (refresh)       | requestLoadCommits がハードリフレッシュ（hard=true）で呼ばれる                     | 即時反映                   |

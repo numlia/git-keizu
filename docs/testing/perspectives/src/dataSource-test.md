@@ -336,3 +336,20 @@
 | TC-123  | parentIndex=2, recordOrigin=true, noCommit=true           | Equivalence - normal (merge commit)  | git args: `["cherry-pick", "-m", "2", "-x", "--no-commit", hash]` | マージコミットの全フラグ |
 | TC-124  | 不正なコミットハッシュ, recordOrigin=true, noCommit=false | Boundary - invalid hash              | INVALID_COMMIT_HASH_MESSAGE を返す                                | バリデーション維持       |
 | TC-125  | parentIndex=-1, recordOrigin=false, noCommit=false        | Boundary - invalid parentIndex       | "Invalid parent index." を返す                                    | バリデーション維持       |
+
+## S21: getGitLog() コミット表示順序（commitOrdering パラメータ）
+
+> Origin: Feature 015 (commit-sort-order) (aidd-spec-tasks-test)
+> Added: 2026-03-10
+
+**シグネチャ**: `private getGitLog(repo: string, branches: string[], num: number, showRemoteBranches: boolean, authors: string[], commitOrdering: CommitOrdering)`
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                                         | Perspective (Equivalence / Boundary) | Expected Result                                                                      | Notes                                     |
+| ------- | ------------------------------------------------------------ | ------------------------------------ | ------------------------------------------------------------------------------------ | ----------------------------------------- |
+| TC-126  | commitOrdering="date"                                        | Equivalence - normal                 | git log 引数に "--date-order" が含まれる                                             | デフォルトと同じ動作                      |
+| TC-127  | commitOrdering="topo"                                        | Equivalence - normal                 | git log 引数に "--topo-order" が含まれる                                             | トポロジカル順序                          |
+| TC-128  | commitOrdering="author-date"                                 | Equivalence - normal                 | git log 引数に "--author-date-order" が含まれる                                      | 著者日時順序                              |
+| TC-129  | COMMIT_ORDER_FLAGS 定数マッピング                            | Equivalence - normal (exhaustive)    | 3つのキー（date, topo, author-date）が存在し、対応するフラグ文字列にマッピングされる | CommitOrdering 型の全値を網羅             |
+| TC-130  | getCommits(repo, branches, max, showRemote, authors, "topo") | Equivalence - normal (passthrough)   | getGitLog に commitOrdering="topo" が正しく渡される                                  | getCommits → getGitLog パラメータ中継     |
+| TC-131  | commitOrdering="date" （後方互換確認）                       | Equivalence - normal (backward)      | 既存のハードコード "--date-order" と同じ git log 引数が生成される                    | v0.5.4 以前と同じ動作であることを保証する |

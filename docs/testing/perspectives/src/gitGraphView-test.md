@@ -172,3 +172,17 @@
 | TC-041  | RequestMergeCommit (squash=false, noCommit=true)             | Equivalence - normal                 | DataSource.mergeCommit に squash=false, noCommit=true が渡される                 | -                |
 | TC-042  | RequestCherrypickCommit (recordOrigin=true, noCommit=true)   | Equivalence - normal                 | DataSource.cherrypickCommit に recordOrigin=true, noCommit=true が渡される       | -                |
 | TC-043  | RequestCherrypickCommit (recordOrigin=false, noCommit=false) | Equivalence - normal                 | DataSource.cherrypickCommit に recordOrigin=false, noCommit=false が渡される     | 従来互換         |
+
+## S14: viewState commitOrdering 受け渡し / loadCommits ハンドラ
+
+> Origin: Feature 015 (commit-sort-order) (aidd-spec-tasks-test)
+> Added: 2026-03-10
+
+**テスト対象パス**: `src/gitGraphView.ts`
+
+| Case ID | Input / Precondition                                  | Perspective (Equivalence / Boundary) | Expected Result                                                                  | Notes                |
+| ------- | ----------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------- | -------------------- |
+| TC-044  | getHtmlForWebview() 呼び出し                          | Equivalence - normal                 | viewState に commitOrdering が含まれ、Config.commitOrdering() の返却値と一致する | 設定パイプライン検証 |
+| TC-045  | loadCommits メッセージに commitOrdering="topo"        | Equivalence - normal                 | dataSource.getCommits() に commitOrdering="topo" が渡される                      | -                    |
+| TC-046  | loadCommits メッセージに commitOrdering="author-date" | Equivalence - normal                 | dataSource.getCommits() に commitOrdering="author-date" が渡される               | -                    |
+| TC-047  | loadCommits メッセージに commitOrdering="date"        | Equivalence - normal (default)       | dataSource.getCommits() に commitOrdering="date" が渡される                      | デフォルト動作確認   |
