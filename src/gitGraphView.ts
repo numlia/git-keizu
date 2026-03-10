@@ -301,7 +301,8 @@ export class GitGraphView {
                 msg.branches,
                 msg.maxCommits,
                 msg.showRemoteBranches,
-                msg.authors
+                msg.authors,
+                msg.commitOrdering
               )),
               hard: msg.hard
             });
@@ -483,6 +484,7 @@ export class GitGraphView {
     const config = getConfig(),
       nonce = getNonce();
     const viewState: GitGraphViewState = {
+      commitOrdering: config.commitOrdering(),
       dateFormat: config.dateFormat(),
       dialogDefaults: config.dialogDefaults(),
       fetchAvatars: config.fetchAvatars() && this.extensionState.isAvatarStorageAvailable(),

@@ -63,6 +63,7 @@ export interface GitRefData {
 export type GitRepoSet = { [repo: string]: GitRepoState };
 export interface GitRepoState {
   columnWidths: number[] | null;
+  commitOrdering?: RepoCommitOrdering;
   fileViewType?: "tree" | "list";
 }
 
@@ -99,6 +100,7 @@ export interface DialogDefaults {
 }
 
 export interface GitGraphViewState {
+  commitOrdering: CommitOrdering;
   dateFormat: DateFormat;
   dialogDefaults: DialogDefaults;
   fetchAvatars: boolean;
@@ -134,6 +136,8 @@ export type DateType = "Author Date" | "Commit Date";
 export type GraphStyle = "rounded" | "angular";
 export type TabIconColourTheme = "colour" | "grey";
 export type GitCommandStatus = string | null;
+export type CommitOrdering = "date" | "topo" | "author-date";
+export type RepoCommitOrdering = CommitOrdering | "default";
 export type GitResetMode = "soft" | "mixed" | "hard";
 export type GitFileChangeType = "A" | "M" | "D" | "R";
 
@@ -301,6 +305,7 @@ export interface RequestLoadCommits {
   showRemoteBranches: boolean;
   hard: boolean;
   authors: string[];
+  commitOrdering: CommitOrdering;
 }
 export interface ResponseLoadCommits {
   command: "loadCommits";

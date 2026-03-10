@@ -1,6 +1,13 @@
 import * as vscode from "vscode";
 
-import { DateFormat, DateType, DialogDefaults, GraphStyle, TabIconColourTheme } from "./types";
+import {
+  CommitOrdering,
+  DateFormat,
+  DateType,
+  DialogDefaults,
+  GraphStyle,
+  TabIconColourTheme
+} from "./types";
 
 const KEYBINDING_PATTERN = /^CTRL\/CMD \+ [A-Z]$/;
 const UNASSIGNED = "UNASSIGNED";
@@ -133,6 +140,10 @@ class Config {
 
   public tabIconColourTheme(): TabIconColourTheme {
     return this.workspaceConfiguration.get("tabIconColourTheme", "colour");
+  }
+
+  public commitOrdering(): CommitOrdering {
+    return this.workspaceConfiguration.get("repository.commits.order", "date");
   }
 
   public muteCommitsMergeCommits(): boolean {

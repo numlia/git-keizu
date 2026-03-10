@@ -57,6 +57,12 @@ const ALL_BRANCHES_VALUE = "";
 const REMOTE_BRANCH_PREFIX = "remotes/";
 const GRAPH_AUTO_LAYOUT_MAX_RATIO = 0.4;
 const GRAPH_COL_MIN_WIDTH = 64;
+const COMMIT_ORDERING_MENU_ITEMS: { label: string; value: GG.RepoCommitOrdering }[] = [
+  { label: "Default", value: "default" },
+  { label: "Date", value: "date" },
+  { label: "Author Date", value: "author-date" },
+  { label: "Topological", value: "topo" }
+];
 const FILE_VIEW_LIST = "list" as const;
 const FILE_VIEW_TREE = "tree" as const;
 type FileViewType = typeof FILE_VIEW_LIST | typeof FILE_VIEW_TREE;
@@ -110,6 +116,7 @@ class GitGraphView {
   private loadBranchesCallback: ((changes: boolean, isRepo: boolean) => void) | null = null;
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
 
+  private commitOrdering: GG.CommitOrdering;
   private selectedAuthors: string[] = [];
 
   private stashNavigationIndex: number = -1;
@@ -123,6 +130,7 @@ class GitGraphView {
     prevState: WebViewState | null
   ) {
     this.gitRepos = repos;
+    this.commitOrdering = viewState.commitOrdering;
     this.config = config;
     this.maxCommits = config.initialLoadCommits;
     this.graph = new Graph("commitGraph", this.config);
@@ -496,8 +504,16 @@ class GitGraphView {
       maxCommits: this.maxCommits,
       showRemoteBranches: this.showRemoteBranches,
       hard: hard,
-      authors: this.selectedAuthors
+      authors: this.selectedAuthors,
+      commitOrdering: this.getEffectiveCommitOrdering()
     });
+  }
+  private getEffectiveCommitOrdering(): GG.CommitOrdering {
+    const repoOrdering = this.gitRepos[this.currentRepo]?.commitOrdering;
+    if (repoOrdering !== undefined && repoOrdering !== "default") {
+      return repoOrdering;
+    }
+    return this.commitOrdering;
   }
   private requestLoadBranchesAndCommits(hard: boolean) {
     this.requestLoadBranches(hard, (branchChanges: boolean, isRepo: boolean) => {
@@ -659,6 +675,7 @@ class GitGraphView {
       ? '<div id="loadMoreCommitsBtn" class="roundedBtn">Load More Commits</div>'
       : "";
     this.makeTableResizable();
+    this.setupColumnHeaderContextMenu();
 
     if (this.moreCommitsAvailable) {
       document.getElementById("loadMoreCommitsBtn")!.addEventListener("click", () => {
@@ -974,6 +991,33 @@ class GitGraphView {
     });
     colHeadersElem.addEventListener("mouseup", stopResizing);
     colHeadersElem.addEventListener("mouseleave", stopResizing);
+  }
+  private setupColumnHeaderContextMenu() {
+    const colHeadersElem = document.getElementById("tableColHeaders");
+    if (colHeadersElem === null) return;
+    colHeadersElem.addEventListener("contextmenu", (e: MouseEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const repoOrdering: GG.RepoCommitOrdering =
+        this.gitRepos[this.currentRepo]?.commitOrdering ?? "default";
+      const items: ContextMenuElement[] = COMMIT_ORDERING_MENU_ITEMS.map(({ label, value }) => ({
+        title: value === repoOrdering ? `\u2713 ${label}` : label,
+        onClick: () => {
+          const updatedRepo: GG.GitRepoState = {
+            ...this.gitRepos[this.currentRepo],
+            commitOrdering: value
+          };
+          this.gitRepos[this.currentRepo] = updatedRepo;
+          sendMessage({
+            command: "saveRepoState",
+            repo: this.currentRepo,
+            state: updatedRepo
+          });
+          this.requestLoadCommits(true, () => {});
+        }
+      }));
+      showContextMenu(e, items, colHeadersElem);
+    });
   }
 
   /* Observers */

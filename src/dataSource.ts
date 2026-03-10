@@ -3,6 +3,7 @@ import * as path from "node:path";
 
 import { getConfig } from "./config";
 import {
+  CommitOrdering,
   GitCommandStatus,
   GitCommit,
   GitCommitDetails,
@@ -39,6 +40,12 @@ const NUMSTAT_ADDITIONS_INDEX = 0;
 const NUMSTAT_DELETIONS_INDEX = 1;
 const NUMSTAT_FILE_NAME_INDEX = 2;
 const VALID_FILE_CHANGE_TYPES: ReadonlySet<string> = new Set(["A", "M", "D", "R"]);
+
+export const COMMIT_ORDER_FLAGS: Readonly<Record<CommitOrdering, string>> = {
+  date: "--date-order",
+  topo: "--topo-order",
+  "author-date": "--author-date-order"
+};
 
 /**
  * Commit details format field indices (used in gitCommitDetailsFormat and commitDetails parser).
@@ -137,10 +144,11 @@ export class DataSource {
     branches: string[],
     maxCommits: number,
     showRemoteBranches: boolean,
-    authors: string[]
+    authors: string[],
+    commitOrdering: CommitOrdering
   ) {
     const [commits, refData, stashes, authorList] = await Promise.all([
-      this.getGitLog(repo, branches, maxCommits + 1, showRemoteBranches, authors),
+      this.getGitLog(repo, branches, maxCommits + 1, showRemoteBranches, authors, commitOrdering),
       this.getRefs(repo, showRemoteBranches),
       this.getStashes(repo),
       this.getAuthors(repo)
@@ -845,9 +853,15 @@ export class DataSource {
     branches: string[],
     num: number,
     showRemoteBranches: boolean,
-    authors: string[]
+    authors: string[],
+    commitOrdering: CommitOrdering
   ) {
-    const args = ["log", `--max-count=${num}`, `--format=${this.gitLogFormat}`, "--date-order"];
+    const args = [
+      "log",
+      `--max-count=${num}`,
+      `--format=${this.gitLogFormat}`,
+      COMMIT_ORDER_FLAGS[commitOrdering]
+    ];
     for (const author of authors) {
       args.push(`--author=${author}`);
     }
