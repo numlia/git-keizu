@@ -23,8 +23,8 @@ vi.mock("node:child_process", () => ({
   spawn: vi.fn()
 }));
 
-import { DataSource } from "../../src/dataSource";
-import { type GitStash, UNCOMMITTED_CHANGES_HASH } from "../../src/types";
+import { COMMIT_ORDER_FLAGS, DataSource } from "../../src/dataSource";
+import { type CommitOrdering, type GitStash, UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 
 const SEP = "XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb";
 const REPO = "/test/repo";
@@ -352,7 +352,7 @@ describe("stash integration in getCommits", () => {
     setupSpawnForCommits({ logOutput, stashOutput });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, [], 10, false, []);
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: The matching commit node has stash info attached
     const stashCommit = result.commits.find((c) => c.hash === commitHash);
@@ -390,7 +390,7 @@ describe("stash integration in getCommits", () => {
     setupSpawnForCommits({ logOutput, stashOutput });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, [], 10, false, []);
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: Stash node is inserted before the base commit
     expect(result.commits).toHaveLength(3);
@@ -430,7 +430,7 @@ describe("stash integration in getCommits", () => {
     setupSpawnForCommits({ logOutput, stashOutput });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, [], 10, false, []);
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: Commit array is unchanged (stash is skipped)
     expect(result.commits).toHaveLength(1);
@@ -475,7 +475,7 @@ describe("stash integration in getCommits", () => {
     setupSpawnForCommits({ logOutput, stashOutput });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, [], 10, false, []);
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: Newer stash appears before older stash (date descending)
     expect(result.commits).toHaveLength(3);
@@ -494,7 +494,7 @@ describe("stash integration in getCommits", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, [], 10, false, []);
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: Commits are returned as-is with no stash info
     expect(result.commits).toHaveLength(2);
@@ -556,7 +556,7 @@ describe("stash integration in getCommits", () => {
     setupSpawnForCommits({ logOutput, stashOutput });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, [], 10, false, []);
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: Each stash is inserted before its respective base commit
     expect(result.commits).toHaveLength(6);
@@ -2002,7 +2002,7 @@ describe("getCommits authorFilter", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with authorFilter
-    await ds.getCommits(REPO, [], 10, false, ["John Doe"]);
+    await ds.getCommits(REPO, [], 10, false, ["John Doe"], "date");
 
     // Then: git log args include --author=John Doe
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2020,7 +2020,7 @@ describe("getCommits authorFilter", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called without authorFilter
-    await ds.getCommits(REPO, [], 10, false, []);
+    await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: git log args do not include --author
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2038,7 +2038,7 @@ describe("getCommits authorFilter", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with empty authorFilter
-    await ds.getCommits(REPO, [], 10, false, []);
+    await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: git log args do not include --author
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2056,7 +2056,7 @@ describe("getCommits authorFilter", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with special character authorFilter
-    await ds.getCommits(REPO, [], 10, false, ["Jane O'Brien"]);
+    await ds.getCommits(REPO, [], 10, false, ["Jane O'Brien"], "date");
 
     // Then: --author flag contains the exact string (no escaping needed with spawn)
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2444,7 +2444,7 @@ describe("getCommits authors integration", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "", authorsOutput });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, [], 10, false, []);
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: Return value contains authors field with sorted author list
     expect(result.authors).toEqual(["Alice", "Bob", "Charlie"]);
@@ -2469,7 +2469,7 @@ describe("getCommits authors integration", () => {
     });
 
     // When: getCommits is called
-    const result = await ds.getCommits(REPO, [], 10, false, []);
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: commits/head/moreCommitsAvailable are normal, authors is empty array
     expect(result.commits).toHaveLength(1);
@@ -2502,7 +2502,7 @@ describe("getGitLog branches array parameter (S17)", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with multiple branches
-    await ds.getCommits(REPO, ["main", "dev"], 10, false, []);
+    await ds.getCommits(REPO, ["main", "dev"], 10, false, [], "date");
 
     // Then: git log args contain "main" and "dev" but not --branches/--tags
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2520,7 +2520,7 @@ describe("getGitLog branches array parameter (S17)", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with empty branches
-    await ds.getCommits(REPO, [], 10, false, []);
+    await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: git log args contain --branches --tags
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2536,7 +2536,7 @@ describe("getGitLog branches array parameter (S17)", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with single branch
-    await ds.getCommits(REPO, ["feature/x"], 10, false, []);
+    await ds.getCommits(REPO, ["feature/x"], 10, false, [], "date");
 
     // Then: git log args contain "feature/x"
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2551,7 +2551,7 @@ describe("getGitLog branches array parameter (S17)", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with branches and showRemoteBranches=true
-    await ds.getCommits(REPO, ["main", "dev"], 10, true, []);
+    await ds.getCommits(REPO, ["main", "dev"], 10, true, [], "date");
 
     // Then: git log args contain branch names but NOT --remotes
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2568,7 +2568,7 @@ describe("getGitLog branches array parameter (S17)", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with empty branches and showRemoteBranches=true
-    await ds.getCommits(REPO, [], 10, true, []);
+    await ds.getCommits(REPO, [], 10, true, [], "date");
 
     // Then: git log args contain --branches --tags --remotes
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2585,7 +2585,7 @@ describe("getGitLog branches array parameter (S17)", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with empty branches and showRemoteBranches=false
-    await ds.getCommits(REPO, [], 10, false, []);
+    await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: git log args contain --branches --tags but NOT --remotes
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2620,7 +2620,7 @@ describe("getGitLog/getCommits authors array parameter (S18)", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with multiple authors
-    await ds.getCommits(REPO, [], 10, false, ["Alice", "Bob"]);
+    await ds.getCommits(REPO, [], 10, false, ["Alice", "Bob"], "date");
 
     // Then: git log args contain both --author=Alice and --author=Bob
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2636,7 +2636,7 @@ describe("getGitLog/getCommits authors array parameter (S18)", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with empty authors
-    await ds.getCommits(REPO, [], 10, false, []);
+    await ds.getCommits(REPO, [], 10, false, [], "date");
 
     // Then: git log args do not contain --author
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2652,7 +2652,7 @@ describe("getGitLog/getCommits authors array parameter (S18)", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with special character author
-    await ds.getCommits(REPO, [], 10, false, ["Jane O'Brien"]);
+    await ds.getCommits(REPO, [], 10, false, ["Jane O'Brien"], "date");
 
     // Then: --author flag contains exact string (no shell injection via spawn)
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2667,7 +2667,7 @@ describe("getGitLog/getCommits authors array parameter (S18)", () => {
     setupSpawnForCommits({ logOutput, stashOutput: "" });
 
     // When: getCommits is called with single author
-    await ds.getCommits(REPO, [], 10, false, ["Alice"]);
+    await ds.getCommits(REPO, [], 10, false, ["Alice"], "date");
 
     // Then: git log args contain exactly one --author=Alice
     const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
@@ -2911,5 +2911,134 @@ describe("cherrypickCommit recordOrigin/noCommit", () => {
     // Then: Returns "Invalid parent index." without calling spawn
     expect(result).toBe("Invalid parent index.");
     expect(spawnMock).not.toHaveBeenCalled();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S21: getGitLog() コミット表示順序（commitOrdering パラメータ）      */
+/* ------------------------------------------------------------------ */
+
+describe("getGitLog() commit ordering parameter (S21)", () => {
+  let ds: DataSource;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  it('commitOrdering="date" passes --date-order to git log (TC-126)', async () => {
+    // Given: DataSource with commitOrdering="date"
+    const commitLine = makeCommitLine("abc1234", "", "Alice", "alice@test.com", 1000, "commit 1");
+    setupSpawnForCommits({
+      logOutput: `${commitLine}\n`,
+      stashOutput: ""
+    });
+
+    // When: getCommits is called with commitOrdering="date"
+    await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: spawn is called with --date-order in args
+    const spawnMock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+    const logCall = spawnMock.mock.calls.find(
+      (call: unknown[]) => (call[1] as string[])[0] === "log"
+    );
+    expect(logCall).toBeDefined();
+    expect(logCall![1] as string[]).toContain("--date-order");
+  });
+
+  it('commitOrdering="topo" passes --topo-order to git log (TC-127)', async () => {
+    // Given: DataSource with commitOrdering="topo"
+    const commitLine = makeCommitLine("abc1234", "", "Alice", "alice@test.com", 1000, "commit 1");
+    setupSpawnForCommits({
+      logOutput: `${commitLine}\n`,
+      stashOutput: ""
+    });
+
+    // When: getCommits is called with commitOrdering="topo"
+    await ds.getCommits(REPO, [], 10, false, [], "topo");
+
+    // Then: spawn is called with --topo-order in args
+    const spawnMock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+    const logCall = spawnMock.mock.calls.find(
+      (call: unknown[]) => (call[1] as string[])[0] === "log"
+    );
+    expect(logCall).toBeDefined();
+    expect(logCall![1] as string[]).toContain("--topo-order");
+  });
+
+  it('commitOrdering="author-date" passes --author-date-order to git log (TC-128)', async () => {
+    // Given: DataSource with commitOrdering="author-date"
+    const commitLine = makeCommitLine("abc1234", "", "Alice", "alice@test.com", 1000, "commit 1");
+    setupSpawnForCommits({
+      logOutput: `${commitLine}\n`,
+      stashOutput: ""
+    });
+
+    // When: getCommits is called with commitOrdering="author-date"
+    await ds.getCommits(REPO, [], 10, false, [], "author-date");
+
+    // Then: spawn is called with --author-date-order in args
+    const spawnMock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+    const logCall = spawnMock.mock.calls.find(
+      (call: unknown[]) => (call[1] as string[])[0] === "log"
+    );
+    expect(logCall).toBeDefined();
+    expect(logCall![1] as string[]).toContain("--author-date-order");
+  });
+
+  it("COMMIT_ORDER_FLAGS covers all CommitOrdering values (TC-129)", () => {
+    // Given: All valid CommitOrdering values
+    const allOrderings: CommitOrdering[] = ["date", "topo", "author-date"];
+
+    // When: Checking COMMIT_ORDER_FLAGS keys
+    // Then: All CommitOrdering values are present as keys with correct flag values
+    expect(Object.keys(COMMIT_ORDER_FLAGS).sort()).toEqual(allOrderings.sort());
+    expect(COMMIT_ORDER_FLAGS["date"]).toBe("--date-order");
+    expect(COMMIT_ORDER_FLAGS["topo"]).toBe("--topo-order");
+    expect(COMMIT_ORDER_FLAGS["author-date"]).toBe("--author-date-order");
+  });
+
+  it("getCommits passes commitOrdering to getGitLog (TC-130)", async () => {
+    // Given: DataSource instance
+    const commitLine = makeCommitLine("abc1234", "", "Alice", "alice@test.com", 1000, "commit 1");
+    setupSpawnForCommits({
+      logOutput: `${commitLine}\n`,
+      stashOutput: ""
+    });
+
+    // When: getCommits is called with commitOrdering="topo"
+    await ds.getCommits(REPO, [], 10, false, [], "topo");
+
+    // Then: git log spawn args contain --topo-order (proving passthrough)
+    const spawnMock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+    const logCall = spawnMock.mock.calls.find(
+      (call: unknown[]) => (call[1] as string[])[0] === "log"
+    );
+    expect(logCall).toBeDefined();
+    expect(logCall![1] as string[]).toContain("--topo-order");
+    expect(logCall![1] as string[]).not.toContain("--date-order");
+  });
+
+  it('commitOrdering="date" produces same args as previous hardcoded --date-order (TC-131)', async () => {
+    // Given: DataSource with default commitOrdering="date"
+    const commitLine = makeCommitLine("abc1234", "", "Alice", "alice@test.com", 1000, "commit 1");
+    setupSpawnForCommits({
+      logOutput: `${commitLine}\n`,
+      stashOutput: ""
+    });
+
+    // When: getCommits is called with commitOrdering="date"
+    await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: git log args include --date-order (backward compatible with v0.5.4)
+    const spawnMock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+    const logCall = spawnMock.mock.calls.find(
+      (call: unknown[]) => (call[1] as string[])[0] === "log"
+    );
+    expect(logCall).toBeDefined();
+    const logArgs = logCall![1] as string[];
+    expect(logArgs).toContain("--date-order");
+    expect(logArgs).not.toContain("--topo-order");
+    expect(logArgs).not.toContain("--author-date-order");
   });
 });

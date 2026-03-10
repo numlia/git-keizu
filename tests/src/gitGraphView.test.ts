@@ -78,6 +78,7 @@ vi.mock("../../src/config", () => ({
     loadMoreCommitsAutomatically: () => true,
     muteCommitsMergeCommits: () => true,
     muteCommitsNotAncestorsOfHead: () => false,
+    commitOrdering: () => "date",
     showCurrentBranchByDefault: () => false,
     dialogDefaults: () => ({
       merge: { noFastForward: true, squashCommits: false, noCommit: false },
@@ -1314,12 +1315,20 @@ describe("GitGraphView loadCommits authorFilter (S10)", () => {
       maxCommits: 300,
       showRemoteBranches: true,
       hard: false,
-      authors: ["Alice"]
+      authors: ["Alice"],
+      commitOrdering: "date"
     });
 
     // Then: getCommits is called with branches and authors arrays
     expect(mocks.getCommits).toHaveBeenCalledTimes(1);
-    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, ["main"], 300, true, ["Alice"]);
+    expect(mocks.getCommits).toHaveBeenCalledWith(
+      TEST_REPO,
+      ["main"],
+      300,
+      true,
+      ["Alice"],
+      "date"
+    );
   });
 
   it("passes empty arrays to dataSource.getCommits when no filter (TC-030)", async () => {
@@ -1332,12 +1341,13 @@ describe("GitGraphView loadCommits authorFilter (S10)", () => {
       maxCommits: 300,
       showRemoteBranches: true,
       hard: false,
-      authors: []
+      authors: [],
+      commitOrdering: "date"
     });
 
     // Then: getCommits is called with empty arrays
     expect(mocks.getCommits).toHaveBeenCalledTimes(1);
-    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, [], 300, true, []);
+    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, [], 300, true, [], "date");
   });
 });
 
@@ -1586,12 +1596,20 @@ describe("GitGraphView loadCommits branches/authors array passthrough (S12)", ()
       maxCommits: 300,
       showRemoteBranches: true,
       hard: false,
-      authors: ["Alice"]
+      authors: ["Alice"],
+      commitOrdering: "date"
     });
 
     // Then: getCommits is called with the exact arrays
     expect(mocks.getCommits).toHaveBeenCalledTimes(1);
-    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, ["main", "dev"], 300, true, ["Alice"]);
+    expect(mocks.getCommits).toHaveBeenCalledWith(
+      TEST_REPO,
+      ["main", "dev"],
+      300,
+      true,
+      ["Alice"],
+      "date"
+    );
   });
 
   it("passes empty arrays to getCommits for show-all mode (TC-038)", async () => {
@@ -1604,12 +1622,13 @@ describe("GitGraphView loadCommits branches/authors array passthrough (S12)", ()
       maxCommits: 300,
       showRemoteBranches: true,
       hard: false,
-      authors: []
+      authors: [],
+      commitOrdering: "date"
     });
 
     // Then: getCommits is called with empty arrays
     expect(mocks.getCommits).toHaveBeenCalledTimes(1);
-    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, [], 300, true, []);
+    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, [], 300, true, [], "date");
   });
 });
 
@@ -1787,5 +1806,146 @@ describe("GitGraphView merge/cherry-pick handler and viewState dialogDefaults (S
       command: "cherrypickCommit",
       status: null
     });
+  });
+});
+
+describe("GitGraphView viewState commitOrdering / loadCommits handler (S14)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitGraphView.currentPanel = undefined;
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.getCommits.mockResolvedValue({
+      commits: [],
+      head: null,
+      moreCommitsAvailable: false,
+      authors: []
+    });
+  });
+
+  afterEach(() => {
+    GitGraphView.currentPanel?.dispose();
+    GitGraphView.currentPanel = undefined;
+  });
+
+  function createPanel(): void {
+    const ds = {
+      getCommits: mocks.getCommits
+    } as unknown as DataSource;
+
+    const es = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const am = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const rm = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitGraphView.createOrShow("/test/extension", ds, es, am, rm);
+  }
+
+  function getPanelHtml(): string {
+    const panelMock = vi.mocked(vscode.window.createWebviewPanel).mock.results[0].value as {
+      webview: { html: string };
+    };
+    return panelMock.webview.html;
+  }
+
+  function parseViewState(html: string): Record<string, unknown> {
+    const match = html.match(/var viewState = (.+?);/);
+    expect(match).not.toBeNull();
+    return JSON.parse(match![1]);
+  }
+
+  it("includes commitOrdering in viewState from Config (TC-044)", async () => {
+    // Given: config.commitOrdering() returns "date" (default mock)
+    // When: panel is created
+    createPanel();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Then: viewState in HTML contains commitOrdering matching Config.commitOrdering()
+    const viewState = parseViewState(getPanelHtml());
+    expect(viewState.commitOrdering).toBe("date");
+  });
+
+  it("passes commitOrdering='topo' to dataSource.getCommits (TC-045)", async () => {
+    // Given: GitGraphView instance with mocked DataSource
+    createPanel();
+
+    // When: loadCommits message with commitOrdering="topo" is received
+    await mocks.messageHandler.current!({
+      command: "loadCommits",
+      repo: TEST_REPO,
+      branches: ["main"],
+      maxCommits: 300,
+      showRemoteBranches: true,
+      hard: false,
+      authors: [],
+      commitOrdering: "topo"
+    });
+
+    // Then: dataSource.getCommits() is called with commitOrdering="topo"
+    expect(mocks.getCommits).toHaveBeenCalledTimes(1);
+    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, ["main"], 300, true, [], "topo");
+  });
+
+  it("passes commitOrdering='author-date' to dataSource.getCommits (TC-046)", async () => {
+    // Given: GitGraphView instance with mocked DataSource
+    createPanel();
+
+    // When: loadCommits message with commitOrdering="author-date" is received
+    await mocks.messageHandler.current!({
+      command: "loadCommits",
+      repo: TEST_REPO,
+      branches: ["main"],
+      maxCommits: 300,
+      showRemoteBranches: true,
+      hard: false,
+      authors: [],
+      commitOrdering: "author-date"
+    });
+
+    // Then: dataSource.getCommits() is called with commitOrdering="author-date"
+    expect(mocks.getCommits).toHaveBeenCalledTimes(1);
+    expect(mocks.getCommits).toHaveBeenCalledWith(
+      TEST_REPO,
+      ["main"],
+      300,
+      true,
+      [],
+      "author-date"
+    );
+  });
+
+  it("passes commitOrdering='date' to dataSource.getCommits for default behavior (TC-047)", async () => {
+    // Given: GitGraphView instance with mocked DataSource
+    createPanel();
+
+    // When: loadCommits message with commitOrdering="date" is received
+    await mocks.messageHandler.current!({
+      command: "loadCommits",
+      repo: TEST_REPO,
+      branches: ["main"],
+      maxCommits: 300,
+      showRemoteBranches: true,
+      hard: false,
+      authors: [],
+      commitOrdering: "date"
+    });
+
+    // Then: dataSource.getCommits() is called with commitOrdering="date"
+    expect(mocks.getCommits).toHaveBeenCalledTimes(1);
+    expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, ["main"], 300, true, [], "date");
   });
 });

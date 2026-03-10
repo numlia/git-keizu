@@ -209,7 +209,7 @@ vi.mock("../../web/fileTree", () => ({
 }));
 
 import { getBranchLabels } from "../../web/branchLabels";
-import { hideContextMenu, isContextMenuActive } from "../../web/contextMenu";
+import { hideContextMenu, isContextMenuActive, showContextMenu } from "../../web/contextMenu";
 import {
   hideDialog,
   isDialogActive,
@@ -4778,5 +4778,276 @@ describe("WebViewState backward compatibility migration (S24)", () => {
     expect(lastState).toHaveProperty("selectedAuthors");
     expect(lastState).not.toHaveProperty("currentBranch");
     expect(lastState).not.toHaveProperty("authorFilter");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S34: コミット表示順序 ソート順解決・コンテキストメニュー            */
+/* ------------------------------------------------------------------ */
+
+function setupViewStateWithOrdering(globalOrdering: string, repoOrdering?: string): void {
+  const repos: Record<string, Record<string, unknown>> = {
+    [TEST_REPO]: { columnWidths: null }
+  };
+  if (repoOrdering !== undefined) {
+    repos[TEST_REPO].commitOrdering = repoOrdering;
+  }
+  (globalThis as Record<string, unknown>).viewState = {
+    repos,
+    lastActiveRepo: TEST_REPO,
+    commitOrdering: globalOrdering,
+    dateFormat: "Date & Time",
+    fetchAvatars: false,
+    graphColours: ["#0085d9"],
+    graphStyle: "rounded",
+    initialLoadCommits: 300,
+    keybindings: { find: "f", refresh: "r", scrollToHead: "h", scrollToStash: "s" },
+    loadMoreCommits: 100,
+    loadMoreCommitsAutomatically: true,
+    showCurrentBranchByDefault: false,
+    dialogDefaults: {
+      merge: { noFastForward: true, squashCommits: false, noCommit: false },
+      cherryPick: { recordOrigin: false, noCommit: false },
+      stashUncommittedChanges: { includeUntracked: false }
+    }
+  };
+}
+
+function getLoadCommitsMessages(
+  mockPostMessage: ReturnType<typeof vi.fn>
+): Record<string, unknown>[] {
+  return mockPostMessage.mock.calls
+    .map((call: [Record<string, unknown>]) => call[0])
+    .filter((msg: Record<string, unknown>) => msg.command === "loadCommits");
+}
+
+describe("Commit ordering effective sort order (S34)", () => {
+  it('effective ordering is "topo" when repoState="topo" and global="date" (TC-184)', async () => {
+    // Given: global commitOrdering="date", repo override="topo"
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewStateWithOrdering("date", "topo");
+
+    const { vscode: freshVscode } = await import("../../web/utils");
+    vi.mocked(freshVscode.getState).mockReturnValueOnce(null);
+    await import("../../web/main");
+    loadTestCommits();
+
+    // Then: loadCommits message has commitOrdering="topo" (repo overrides global)
+    const msgs = getLoadCommitsMessages(vi.mocked(freshVscode.postMessage));
+    expect(msgs.length).toBeGreaterThan(0);
+    expect(msgs[msgs.length - 1].commitOrdering).toBe("topo");
+  });
+
+  it('effective ordering is "topo" when repoState="default" and global="topo" (TC-185)', async () => {
+    // Given: global commitOrdering="topo", repo override="default"
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewStateWithOrdering("topo", "default");
+
+    const { vscode: freshVscode } = await import("../../web/utils");
+    vi.mocked(freshVscode.getState).mockReturnValueOnce(null);
+    await import("../../web/main");
+    loadTestCommits();
+
+    // Then: commitOrdering="topo" (falls back to global because repo is "default")
+    const msgs = getLoadCommitsMessages(vi.mocked(freshVscode.postMessage));
+    expect(msgs.length).toBeGreaterThan(0);
+    expect(msgs[msgs.length - 1].commitOrdering).toBe("topo");
+  });
+
+  it('effective ordering is "date" when repoState is undefined and global="date" (TC-186)', async () => {
+    // Given: global commitOrdering="date", no repo override
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewStateWithOrdering("date");
+
+    const { vscode: freshVscode } = await import("../../web/utils");
+    vi.mocked(freshVscode.getState).mockReturnValueOnce(null);
+    await import("../../web/main");
+    loadTestCommits();
+
+    // Then: commitOrdering="date" (global default used)
+    const msgs = getLoadCommitsMessages(vi.mocked(freshVscode.postMessage));
+    expect(msgs.length).toBeGreaterThan(0);
+    expect(msgs[msgs.length - 1].commitOrdering).toBe("date");
+  });
+
+  it('effective ordering is "author-date" when repoState="author-date" and global="date" (TC-187)', async () => {
+    // Given: global commitOrdering="date", repo override="author-date"
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewStateWithOrdering("date", "author-date");
+
+    const { vscode: freshVscode } = await import("../../web/utils");
+    vi.mocked(freshVscode.getState).mockReturnValueOnce(null);
+    await import("../../web/main");
+    loadTestCommits();
+
+    // Then: commitOrdering="author-date" (repo overrides global)
+    const msgs = getLoadCommitsMessages(vi.mocked(freshVscode.postMessage));
+    expect(msgs.length).toBeGreaterThan(0);
+    expect(msgs[msgs.length - 1].commitOrdering).toBe("author-date");
+  });
+
+  it('initializes global default from viewState.commitOrdering="topo" (TC-188)', async () => {
+    // Given: global commitOrdering="topo", no repo override
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewStateWithOrdering("topo");
+
+    const { vscode: freshVscode } = await import("../../web/utils");
+    vi.mocked(freshVscode.getState).mockReturnValueOnce(null);
+    await import("../../web/main");
+    loadTestCommits();
+
+    // Then: loadCommits uses "topo" as the effective ordering (from global default)
+    const msgs = getLoadCommitsMessages(vi.mocked(freshVscode.postMessage));
+    expect(msgs.length).toBeGreaterThan(0);
+    expect(msgs[msgs.length - 1].commitOrdering).toBe("topo");
+  });
+
+  it("includes commitOrdering field in requestLoadCommits message (TC-189)", async () => {
+    // Given: global commitOrdering="date"
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewStateWithOrdering("date");
+
+    const { vscode: freshVscode } = await import("../../web/utils");
+    vi.mocked(freshVscode.getState).mockReturnValueOnce(null);
+    await import("../../web/main");
+    loadTestCommits();
+
+    // Then: loadCommits message has commitOrdering property
+    const msgs = getLoadCommitsMessages(vi.mocked(freshVscode.postMessage));
+    expect(msgs.length).toBeGreaterThan(0);
+    const msg = msgs[msgs.length - 1];
+    expect(msg).toHaveProperty("commitOrdering");
+    expect(msg.commitOrdering).toBe("date");
+  });
+});
+
+describe("Commit ordering context menu (S34)", () => {
+  let freshVscode: typeof vscode;
+  let freshShowContextMenu: typeof showContextMenu;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewStateWithOrdering("date", "topo");
+
+    const utilsMod = await import("../../web/utils");
+    freshVscode = utilsMod.vscode;
+    vi.mocked(freshVscode.getState).mockReturnValueOnce(null);
+
+    const ctxMod = await import("../../web/contextMenu");
+    freshShowContextMenu = ctxMod.showContextMenu;
+
+    await import("../../web/main");
+    loadTestCommits();
+  });
+
+  beforeEach(() => {
+    // Clear any pending loadCommitsCallback by dispatching a no-op response
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: false
+    });
+    vi.mocked(freshShowContextMenu).mockClear();
+    vi.mocked(freshVscode.postMessage).mockClear();
+  });
+
+  it('shows "Default", "Date", "Author Date", "Topological" menu items on table header right-click (TC-190)', () => {
+    // Given: table headers are rendered
+    const colHeaders = document.getElementById("tableColHeaders");
+    expect(colHeaders).not.toBeNull();
+
+    // When: right-click on table headers
+    colHeaders!.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, clientX: 100, clientY: 50 })
+    );
+
+    // Then: showContextMenu is called with 4 items
+    expect(freshShowContextMenu).toHaveBeenCalledTimes(1);
+    const items = vi.mocked(freshShowContextMenu).mock.calls[0][1];
+    expect(items).toHaveLength(4);
+    const titles = items.map((item) => item!.title);
+    expect(titles.some((t) => t.includes("Default"))).toBe(true);
+    expect(titles.some((t) => t.includes("Date") && !t.includes("Author"))).toBe(true);
+    expect(titles.some((t) => t.includes("Author Date"))).toBe(true);
+    expect(titles.some((t) => t.includes("Topological"))).toBe(true);
+  });
+
+  it('shows checkmark on "Topological" when effective ordering is "topo" (TC-191)', () => {
+    // Given: effective ordering is "topo" (repo override from beforeAll)
+    const colHeaders = document.getElementById("tableColHeaders")!;
+
+    // When: right-click on table headers
+    colHeaders.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, clientX: 100, clientY: 50 })
+    );
+
+    // Then: "Topological" has checkmark prefix, others don't
+    const items = vi.mocked(freshShowContextMenu).mock.calls[0][1];
+    expect(items[0]!.title).toBe("Default");
+    expect(items[1]!.title).toBe("Date");
+    expect(items[2]!.title).toBe("Author Date");
+    expect(items[3]!.title).toBe("\u2713 Topological");
+  });
+
+  it('updates repoState and sends saveRepoState when "Author Date" is selected (TC-192)', () => {
+    // Given: context menu is shown
+    const colHeaders = document.getElementById("tableColHeaders")!;
+    colHeaders.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, clientX: 100, clientY: 50 })
+    );
+    const items = vi.mocked(freshShowContextMenu).mock.calls[0][1];
+    vi.mocked(freshVscode.postMessage).mockClear();
+
+    // When: "Author Date" is clicked
+    items[2]!.onClick();
+
+    // Then: saveRepoState message is sent with commitOrdering="author-date"
+    const saveStateCalls = vi
+      .mocked(freshVscode.postMessage)
+      .mock.calls.filter(
+        (call) => (call[0] as Record<string, unknown>).command === "saveRepoState"
+      );
+    expect(saveStateCalls.length).toBeGreaterThan(0);
+    const state = (saveStateCalls[0][0] as Record<string, unknown>).state as Record<
+      string,
+      unknown
+    >;
+    expect(state.commitOrdering).toBe("author-date");
+  });
+
+  it("calls requestLoadCommits with hard refresh when sort order is selected (TC-193)", () => {
+    // Given: context menu is shown
+    const colHeaders = document.getElementById("tableColHeaders")!;
+    colHeaders.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, clientX: 100, clientY: 50 })
+    );
+    const items = vi.mocked(freshShowContextMenu).mock.calls[0][1];
+    vi.mocked(freshVscode.postMessage).mockClear();
+
+    // When: "Date" is clicked
+    items[1]!.onClick();
+
+    // Then: loadCommits message is sent with hard=true
+    const loadCommitsCalls = vi
+      .mocked(freshVscode.postMessage)
+      .mock.calls.filter((call) => (call[0] as Record<string, unknown>).command === "loadCommits");
+    expect(loadCommitsCalls.length).toBeGreaterThan(0);
+    expect((loadCommitsCalls[0][0] as Record<string, unknown>).hard).toBe(true);
   });
 });

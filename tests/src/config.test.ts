@@ -455,3 +455,47 @@ describe("dialogDefaults", () => {
     expect(result.stashUncommittedChanges.includeUntracked).toBe(true);
   });
 });
+
+// S8: commitOrdering() コミット表示順序設定
+describe("commitOrdering", () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  // TC-035: default → "date"
+  it("returns 'date' by default when not configured", () => {
+    // Given: no explicit setting configured (get returns provided default)
+    mockGet.mockImplementation((_key: string, defaultValue: unknown) => defaultValue);
+    // When: reading commitOrdering
+    const config = getConfig();
+    const result = config.commitOrdering();
+    // Then: returns "date" (default value matching existing --date-order behavior)
+    expect(result).toBe("date");
+  });
+
+  // TC-036: configured "topo" → "topo"
+  it("returns 'topo' when configured to topological order", () => {
+    // Given: repository.commits.order set to "topo"
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "repository.commits.order" ? "topo" : defaultValue
+    );
+    // When: reading commitOrdering
+    const config = getConfig();
+    const result = config.commitOrdering();
+    // Then: returns "topo"
+    expect(result).toBe("topo");
+  });
+
+  // TC-037: configured "author-date" → "author-date"
+  it("returns 'author-date' when configured to author date order", () => {
+    // Given: repository.commits.order set to "author-date"
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "repository.commits.order" ? "author-date" : defaultValue
+    );
+    // When: reading commitOrdering
+    const config = getConfig();
+    const result = config.commitOrdering();
+    // Then: returns "author-date"
+    expect(result).toBe("author-date");
+  });
+});
