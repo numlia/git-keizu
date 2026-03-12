@@ -541,3 +541,21 @@
 | TC-191  | 現在の有効ソート順が "topo"                               | Equivalence - normal (checkmark)     | "Topological" にチェックマーク（"✓ " プレフィックス）が表示される                  | 視覚的識別                 |
 | TC-192  | コンテキストメニューで "Author Date" を選択               | Equivalence - normal (select)        | repoState.commitOrdering が "author-date" に更新され、saveRepoState メッセージ送信 | 永続化                     |
 | TC-193  | コンテキストメニューでソート順を選択                      | Equivalence - normal (refresh)       | requestLoadCommits がハードリフレッシュ（hard=true）で呼ばれる                     | 即時反映                   |
+
+## S35: worktree アイコン描画とデータ属性
+
+> Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
+> Added: 2026-03-12
+
+**テスト対象パス**: `web/main.ts`
+
+| Case ID | Input / Precondition                                            | Perspective (Equivalence / Boundary) | Expected Result                                                                       | Notes        |
+| ------- | --------------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------- | ------------ |
+| TC-194  | worktreeMap にブランチ名が存在するラベル                        | Equivalence - normal                 | span に worktree CSS クラス、data-worktree-path 属性、worktree アイコン要素が含まれる | REQ-2.1      |
+| TC-195  | worktreeMap にブランチ名が存在しないラベル                      | Equivalence - normal (no worktree)   | 従来通りの描画（worktree CSS クラスなし、アイコンなし）                               | REQ-2.1-TC2  |
+| TC-196  | worktree アイコンの title 属性                                  | Equivalence - normal                 | title="Worktree: <path>" が設定される                                                 | REQ-2.2      |
+| TC-197  | worktree パスに HTML 特殊文字を含む（例: `<script>` 含むパス）  | Boundary - XSS prevention            | data-worktree-path の値が escapeHtml() 適用済み                                       | セキュリティ |
+| TC-198  | リモートブランチ（worktreeMap にエントリがあっても）            | Equivalence - exclusion              | worktree アイコンが表示されない                                                       | REQ-2.1-TC3  |
+| TC-199  | コンテキストメニューへの worktreeInfo 受け渡し（worktree あり） | Equivalence - normal                 | worktreeInfo に path と isMainWorktree が含まれる                                     | REQ-2.3      |
+| TC-200  | コンテキストメニューへの worktreeInfo 受け渡し（worktree なし） | Equivalence - normal (null)          | worktreeInfo が null                                                                  | REQ-2.3      |
+| TC-201  | worktreeMap が空オブジェクト                                    | Boundary - empty map                 | すべてのブランチラベルが従来通り（worktree 関連表示なし）                             | 後方互換     |

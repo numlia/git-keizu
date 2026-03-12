@@ -53,3 +53,20 @@
 | TC-019  | No Commit checkbox デフォルト値                         | Equivalence - normal                 | viewState.dialogDefaults.cherryPick.noCommit を反映                    | -                                 |
 | TC-020  | callback で recordOrigin, noCommit 取得、確定ボタン押下 | Equivalence - normal                 | RequestCherrypickCommit に recordOrigin, noCommit が含まれる           | sendMessage 検証                  |
 | TC-021  | Record Origin / No Commit checkbox の構成               | Equivalence - normal                 | 両 checkbox に info プロパティ（ツールチップテキスト）が設定されている | -                                 |
+
+## S4: Create Worktree Here ダイアログ
+
+> Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
+> Added: 2026-03-12
+
+**テスト対象パス**: `web/commitMenu.ts`
+
+| Case ID | Input / Precondition                  | Perspective (Equivalence / Boundary) | Expected Result                                                                                             | Notes            |
+| ------- | ------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------------------------------- | ---------------- |
+| TC-022  | Create Worktree Here メニュー項目選択 | Equivalence - normal                 | showFormDialog が Branch Name (text-ref) + Path (text) + Open Terminal (checkbox) の 3 フィールドで呼ばれる | REQ-3.1, REQ-3.3 |
+| TC-023  | Branch Name フィールドが空            | Boundary - empty name                | text-ref バリデーションにより送信ボタンが無効化される                                                       | REQ-3.1-TC3      |
+| TC-024  | Path デフォルト値                     | Equivalence - normal                 | `../<repoName>-` 形式（ブランチ名入力前）                                                                   | REQ-3.3          |
+| TC-025  | Open Terminal デフォルト値            | Equivalence - normal                 | チェック ON (checked)                                                                                       | REQ-3.3-TC4      |
+| TC-026  | 有効入力で送信                        | Equivalence - normal                 | RequestCreateWorktree に repo, path, branchName, commitHash, openTerminal が含まれる                        | REQ-3.1          |
+| TC-027  | Branch Name 入力時の Path 動的更新    | Equivalence - normal (dynamic)       | Branch Name 入力に連動して Path が `../<repoName>-<branchName>` に更新される                                | REQ-3.3          |
+| TC-028  | Path 手動編集後に Branch Name を変更  | Boundary - manual edit               | ユーザーが Path を手動編集した後は Branch Name 変更時に Path が自動更新されない                             | UX: 手動編集優先 |

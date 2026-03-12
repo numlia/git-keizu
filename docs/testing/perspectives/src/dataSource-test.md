@@ -353,3 +353,46 @@
 | TC-129  | COMMIT_ORDER_FLAGS 定数マッピング                            | Equivalence - normal (exhaustive)    | 3つのキー（date, topo, author-date）が存在し、対応するフラグ文字列にマッピングされる | CommitOrdering 型の全値を網羅             |
 | TC-130  | getCommits(repo, branches, max, showRemote, authors, "topo") | Equivalence - normal (passthrough)   | getGitLog に commitOrdering="topo" が正しく渡される                                  | getCommits → getGitLog パラメータ中継     |
 | TC-131  | commitOrdering="date" （後方互換確認）                       | Equivalence - normal (backward)      | 既存のハードコード "--date-order" と同じ git log 引数が生成される                    | v0.5.4 以前と同じ動作であることを保証する |
+
+## S22: getWorktrees() worktree 一覧取得
+
+> Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
+> Added: 2026-03-12
+
+**シグネチャ**: `getWorktrees(repo: string): Promise<WorktreeMap>`
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                    | Perspective (Equivalence / Boundary) | Expected Result                            | Notes                                     |
+| ------- | --------------------------------------- | ------------------------------------ | ------------------------------------------ | ----------------------------------------- |
+| TC-132  | spawnGit 成功、porcelain 出力あり       | Equivalence - normal                 | parseWorktreeList の結果がそのまま返される | spawnGit → parseWorktreeList パイプライン |
+| TC-133  | spawnGit エラー（exit code 非 0）       | Equivalence - error                  | 空マップ `{}` を返す                       | エラー時のフォールバック                  |
+| TC-134  | リポジトリに worktree なし（main のみ） | Boundary - single                    | main worktree のみのマップ                 | 最小有効結果                              |
+
+## S23: addWorktree() worktree 作成
+
+> Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
+> Added: 2026-03-12
+
+**シグネチャ**: `addWorktree(repo: string, path: string, branchName: string, commitHash?: string): Promise<GitCommandStatus>`
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                 | Perspective (Equivalence / Boundary)   | Expected Result                                                                  | Notes                |
+| ------- | ------------------------------------ | -------------------------------------- | -------------------------------------------------------------------------------- | -------------------- |
+| TC-135  | path + branchName（commitHash なし） | Equivalence - normal (existing branch) | git args: `["worktree", "add", path, branchName]`。null を返す                   | REQ-3.2 既存ブランチ |
+| TC-136  | path + branchName + commitHash       | Equivalence - normal (new branch)      | git args: `["worktree", "add", "-b", branchName, path, commitHash]`。null を返す | REQ-3.1 新規ブランチ |
+| TC-137  | 作成成功（exit code 0）              | Equivalence - normal                   | null を返す（GitCommandStatus）                                                  | -                    |
+| TC-138  | 重複ブランチ名で git がエラー        | Equivalence - error                    | エラーメッセージ文字列を返す                                                     | REQ-3.1-TC4          |
+| TC-139  | 既存パスで git がエラー              | Equivalence - error                    | エラーメッセージ文字列を返す                                                     | REQ-3.1-TC5          |
+
+## S24: removeWorktree() worktree 削除
+
+> Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
+> Added: 2026-03-12
+
+**シグネチャ**: `removeWorktree(repo: string, worktreePath: string): Promise<GitCommandStatus>`
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                 | Perspective (Equivalence / Boundary) | Expected Result                                               | Notes       |
+| ------- | ------------------------------------ | ------------------------------------ | ------------------------------------------------------------- | ----------- |
+| TC-140  | 有効な worktreePath                  | Equivalence - normal                 | git args: `["worktree", "remove", worktreePath]`。null を返す | REQ-4.1     |
+| TC-141  | 未コミット変更がある worktree の削除 | Equivalence - error                  | エラーメッセージ文字列を返す                                  | REQ-4.1-TC5 |

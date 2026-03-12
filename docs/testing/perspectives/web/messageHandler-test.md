@@ -68,3 +68,19 @@
 | ------- | -------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------- | ---------------------------- |
 | TC-013  | ResponseLoadCommits: authors=["Alice","Bob"]             | Equivalence - normal                 | gitGraph.loadCommits が authors=["Alice","Bob"] を含むパラメータで呼ばれる | authors フィールドの転送検証 |
 | TC-014  | ResponseLoadCommits: authors フィールドなし（undefined） | Equivalence - normal (no authors)    | gitGraph.loadCommits が authors=undefined で呼ばれる                       | optional フィールド未設定時  |
+
+## S6: createWorktree/removeWorktree/openTerminal レスポンス処理
+
+> Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
+> Added: 2026-03-12
+
+**シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
+**テスト対象パス**: `web/messageHandler.ts`
+
+| Case ID | Input / Precondition                             | Perspective (Equivalence / Boundary) | Expected Result                                           | Notes            |
+| ------- | ------------------------------------------------ | ------------------------------------ | --------------------------------------------------------- | ---------------- |
+| TC-015  | ResponseCreateWorktree: status = null            | Equivalence - normal (success)       | refreshOrError が呼ばれ、グラフリフレッシュ               | REQ-3.1, REQ-3.2 |
+| TC-016  | ResponseCreateWorktree: status = "error message" | Equivalence - error                  | エラーダイアログ "Unable to Create Worktree" が表示される | -                |
+| TC-017  | ResponseRemoveWorktree: status = null            | Equivalence - normal (success)       | refreshOrError が呼ばれ、グラフリフレッシュ               | REQ-4.1          |
+| TC-018  | ResponseRemoveWorktree: status = "error message" | Equivalence - error                  | エラーダイアログ "Unable to Remove Worktree" が表示される | -                |
+| TC-019  | ResponseOpenTerminal                             | Equivalence - normal                 | ノーオペレーション（エラーなく処理完了）                  | REQ-9.1          |

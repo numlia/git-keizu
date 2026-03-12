@@ -186,3 +186,18 @@
 | TC-045  | loadCommits メッセージに commitOrdering="topo"        | Equivalence - normal                 | dataSource.getCommits() に commitOrdering="topo" が渡される                      | -                    |
 | TC-046  | loadCommits メッセージに commitOrdering="author-date" | Equivalence - normal                 | dataSource.getCommits() に commitOrdering="author-date" が渡される               | -                    |
 | TC-047  | loadCommits メッセージに commitOrdering="date"        | Equivalence - normal (default)       | dataSource.getCommits() に commitOrdering="date" が渡される                      | デフォルト動作確認   |
+
+## S15: createWorktree/removeWorktree/openTerminal メッセージハンドラ
+
+> Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
+> Added: 2026-03-12
+
+**テスト対象パス**: `src/gitGraphView.ts`
+
+| Case ID | Input / Precondition                                                          | Perspective (Equivalence / Boundary) | Expected Result                                                                                      | Notes                |
+| ------- | ----------------------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------- | -------------------- |
+| TC-048  | RequestCreateWorktree（commitHash なし, openTerminal=false）                  | Equivalence - normal                 | DataSource.addWorktree が正しい引数で呼ばれ、ResponseCreateWorktree が送信される。ターミナル起動なし | REQ-3.2              |
+| TC-049  | RequestCreateWorktree（commitHash あり, openTerminal=true）、addWorktree 成功 | Equivalence - normal (with terminal) | addWorktree 呼出後、createTerminal が name + cwd 付きで呼ばれ、terminal.show() 実行                  | REQ-3.1, REQ-3.1-TC6 |
+| TC-050  | RequestCreateWorktree、addWorktree 失敗（エラー文字列返却）                   | Equivalence - error                  | ResponseCreateWorktree に status（エラー文字列）が含まれ、ターミナル起動なし                         | -                    |
+| TC-051  | RequestRemoveWorktree                                                         | Equivalence - normal                 | DataSource.removeWorktree が呼ばれ、ResponseRemoveWorktree が送信される                              | REQ-4.1              |
+| TC-052  | RequestOpenTerminal                                                           | Equivalence - normal                 | createTerminal が name + cwd 付きで呼ばれ、terminal.show() 実行。ResponseOpenTerminal 送信           | REQ-9.1              |

@@ -104,3 +104,22 @@
 | TC-030  | 3 checkbox のデフォルト値            | Equivalence - normal                 | viewState.dialogDefaults.merge の各フィールド値を反映                | commitMenu と同一構成         |
 | TC-031  | callback で 3 値取得、確定ボタン押下 | Equivalence - normal                 | RequestMergeBranch に createNewCommit, squash, noCommit が含まれる   | sendMessage 検証              |
 | TC-032  | Squash / No Commit checkbox の構成   | Equivalence - normal                 | info プロパティ（ツールチップテキスト）が設定されている              | commitMenu と同一テキスト     |
+
+## S8: buildRefContextMenuItems() worktree 関連メニュー項目
+
+> Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
+> Added: 2026-03-12
+
+**テスト対象パス**: `web/refMenu.ts`
+
+| Case ID | Input / Precondition                                             | Perspective (Equivalence / Boundary) | Expected Result                                                                                | Notes            |
+| ------- | ---------------------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------- | ---------------- |
+| TC-033  | ローカルブランチ、worktreeInfo = null                            | Equivalence - normal                 | メニューに "Create Worktree..." が含まれる                                                     | REQ-2.3-TC1      |
+| TC-034  | ローカルブランチ、worktreeInfo = { path, isMainWorktree: false } | Equivalence - normal                 | メニューに "Open Terminal Here" / "Copy Worktree Path" / "Remove Worktree" の 3 項目が含まれる | REQ-2.3-TC2      |
+| TC-035  | ローカルブランチ、worktreeInfo = { path, isMainWorktree: true }  | Equivalence - normal (main wt)       | メニューに "Open Terminal Here" / "Copy Worktree Path" のみ（Remove Worktree なし）            | REQ-2.3-TC4      |
+| TC-036  | リモートブランチ                                                 | Equivalence - exclusion              | worktree 関連メニュー項目が一切含まれない                                                      | REQ-2.3-TC3      |
+| TC-037  | Create Worktree... 選択                                          | Equivalence - normal                 | showFormDialog が Path + Open Terminal の 2 フィールドで呼ばれる                               | REQ-3.2, REQ-3.3 |
+| TC-038  | Create Worktree ダイアログの Path デフォルト値                   | Equivalence - normal                 | `../<repoName>-<branchName>` 形式                                                              | REQ-3.3-TC3      |
+| TC-039  | Open Terminal Here 選択                                          | Equivalence - normal                 | sendMessage openTerminal に path と name が含まれる                                            | REQ-9.1          |
+| TC-040  | Copy Worktree Path 選択                                          | Equivalence - normal                 | sendMessage copyToClipboard に type: "worktreePath" と data: path が含まれる                   | REQ-9.2          |
+| TC-041  | Remove Worktree 選択                                             | Equivalence - normal                 | showConfirmationDialog が呼ばれ、確認メッセージにブランチ名とパスが含まれる                    | REQ-4.1          |

@@ -27,3 +27,14 @@
 | TC-005  | hash="abc123", stash={...}, muted=true                | Equivalence - special                | class="commit stash" data-hash="abc123" を含む（mute なし） | stash は mute 不適用   |
 | TC-006  | hash=UNCOMMITTED_CHANGES_HASH, stash=null, muted=true | Equivalence - special                | class="unsavedChanges" を含む（mute なし）                  | unsaved は mute 不適用 |
 | TC-007  | hash="abc123", stash=null, muted=true                 | Equivalence - normal                 | data-hash="abc123" が含まれる                               | data-hash 保持         |
+
+## S3: svgIcons.worktree アイコン検証
+
+> Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
+> Added: 2026-03-12
+
+**テスト対象パス**: `web/utils.ts`
+
+| Case ID | Input / Precondition     | Perspective (Equivalence / Boundary) | Expected Result                | Notes   |
+| ------- | ------------------------ | ------------------------------------ | ------------------------------ | ------- |
+| TC-008  | svgIcons.worktree を参照 | Equivalence - normal                 | 空でない文字列で `<svg` を含む | REQ-2.1 |
