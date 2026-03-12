@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-03-13
+
+### Added
+
+- **Worktree support**: Git worktrees are now first-class in the graph — branches with an associated linked worktree show a dedicated worktree icon; hovering the label displays the worktree path in a tooltip
+- **Create Worktree from branch**: Right-click any local branch without a worktree to create one — enter a path (default: `../repo-branchname`) with an "Open Terminal" checkbox to launch a VS Code terminal in the new worktree after creation
+- **Create Worktree from commit**: Right-click any commit and choose "Create Worktree Here..." to create a new branch + worktree at that commit; the path field auto-fills as you type the branch name
+- **Worktree actions on branch labels**: Right-click a branch with a linked worktree to open a terminal at its path, copy the path to clipboard, or remove the worktree (with confirmation; not available for the main worktree)
+
 ## [0.5.5] - 2026-03-10
 
 ### Added
@@ -206,7 +215,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.5...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.6...HEAD
+[0.5.6]: https://github.com/numlia/git-keizu/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/numlia/git-keizu/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/numlia/git-keizu/compare/v0.5.3...v0.5.4
 [0.5.3]: https://github.com/numlia/git-keizu/compare/v0.5.2...v0.5.3
