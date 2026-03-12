@@ -2,7 +2,7 @@
   "name": "git-keizu",
   "displayName": "Git Keizu",
   "version": "0.5.5",
-  "description": "A modern git history graph for VS Code — view branches, commits, stashes, and tags in one visual graph, and perform git actions (checkout, merge, rebase, cherry-pick, stash) directly from it. Actively maintained successor to Git Graph.",
+  "description": "A modern git history graph for VS Code — view all your branches in one interactive graph and act on them directly: checkout, merge, rebase, cherry-pick, stash, and git worktree support. One of the few git extensions with built-in worktree management. Actively maintained successor to Git Graph.",
   "categories": [
     "SCM Providers",
     "Visualization"

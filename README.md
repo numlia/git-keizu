@@ -11,7 +11,7 @@
 [![vscode installs](https://img.shields.io/visual-studio-marketplace/i/numlia-vs.git-keizu?label=install)](https://marketplace.visualstudio.com/items?itemName=numlia-vs.git-keizu)
 [![open-vsx downloads](https://img.shields.io/open-vsx/dt/numlia-vs/git-keizu?label=open-vsx)](https://open-vsx.org/extension/numlia-vs/git-keizu)
 
-**Git Keizu** is a fast, focused **git history graph** for Visual Studio Code. View all your branches, commits, stashes, and tags in one interactive visual graph — and perform git actions (checkout, merge, rebase, cherry-pick, stash) directly from it, without ever opening a terminal.
+**Git Keizu** is a fast, focused **git history graph** for Visual Studio Code. View all your branches, commits, stashes, and tags in one interactive visual graph — and perform git actions (checkout, merge, rebase, cherry-pick, stash) and manage git worktrees directly from it, without ever opening a terminal.
 
 An actively maintained fork of [Git Graph](https://github.com/mhutchie/vscode-git-graph) (MIT, 2019), intentionally kept focused on the essentials. If the core graph experience is what you're after, this is for you.
 
@@ -22,6 +22,15 @@ An actively maintained fork of [Git Graph](https://github.com/mhutchie/vscode-gi
 
 **Commit actions** — right-click any commit to checkout, cherry-pick, revert, merge, reset, or add a tag, without ever opening a terminal:
 ![Commit actions](./resources/screenshots/commit-actions.png)
+
+**Worktree at a glance** — branches with a linked worktree show a distinct icon right on the graph label. Hover to see the worktree path in a tooltip:
+![Worktree icons](./resources/screenshots/worktree-icons.png)
+
+**Worktree actions** — right-click any worktree branch to open a terminal there, copy its path, or remove it — all without leaving the graph:
+![Worktree actions](./resources/screenshots/worktree-actions.png)
+
+**Create worktree from commit** — right-click any commit and choose "Create Worktree Here..." to spin up a new branch + worktree at that point in history; the path auto-fills as you type the branch name:
+![Create worktree](./resources/screenshots/worktree-create.png)
 
 **Branch filter** — narrow the graph to one or more branches with a multi-select dropdown:
 ![Branch filter](./resources/screenshots/branch-filter.png)
