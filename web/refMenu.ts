@@ -5,7 +5,7 @@ import {
   showFormDialog,
   showRefInputDialog
 } from "./dialogs";
-import { ELLIPSIS, escapeHtml, getRepoName, sendMessage } from "./utils";
+import { ELLIPSIS, escapeHtml, getRepoName, sendMessage, svgIcons } from "./utils";
 
 export interface ParsedRemoteRef {
   remoteName: string;
@@ -87,11 +87,25 @@ function buildMergeBranchMenuItem(repo: string, refName: string): ContextMenuIte
   };
 }
 
-function showDeleteBranchDialog(repo: string, refName: string, remotes: string[]): void {
+function buildWorktreeWarning(
+  worktreeInfo: { path: string; isMainWorktree: boolean } | null | undefined
+): string {
+  if (worktreeInfo === null || worktreeInfo === undefined) return "";
+  return `<br><span class="dialogWarning">${svgIcons.alert} This branch has an active worktree at <b>${escapeHtml(worktreeInfo.path)}</b>. Force deleting will orphan the worktree directory (detached HEAD).</span>`;
+}
+
+function showDeleteBranchDialog(
+  repo: string,
+  refName: string,
+  remotes: string[],
+  worktreeInfo?: { path: string; isMainWorktree: boolean } | null
+): void {
+  const worktreeWarning = buildWorktreeWarning(worktreeInfo);
+  const message = `Are you sure you want to delete the branch <b><i>${escapeHtml(refName)}</i></b>?${worktreeWarning}`;
   const hasRemotes = remotes.length > 0;
   if (hasRemotes) {
     showFormDialog(
-      `Are you sure you want to delete the branch <b><i>${escapeHtml(refName)}</i></b>?`,
+      message,
       [
         { type: "checkbox", name: "Force Delete", value: false },
         {
@@ -114,7 +128,7 @@ function showDeleteBranchDialog(repo: string, refName: string, remotes: string[]
     );
   } else {
     showCheckboxDialog(
-      `Are you sure you want to delete the branch <b><i>${escapeHtml(refName)}</i></b>?`,
+      message,
       "Force Delete",
       false,
       "Delete Branch",
@@ -238,8 +252,12 @@ export function buildRefContextMenuItems(
     menu.push({
       title: `Rename Branch${ELLIPSIS}`,
       onClick: () => {
+        const renameWorktreeWarning =
+          worktreeInfo !== null && worktreeInfo !== undefined
+            ? `<br><span class="dialogWarning">${svgIcons.alert} This branch has an active worktree at <b>${escapeHtml(worktreeInfo.path)}</b>. Renaming will not update the worktree directory name.</span>`
+            : "";
         showRefInputDialog(
-          `Enter the new name for branch <b><i>${escapeHtml(refName)}</i></b>:`,
+          `Enter the new name for branch <b><i>${escapeHtml(refName)}</i></b>:${renameWorktreeWarning}`,
           refName,
           "Rename Branch",
           (newName) => {
@@ -259,7 +277,7 @@ export function buildRefContextMenuItems(
       menu.push(
         {
           title: `Delete Branch${ELLIPSIS}`,
-          onClick: () => showDeleteBranchDialog(repo, refName, resolvedRemotes)
+          onClick: () => showDeleteBranchDialog(repo, refName, resolvedRemotes, worktreeInfo)
         },
         buildMergeBranchMenuItem(repo, refName),
         {

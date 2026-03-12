@@ -685,6 +685,22 @@ svg.fileIcon {
   margin-top: 10px;
   text-align: left;
 }
+#dialog .dialogWarning {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 6px 8px;
+  text-align: left;
+  color: var(--vscode-editorWarning-foreground, #cca700);
+  background: var(--vscode-editorWarning-background, rgba(204, 167, 0, 0.1));
+  border-radius: 4px;
+}
+#dialog .dialogWarning svg {
+  width: 14px;
+  height: 14px;
+  vertical-align: text-bottom;
+  fill: var(--vscode-editorWarning-foreground, #cca700);
+  margin-right: 4px;
+}
 #dialogBacking.active {
   display: block;
   position: fixed;
