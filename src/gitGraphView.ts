@@ -421,6 +421,38 @@ export class GitGraphView {
               status: await this.dataSource.cleanUntrackedFiles(msg.repo, msg.directories)
             });
             break;
+          case "createWorktree": {
+            const wtStatus = await this.dataSource.addWorktree(
+              msg.repo,
+              msg.path,
+              msg.branchName,
+              msg.commitHash
+            );
+            if (wtStatus === null && msg.openTerminal) {
+              const terminal = vscode.window.createTerminal({
+                name: `Worktree: ${msg.branchName}`,
+                cwd: path.resolve(msg.repo, msg.path)
+              });
+              terminal.show();
+            }
+            this.sendMessage({ command: "createWorktree", status: wtStatus });
+            break;
+          }
+          case "removeWorktree":
+            this.sendMessage({
+              command: "removeWorktree",
+              status: await this.dataSource.removeWorktree(msg.repo, msg.worktreePath)
+            });
+            break;
+          case "openTerminal": {
+            const terminal = vscode.window.createTerminal({
+              name: msg.name,
+              cwd: path.resolve(msg.repo, msg.path)
+            });
+            terminal.show();
+            this.sendMessage({ command: "openTerminal" });
+            break;
+          }
           case "fetch":
             this.sendMessage({
               command: "fetch",

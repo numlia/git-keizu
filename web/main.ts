@@ -32,6 +32,7 @@ import {
   insertAfter,
   sendMessage,
   svgIcons,
+  worktreeMapsEqual,
   UNCOMMITTED_CHANGES_HASH,
   unescapeHtml,
   vscode
@@ -115,6 +116,7 @@ class GitGraphView {
 
   private loadBranchesCallback: ((changes: boolean, isRepo: boolean) => void) | null = null;
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
+  private worktrees: GG.WorktreeMap = {};
 
   private commitOrdering: GG.CommitOrdering;
   private selectedAuthors: string[] = [];
@@ -379,12 +381,14 @@ class GitGraphView {
     commitHead: string | null,
     moreAvailable: boolean,
     hard: boolean,
-    authors?: string[]
+    authors?: string[],
+    worktrees?: GG.WorktreeMap
   ) {
     if (
       !hard &&
       this.moreCommitsAvailable === moreAvailable &&
       this.commitHead === commitHead &&
+      worktreeMapsEqual(this.worktrees, worktrees ?? {}) &&
       arraysEqual(
         this.commits,
         commits,
@@ -407,6 +411,7 @@ class GitGraphView {
     this.moreCommitsAvailable = moreAvailable;
     this.commits = commits;
     this.commitHead = commitHead;
+    this.worktrees = worktrees ?? {};
     this.commitLookup = {};
     this.saveState();
 
@@ -633,7 +638,13 @@ class GitGraphView {
         const headRemotes = branchLabels.heads[j].remotes;
         const remotesAttr =
           headRemotes.length > 0 ? ` data-remotes="${headRemotes.map(escapeHtml).join(",")}"` : "";
-        refHtml = `<span class="gitRef head${refActive ? " active" : ""}" data-name="${refName}"${remotesAttr}>${svgIcons.branch}<span class="gitRefName">${refName}</span>`;
+        const wtEntry = this.worktrees[branchLabels.heads[j].name];
+        const isLinkedWorktree = wtEntry !== undefined && !wtEntry.isMain;
+        const wtClass = isLinkedWorktree ? " worktree" : "";
+        const wtAttr = isLinkedWorktree ? ` data-worktree-path="${escapeHtml(wtEntry.path)}"` : "";
+        const wtTitle = isLinkedWorktree ? ` title="Worktree: ${escapeHtml(wtEntry.path)}"` : "";
+        const branchIcon = isLinkedWorktree ? svgIcons.worktree : svgIcons.branch;
+        refHtml = `<span class="gitRef head${refActive ? " active" : ""}${wtClass}" data-name="${refName}"${remotesAttr}${wtAttr}${wtTitle}>${branchIcon}<span class="gitRefName">${refName}</span>`;
         for (let k = 0; k < branchLabels.heads[j].remotes.length; k++) {
           let remoteName = escapeHtml(branchLabels.heads[j].remotes[k]);
           refHtml += `<span class="gitRefHeadRemote" data-remote="${remoteName}" data-name="${escapeHtml(`${branchLabels.heads[j].remotes[k]}/${branchLabels.heads[j].name}`)}">${remoteName}</span>`;
@@ -843,6 +854,13 @@ class GitGraphView {
       const remotes = sourceElem.dataset.remotes
         ? sourceElem.dataset.remotes.split(",")
         : undefined;
+      let worktreeInfo: { path: string; isMainWorktree: boolean } | null = null;
+      if (sourceElem.classList.contains("head") && !isRemoteCombined) {
+        const wtEntry = this.worktrees[unescapeHtml(sourceElem.dataset.name!)];
+        if (wtEntry) {
+          worktreeInfo = { path: wtEntry.path, isMainWorktree: wtEntry.isMain };
+        }
+      }
       showContextMenu(
         <MouseEvent>e,
         buildRefContextMenuItems(
@@ -851,7 +869,8 @@ class GitGraphView {
           sourceElem,
           isRemoteCombined,
           this.gitBranchHead,
-          remotes
+          remotes,
+          worktreeInfo
         ),
         sourceElem
       );

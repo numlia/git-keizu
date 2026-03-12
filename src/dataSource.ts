@@ -15,9 +15,11 @@ import {
   GitStash,
   GitUnsavedChanges,
   UNCOMMITTED_CHANGES_HASH,
-  VALID_UNCOMMITTED_RESET_MODES
+  VALID_UNCOMMITTED_RESET_MODES,
+  WorktreeMap
 } from "./types";
 import { getPathFromStr } from "./utils";
+import { parseWorktreeList } from "./worktree";
 
 const eolRegex = /\r\n|\r|\n/g;
 const headRegex = /^\(HEAD detached at [0-9A-Za-z]+\)/g;
@@ -147,11 +149,12 @@ export class DataSource {
     authors: string[],
     commitOrdering: CommitOrdering
   ) {
-    const [commits, refData, stashes, authorList] = await Promise.all([
+    const [commits, refData, stashes, authorList, worktrees] = await Promise.all([
       this.getGitLog(repo, branches, maxCommits + 1, showRemoteBranches, authors, commitOrdering),
       this.getRefs(repo, showRemoteBranches),
       this.getStashes(repo),
-      this.getAuthors(repo)
+      this.getAuthors(repo),
+      this.getWorktrees(repo)
     ]);
 
     const moreCommitsAvailable = commits.length === maxCommits + 1;
@@ -238,7 +241,8 @@ export class DataSource {
       commits: commitNodes,
       head: refData.head,
       moreCommitsAvailable: moreCommitsAvailable,
-      authors: authorList
+      authors: authorList,
+      worktrees
     };
   }
 
@@ -806,6 +810,26 @@ export class DataSource {
 
   public fetch(repo: string) {
     return this.runGitCommandSpawn(["fetch", "--all", "--prune"], repo);
+  }
+
+  public getWorktrees(repo: string) {
+    return this.spawnGit<WorktreeMap>(
+      ["worktree", "list", "--porcelain"],
+      repo,
+      (stdout) => parseWorktreeList(stdout),
+      {}
+    );
+  }
+
+  public addWorktree(repo: string, path: string, branchName: string, commitHash?: string) {
+    if (commitHash !== undefined) {
+      return this.runGitCommandSpawn(["worktree", "add", "-b", branchName, path, commitHash], repo);
+    }
+    return this.runGitCommandSpawn(["worktree", "add", path, branchName], repo);
+  }
+
+  public removeWorktree(repo: string, worktreePath: string) {
+    return this.runGitCommandSpawn(["worktree", "remove", worktreePath], repo);
   }
 
   private getRefs(repo: string, showRemoteBranches: boolean) {

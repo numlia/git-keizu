@@ -136,6 +136,15 @@ export type DateType = "Author Date" | "Commit Date";
 export type GraphStyle = "rounded" | "angular";
 export type TabIconColourTheme = "colour" | "grey";
 export type GitCommandStatus = string | null;
+
+/* Worktree Types */
+
+export interface WorktreeInfo {
+  path: string;
+  isMain: boolean;
+}
+
+export type WorktreeMap = { [branchName: string]: WorktreeInfo };
 export type CommitOrdering = "date" | "topo" | "author-date";
 export type RepoCommitOrdering = CommitOrdering | "default";
 export type GitResetMode = "soft" | "mixed" | "hard";
@@ -314,6 +323,7 @@ export interface ResponseLoadCommits {
   moreCommitsAvailable: boolean;
   hard: boolean;
   authors?: string[];
+  worktrees?: WorktreeMap;
 }
 
 export interface RequestLoadRepos {
@@ -491,6 +501,40 @@ export interface ResponsePushStash {
   status: GitCommandStatus;
 }
 
+export interface RequestCreateWorktree {
+  command: "createWorktree";
+  repo: string;
+  path: string;
+  branchName: string;
+  commitHash?: string;
+  openTerminal: boolean;
+}
+export interface ResponseCreateWorktree {
+  command: "createWorktree";
+  status: GitCommandStatus;
+}
+
+export interface RequestRemoveWorktree {
+  command: "removeWorktree";
+  repo: string;
+  worktreePath: string;
+  branchName: string;
+}
+export interface ResponseRemoveWorktree {
+  command: "removeWorktree";
+  status: GitCommandStatus;
+}
+
+export interface RequestOpenTerminal {
+  command: "openTerminal";
+  repo: string;
+  path: string;
+  name: string;
+}
+export interface ResponseOpenTerminal {
+  command: "openTerminal";
+}
+
 export interface RequestFetch {
   command: "fetch";
   repo: string;
@@ -547,6 +591,7 @@ export type RequestMessage =
   | RequestCherrypickCommit
   | RequestCleanUntrackedFiles
   | RequestCommitDetails
+  | RequestCreateWorktree
   | RequestCompareCommits
   | RequestCopyToClipboard
   | RequestCreateBranch
@@ -563,10 +608,12 @@ export type RequestMessage =
   | RequestLoadRepos
   | RequestMergeBranch
   | RequestMergeCommit
+  | RequestOpenTerminal
   | RequestPopStash
   | RequestPushStash
   | RequestPushTag
   | RequestRebaseBranch
+  | RequestRemoveWorktree
   | RequestRenameBranch
   | RequestResetToCommit
   | RequestResetUncommitted
@@ -583,6 +630,7 @@ export type ResponseMessage =
   | ResponseCherrypickCommit
   | ResponseCleanUntrackedFiles
   | ResponseCommitDetails
+  | ResponseCreateWorktree
   | ResponseCompareCommits
   | ResponseCopyToClipboard
   | ResponseCreateBranch
@@ -599,11 +647,13 @@ export type ResponseMessage =
   | ResponseLoadRepos
   | ResponseMergeBranch
   | ResponseMergeCommit
+  | ResponseOpenTerminal
   | ResponsePopStash
   | ResponsePushStash
   | ResponsePushTag
   | ResponseRebaseBranch
   | ResponseRefresh
+  | ResponseRemoveWorktree
   | ResponseSelectRepo
   | ResponseRenameBranch
   | ResponseResetToCommit

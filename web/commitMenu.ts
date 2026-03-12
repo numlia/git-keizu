@@ -1,6 +1,6 @@
 import type { GitCommitNode, GitResetMode } from "../src/types";
 import { showConfirmationDialog, showFormDialog, showSelectDialog } from "./dialogs";
-import { abbrevCommit, ELLIPSIS, sendMessage } from "./utils";
+import { abbrevCommit, ELLIPSIS, getRepoName, sendMessage } from "./utils";
 
 export function buildCommitContextMenuItems(
   repo: string,
@@ -69,6 +69,46 @@ export function buildCommitContextMenuItems(
             });
           },
           sourceElem
+        );
+      }
+    },
+    {
+      title: `Create Worktree Here${ELLIPSIS}`,
+      onClick: () => {
+        const repoName = getRepoName(repo);
+        const pathPrefix = `../${repoName}-`;
+        showFormDialog(
+          `Create worktree at commit <b><i>${abbrevCommit(hash)}</i></b>:`,
+          [
+            { type: "text-ref" as const, name: "Branch Name: ", default: "" },
+            { type: "text" as const, name: "Path: ", default: pathPrefix, placeholder: null },
+            { type: "checkbox" as const, name: "Open Terminal", value: true }
+          ],
+          "Create Worktree",
+          (values) => {
+            sendMessage({
+              command: "createWorktree",
+              repo: repo,
+              path: values[1],
+              branchName: values[0],
+              commitHash: hash,
+              openTerminal: values[2] === "checked"
+            });
+          },
+          sourceElem,
+          (dialogEl) => {
+            const branchInput = dialogEl.querySelector("#dialogInput0") as HTMLInputElement;
+            const pathInput = dialogEl.querySelector("#dialogInput1") as HTMLInputElement;
+            let lastBranchName = "";
+            branchInput.addEventListener("input", () => {
+              const currentPath = pathInput.value;
+              const expectedPath = `${pathPrefix}${lastBranchName}`;
+              if (currentPath === expectedPath || currentPath === pathPrefix) {
+                pathInput.value = `${pathPrefix}${branchInput.value}`;
+              }
+              lastBranchName = branchInput.value;
+            });
+          }
         );
       }
     },

@@ -3,7 +3,8 @@ import type {
   GitCommitNode,
   GitFileChange,
   GitRepoSet,
-  ResponseMessage
+  ResponseMessage,
+  WorktreeMap
 } from "../src/types";
 import { showErrorDialog } from "./dialogs";
 import { generateGitFileTree } from "./fileTree";
@@ -20,7 +21,8 @@ export interface GitGraphViewAPI {
     head: string | null,
     moreAvailable: boolean,
     hard: boolean,
-    authors?: string[]
+    authors?: string[],
+    worktrees?: WorktreeMap
   ): void;
   loadRepos(repos: GitRepoSet, lastActiveRepo: string | null): void;
   refresh(hard: boolean): void;
@@ -75,6 +77,9 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
     case "createBranch":
       refreshOrError(gitGraph, msg.status, "Unable to Create Branch");
       break;
+    case "createWorktree":
+      refreshOrError(gitGraph, msg.status, "Unable to Create Worktree");
+      break;
     case "deleteBranch":
       refreshOrError(gitGraph, msg.status, "Unable to Delete Branch");
       break;
@@ -97,13 +102,22 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
       gitGraph.loadBranches(msg.branches, msg.head, msg.hard, msg.isRepo);
       break;
     case "loadCommits":
-      gitGraph.loadCommits(msg.commits, msg.head, msg.moreCommitsAvailable, msg.hard, msg.authors);
+      gitGraph.loadCommits(
+        msg.commits,
+        msg.head,
+        msg.moreCommitsAvailable,
+        msg.hard,
+        msg.authors,
+        msg.worktrees
+      );
       break;
     case "loadRepos":
       gitGraph.loadRepos(msg.repos, msg.lastActiveRepo);
       break;
     case "mergeBranch":
       refreshOrError(gitGraph, msg.status, "Unable to Merge Branch");
+      break;
+    case "openTerminal":
       break;
     case "mergeCommit":
       refreshOrError(gitGraph, msg.status, "Unable to Merge Commit");
@@ -125,6 +139,9 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
       break;
     case "pushTag":
       refreshOrError(gitGraph, msg.status, "Unable to Push Tag");
+      break;
+    case "removeWorktree":
+      refreshOrError(gitGraph, msg.status, "Unable to Remove Worktree");
       break;
     case "renameBranch":
       refreshOrError(gitGraph, msg.status, "Unable to Rename Branch");

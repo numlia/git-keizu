@@ -5,7 +5,7 @@ import {
   showFormDialog,
   showRefInputDialog
 } from "./dialogs";
-import { ELLIPSIS, escapeHtml, sendMessage } from "./utils";
+import { ELLIPSIS, escapeHtml, getRepoName, sendMessage } from "./utils";
 
 export interface ParsedRemoteRef {
   remoteName: string;
@@ -138,7 +138,8 @@ export function buildRefContextMenuItems(
   sourceElem: HTMLElement,
   isRemoteCombined: boolean,
   gitBranchHead: string | null,
-  remotes?: string[]
+  remotes?: string[],
+  worktreeInfo?: { path: string; isMainWorktree: boolean } | null
 ): ContextMenuElement[] {
   let menu: ContextMenuElement[];
   let copyType: string;
@@ -278,6 +279,82 @@ export function buildRefContextMenuItems(
           }
         }
       );
+    }
+    if (worktreeInfo == null) {
+      const repoName = getRepoName(repo);
+      const defaultPath = `../${repoName}-${refName}`;
+      menu.push(null, {
+        title: `Create Worktree${ELLIPSIS}`,
+        onClick: () => {
+          showFormDialog(
+            `Create worktree for branch <b><i>${escapeHtml(refName)}</i></b>:`,
+            [
+              {
+                type: "text" as const,
+                name: "Path: ",
+                default: defaultPath,
+                placeholder: null
+              },
+              { type: "checkbox" as const, name: "Open Terminal", value: true }
+            ],
+            "Create Worktree",
+            (values) => {
+              sendMessage({
+                command: "createWorktree",
+                repo: repo,
+                path: values[0],
+                branchName: refName,
+                openTerminal: values[1] === "checked"
+              });
+            },
+            sourceElem
+          );
+        }
+      });
+    } else {
+      menu.push(
+        null,
+        {
+          title: "Open Terminal Here",
+          onClick: () => {
+            sendMessage({
+              command: "openTerminal",
+              repo: repo,
+              path: worktreeInfo.path,
+              name: `Worktree: ${refName}`
+            });
+          }
+        },
+        {
+          title: "Copy Worktree Path",
+          onClick: () => {
+            sendMessage({
+              command: "copyToClipboard",
+              type: "worktreePath",
+              data: worktreeInfo.path
+            });
+          }
+        }
+      );
+      if (!worktreeInfo.isMainWorktree) {
+        menu.push({
+          title: `Remove Worktree${ELLIPSIS}`,
+          onClick: () => {
+            showConfirmationDialog(
+              `Are you sure you want to remove the worktree for branch '${escapeHtml(refName)}' at '${escapeHtml(worktreeInfo.path)}'?`,
+              () => {
+                sendMessage({
+                  command: "removeWorktree",
+                  repo: repo,
+                  worktreePath: worktreeInfo.path,
+                  branchName: refName
+                });
+              },
+              sourceElem
+            );
+          }
+        });
+      }
     }
     copyType = "Branch Name";
   }

@@ -39,7 +39,9 @@ export const svgIcons = {
   treeView:
     '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M1.5 1h13l.5.5v13l-.5.5h-13l-.5-.5v-13l.5-.5zM2 14h12V2H2v12zm2-2v-1h3v1H4zm0-4V7h5v1H4zm7-2H4V5h7v1z"/></svg>',
   listView:
-    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M2 3h12v1H2V3zm0 4h12v1H2V7zm0 4h12v1H2v-1z"/></svg>'
+    '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16"><path fill-rule="evenodd" d="M2 3h12v1H2V3zm0 4h12v1H2V7zm0 4h12v1H2v-1z"/></svg>',
+  worktree:
+    '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10"><path d="M8.854 7.14578C8.659 6.95078 8.342 6.95078 8.147 7.14578C7.952 7.34079 7.952 7.65778 8.147 7.85279L8.293 7.99879H5.75C5.337 7.99879 5 7.66279 5 7.24879V3.74879C5 3.33479 5.337 2.99879 5.75 2.99879H8.293L8.147 3.14479C7.952 3.33979 7.952 3.65679 8.147 3.85179C8.245 3.94979 8.373 3.99779 8.501 3.99779C8.629 3.99779 8.757 3.94879 8.855 3.85179L9.855 2.85179C10.05 2.65679 10.05 2.33979 9.855 2.14479L8.855 1.14479C8.66 0.949785 8.343 0.949785 8.148 1.14479C7.953 1.33979 7.953 1.65679 8.148 1.85179L8.294 1.99779H5.751C4.786 1.99779 4.001 2.78279 4.001 3.74779V4.99779H0.5C0.224 4.99779 0 5.22179 0 5.49779C0 5.77379 0.224 5.99779 0.5 5.99779H4V7.24779C4 8.21279 4.785 8.99779 5.75 8.99779H8.293L8.147 9.14379C7.952 9.33879 7.952 9.65579 8.147 9.85079C8.245 9.94878 8.373 9.99679 8.501 9.99679C8.629 9.99679 8.757 9.94779 8.855 9.85079L9.855 8.85078C10.05 8.65578 10.05 8.33879 9.855 8.14378L8.855 7.14378L8.854 7.14578Z"/></svg>'
 };
 export const months = [
   "Jan",
@@ -80,6 +82,18 @@ export function arraysEqual<T>(a: T[], b: T[], equalElements: (a: T, b: T) => bo
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (!equalElements(a[i], b[i])) return false;
+  }
+  return true;
+}
+
+export function worktreeMapsEqual(a: GG.WorktreeMap, b: GG.WorktreeMap): boolean {
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  for (const key of keysA) {
+    const entryB = b[key];
+    if (entryB === undefined || a[key].path !== entryB.path || a[key].isMain !== entryB.isMain)
+      return false;
   }
   return true;
 }
@@ -146,4 +160,9 @@ export function getVSCodeStyle(name: string) {
 const ABBREV_COMMIT_LENGTH = 8;
 export function abbrevCommit(commitHash: string) {
   return commitHash.substring(0, ABBREV_COMMIT_LENGTH);
+}
+
+export function getRepoName(repoPath: string): string {
+  const separatorIndex = Math.max(repoPath.lastIndexOf("/"), repoPath.lastIndexOf("\\"));
+  return separatorIndex >= 0 ? repoPath.substring(separatorIndex + 1) : repoPath;
 }
