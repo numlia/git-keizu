@@ -7,7 +7,8 @@ import {
   pad2,
   svgIcons,
   UNCOMMITTED_CHANGES_HASH,
-  unescapeHtml
+  unescapeHtml,
+  worktreeMapsEqual
 } from "../../web/utils";
 
 describe("escapeHtml", () => {
@@ -100,6 +101,42 @@ describe("arraysEqual", () => {
     const a = [{ id: 1 }, { id: 2 }];
     const b = [{ id: 1 }, { id: 3 }];
     expect(arraysEqual(a, b, (x, y) => x.id === y.id)).toBe(false);
+  });
+});
+
+describe("worktreeMapsEqual", () => {
+  it("returns true for two empty maps", () => {
+    expect(worktreeMapsEqual({}, {})).toBe(true);
+  });
+
+  it("returns true for identical maps", () => {
+    const a = { main: { path: "/repo", isMain: true }, feat: { path: "/wt", isMain: false } };
+    const b = { main: { path: "/repo", isMain: true }, feat: { path: "/wt", isMain: false } };
+    expect(worktreeMapsEqual(a, b)).toBe(true);
+  });
+
+  it("returns false when key count differs", () => {
+    const a = { main: { path: "/repo", isMain: true } };
+    const b = {};
+    expect(worktreeMapsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false when a key is missing in b", () => {
+    const a = { main: { path: "/repo", isMain: true }, feat: { path: "/wt", isMain: false } };
+    const b = { main: { path: "/repo", isMain: true }, other: { path: "/x", isMain: false } };
+    expect(worktreeMapsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false when path differs", () => {
+    const a = { feat: { path: "/wt-old", isMain: false } };
+    const b = { feat: { path: "/wt-new", isMain: false } };
+    expect(worktreeMapsEqual(a, b)).toBe(false);
+  });
+
+  it("returns false when isMain differs", () => {
+    const a = { feat: { path: "/wt", isMain: false } };
+    const b = { feat: { path: "/wt", isMain: true } };
+    expect(worktreeMapsEqual(a, b)).toBe(false);
   });
 });
 

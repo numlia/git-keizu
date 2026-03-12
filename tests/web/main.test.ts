@@ -3763,7 +3763,8 @@ describe("Author, details, remotes & parent navigation", () => {
         expect.any(HTMLElement),
         expect.any(Boolean),
         expect.anything(),
-        ["origin"]
+        ["origin"],
+        null
       );
 
       // Cleanup
@@ -5049,5 +5050,309 @@ describe("Commit ordering context menu (S34)", () => {
       .mock.calls.filter((call) => (call[0] as Record<string, unknown>).command === "loadCommits");
     expect(loadCommitsCalls.length).toBeGreaterThan(0);
     expect((loadCommitsCalls[0][0] as Record<string, unknown>).hard).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S35: worktree アイコン描画とデータ属性                             */
+/* ------------------------------------------------------------------ */
+
+describe("worktree icon drawing and data attributes (S35)", () => {
+  beforeEach(() => {
+    resetCommitState();
+  });
+
+  it("adds worktree CSS class, data-worktree-path, and replaces branch icon for linked worktree (TC-194)", () => {
+    // Given: a head branch "feature" has a linked worktree entry (isMain: false)
+    vi.mocked(getBranchLabels).mockReturnValue({
+      heads: [{ name: "feature", remotes: [] }],
+      remotes: [],
+      tags: []
+    });
+
+    // When: loadCommits with worktrees map is dispatched
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true,
+      worktrees: { feature: { path: "/home/user/feature-wt", isMain: false } }
+    });
+
+    // Then: the gitRef head span has worktree class and data-worktree-path
+    const headSpan = document.querySelector(".gitRef.head");
+    expect(headSpan).not.toBeNull();
+    expect(headSpan!.classList.contains("worktree")).toBe(true);
+    expect(headSpan!.getAttribute("data-worktree-path")).toBe("/home/user/feature-wt");
+    // And: the branch icon is replaced with the worktree icon (viewBox 0 0 10 10)
+    const svg = headSpan!.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg!.getAttribute("viewBox")).toBe("0 0 10 10");
+
+    // Cleanup
+    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+  });
+
+  it("renders branch without worktree-related elements when not in worktree map (TC-195)", () => {
+    // Given: a head branch "develop" with no worktree entry
+    vi.mocked(getBranchLabels).mockReturnValue({
+      heads: [{ name: "develop", remotes: [] }],
+      remotes: [],
+      tags: []
+    });
+
+    // When: loadCommits with empty worktrees map is dispatched
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true,
+      worktrees: {}
+    });
+
+    // Then: the gitRef head span does NOT have worktree class or data-worktree-path
+    const headSpan = document.querySelector(".gitRef.head");
+    expect(headSpan).not.toBeNull();
+    expect(headSpan!.classList.contains("worktree")).toBe(false);
+    expect(headSpan!.hasAttribute("data-worktree-path")).toBe(false);
+    // And: the branch icon is the standard branch icon (viewBox 0 0 10 16)
+    const svg = headSpan!.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg!.getAttribute("viewBox")).toBe("0 0 10 16");
+
+    // Cleanup
+    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+  });
+
+  it("sets tooltip title='Worktree: <path>' on gitRef span for linked worktree (TC-196)", () => {
+    // Given: a head branch with linked worktree
+    vi.mocked(getBranchLabels).mockReturnValue({
+      heads: [{ name: "feature", remotes: [] }],
+      remotes: [],
+      tags: []
+    });
+
+    // When: loadCommits with worktrees is dispatched
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true,
+      worktrees: { feature: { path: "/tmp/my-worktree", isMain: false } }
+    });
+
+    // Then: the gitRef span has title attribute with "Worktree: <path>"
+    const headSpan = document.querySelector(".gitRef.head.worktree");
+    expect(headSpan).not.toBeNull();
+    expect(headSpan!.getAttribute("title")).toBe("Worktree: /tmp/my-worktree");
+
+    // Cleanup
+    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+  });
+
+  it("applies escapeHtml to worktree path with HTML special characters (TC-197)", () => {
+    // Given: a worktree path containing HTML special characters
+    const maliciousPath = '/tmp/<script>alert("xss")</script>';
+    vi.mocked(getBranchLabels).mockReturnValue({
+      heads: [{ name: "feature", remotes: [] }],
+      remotes: [],
+      tags: []
+    });
+
+    // When: loadCommits with the malicious path is dispatched
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true,
+      worktrees: { feature: { path: maliciousPath, isMain: false } }
+    });
+
+    // Then: no <script> element was injected into the DOM (XSS prevented by escapeHtml)
+    const headSpan = document.querySelector(".gitRef.head");
+    expect(headSpan).not.toBeNull();
+    expect(headSpan!.querySelector("script")).toBeNull();
+
+    // And: quotes in path are escaped in the serialized HTML (jsdom re-escapes " as &quot;)
+    const outerHtml = headSpan!.outerHTML;
+    expect(outerHtml).toContain("&quot;xss&quot;");
+
+    // And: getAttribute returns the decoded original path (DOM decodes entities)
+    expect(headSpan!.getAttribute("data-worktree-path")).toBe(maliciousPath);
+
+    // And: the tooltip on the gitRef span contains the path
+    expect(headSpan!.getAttribute("title")).toBe(`Worktree: ${maliciousPath}`);
+
+    // Cleanup
+    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+  });
+
+  it("does not add worktree indicators for remote branches (TC-198)", () => {
+    // Given: only remote branches are present (no head branches)
+    vi.mocked(getBranchLabels).mockReturnValue({
+      heads: [],
+      remotes: [{ name: "origin/feature", remote: "origin" }],
+      tags: []
+    });
+
+    // When: loadCommits with worktrees that include a matching name is dispatched
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true,
+      worktrees: { "origin/feature": { path: "/tmp/wt", isMain: false } }
+    });
+
+    // Then: remote branch span does not have worktree class
+    const remoteSpan = document.querySelector(".gitRef.remote");
+    expect(remoteSpan).not.toBeNull();
+    expect(remoteSpan!.classList.contains("worktree")).toBe(false);
+
+    // Cleanup
+    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+  });
+
+  it("does not add worktree CSS class or icon for main worktree branch (TC-194b)", () => {
+    // Given: a head branch "main" is the main worktree (isMain: true)
+    vi.mocked(getBranchLabels).mockReturnValue({
+      heads: [{ name: "main", remotes: [] }],
+      remotes: [],
+      tags: []
+    });
+
+    // When: loadCommits with main worktree is dispatched
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true,
+      worktrees: { main: { path: "/home/user/repo", isMain: true } }
+    });
+
+    // Then: the gitRef head span does NOT have worktree class or data-worktree-path
+    const headSpan = document.querySelector(".gitRef.head");
+    expect(headSpan).not.toBeNull();
+    expect(headSpan!.classList.contains("worktree")).toBe(false);
+    expect(headSpan!.hasAttribute("data-worktree-path")).toBe(false);
+    // And: the branch icon is the standard branch icon (viewBox 0 0 10 16)
+    const svg = headSpan!.querySelector("svg");
+    expect(svg).not.toBeNull();
+    expect(svg!.getAttribute("viewBox")).toBe("0 0 10 16");
+
+    // Cleanup
+    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+  });
+
+  it("passes worktreeInfo with path and isMainWorktree to buildRefContextMenuItems (TC-199)", () => {
+    // Given: a worktree branch is rendered
+    vi.mocked(getBranchLabels).mockReturnValue({
+      heads: [{ name: "feature", remotes: [] }],
+      remotes: [],
+      tags: []
+    });
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true,
+      worktrees: { feature: { path: "/home/user/wt", isMain: true } }
+    });
+    vi.clearAllMocks();
+
+    // When: contextmenu is triggered on the gitRef head element
+    const headSpan = document.querySelector(".gitRef.head");
+    expect(headSpan).not.toBeNull();
+    headSpan!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // Then: buildRefContextMenuItems is called with worktreeInfo containing path and isMainWorktree
+    expect(buildRefContextMenuItems).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(HTMLElement),
+      expect.any(Boolean),
+      expect.anything(),
+      undefined,
+      { path: "/home/user/wt", isMainWorktree: true }
+    );
+
+    // Cleanup
+    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+  });
+
+  it("passes null worktreeInfo when branch has no worktree (TC-200)", () => {
+    // Given: a branch with no worktree entry is rendered
+    vi.mocked(getBranchLabels).mockReturnValue({
+      heads: [{ name: "develop", remotes: [] }],
+      remotes: [],
+      tags: []
+    });
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true,
+      worktrees: {}
+    });
+    vi.clearAllMocks();
+
+    // When: contextmenu is triggered on the gitRef head element
+    const headSpan = document.querySelector(".gitRef.head");
+    expect(headSpan).not.toBeNull();
+    headSpan!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // Then: buildRefContextMenuItems is called with worktreeInfo = null
+    expect(buildRefContextMenuItems).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.any(HTMLElement),
+      expect.any(Boolean),
+      expect.anything(),
+      undefined,
+      null
+    );
+
+    // Cleanup
+    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+  });
+
+  it("renders all branches without worktree elements when worktree map is empty (TC-201)", () => {
+    // Given: multiple head branches, worktree map is empty
+    vi.mocked(getBranchLabels).mockReturnValue({
+      heads: [
+        { name: "main", remotes: [] },
+        { name: "feature", remotes: [] }
+      ],
+      remotes: [],
+      tags: []
+    });
+
+    // When: loadCommits without worktrees field is dispatched (backward compat)
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+
+    // Then: no branch has worktree class (2 heads × 3 commits = 6 spans)
+    const headSpans = document.querySelectorAll(".gitRef.head");
+    expect(headSpans.length).toBeGreaterThanOrEqual(2);
+    headSpans.forEach((span) => {
+      expect(span.classList.contains("worktree")).toBe(false);
+      expect(span.hasAttribute("data-worktree-path")).toBe(false);
+    });
+
+    // Cleanup
+    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
   });
 });

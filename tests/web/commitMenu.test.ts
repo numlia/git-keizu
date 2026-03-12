@@ -12,6 +12,10 @@ vi.mock("../../web/utils", () => ({
   abbrevCommit: vi.fn((h: string) => h.substring(0, 8)),
   escapeHtml: vi.fn((str: string) => str),
   sendMessage: vi.fn(),
+  getRepoName: vi.fn((repoPath: string) => {
+    const i = Math.max(repoPath.lastIndexOf("/"), repoPath.lastIndexOf("\\"));
+    return i >= 0 ? repoPath.substring(i + 1) : repoPath;
+  }),
   ELLIPSIS: "&#8230;"
 }));
 
@@ -475,5 +479,164 @@ describe("Cherry-pick dialog (S3)", () => {
     expect(recordOriginInput.info).toContain("origin of the cherry pick");
     expect(noCommitInput.info).toBeDefined();
     expect(noCommitInput.info).toContain("staged but not committed");
+  });
+});
+
+// --- S4: Create Worktree Here ダイアログ ---
+
+describe("Create Worktree Here dialog (S4)", () => {
+  function getCreateWorktreeItem() {
+    const items = buildCommitContextMenuItems(
+      REPO,
+      HASH,
+      PARENT_HASHES,
+      [],
+      {},
+      createMockElement()
+    );
+    return items.find((item) => item !== null && item.title.includes("Create Worktree Here"))!;
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("calls showFormDialog with text-ref + text + checkbox (3 fields) (TC-022)", () => {
+    // Given: Create Worktree Here menu item exists
+    const item = getCreateWorktreeItem();
+
+    // When: onClick is triggered
+    item.onClick();
+
+    // Then: showFormDialog is called with 3 form inputs
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs).toHaveLength(3);
+    expect(inputs[0].type).toBe("text-ref");
+    expect(inputs[1].type).toBe("text");
+    expect(inputs[2].type).toBe("checkbox");
+  });
+
+  it("Branch Name has empty default enabling text-ref validation (TC-023)", () => {
+    // Given: Create Worktree Here menu item
+    const item = getCreateWorktreeItem();
+
+    // When: onClick is triggered
+    item.onClick();
+
+    // Then: Branch Name (text-ref) has empty default — empty triggers validation block
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs[0].type).toBe("text-ref");
+    expect(inputs[0].default).toBe("");
+  });
+
+  it("Path defaults to '../<repoName>-' format (TC-024)", () => {
+    // Given: repo is "/test/repo" → repoName = "repo"
+    const item = getCreateWorktreeItem();
+
+    // When: onClick is triggered
+    item.onClick();
+
+    // Then: Path field default is "../repo-"
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs[1].default).toBe("../repo-");
+  });
+
+  it("Open Terminal checkbox defaults to ON (TC-025)", () => {
+    // Given: Create Worktree Here menu item
+    const item = getCreateWorktreeItem();
+
+    // When: onClick is triggered
+    item.onClick();
+
+    // Then: Open Terminal checkbox value defaults to true
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect((inputs[2] as DialogCheckboxInput).value).toBe(true);
+  });
+
+  it("sends RequestCreateWorktree with all fields on submit (TC-026)", () => {
+    // Given: Create Worktree Here dialog is shown
+    const item = getCreateWorktreeItem();
+    item.onClick();
+
+    // When: form is submitted with valid values
+    const actioned = vi.mocked(showFormDialog).mock.calls[0][3];
+    actioned(["feature/wt", "../repo-feature/wt", "checked"]);
+
+    // Then: sendMessage is called with createWorktree command and all fields
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "createWorktree",
+      repo: REPO,
+      path: "../repo-feature/wt",
+      branchName: "feature/wt",
+      commitHash: HASH,
+      openTerminal: true
+    });
+  });
+
+  it("afterCreate callback updates Path dynamically when Branch Name changes (TC-027)", () => {
+    // Given: Create Worktree Here dialog is shown
+    const item = getCreateWorktreeItem();
+    item.onClick();
+
+    const afterCreate = vi.mocked(showFormDialog).mock.calls[0][5];
+    expect(afterCreate).toBeDefined();
+
+    // Set up mock dialog elements
+    const mockBranchInput = { value: "", addEventListener: vi.fn() } as unknown as HTMLInputElement;
+    const mockPathInput = { value: "../repo-" } as unknown as HTMLInputElement;
+    const mockDialogEl = {
+      querySelector: vi.fn((selector: string) => {
+        if (selector === "#dialogInput0") return mockBranchInput;
+        if (selector === "#dialogInput1") return mockPathInput;
+        return null;
+      })
+    } as unknown as HTMLElement;
+
+    afterCreate!(mockDialogEl);
+
+    // When: Branch Name input event is triggered with "my-branch"
+    const inputHandler = mockBranchInput.addEventListener.mock.calls.find(
+      (call: unknown[]) => call[0] === "input"
+    )![1] as () => void;
+    (mockBranchInput as { value: string }).value = "my-branch";
+    inputHandler();
+
+    // Then: Path is updated to "../repo-my-branch"
+    expect(mockPathInput.value).toBe("../repo-my-branch");
+  });
+
+  it("afterCreate callback stops Path updates after manual Path edit (TC-028)", () => {
+    // Given: Create Worktree Here dialog is shown
+    const item = getCreateWorktreeItem();
+    item.onClick();
+
+    const afterCreate = vi.mocked(showFormDialog).mock.calls[0][5];
+    expect(afterCreate).toBeDefined();
+
+    const mockBranchInput = { value: "", addEventListener: vi.fn() } as unknown as HTMLInputElement;
+    const mockPathInput = { value: "../repo-" } as unknown as HTMLInputElement;
+    const mockDialogEl = {
+      querySelector: vi.fn((selector: string) => {
+        if (selector === "#dialogInput0") return mockBranchInput;
+        if (selector === "#dialogInput1") return mockPathInput;
+        return null;
+      })
+    } as unknown as HTMLElement;
+
+    afterCreate!(mockDialogEl);
+
+    const inputHandler = mockBranchInput.addEventListener.mock.calls.find(
+      (call: unknown[]) => call[0] === "input"
+    )![1] as () => void;
+
+    // When: User manually edits Path to a custom value
+    (mockPathInput as { value: string }).value = "/custom/path";
+    (mockBranchInput as { value: string }).value = "new-branch";
+    inputHandler();
+
+    // Then: Path remains unchanged (manual edit detected, auto-update stopped)
+    expect(mockPathInput.value).toBe("/custom/path");
   });
 });

@@ -12,6 +12,10 @@ vi.mock("../../web/dialogs", () => ({
 vi.mock("../../web/utils", () => ({
   escapeHtml: vi.fn((str: string) => str),
   sendMessage: vi.fn(),
+  getRepoName: vi.fn((repoPath: string) => {
+    const sep = Math.max(repoPath.lastIndexOf("/"), repoPath.lastIndexOf("\\"));
+    return sep >= 0 ? repoPath.substring(sep + 1) : repoPath;
+  }),
   ELLIPSIS: "&#8230;"
 }));
 
@@ -22,7 +26,7 @@ import {
   showRefInputDialog
 } from "../../web/dialogs";
 import { buildRefContextMenuItems, checkoutBranchAction, parseRemoteRef } from "../../web/refMenu";
-import { sendMessage } from "../../web/utils";
+import { getRepoName, sendMessage } from "../../web/utils";
 
 function createMockElement(classes: string[]): HTMLElement {
   const classList = {
@@ -607,5 +611,252 @@ describe("buildMergeBranchMenuItem Merge dialog (S7)", () => {
     expect(squashInput.info).toContain("single commit");
     expect(noCommitInput.info).toBeDefined();
     expect(noCommitInput.info).toContain("staged but not committed");
+  });
+});
+
+// --- S8: buildRefContextMenuItems() worktree 関連メニュー項目 ---
+
+describe("buildRefContextMenuItems worktree menu items (S8)", () => {
+  const WORKTREE_PATH = "/home/user/project-feature";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function getTitles(menu: ContextMenuElement[]): string[] {
+    return menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .map((item) => item.title);
+  }
+
+  it("includes 'Create Worktree...' for local branch with worktreeInfo=null (TC-033)", () => {
+    // Given: A local branch element with no worktree (worktreeInfo is null)
+    const sourceElem = createMockElement(["head"]);
+
+    // When: buildRefContextMenuItems is called with worktreeInfo=null
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      null
+    );
+
+    // Then: Menu contains "Create Worktree..." item
+    const titles = getTitles(menu);
+    expect(titles).toContain("Create Worktree&#8230;");
+  });
+
+  it("includes 3 worktree items for local branch with worktreeInfo (non-main) (TC-034)", () => {
+    // Given: A local branch with worktree info (non-main worktree)
+    const sourceElem = createMockElement(["head"]);
+    const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
+
+    // When: buildRefContextMenuItems is called with worktreeInfo
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      worktreeInfo
+    );
+
+    // Then: Menu contains Open Terminal Here, Copy Worktree Path, and Remove Worktree
+    const titles = getTitles(menu);
+    expect(titles).toContain("Open Terminal Here");
+    expect(titles).toContain("Copy Worktree Path");
+    expect(titles).toContain("Remove Worktree&#8230;");
+  });
+
+  it("excludes Remove Worktree for main worktree (TC-035)", () => {
+    // Given: A local branch with worktree info (main worktree)
+    const sourceElem = createMockElement(["head"]);
+    const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: true };
+
+    // When: buildRefContextMenuItems is called with main worktree info
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "main",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      worktreeInfo
+    );
+
+    // Then: Menu contains Open Terminal Here and Copy Worktree Path, but NOT Remove Worktree
+    const titles = getTitles(menu);
+    expect(titles).toContain("Open Terminal Here");
+    expect(titles).toContain("Copy Worktree Path");
+    expect(titles).not.toContain("Remove Worktree&#8230;");
+  });
+
+  it("does not include worktree items for remote branch (TC-036)", () => {
+    // Given: A remote branch element
+    const sourceElem = createMockElement(["remote"]);
+
+    // When: buildRefContextMenuItems is called for a remote branch
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "origin/feature",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      null
+    );
+
+    // Then: Menu does not contain any worktree-related items
+    const titles = getTitles(menu);
+    expect(titles).not.toContain("Create Worktree&#8230;");
+    expect(titles).not.toContain("Open Terminal Here");
+    expect(titles).not.toContain("Copy Worktree Path");
+    expect(titles).not.toContain("Remove Worktree&#8230;");
+  });
+
+  it("showFormDialog is called with 2 fields when Create Worktree is selected (TC-037)", () => {
+    // Given: A local branch with no worktree
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      null
+    );
+
+    // When: Create Worktree item is clicked
+    const createItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Create Worktree&#8230;");
+    createItem!.onClick();
+
+    // Then: showFormDialog is called with Path (text) and Open Terminal (checkbox) fields
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0].type).toBe("text");
+    expect(inputs[0].name).toBe("Path: ");
+    expect(inputs[1].type).toBe("checkbox");
+    expect(inputs[1].name).toBe("Open Terminal");
+    expect((inputs[1] as DialogCheckboxInput).value).toBe(true);
+  });
+
+  it("Path default value is '../<repoName>-<branchName>' format (TC-038)", () => {
+    // Given: A local branch with no worktree
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      null
+    );
+
+    // When: Create Worktree item is clicked
+    const createItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Create Worktree&#8230;");
+    createItem!.onClick();
+
+    // Then: Path default is "../repo-feature/x" (getRepoName extracts "repo" from "/test/repo")
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const pathInput = inputs[0] as DialogTextInput;
+    expect(pathInput.default).toBe("../repo-feature/x");
+    expect(getRepoName).toHaveBeenCalledWith(REPO);
+  });
+
+  it("Open Terminal Here sends openTerminal message (TC-039)", () => {
+    // Given: A local branch with worktree info
+    const sourceElem = createMockElement(["head"]);
+    const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      worktreeInfo
+    );
+
+    // When: Open Terminal Here item is clicked
+    const openItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Open Terminal Here");
+    openItem!.onClick();
+
+    // Then: sendMessage is called with openTerminal command including path and name
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "openTerminal",
+      repo: REPO,
+      path: WORKTREE_PATH,
+      name: "Worktree: feature/x"
+    });
+  });
+
+  it("Copy Worktree Path sends copyToClipboard message (TC-040)", () => {
+    // Given: A local branch with worktree info
+    const sourceElem = createMockElement(["head"]);
+    const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      worktreeInfo
+    );
+
+    // When: Copy Worktree Path item is clicked
+    const copyItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Copy Worktree Path");
+    copyItem!.onClick();
+
+    // Then: sendMessage is called with copyToClipboard command, type worktreePath
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "copyToClipboard",
+      type: "worktreePath",
+      data: WORKTREE_PATH
+    });
+  });
+
+  it("Remove Worktree shows confirmation dialog with branch name and path (TC-041)", () => {
+    // Given: A local branch with non-main worktree info
+    const sourceElem = createMockElement(["head"]);
+    const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      worktreeInfo
+    );
+
+    // When: Remove Worktree item is clicked
+    const removeItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Remove Worktree&#8230;");
+    removeItem!.onClick();
+
+    // Then: showConfirmationDialog is called with message containing branch name and path
+    expect(showConfirmationDialog).toHaveBeenCalledTimes(1);
+    const dialogMessage = vi.mocked(showConfirmationDialog).mock.calls[0][0];
+    expect(dialogMessage).toContain("feature/x");
+    expect(dialogMessage).toContain(WORKTREE_PATH);
   });
 });

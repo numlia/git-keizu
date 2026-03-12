@@ -3042,3 +3042,208 @@ describe("getGitLog() commit ordering parameter (S21)", () => {
     expect(logArgs).not.toContain("--author-date-order");
   });
 });
+
+describe("getWorktrees", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns parsed worktree map on spawnGit success (TC-132)", async () => {
+    // Given: spawnGit succeeds with porcelain output containing main + feature branch
+    const porcelainOutput = [
+      "worktree /home/user/project",
+      "HEAD abc1234",
+      "branch refs/heads/main",
+      "",
+      "worktree /home/user/project-feature",
+      "HEAD def5678",
+      "branch refs/heads/feature/x",
+      ""
+    ].join("\n");
+    spawnMock.mockImplementation(() => createMockProcess(porcelainOutput));
+
+    // When: getWorktrees(repo) is called
+    const result = await ds.getWorktrees(REPO);
+
+    // Then: parseWorktreeList result is returned with correct args
+    expect(result).toEqual({
+      main: { path: "/home/user/project", isMain: true },
+      "feature/x": { path: "/home/user/project-feature", isMain: false }
+    });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "list", "--porcelain"], {
+      cwd: REPO
+    });
+  });
+
+  it("returns empty map when spawnGit fails (TC-133)", async () => {
+    // Given: spawnGit fails with non-zero exit code
+    spawnMock.mockImplementation(() => createMockProcess("", 1));
+
+    // When: getWorktrees(repo) is called
+    const result = await ds.getWorktrees(REPO);
+
+    // Then: empty map is returned as fallback
+    expect(result).toEqual({});
+  });
+
+  it("returns single entry map for main worktree only (TC-134)", async () => {
+    // Given: Repository has only the main worktree (no additional worktrees)
+    const porcelainOutput = [
+      "worktree /home/user/project",
+      "HEAD abc1234",
+      "branch refs/heads/main",
+      ""
+    ].join("\n");
+    spawnMock.mockImplementation(() => createMockProcess(porcelainOutput));
+
+    // When: getWorktrees(repo) is called
+    const result = await ds.getWorktrees(REPO);
+
+    // Then: single entry with isMain=true
+    expect(result).toEqual({
+      main: { path: "/home/user/project", isMain: true }
+    });
+  });
+});
+
+describe("addWorktree", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('passes ["worktree", "add", path, branchName] when commitHash is undefined (TC-135)', async () => {
+    // Given: addWorktree called with existing branch (no commitHash)
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: addWorktree(repo, path, branchName) is called without commitHash
+    const result = await ds.addWorktree(REPO, "/tmp/wt", "feature/x");
+
+    // Then: spawn is called with correct args for existing branch
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "add", "/tmp/wt", "feature/x"], {
+      cwd: REPO
+    });
+  });
+
+  it('passes ["worktree", "add", "-b", branchName, path, commitHash] when commitHash is provided (TC-136)', async () => {
+    // Given: addWorktree called with new branch from commit
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: addWorktree(repo, path, branchName, commitHash) is called
+    const result = await ds.addWorktree(REPO, "/tmp/wt", "new-branch", "abc1234");
+
+    // Then: spawn is called with -b flag and commitHash
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["worktree", "add", "-b", "new-branch", "/tmp/wt", "abc1234"],
+      { cwd: REPO }
+    );
+  });
+
+  it("returns null on success (TC-137)", async () => {
+    // Given: spawn completes successfully (exit code 0)
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({ stdout: "Preparing worktree\n" })
+    );
+
+    // When: addWorktree is called
+    const result = await ds.addWorktree(REPO, "/tmp/wt", "feature/y");
+
+    // Then: null is returned (GitCommandStatus success)
+    expect(result).toBeNull();
+  });
+
+  it("returns error message for duplicate branch name (TC-138)", async () => {
+    // Given: git worktree add fails because branch already exists
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({
+        stderr: "fatal: a branch named 'feature/x' already exists\n",
+        exitCode: 128
+      })
+    );
+
+    // When: addWorktree is called with an existing branch name
+    const result = await ds.addWorktree(REPO, "/tmp/wt", "feature/x", "abc1234");
+
+    // Then: error message string is returned
+    expect(result).not.toBeNull();
+    expect(result).toContain("already exists");
+  });
+
+  it("returns error message for existing path (TC-139)", async () => {
+    // Given: git worktree add fails because path already exists
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({
+        stderr: "fatal: '/tmp/wt' already exists\n",
+        exitCode: 128
+      })
+    );
+
+    // When: addWorktree is called with an existing path
+    const result = await ds.addWorktree(REPO, "/tmp/wt", "feature/z");
+
+    // Then: error message string is returned
+    expect(result).not.toBeNull();
+    expect(result).toContain("already exists");
+  });
+});
+
+describe("removeWorktree", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('passes ["worktree", "remove", worktreePath] and returns null on success (TC-140)', async () => {
+    // Given: removeWorktree called with a valid worktree path
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: removeWorktree(repo, worktreePath) is called
+    const result = await ds.removeWorktree(REPO, "/tmp/wt");
+
+    // Then: spawn is called with correct args and null is returned
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "remove", "/tmp/wt"], { cwd: REPO });
+  });
+
+  it("returns error message when worktree has uncommitted changes (TC-141)", async () => {
+    // Given: git worktree remove fails due to uncommitted changes
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({
+        stderr: "fatal: '/tmp/wt' contains modified or untracked files, use --force to delete it\n",
+        exitCode: 128
+      })
+    );
+
+    // When: removeWorktree is called on a dirty worktree
+    const result = await ds.removeWorktree(REPO, "/tmp/wt");
+
+    // Then: error message string is returned
+    expect(result).not.toBeNull();
+    expect(result).toContain("modified or untracked");
+  });
+});

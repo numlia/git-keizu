@@ -252,7 +252,14 @@ describe("handleMessage loadCommits authors pass-through (S5)", () => {
 
     // Then: gitGraph.loadCommits is called with authors forwarded
     expect(gitGraph.loadCommits).toHaveBeenCalledTimes(1);
-    expect(gitGraph.loadCommits).toHaveBeenCalledWith([], null, false, false, ["Alice", "Bob"]);
+    expect(gitGraph.loadCommits).toHaveBeenCalledWith(
+      [],
+      null,
+      false,
+      false,
+      ["Alice", "Bob"],
+      undefined
+    );
   });
 
   it("passes undefined when authors field is absent (TC-014)", () => {
@@ -270,6 +277,81 @@ describe("handleMessage loadCommits authors pass-through (S5)", () => {
 
     // Then: gitGraph.loadCommits is called with authors as undefined
     expect(gitGraph.loadCommits).toHaveBeenCalledTimes(1);
-    expect(gitGraph.loadCommits).toHaveBeenCalledWith([], null, false, false, undefined);
+    expect(gitGraph.loadCommits).toHaveBeenCalledWith([], null, false, false, undefined, undefined);
+  });
+});
+
+describe("handleMessage createWorktree/removeWorktree/openTerminal response (S6)", () => {
+  let gitGraph: GitGraphViewAPI;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitGraph = createMockGitGraphView();
+  });
+
+  it("calls refresh on createWorktree success (TC-015)", () => {
+    // Given: A createWorktree success response (status = null)
+    const msg: ResponseMessage = { command: "createWorktree", status: null };
+
+    // When: handleMessage is called with the success response
+    handleMessage(msg, gitGraph);
+
+    // Then: gitGraph.refresh(false) is called for a soft refresh
+    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
+    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    expect(showErrorDialog).not.toHaveBeenCalled();
+  });
+
+  it("shows error dialog on createWorktree failure (TC-016)", () => {
+    // Given: A createWorktree error response (status = error message string)
+    const errorMsg = "fatal: 'feature/x' is already checked out at '/path/to/worktree'";
+    const msg: ResponseMessage = { command: "createWorktree", status: errorMsg };
+
+    // When: handleMessage is called with the error response
+    handleMessage(msg, gitGraph);
+
+    // Then: showErrorDialog is called with "Unable to Create Worktree" and the git error message
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Create Worktree", errorMsg, null);
+    expect(gitGraph.refresh).not.toHaveBeenCalled();
+  });
+
+  it("calls refresh on removeWorktree success (TC-017)", () => {
+    // Given: A removeWorktree success response (status = null)
+    const msg: ResponseMessage = { command: "removeWorktree", status: null };
+
+    // When: handleMessage is called with the success response
+    handleMessage(msg, gitGraph);
+
+    // Then: gitGraph.refresh(false) is called for a soft refresh
+    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
+    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    expect(showErrorDialog).not.toHaveBeenCalled();
+  });
+
+  it("shows error dialog on removeWorktree failure (TC-018)", () => {
+    // Given: A removeWorktree error response (status = error message string)
+    const errorMsg = "fatal: 'feature/y' contains modified or untracked files";
+    const msg: ResponseMessage = { command: "removeWorktree", status: errorMsg };
+
+    // When: handleMessage is called with the error response
+    handleMessage(msg, gitGraph);
+
+    // Then: showErrorDialog is called with "Unable to Remove Worktree" and the git error message
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Remove Worktree", errorMsg, null);
+    expect(gitGraph.refresh).not.toHaveBeenCalled();
+  });
+
+  it("completes as no-op on openTerminal response (TC-019)", () => {
+    // Given: An openTerminal response (no status field)
+    const msg: ResponseMessage = { command: "openTerminal" };
+
+    // When: handleMessage is called with the openTerminal response
+    handleMessage(msg, gitGraph);
+
+    // Then: No refresh or error dialog — terminal launch is handled by extension host
+    expect(gitGraph.refresh).not.toHaveBeenCalled();
+    expect(showErrorDialog).not.toHaveBeenCalled();
   });
 });

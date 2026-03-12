@@ -24,6 +24,10 @@ const mocks = vi.hoisted(() => ({
   mergeBranch: vi.fn(),
   mergeCommit: vi.fn(),
   cherrypickCommit: vi.fn(),
+  addWorktree: vi.fn(),
+  removeWorktree: vi.fn(),
+  createTerminal: vi.fn(),
+  terminalShow: vi.fn(),
   messageHandler: { current: null as ((msg: unknown) => Promise<void>) | null }
 }));
 
@@ -46,7 +50,8 @@ vi.mock("vscode", () => ({
       iconPath: null,
       dispose: vi.fn()
     })),
-    activeTextEditor: undefined
+    activeTextEditor: undefined,
+    createTerminal: mocks.createTerminal
   },
   Uri: {
     file: vi.fn((p: string) => ({ fsPath: p, toString: () => p }))
@@ -1947,5 +1952,167 @@ describe("GitGraphView viewState commitOrdering / loadCommits handler (S14)", ()
     // Then: dataSource.getCommits() is called with commitOrdering="date"
     expect(mocks.getCommits).toHaveBeenCalledTimes(1);
     expect(mocks.getCommits).toHaveBeenCalledWith(TEST_REPO, ["main"], 300, true, [], "date");
+  });
+});
+
+describe("GitGraphView worktree message handlers", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitGraphView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.addWorktree.mockResolvedValue(null);
+    mocks.removeWorktree.mockResolvedValue(null);
+    mocks.createTerminal.mockReturnValue({ show: mocks.terminalShow });
+
+    const mockDataSource = {
+      addWorktree: mocks.addWorktree,
+      removeWorktree: mocks.removeWorktree
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitGraphView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitGraphView.currentPanel?.dispose();
+    GitGraphView.currentPanel = undefined;
+  });
+
+  it("createWorktree without commitHash and openTerminal=false calls addWorktree, no terminal (TC-048)", async () => {
+    // Given: GitGraphView instance with mocked DataSource
+    // When: RequestCreateWorktree without commitHash and openTerminal=false
+    await mocks.messageHandler.current!({
+      command: "createWorktree",
+      repo: TEST_REPO,
+      path: "/tmp/wt",
+      branchName: "feature/x",
+      openTerminal: false
+    });
+
+    // Then: addWorktree is called with correct args, no terminal created
+    expect(mocks.addWorktree).toHaveBeenCalledTimes(1);
+    expect(mocks.addWorktree).toHaveBeenCalledWith(TEST_REPO, "/tmp/wt", "feature/x", undefined);
+    expect(mocks.createTerminal).not.toHaveBeenCalled();
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "createWorktree",
+      status: null
+    });
+  });
+
+  it("createWorktree with commitHash and openTerminal=true creates terminal on success (TC-049)", async () => {
+    // Given: addWorktree succeeds (returns null)
+    mocks.addWorktree.mockResolvedValue(null);
+
+    // When: RequestCreateWorktree with commitHash and openTerminal=true
+    await mocks.messageHandler.current!({
+      command: "createWorktree",
+      repo: TEST_REPO,
+      path: "/tmp/wt",
+      branchName: "new-branch",
+      commitHash: "abc1234",
+      openTerminal: true
+    });
+
+    // Then: addWorktree called, terminal created with name and cwd, show() called
+    expect(mocks.addWorktree).toHaveBeenCalledWith(TEST_REPO, "/tmp/wt", "new-branch", "abc1234");
+    expect(mocks.createTerminal).toHaveBeenCalledWith({
+      name: "Worktree: new-branch",
+      cwd: "/tmp/wt"
+    });
+    expect(mocks.terminalShow).toHaveBeenCalled();
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "createWorktree",
+      status: null
+    });
+  });
+
+  it("createWorktree failure sends error status and does not create terminal (TC-050)", async () => {
+    // Given: addWorktree fails with error message
+    mocks.addWorktree.mockResolvedValue("fatal: branch already exists");
+
+    // When: RequestCreateWorktree with openTerminal=true
+    await mocks.messageHandler.current!({
+      command: "createWorktree",
+      repo: TEST_REPO,
+      path: "/tmp/wt",
+      branchName: "existing",
+      commitHash: "abc1234",
+      openTerminal: true
+    });
+
+    // Then: error status sent, no terminal created
+    expect(mocks.createTerminal).not.toHaveBeenCalled();
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "createWorktree",
+      status: "fatal: branch already exists"
+    });
+  });
+
+  it("removeWorktree calls DataSource.removeWorktree and sends response (TC-051)", async () => {
+    // Given: removeWorktree succeeds
+    mocks.removeWorktree.mockResolvedValue(null);
+
+    // When: RequestRemoveWorktree message is received
+    await mocks.messageHandler.current!({
+      command: "removeWorktree",
+      repo: TEST_REPO,
+      worktreePath: "/tmp/wt",
+      branchName: "feature/x"
+    });
+
+    // Then: removeWorktree is called and response is sent
+    expect(mocks.removeWorktree).toHaveBeenCalledTimes(1);
+    expect(mocks.removeWorktree).toHaveBeenCalledWith(TEST_REPO, "/tmp/wt");
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "removeWorktree",
+      status: null
+    });
+  });
+
+  it("openTerminal creates terminal with name and cwd, sends response (TC-052)", async () => {
+    // Given: GitGraphView instance
+    // When: RequestOpenTerminal message is received
+    await mocks.messageHandler.current!({
+      command: "openTerminal",
+      repo: TEST_REPO,
+      path: "/home/user/worktree",
+      name: "Worktree: feature/x"
+    });
+
+    // Then: createTerminal called with name and cwd, show() called, response sent
+    expect(mocks.createTerminal).toHaveBeenCalledWith({
+      name: "Worktree: feature/x",
+      cwd: "/home/user/worktree"
+    });
+    expect(mocks.terminalShow).toHaveBeenCalled();
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "openTerminal"
+    });
   });
 });
