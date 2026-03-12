@@ -32,10 +32,10 @@ import {
   insertAfter,
   sendMessage,
   svgIcons,
-  worktreeMapsEqual,
   UNCOMMITTED_CHANGES_HASH,
   unescapeHtml,
-  vscode
+  vscode,
+  worktreeMapsEqual
 } from "./utils";
 
 const FLASH_ANIMATION_DURATION_MS = 850;

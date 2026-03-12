@@ -298,7 +298,7 @@ export function buildRefContextMenuItems(
         }
       );
     }
-    if (worktreeInfo == null) {
+    if (worktreeInfo === null || worktreeInfo === undefined) {
       const repoName = getRepoName(repo);
       const defaultPath = `../${repoName}-${refName}`;
       menu.push(null, {
