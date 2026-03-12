@@ -16,6 +16,7 @@ vi.mock("../../web/utils", () => ({
     const sep = Math.max(repoPath.lastIndexOf("/"), repoPath.lastIndexOf("\\"));
     return sep >= 0 ? repoPath.substring(sep + 1) : repoPath;
   }),
+  svgIcons: { alert: "<svg>alert</svg>" },
   ELLIPSIS: "&#8230;"
 }));
 
@@ -858,5 +859,177 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
     const dialogMessage = vi.mocked(showConfirmationDialog).mock.calls[0][0];
     expect(dialogMessage).toContain("feature/x");
     expect(dialogMessage).toContain(WORKTREE_PATH);
+  });
+});
+
+// --- S9: Delete Branch dialog worktree warning ---
+
+describe("showDeleteBranchDialog worktree warning (S9)", () => {
+  const WORKTREE_PATH = "/home/user/project-feature";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows worktree warning in Delete Branch dialog when branch has worktree (with remotes) (TC-042)", () => {
+    // Given: A non-HEAD local branch with worktree AND remotes
+    const sourceElem = createMockElement(["head"]);
+    const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      ["origin"],
+      worktreeInfo
+    );
+
+    // When: Delete Branch item is clicked
+    const deleteItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Delete Branch&#8230;");
+    deleteItem!.onClick();
+
+    // Then: showFormDialog message contains worktree warning with path
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const dialogMessage = vi.mocked(showFormDialog).mock.calls[0][0];
+    expect(dialogMessage).toContain(WORKTREE_PATH);
+    expect(dialogMessage).toContain("active worktree");
+    expect(dialogMessage).toContain("orphan");
+  });
+
+  it("shows worktree warning in Delete Branch dialog when branch has worktree (no remotes) (TC-043)", () => {
+    // Given: A non-HEAD local branch with worktree but NO remotes
+    const sourceElem = createMockElement(["head"]);
+    const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      [],
+      worktreeInfo
+    );
+
+    // When: Delete Branch item is clicked
+    const deleteItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Delete Branch&#8230;");
+    deleteItem!.onClick();
+
+    // Then: showCheckboxDialog message contains worktree warning with path
+    expect(showCheckboxDialog).toHaveBeenCalledTimes(1);
+    const dialogMessage = vi.mocked(showCheckboxDialog).mock.calls[0][0];
+    expect(dialogMessage).toContain(WORKTREE_PATH);
+    expect(dialogMessage).toContain("active worktree");
+    expect(dialogMessage).toContain("orphan");
+  });
+
+  it("does not show worktree warning when branch has no worktree (TC-044)", () => {
+    // Given: A non-HEAD local branch WITHOUT worktree
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      ["origin"],
+      null
+    );
+
+    // When: Delete Branch item is clicked
+    const deleteItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Delete Branch&#8230;");
+    deleteItem!.onClick();
+
+    // Then: showFormDialog message does NOT contain worktree warning
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const dialogMessage = vi.mocked(showFormDialog).mock.calls[0][0];
+    expect(dialogMessage).not.toContain("active worktree");
+    expect(dialogMessage).not.toContain("orphan");
+  });
+
+  it("does not show worktree warning when worktreeInfo is undefined (TC-045)", () => {
+    // Given: A non-HEAD local branch where worktreeInfo is not passed (undefined)
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(REPO, "feature/x", sourceElem, false, "main", []);
+
+    // When: Delete Branch item is clicked
+    const deleteItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Delete Branch&#8230;");
+    deleteItem!.onClick();
+
+    // Then: showCheckboxDialog message does NOT contain worktree warning
+    expect(showCheckboxDialog).toHaveBeenCalledTimes(1);
+    const dialogMessage = vi.mocked(showCheckboxDialog).mock.calls[0][0];
+    expect(dialogMessage).not.toContain("active worktree");
+  });
+});
+
+// --- S10: Rename Branch dialog worktree warning ---
+
+describe("Rename Branch dialog worktree warning (S10)", () => {
+  const WORKTREE_PATH = "/home/user/project-feature";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows worktree warning in Rename Branch dialog when branch has worktree (TC-046)", () => {
+    // Given: A local branch with an active worktree
+    const sourceElem = createMockElement(["head"]);
+    const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      worktreeInfo
+    );
+
+    // When: Rename Branch item is clicked
+    const renameItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Rename Branch&#8230;");
+    renameItem!.onClick();
+
+    // Then: showRefInputDialog message contains worktree warning with path
+    expect(showRefInputDialog).toHaveBeenCalledTimes(1);
+    const dialogMessage = vi.mocked(showRefInputDialog).mock.calls[0][0];
+    expect(dialogMessage).toContain(WORKTREE_PATH);
+    expect(dialogMessage).toContain("active worktree");
+    expect(dialogMessage).toContain("directory name");
+  });
+
+  it("does not show worktree warning in Rename Branch dialog when branch has no worktree (TC-047)", () => {
+    // Given: A local branch WITHOUT worktree
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      null
+    );
+
+    // When: Rename Branch item is clicked
+    const renameItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Rename Branch&#8230;");
+    renameItem!.onClick();
+
+    // Then: showRefInputDialog message does NOT contain worktree warning
+    expect(showRefInputDialog).toHaveBeenCalledTimes(1);
+    const dialogMessage = vi.mocked(showRefInputDialog).mock.calls[0][0];
+    expect(dialogMessage).not.toContain("active worktree");
   });
 });
