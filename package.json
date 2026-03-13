@@ -52,7 +52,8 @@
     "typecheck": "tsc -p ./src --noEmit && tsc -p ./web --noEmit",
     "vscode:prepublish": "npx --yes pnpm@10.29.3 run compile",
     "clean": "rm -rf out",
-    "compile": "pnpm run clean && pnpm run compile-src && pnpm run compile-web",
+    "copy-codicons": "cp node_modules/@vscode/codicons/dist/codicon.css media/codicon.css && cp node_modules/@vscode/codicons/dist/codicon.ttf media/codicon.ttf",
+    "compile": "pnpm run clean && pnpm run copy-codicons && pnpm run compile-src && pnpm run compile-web",
     "compile-src": "esbuild --bundle src/extension.ts --outfile=out/extension.js --platform=node --format=cjs --target=es6 --external:vscode --minify",
     "compile-web": "esbuild --bundle web/main.ts --outfile=out/web.min.js --minify --target=es2020 --format=iife",
     "package": "pnpm run clean && vsce package",
@@ -67,6 +68,7 @@
   "devDependencies": {
     "@types/node": "^22.19.11",
     "@types/vscode": "~1.74.0",
+    "@vscode/codicons": "^0.0.45",
     "@vscode/vsce": "^3.7.1",
     "esbuild": "^0.27.3",
     "eslint-plugin-simple-import-sort": "^12.1.1",
