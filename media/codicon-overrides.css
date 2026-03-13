@@ -1,0 +1,140 @@
+/*
+ * Codicon Overrides -- VS Code Codicons used as inline icons.
+ * Separated from main.css to keep file sizes manageable.
+ */
+
+/*
+ * Ref label icons -- the codicon inside .gitRef badges.
+ * transform/text-stroke values are visually tuned; do not change.
+ */
+.gitRef > .codicon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--git-graph-color);
+  color: var(--vscode-editor-background);
+  font-size: 14px;
+  height: 100%;
+  width: 18px;
+  margin-right: 5px;
+  vertical-align: top;
+}
+.gitRef > .codicon::before {
+  display: block;
+  transform: scale(0.9);
+  -webkit-text-stroke: 0.3px currentColor;
+}
+.gitRef.stash > .codicon {
+  background-color: var(--git-graph-color);
+}
+
+/* Toolbar icon buttons (search / fetch / current / refresh) */
+#searchBtn .codicon,
+#fetchBtn .codicon,
+#currentBtn .codicon,
+#refreshBtn .codicon {
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  font-size: 16px;
+  color: var(--vscode-editor-foreground);
+  opacity: 0.8;
+}
+#searchBtn:hover .codicon,
+#fetchBtn:hover .codicon,
+#currentBtn:hover .codicon,
+#refreshBtn:hover .codicon {
+  opacity: 1;
+}
+#refreshBtn.refreshing .codicon {
+  animation: codicon-spin 1.5s linear infinite;
+}
+#currentBtn.disabled:hover .codicon {
+  opacity: 0.8;
+}
+
+/* Commit details: close button & file-view toggle */
+#commitDetailsClose .codicon,
+.fileViewToggleBtn .codicon {
+  color: var(--vscode-editor-foreground);
+  opacity: 0.6;
+}
+#commitDetailsClose .codicon {
+  font-size: 20px;
+}
+.fileViewToggleBtn .codicon {
+  font-size: 16px;
+}
+#commitDetailsClose:hover .codicon,
+.fileViewToggleBtn:hover .codicon {
+  opacity: 1;
+}
+
+/* Git file / folder icons */
+.gitFileIcon .codicon,
+.gitFolderIcon .codicon {
+  font-size: 13px;
+  color: var(--vscode-editor-foreground);
+  opacity: 0.6;
+  margin-right: 8px;
+  vertical-align: top;
+}
+
+/* Loading spinner */
+#loadingHeader .codicon {
+  display: inline;
+  color: rgb(128, 128, 128);
+  margin-right: 10px;
+  vertical-align: top;
+}
+
+/* Dialog icons */
+#dialog .codicon {
+  display: inline;
+  color: rgb(128, 128, 128);
+  margin-right: 3px;
+  vertical-align: sub;
+}
+#dialog .dialogWarning .codicon {
+  font-size: 14px;
+  vertical-align: text-bottom;
+  color: var(--vscode-editorWarning-foreground, #cca700);
+  margin-right: 4px;
+}
+#dialog .dialogInfo .codicon {
+  color: var(--vscode-menu-foreground);
+  opacity: 0.6;
+  margin-right: 0;
+  vertical-align: middle;
+}
+#dialog .dialogInfo:hover .codicon {
+  opacity: 1;
+}
+
+/* Action running spinner */
+#actionRunning .codicon {
+  display: inline-block;
+  color: rgb(128, 128, 128);
+  margin-right: 10px;
+  vertical-align: top;
+  font-size: 18px;
+}
+
+/* FindWidget action button icons */
+#findPrev .codicon,
+#findNext .codicon,
+#findOpenCdv .codicon,
+#findClose .codicon {
+  font-size: 14px;
+  color: var(--vscode-editor-foreground);
+  opacity: 0.7;
+}
+#findPrev:hover .codicon,
+#findNext:hover .codicon,
+#findOpenCdv:hover .codicon,
+#findClose:hover .codicon {
+  opacity: 1;
+}
+#findOpenCdv.active .codicon {
+  opacity: 1;
+}

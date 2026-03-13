@@ -1,0 +1,104 @@
+/* FindWidget -- search panel overlaid on the graph view */
+
+.findWidget {
+  position: fixed;
+  top: 0;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
+  border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.5));
+  border-top: none;
+  border-radius: 0 0 4px 4px;
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+  z-index: 100;
+  transform: translateY(-100%);
+}
+.findWidget.active {
+  transform: translateY(0);
+}
+.findWidget.transition {
+  transition: transform 0.2s ease-out;
+}
+#findInput {
+  width: 200px;
+  padding: 3px 6px;
+  border: 1px solid rgba(128, 128, 128, 0.3);
+  background-color: var(--vscode-input-background);
+  color: var(--vscode-input-foreground);
+  font-size: 13px;
+  outline: none;
+}
+#findInput:focus {
+  border-color: var(--vscode-focusBorder);
+}
+.findWidget[data-error] #findInput {
+  border-color: var(--vscode-inputValidation-errorBorder, #f44747);
+}
+#findInput:disabled {
+  opacity: 0.5;
+}
+.findModifier {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  font-size: 11px;
+  user-select: none;
+  opacity: 0.7;
+}
+.findModifier:hover {
+  opacity: 1;
+  background-color: rgba(128, 128, 128, 0.1);
+}
+.findModifier.active {
+  opacity: 1;
+  background-color: rgba(128, 128, 128, 0.2);
+  border-color: rgba(128, 128, 128, 0.5);
+}
+#findPosition {
+  display: inline-block;
+  min-width: 60px;
+  text-align: center;
+  font-size: 12px;
+  padding: 0 4px;
+  white-space: nowrap;
+  opacity: 0.8;
+}
+/* Action buttons (prev / next / open-cdv / close) */
+#findPrev,
+#findNext,
+#findOpenCdv,
+#findClose {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+#findPrev:hover,
+#findNext:hover,
+#findOpenCdv:hover,
+#findClose:hover {
+  background-color: rgba(128, 128, 128, 0.15);
+}
+#findPrev.disabled,
+#findNext.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+#findPrev.disabled:hover,
+#findNext.disabled:hover {
+  background-color: transparent;
+}
+#findOpenCdv.active {
+  background-color: rgba(128, 128, 128, 0.2);
+}

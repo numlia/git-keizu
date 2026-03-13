@@ -583,14 +583,18 @@ export class GitGraphView {
     }
     this.isGraphViewLoaded = numRepos > 0;
 
+    // CSP: font-src is required for codicon.ttf loaded by codicon.css
     return `<!DOCTYPE html>
 		<html lang="en">
 			<head>
 				<meta charset="UTF-8">
-				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src ${this.panel.webview.cspSource} 'nonce-${nonce}'; img-src data:;">
+				<meta http-equiv="Content-Security-Policy" content="default-src 'none'; font-src ${this.panel.webview.cspSource}; style-src ${this.panel.webview.cspSource} 'unsafe-inline'; script-src ${this.panel.webview.cspSource} 'nonce-${nonce}'; img-src data:;">
 				<meta name="viewport" content="width=device-width, initial-scale=1.0">
 				<link rel="stylesheet" type="text/css" href="${this.getMediaUri("main.css")}">
 				<link rel="stylesheet" type="text/css" href="${this.getMediaUri("dropdown.css")}">
+				<link rel="stylesheet" type="text/css" href="${this.getMediaUri("codicon.css")}">
+				<link rel="stylesheet" type="text/css" href="${this.getMediaUri("codicon-overrides.css")}">
+				<link rel="stylesheet" type="text/css" href="${this.getMediaUri("findwidget.css")}">
 				<title>Git Keizu</title>
 				<style>${colorParams}</style>
 			</head>

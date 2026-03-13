@@ -1,4 +1,5 @@
-/* Body */
+/* -- Layout ---------------------------------------------------------------- */
+
 body {
   margin: 0;
   padding: 0;
@@ -16,6 +17,14 @@ body.unableToLoad h2,
 body.unableToLoad p {
   text-align: center;
 }
+#content {
+  position: relative;
+}
+#scrollContainer {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 0;
+}
 #scrollShadow.active {
   position: sticky;
   top: 0;
@@ -26,12 +35,8 @@ body.unableToLoad p {
   z-index: 200;
 }
 
-/* Content */
-#content {
-  position: relative;
-}
+/* -- Commit Graph (SVG) ---------------------------------------------------- */
 
-/* Commit Graph */
 #commitGraph {
   display: block;
   position: absolute;
@@ -63,7 +68,8 @@ body.unableToLoad p {
   stroke-width: 2;
 }
 
-/* Commit Table */
+/* -- Commit Table ---------------------------------------------------------- */
+
 #commitTable table {
   width: 100%;
   border-collapse: collapse;
@@ -84,6 +90,16 @@ body.unableToLoad p {
   text-overflow: ellipsis;
   overflow: hidden;
 }
+#commitTable td {
+  line-height: 24px;
+  padding: 0 4px;
+}
+#commitTable th {
+  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
+  line-height: 18px;
+  padding: 6px 12px;
+}
+/* Row hover / active highlights */
 #commitTable tr.commit:hover td,
 #commitTable tr.unsavedChanges:hover td,
 #commitTable tr.commit.contextMenuActive td,
@@ -98,16 +114,13 @@ body.unableToLoad p {
 #commitTable tr.unsavedChanges:hover td {
   cursor: pointer;
 }
-#commitTable td {
-  line-height: 24px;
-  padding: 0 4px;
+#commitTable tr.commit.commitDetailsOpen td {
+  background-color: rgba(128, 128, 128, 0.25);
 }
-#commitTable th {
-  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
-  line-height: 18px;
-  padding: 6px 12px;
+#commitTable tr.commit.commitDetailsOpen:hover td {
+  background-color: rgba(128, 128, 128, 0.35);
 }
-
+/* Table layout modes */
 #commitTable.fixedLayout table {
   table-layout: fixed;
 }
@@ -144,8 +157,62 @@ body.unableToLoad p {
 .resizeCol.right {
   right: 0px;
 }
+/* Stash rows */
+#commitTable tr.commit.stash td {
+  font-style: italic;
+}
+/* Flash animation for scroll-to-current */
+#commitTable tr.commit.flash td {
+  animation: flash-commit 0.75s linear;
+}
+@keyframes flash-commit {
+  0% {
+    background-color: transparent;
+  }
+  20% {
+    background-color: rgba(128, 128, 128, 0.4);
+  }
+  35% {
+    background-color: rgba(128, 128, 128, 0.15);
+  }
+  50% {
+    background-color: rgba(128, 128, 128, 0.35);
+  }
+  65% {
+    background-color: rgba(128, 128, 128, 0.25);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+/* Compare target highlight */
+#commitTable tr.commit.compareTarget td {
+  background-color: rgba(255, 167, 36, 0.15);
+}
+#commitTable tr.commit.compareTarget:hover td {
+  background-color: rgba(255, 167, 36, 0.25);
+}
+/* Find match highlight */
+#commitTable tr.commit.findMatch td {
+  background-color: rgba(234, 92, 0, 0.1);
+}
+#commitTable tr.commit.findCurrentCommit td {
+  background-color: rgba(234, 92, 0, 0.25);
+}
+/* Muted commits */
+#commitTable tr.commit.mute td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute td:nth-child(n + 3) {
+  opacity: 0.5;
+}
+#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(n + 3),
+#commitTable tr.commit.mute.findCurrentCommit td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute.findCurrentCommit td:nth-child(n + 3) {
+  opacity: 1;
+}
 
-/* Commit Details View */
+/* -- Commit Details View --------------------------------------------------- */
+
 #commitDetails {
   vertical-align: top;
 }
@@ -166,12 +233,7 @@ body.unableToLoad p {
   height: 2px;
   background-color: rgba(128, 128, 128, 0.2);
 }
-#commitTable tr.commit.commitDetailsOpen td {
-  background-color: rgba(128, 128, 128, 0.25);
-}
-#commitTable tr.commit.commitDetailsOpen:hover td {
-  background-color: rgba(128, 128, 128, 0.35);
-}
+/* Summary panel */
 #commitDetailsSummary {
   position: absolute;
   left: 0;
@@ -214,6 +276,7 @@ body.unableToLoad p {
   width: 54px;
   border-radius: 4px;
 }
+/* File list panel */
 #commitDetailsFiles {
   position: absolute;
   right: 32px;
@@ -244,22 +307,7 @@ body.unableToLoad p {
   text-overflow: ellipsis;
   overflow-x: hidden;
 }
-.fileViewToggleBtn {
-  display: inline-block;
-  float: right;
-  cursor: pointer;
-  padding: 2px 4px;
-  margin-right: 4px;
-}
-.fileViewToggleBtn svg {
-  width: 16px;
-  height: 16px;
-  fill: var(--vscode-editor-foreground);
-  fill-opacity: 0.6;
-}
-.fileViewToggleBtn:hover svg {
-  fill-opacity: 1;
-}
+/* Close button */
 #commitDetailsClose {
   position: absolute;
   right: 4px;
@@ -268,28 +316,15 @@ body.unableToLoad p {
   height: 24px;
   cursor: pointer;
 }
-#commitDetailsClose svg {
-  width: 24px;
-  height: 24px;
-  fill: var(--vscode-editor-foreground);
-  fill-opacity: 0.6;
+/* File view toggle */
+.fileViewToggleBtn {
+  display: inline-block;
+  float: right;
+  cursor: pointer;
+  padding: 2px 4px;
+  margin-right: 4px;
 }
-#commitDetailsClose:hover svg {
-  stroke: var(--vscode-editor-foreground);
-  stroke-width: 1;
-  stroke-opacity: 0.2;
-}
-svg.openFolderIcon,
-svg.closedFolderIcon,
-svg.fileIcon {
-  width: 13px;
-  height: 13px;
-  margin-top: 2.5px;
-  fill: var(--vscode-editor-foreground);
-  fill-opacity: 0.6;
-  margin-right: 8px;
-  vertical-align: top;
-}
+/* Git file / folder entries */
 .gitFolderContents.hidden {
   display: none;
 }
@@ -327,7 +362,7 @@ svg.fileIcon {
 .gitFileRename {
   cursor: help;
 }
-
+/* Avatar */
 .commit .avatar > img {
   display: inline-block;
   width: 18px;
@@ -336,7 +371,7 @@ svg.fileIcon {
   margin-top: 3px;
   margin-right: 4px;
 }
-
+/* HEAD dot indicator */
 .commitHeadDot {
   width: 6px;
   height: 6px;
@@ -347,8 +382,18 @@ svg.fileIcon {
   vertical-align: top;
   margin-top: 7px;
 }
+/* Parent hash links */
+.parentHash {
+  color: var(--vscode-textLink-foreground);
+  cursor: pointer;
+  text-decoration: underline;
+}
+.parentHash:hover {
+  color: var(--vscode-textLink-activeForeground);
+}
 
-/* Ref labels */
+/* -- Ref Labels (branch / tag / stash badges) ------------------------------ */
+
 .gitRef {
   display: inline-block;
   height: 18px;
@@ -362,19 +407,11 @@ svg.fileIcon {
   vertical-align: top;
   font-size: 12px;
   cursor: default;
+  overflow: hidden;
 }
-.gitRef.active {
+.gitRef.active,
+.gitRef.stash {
   border-color: var(--git-graph-color);
-}
-.gitRef > svg {
-  background-color: var(--git-graph-color);
-  fill: var(--vscode-editor-background);
-  width: 14px;
-  height: 14px;
-  padding: 2px;
-  margin-right: 5px;
-  border-radius: 4px 0 0 4px;
-  vertical-align: top;
 }
 .gitRef.head {
   padding-right: 0;
@@ -394,39 +431,8 @@ svg.fileIcon {
   background-color: rgba(128, 128, 128, 0.1);
 }
 
-/* Stash */
-#commitTable tr.commit.stash td {
-  font-style: italic;
-}
-.gitRef.stash {
-  border-color: var(--git-graph-color);
-}
-.gitRef.stash > svg {
-  background-color: var(--git-graph-color);
-}
+/* -- Controls (top toolbar) ------------------------------------------------ */
 
-/* Loader */
-#loadingHeader {
-  text-align: center;
-  line-height: 32px;
-}
-#loadingHeader svg {
-  display: inline;
-  fill: rgb(128, 128, 128);
-  margin-right: 10px;
-  vertical-align: top;
-  animation: loadingIconAnimation 2s linear infinite;
-}
-@keyframes loadingIconAnimation {
-  0% {
-    transform: rotate(0deg);
-  }
-  100% {
-    transform: rotate(360deg);
-  }
-}
-
-/* Controls */
 #controls {
   display: block;
   position: relative;
@@ -443,10 +449,12 @@ svg.fileIcon {
   font-size: 13px;
   flex-shrink: 0;
 }
-#scrollContainer {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
+#controls select:focus,
+#controls input:focus {
+  outline: none;
+}
+#controls label {
+  cursor: pointer;
 }
 #repoControl,
 #branchControl,
@@ -465,6 +473,7 @@ svg.fileIcon {
   width: 14px;
   vertical-align: text-top;
 }
+/* Toolbar icon buttons (search / fetch / current / refresh) */
 #searchBtn,
 #fetchBtn,
 #currentBtn,
@@ -489,70 +498,14 @@ svg.fileIcon {
 #refreshBtn {
   right: 10px;
 }
-#searchBtn svg,
-#fetchBtn svg,
-#currentBtn svg,
-#refreshBtn svg {
-  position: absolute;
-  fill: var(--vscode-editor-foreground);
-  opacity: 0.8;
-  stroke: var(--vscode-editor-foreground);
-  stroke-opacity: 0.5;
-  stroke-width: 0;
-}
-#searchBtn svg {
-  left: 2px;
-  top: 2px;
-  width: 16px !important;
-  height: 16px !important;
-}
-#fetchBtn svg {
-  left: 2px;
-  top: 2px;
-  width: 16px !important;
-  height: 16px !important;
-}
-#currentBtn svg {
-  left: 1px;
-  top: 1px;
-  width: 18px !important;
-  height: 18px !important;
-  stroke-width: 0.5px;
-}
-#refreshBtn svg {
-  left: 2px;
-  top: 2px;
-  width: 16px !important;
-  height: 16px !important;
-}
-#searchBtn:hover svg,
-#fetchBtn:hover svg,
-#currentBtn:hover svg,
-#refreshBtn:hover svg {
-  opacity: 1;
-  stroke-width: 0.5px;
-}
-#currentBtn:hover svg {
-  stroke-width: 1px;
-}
 #refreshBtn.refreshing {
   cursor: default;
-}
-#refreshBtn.refreshing svg {
-  left: 3.25px;
-  top: 2px;
-  width: 13.5px !important;
-  height: 18px !important;
-  animation: loadingIconAnimation 2s linear infinite;
 }
 #currentBtn.disabled {
   opacity: 0.4;
   cursor: default;
 }
-#currentBtn.disabled:hover svg {
-  opacity: 0.8;
-  stroke-width: 0.5px;
-}
+/* Load more */
 #loadMoreCommitsBtn {
   width: 180px;
   height: 28px;
@@ -561,15 +514,8 @@ svg.fileIcon {
   line-height: 28px;
 }
 
-#controls select:focus,
-#controls input:focus {
-  outline: none;
-}
-#controls label {
-  cursor: pointer;
-}
+/* -- Context Menu ---------------------------------------------------------- */
 
-/* Context Menu */
 #contextMenu {
   display: none;
   position: fixed;
@@ -600,7 +546,8 @@ svg.fileIcon {
   opacity: 0.5;
 }
 
-/* Dialogs */
+/* -- Dialogs --------------------------------------------------------------- */
+
 #dialog,
 #dialogBacking {
   display: none;
@@ -623,7 +570,16 @@ svg.fileIcon {
   box-shadow: 0 0 30px 5px var(--vscode-widget-shadow);
   overflow-y: auto;
 }
-
+#dialogBacking.active {
+  display: block;
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 19;
+}
+/* Dialog form */
 #dialog > table.dialogForm {
   display: inline-table;
   width: 360px;
@@ -671,6 +627,7 @@ svg.fileIcon {
   border: 1px solid rgba(128, 128, 128, 0.3);
   outline-style: none;
 }
+/* Dialog buttons and messages */
 #dialog .roundedBtn {
   display: inline-block;
   line-height: 20px;
@@ -694,22 +651,6 @@ svg.fileIcon {
   background: var(--vscode-editorWarning-background, rgba(204, 167, 0, 0.1));
   border-radius: 4px;
 }
-#dialog .dialogWarning svg {
-  width: 14px;
-  height: 14px;
-  vertical-align: text-bottom;
-  fill: var(--vscode-editorWarning-foreground, #cca700);
-  margin-right: 4px;
-}
-#dialogBacking.active {
-  display: block;
-  position: fixed;
-  left: 0;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  z-index: 19;
-}
 #dialog.noInput #dialogAction,
 #dialog.inputInvalid #dialogAction {
   background-color: rgba(128, 128, 128, 0.2);
@@ -721,43 +662,28 @@ svg.fileIcon {
 #dialog.inputInvalid #dialogAction {
   cursor: help;
 }
-#dialog svg {
-  display: inline;
-  fill: rgb(128, 128, 128);
-  margin-right: 3px;
-  line-height: 20px;
-  vertical-align: sub;
-}
+/* Dialog info tooltip */
 .dialogInfo {
   cursor: help;
   display: inline-block;
   margin-left: 4px;
   vertical-align: middle;
 }
-#dialog .dialogInfo svg {
-  fill: var(--vscode-menu-foreground);
-  opacity: 0.6;
-  margin-right: 0;
-  vertical-align: middle;
-}
-#dialog .dialogInfo:hover svg {
-  opacity: 1;
-}
+/* Action running indicator */
 #actionRunning {
   margin: 0 16px;
   line-height: 24px;
 }
-#actionRunning svg {
-  display: inline-block;
-  fill: rgb(128, 128, 128);
-  margin-right: 10px;
-  vertical-align: top;
-  animation: loadingIconAnimation 2s linear infinite;
-  width: 18px !important;
-  height: 24px !important;
+
+/* -- Loader ---------------------------------------------------------------- */
+
+#loadingHeader {
+  text-align: center;
+  line-height: 32px;
 }
 
-/* Buttons */
+/* -- Buttons --------------------------------------------------------------- */
+
 .roundedBtn {
   display: block;
   background-color: rgba(128, 128, 128, 0.1);
@@ -770,193 +696,7 @@ svg.fileIcon {
   background-color: rgba(128, 128, 128, 0.2);
 }
 
-/* Parent Hash Links */
-.parentHash {
-  color: var(--vscode-textLink-foreground);
-  cursor: pointer;
-  text-decoration: underline;
-}
-.parentHash:hover {
-  color: var(--vscode-textLink-activeForeground);
-}
-
-/* Flash animation for scroll-to-current */
-#commitTable tr.commit.flash td {
-  animation: flash-commit 0.75s linear;
-}
-@keyframes flash-commit {
-  0% {
-    background-color: transparent;
-  }
-  20% {
-    background-color: rgba(128, 128, 128, 0.4);
-  }
-  35% {
-    background-color: rgba(128, 128, 128, 0.15);
-  }
-  50% {
-    background-color: rgba(128, 128, 128, 0.35);
-  }
-  65% {
-    background-color: rgba(128, 128, 128, 0.25);
-  }
-  100% {
-    background-color: transparent;
-  }
-}
-
-/* Compare Target */
-#commitTable tr.commit.compareTarget td {
-  background-color: rgba(255, 167, 36, 0.15);
-}
-#commitTable tr.commit.compareTarget:hover td {
-  background-color: rgba(255, 167, 36, 0.25);
-}
-
-/* Find Match Highlight */
-#commitTable tr.commit.findMatch td {
-  background-color: rgba(234, 92, 0, 0.1);
-}
-#commitTable tr.commit.findCurrentCommit td {
-  background-color: rgba(234, 92, 0, 0.25);
-}
-
-/* Muted Commits */
-#commitTable tr.commit.mute td:nth-child(2) .commitMessage,
-#commitTable tr.commit.mute td:nth-child(n + 3) {
-  opacity: 0.5;
-}
-#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(2) .commitMessage,
-#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(n + 3) {
-  opacity: 1;
-}
-#commitTable tr.commit.mute.findCurrentCommit td:nth-child(2) .commitMessage,
-#commitTable tr.commit.mute.findCurrentCommit td:nth-child(n + 3) {
-  opacity: 1;
-}
-
-/* FindWidget */
-.findWidget {
-  position: fixed;
-  top: 0;
-  right: 24px;
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 4px;
-  background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
-  border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.5));
-  border-top: none;
-  border-radius: 0 0 4px 4px;
-  box-shadow: 0 2px 8px var(--vscode-widget-shadow);
-  z-index: 100;
-  transform: translateY(-100%);
-}
-.findWidget.active {
-  transform: translateY(0);
-}
-.findWidget.transition {
-  transition: transform 0.2s ease-out;
-}
-#findInput {
-  width: 200px;
-  padding: 3px 6px;
-  border: 1px solid rgba(128, 128, 128, 0.3);
-  background-color: var(--vscode-input-background);
-  color: var(--vscode-input-foreground);
-  font-size: 13px;
-  outline: none;
-}
-#findInput:focus {
-  border-color: var(--vscode-focusBorder);
-}
-.findWidget[data-error] #findInput {
-  border-color: var(--vscode-inputValidation-errorBorder, #f44747);
-}
-#findInput:disabled {
-  opacity: 0.5;
-}
-.findModifier {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  cursor: pointer;
-  border: 1px solid transparent;
-  border-radius: 3px;
-  font-size: 11px;
-  user-select: none;
-  opacity: 0.7;
-}
-.findModifier:hover {
-  opacity: 1;
-  background-color: rgba(128, 128, 128, 0.1);
-}
-.findModifier.active {
-  opacity: 1;
-  background-color: rgba(128, 128, 128, 0.2);
-  border-color: rgba(128, 128, 128, 0.5);
-}
-#findPosition {
-  display: inline-block;
-  min-width: 60px;
-  text-align: center;
-  font-size: 12px;
-  padding: 0 4px;
-  white-space: nowrap;
-  opacity: 0.8;
-}
-#findPrev,
-#findNext,
-#findOpenCdv,
-#findClose {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 22px;
-  height: 22px;
-  cursor: pointer;
-  border-radius: 3px;
-}
-#findPrev:hover,
-#findNext:hover,
-#findOpenCdv:hover,
-#findClose:hover {
-  background-color: rgba(128, 128, 128, 0.15);
-}
-#findPrev svg,
-#findNext svg,
-#findOpenCdv svg,
-#findClose svg {
-  width: 14px;
-  height: 14px;
-  fill: var(--vscode-editor-foreground);
-  opacity: 0.7;
-}
-#findPrev:hover svg,
-#findNext:hover svg,
-#findOpenCdv:hover svg,
-#findClose:hover svg {
-  opacity: 1;
-}
-#findPrev.disabled,
-#findNext.disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-#findPrev.disabled:hover,
-#findNext.disabled:hover {
-  background-color: transparent;
-}
-#findOpenCdv.active {
-  background-color: rgba(128, 128, 128, 0.2);
-}
-#findOpenCdv.active svg {
-  opacity: 1;
-}
-
-/* Custom Checkboxes */
+/* -- Custom Checkboxes ----------------------------------------------------- */
 
 input[type="checkbox"] {
   position: absolute;
@@ -993,7 +733,8 @@ label > input[type="checkbox"]:checked ~ .customCheckbox:after {
   transform: rotate(45deg);
 }
 
-/* General */
+/* -- User-select overrides ------------------------------------------------- */
+
 #commitGraph,
 #commitTable th,
 #commitTable td,
