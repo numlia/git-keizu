@@ -141,22 +141,22 @@ describe("worktreeMapsEqual", () => {
 });
 
 describe("svgIcons", () => {
-  it("fetch icon is a non-empty SVG string (TC-001)", () => {
+  it("fetch icon is a non-empty codicon span string (TC-001)", () => {
     // Given: svgIcons is imported
     // When: fetch property is referenced
-    // Then: it is a non-empty string containing "<svg"
+    // Then: it is a non-empty string containing a codicon span for git-fetch
     expect(typeof svgIcons.fetch).toBe("string");
     expect(svgIcons.fetch.length).toBeGreaterThan(0);
-    expect(svgIcons.fetch).toContain("<svg");
+    expect(svgIcons.fetch).toContain('class="codicon codicon-git-fetch"');
   });
 
-  it("stash icon is a non-empty SVG string (TC-002)", () => {
+  it("stash icon is a non-empty codicon span string (TC-002)", () => {
     // Given: svgIcons is imported
     // When: stash property is referenced
-    // Then: it is a non-empty string containing "<svg"
+    // Then: it is a non-empty string containing a codicon span for git-stash
     expect(typeof svgIcons.stash).toBe("string");
     expect(svgIcons.stash.length).toBeGreaterThan(0);
-    expect(svgIcons.stash).toContain("<svg");
+    expect(svgIcons.stash).toContain('class="codicon codicon-git-stash"');
   });
 });
 

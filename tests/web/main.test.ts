@@ -5085,10 +5085,9 @@ describe("worktree icon drawing and data attributes (S35)", () => {
     expect(headSpan).not.toBeNull();
     expect(headSpan!.classList.contains("worktree")).toBe(true);
     expect(headSpan!.getAttribute("data-worktree-path")).toBe("/home/user/feature-wt");
-    // And: the branch icon is replaced with the worktree icon (viewBox 0 0 10 10)
-    const svg = headSpan!.querySelector("svg");
-    expect(svg).not.toBeNull();
-    expect(svg!.getAttribute("viewBox")).toBe("0 0 10 10");
+    // And: the branch icon is replaced with the worktree icon (codicon-worktree-small)
+    const icon = headSpan!.querySelector(".codicon.codicon-worktree-small");
+    expect(icon).not.toBeNull();
 
     // Cleanup
     vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
@@ -5117,10 +5116,9 @@ describe("worktree icon drawing and data attributes (S35)", () => {
     expect(headSpan).not.toBeNull();
     expect(headSpan!.classList.contains("worktree")).toBe(false);
     expect(headSpan!.hasAttribute("data-worktree-path")).toBe(false);
-    // And: the branch icon is the standard branch icon (viewBox 0 0 10 16)
-    const svg = headSpan!.querySelector("svg");
-    expect(svg).not.toBeNull();
-    expect(svg!.getAttribute("viewBox")).toBe("0 0 10 16");
+    // And: the branch icon is the standard branch icon (codicon-git-branch)
+    const icon = headSpan!.querySelector(".codicon.codicon-git-branch");
+    expect(icon).not.toBeNull();
 
     // Cleanup
     vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
@@ -5241,10 +5239,9 @@ describe("worktree icon drawing and data attributes (S35)", () => {
     expect(headSpan).not.toBeNull();
     expect(headSpan!.classList.contains("worktree")).toBe(false);
     expect(headSpan!.hasAttribute("data-worktree-path")).toBe(false);
-    // And: the branch icon is the standard branch icon (viewBox 0 0 10 16)
-    const svg = headSpan!.querySelector("svg");
-    expect(svg).not.toBeNull();
-    expect(svg!.getAttribute("viewBox")).toBe("0 0 10 16");
+    // And: the branch icon is the standard branch icon (codicon-git-branch)
+    const icon = headSpan!.querySelector(".codicon.codicon-git-branch");
+    expect(icon).not.toBeNull();
 
     // Cleanup
     vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
