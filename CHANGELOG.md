@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-03-13
+
+### Changed
+
+- **Icons**: All webview icons have been migrated from custom inline SVGs to VS Code's official [codicons](https://microsoft.github.io/vscode-codicons/) icon font — toolbar buttons (search, fetch, current, refresh), branch/stash/tag labels, commit detail panels, dialogs, and file tree entries now use native VS Code icons for consistent styling and proper theme adaptation
+
 ## [0.5.6] - 2026-03-13
 
 ### Added
@@ -215,7 +221,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.6...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.7...HEAD
+[0.5.7]: https://github.com/numlia/git-keizu/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/numlia/git-keizu/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/numlia/git-keizu/compare/v0.5.4...v0.5.5
 [0.5.4]: https://github.com/numlia/git-keizu/compare/v0.5.3...v0.5.4
