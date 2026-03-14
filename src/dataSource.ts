@@ -127,6 +127,7 @@ export class DataSource {
         for (let i = 0; i < lines.length - 1; i++) {
           let name = lines[i].substring(2).split(" -> ")[0];
           if (name.match(headRegex) !== null) continue;
+          if (name.startsWith("remotes/")) continue;
 
           if (lines[i][0] === "*") {
             branchData.head = name;
@@ -861,7 +862,9 @@ export class DataSource {
               type: "tag"
             });
           } else if (ref.startsWith("refs/remotes/")) {
-            refData.refs.push({ hash: hash, name: ref.substring(13), type: "remote" });
+            const name = ref.substring(13);
+            if (name.endsWith("/HEAD")) continue;
+            refData.refs.push({ hash: hash, name: name, type: "remote" });
           } else if (ref === "HEAD") {
             refData.head = hash;
           }
