@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-03-14
+
+### Fixed
+
+- **Branch filter — remote-tracking branches excluded**: Remote-tracking branches (`origin/*`) no longer appear in the branch filter dropdown; only local branches are listed
+- **Graph labels — `origin/HEAD` hidden**: The `origin/HEAD` symbolic ref (and any `*/HEAD` remote tracking pointer) is no longer shown as a label on commits in the graph
+
 ## [0.5.7] - 2026-03-13
 
 ### Changed
@@ -221,7 +228,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.7...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.8...HEAD
+[0.5.8]: https://github.com/numlia/git-keizu/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/numlia/git-keizu/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/numlia/git-keizu/compare/v0.5.5...v0.5.6
 [0.5.5]: https://github.com/numlia/git-keizu/compare/v0.5.4...v0.5.5
