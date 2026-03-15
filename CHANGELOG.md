@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-03-15
+
+### Fixed
+
+- **2-commit comparison — consistent file diff direction**: File diffs in 2-commit comparison mode now always show changes from old to new, regardless of which commit was selected first. Previously, selecting a newer commit first and then Ctrl/Cmd+clicking an older one would display the diff in reverse chronological order
+
 ## [0.5.8] - 2026-03-14
 
 ### Fixed
@@ -228,7 +234,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.8...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.9...HEAD
+[0.5.9]: https://github.com/numlia/git-keizu/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/numlia/git-keizu/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/numlia/git-keizu/compare/v0.5.6...v0.5.7
 [0.5.6]: https://github.com/numlia/git-keizu/compare/v0.5.5...v0.5.6
