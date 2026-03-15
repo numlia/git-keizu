@@ -1358,15 +1358,16 @@ describe("GitGraphView frontend integration", () => {
       expect(fileElem).not.toBeNull();
       fileElem!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
-      // Then: viewDiff message includes compareWithHash
+      // Then: viewDiff message includes compareWithHash, with hashes normalized to old→new
+      // getCommitOrder treats higher index as older, so COMMIT_HASH_2 (idx 1) becomes commitHash (left)
       expect(vscode.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
           command: "viewDiff",
-          commitHash: COMMIT_HASH_1,
+          commitHash: COMMIT_HASH_2,
           oldFilePath: "old.ts",
           newFilePath: "new.ts",
           type: "M",
-          compareWithHash: COMMIT_HASH_2
+          compareWithHash: COMMIT_HASH_1
         })
       );
     });

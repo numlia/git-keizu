@@ -1531,16 +1531,22 @@ class GitGraphView {
     addListenerToClass("gitFile", "click", (e) => {
       let sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;
       if (this.expandedCommit === null || !sourceElem.classList.contains("gitDiffPossible")) return;
+      // When in comparison mode, normalize order so diff always shows old → new
+      let diffCommitHash = this.expandedCommit.hash;
+      let diffCompareWithHash = this.expandedCommit.compareWithHash;
+      if (diffCompareWithHash !== null) {
+        const order = this.getCommitOrder(diffCommitHash, diffCompareWithHash);
+        diffCommitHash = order.from;
+        diffCompareWithHash = order.to;
+      }
       sendMessage({
         command: "viewDiff",
         repo: this.currentRepo!,
-        commitHash: this.expandedCommit.hash,
+        commitHash: diffCommitHash,
         oldFilePath: decodeURIComponent(sourceElem.dataset.oldfilepath!),
         newFilePath: decodeURIComponent(sourceElem.dataset.newfilepath!),
         type: <GG.GitFileChangeType>sourceElem.dataset.type,
-        ...(this.expandedCommit.compareWithHash !== null
-          ? { compareWithHash: this.expandedCommit.compareWithHash }
-          : {})
+        ...(diffCompareWithHash !== null ? { compareWithHash: diffCompareWithHash } : {})
       });
     });
   }
