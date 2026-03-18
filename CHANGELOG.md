@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.10] - 2026-03-18
+
+### Added
+
+- **Configurable "Open Terminal" default for Create Worktree**: The "Open Terminal" checkbox in the Create Worktree dialog now reads its initial state from `git-keizu.dialog.createWorktree.openTerminal` (default: on); set it to off if you prefer not to open a terminal after each worktree creation
+- **Remove Worktree with branch co-deletion**: The Remove Worktree confirmation has been upgraded to a form dialog with an "Also delete branch" checkbox — when checked, the worktree's branch is deleted via `git branch -d` (safe delete) after the worktree is removed; unmerged branches are not affected. The checkbox default is configurable via `git-keizu.dialog.removeWorktree.deleteBranch` (default: on)
+
 ## [0.5.9] - 2026-03-15
 
 ### Fixed
@@ -234,7 +241,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.9...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.10...HEAD
+[0.5.10]: https://github.com/numlia/git-keizu/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/numlia/git-keizu/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/numlia/git-keizu/compare/v0.5.7...v0.5.8
 [0.5.7]: https://github.com/numlia/git-keizu/compare/v0.5.6...v0.5.7
