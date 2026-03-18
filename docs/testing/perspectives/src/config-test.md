@@ -126,3 +126,18 @@
 | TC-035  | 設定未指定（デフォルト） | Equivalence - normal (default)       | "date" を返す        | デフォルト値 |
 | TC-036  | 設定値="topo"            | Equivalence - normal                 | "topo" を返す        | 有効な代替値 |
 | TC-037  | 設定値="author-date"     | Equivalence - normal                 | "author-date" を返す | 有効な代替値 |
+
+## S9: dialogDefaults() createWorktree/removeWorktree 設定
+
+> Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-15
+
+**シグネチャ**: `dialogDefaults(): DialogDefaults`
+**テスト対象パス**: `src/config.ts`
+
+| Case ID | Input / Precondition                      | Perspective (Equivalence / Boundary) | Expected Result                          | Notes                    |
+| ------- | ----------------------------------------- | ------------------------------------ | ---------------------------------------- | ------------------------ |
+| TC-038  | dialog.createWorktree.openTerminal 未指定 | Equivalence - normal (default)       | createWorktree.openTerminal=true を返す  | デフォルト値（後方互換） |
+| TC-039  | dialog.createWorktree.openTerminal=false  | Equivalence - normal (custom)        | createWorktree.openTerminal=false を返す | カスタム値               |
+| TC-040  | dialog.removeWorktree.deleteBranch 未指定 | Equivalence - normal (default)       | removeWorktree.deleteBranch=true を返す  | デフォルト値             |
+| TC-041  | dialog.removeWorktree.deleteBranch=false  | Equivalence - normal (custom)        | removeWorktree.deleteBranch=false を返す | カスタム値               |

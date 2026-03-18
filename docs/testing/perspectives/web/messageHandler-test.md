@@ -84,3 +84,18 @@
 | TC-017  | ResponseRemoveWorktree: status = null            | Equivalence - normal (success)       | refreshOrError が呼ばれ、グラフリフレッシュ               | REQ-4.1          |
 | TC-018  | ResponseRemoveWorktree: status = "error message" | Equivalence - error                  | エラーダイアログ "Unable to Remove Worktree" が表示される | -                |
 | TC-019  | ResponseOpenTerminal                             | Equivalence - normal                 | ノーオペレーション（エラーなく処理完了）                  | REQ-9.1          |
+
+## S7: removeWorktree ブランチ削除結果の表示
+
+> Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-15
+
+**シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
+**テスト対象パス**: `web/messageHandler.ts`
+
+| Case ID | Input / Precondition                       | Perspective (Equivalence / Boundary) | Expected Result                                          | Notes       |
+| ------- | ------------------------------------------ | ------------------------------------ | -------------------------------------------------------- | ----------- |
+| TC-020  | status=null, branchStatus=undefined        | Equivalence - normal                 | グラフリフレッシュ（既存動作同等、ブランチ削除未要求）   | REQ-4.2     |
+| TC-021  | status=null, branchStatus=null             | Equivalence - normal                 | グラフリフレッシュ（worktree + ブランチ両方削除成功）    | REQ-4.2-TC1 |
+| TC-022  | status=null, branchStatus="error msg"      | Equivalence - partial success        | グラフリフレッシュ + ブランチ削除失敗エラー表示          | REQ-4.2-TC2 |
+| TC-023  | status="error msg", branchStatus=undefined | Equivalence - error                  | エラーダイアログ "Unable to Remove Worktree"（既存動作） | REQ-4.2-TC5 |

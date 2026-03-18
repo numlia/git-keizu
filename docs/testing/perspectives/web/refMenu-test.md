@@ -123,3 +123,35 @@
 | TC-039  | Open Terminal Here 選択                                          | Equivalence - normal                 | sendMessage openTerminal に path と name が含まれる                                            | REQ-9.1          |
 | TC-040  | Copy Worktree Path 選択                                          | Equivalence - normal                 | sendMessage copyToClipboard に type: "worktreePath" と data: path が含まれる                   | REQ-9.2          |
 | TC-041  | Remove Worktree 選択                                             | Equivalence - normal                 | showConfirmationDialog が呼ばれ、確認メッセージにブランチ名とパスが含まれる                    | REQ-4.1          |
+
+## S11: Create Worktree ダイアログ Open Terminal 設定反映
+
+> Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-15
+> Updated: 2026-03-17 (S9→S11, TC-ID renumbered to avoid collision with existing S9/S10)
+
+**テスト対象パス**: `web/refMenu.ts`
+
+| Case ID | Input / Precondition                                       | Perspective (Equivalence / Boundary) | Expected Result                                                     | Notes       |
+| ------- | ---------------------------------------------------------- | ------------------------------------ | ------------------------------------------------------------------- | ----------- |
+| TC-048  | viewState.dialogDefaults.createWorktree.openTerminal=true  | Equivalence - normal                 | showFormDialog の Open Terminal チェックボックスが checked で表示   | REQ-9.1-TC1 |
+| TC-049  | viewState.dialogDefaults.createWorktree.openTerminal=false | Equivalence - normal                 | showFormDialog の Open Terminal チェックボックスが unchecked で表示 | REQ-9.1-TC2 |
+
+## S12: Remove Worktree ブランチ同時削除ダイアログ
+
+> Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-15
+> Updated: 2026-03-17 (S10→S12, TC-ID renumbered to avoid collision with existing S9/S10)
+
+**テスト対象パス**: `web/refMenu.ts`
+
+| Case ID | Input / Precondition                                       | Perspective (Equivalence / Boundary) | Expected Result                                                   | Notes                |
+| ------- | ---------------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------- | -------------------- |
+| TC-050  | Remove Worktree 選択、非メインworktree                     | Equivalence - normal                 | showFormDialog がチェックボックス入力付きで呼ばれる               | REQ-4.1-TC1          |
+| TC-051  | viewState.dialogDefaults.removeWorktree.deleteBranch=true  | Equivalence - normal                 | チェックボックスのデフォルトが checked                            | REQ-9.2-TC1          |
+| TC-052  | viewState.dialogDefaults.removeWorktree.deleteBranch=false | Equivalence - normal                 | チェックボックスのデフォルトが unchecked                          | REQ-9.2-TC2          |
+| TC-053  | チェックボックスの info プロパティ確認                     | Equivalence - normal                 | 安全な削除（git branch -d）の説明テキストが info に設定されている | REQ-4.1-TC2          |
+| TC-054  | チェックON + Remove ボタン押下                             | Equivalence - normal                 | sendMessage に deleteBranch: true が含まれる                      | REQ-4.1              |
+| TC-055  | チェックOFF + Remove ボタン押下                            | Equivalence - normal                 | sendMessage に deleteBranch: false が含まれる                     | REQ-4.1              |
+| TC-056  | ダイアログのアクションボタン名                             | Equivalence - normal                 | ボタンテキストが "Remove" である                                  | REQ-4.1              |
+| TC-057  | 確認メッセージの内容                                       | Equivalence - normal                 | メッセージにブランチ名と worktree パスが含まれる                  | REQ-4.1 既存動作維持 |

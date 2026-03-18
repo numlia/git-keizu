@@ -201,3 +201,19 @@
 | TC-050  | RequestCreateWorktree、addWorktree 失敗（エラー文字列返却）                   | Equivalence - error                  | ResponseCreateWorktree に status（エラー文字列）が含まれ、ターミナル起動なし                         | -                    |
 | TC-051  | RequestRemoveWorktree                                                         | Equivalence - normal                 | DataSource.removeWorktree が呼ばれ、ResponseRemoveWorktree が送信される                              | REQ-4.1              |
 | TC-052  | RequestOpenTerminal                                                           | Equivalence - normal                 | createTerminal が name + cwd 付きで呼ばれ、terminal.show() 実行。ResponseOpenTerminal 送信           | REQ-9.1              |
+
+## S16: removeWorktree ハンドラ ブランチ同時削除
+
+> Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-15
+
+**テスト対象パス**: `src/gitGraphView.ts`
+
+| Case ID | Input / Precondition                                                 | Perspective (Equivalence / Boundary) | Expected Result                                                                  | Notes            |
+| ------- | -------------------------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------- | ---------------- |
+| TC-053  | deleteBranch=true, worktree 削除成功(null), branch 削除成功(null)    | Equivalence - normal                 | ResponseRemoveWorktree: status=null, branchStatus=null                           | REQ-4.2-TC1      |
+| TC-054  | deleteBranch=true, worktree 削除成功(null), branch 削除失敗("error") | Equivalence - partial success        | ResponseRemoveWorktree: status=null, branchStatus="error message"                | REQ-4.2-TC2      |
+| TC-055  | deleteBranch=true, worktree 削除失敗("error")                        | Equivalence - error                  | ResponseRemoveWorktree: status="error", branchStatus 未設定。deleteBranch 未呼出 | REQ-4.2-TC5      |
+| TC-056  | deleteBranch=false, worktree 削除成功(null)                          | Equivalence - normal                 | ResponseRemoveWorktree: status=null, branchStatus 未設定。deleteBranch 未呼出    | REQ-4.2-TC3      |
+| TC-057  | deleteBranch=undefined (旧 webview 互換)                             | Boundary - legacy compat             | deleteBranch 未呼出、false としてフォールバック                                  | REQ-4.2 後方互換 |
+| TC-058  | deleteBranch=true 時の forceDelete パラメータ検証                    | Equivalence - constraint             | dataSource.deleteBranch の第3引数が false（安全な削除）固定                      | REQ-4.2-TC4      |
