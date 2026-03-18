@@ -140,7 +140,9 @@ describe("Merge dialog (S2)", () => {
   const DEFAULT_DIALOG_DEFAULTS = {
     merge: { noFastForward: true, squashCommits: false, noCommit: false },
     cherryPick: { recordOrigin: false, noCommit: false },
-    stashUncommittedChanges: { includeUntracked: false }
+    stashUncommittedChanges: { includeUntracked: false },
+    createWorktree: { openTerminal: true },
+    removeWorktree: { deleteBranch: true }
   };
 
   function setupViewState(overrides?: Partial<typeof DEFAULT_DIALOG_DEFAULTS.merge>) {
@@ -364,7 +366,9 @@ describe("Cherry-pick dialog (S3)", () => {
       dialogDefaults: {
         merge: { noFastForward: true, squashCommits: false, noCommit: false },
         cherryPick: { recordOrigin: false, noCommit: false, ...overrides },
-        stashUncommittedChanges: { includeUntracked: false }
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
       }
     };
   }

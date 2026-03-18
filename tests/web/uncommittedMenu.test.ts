@@ -31,7 +31,9 @@ describe("Stash Push Include Untracked default value (S1)", () => {
       dialogDefaults: {
         merge: { noFastForward: true, squashCommits: false, noCommit: false },
         cherryPick: { recordOrigin: false, noCommit: false },
-        stashUncommittedChanges: { includeUntracked }
+        stashUncommittedChanges: { includeUntracked },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
       }
     };
   }

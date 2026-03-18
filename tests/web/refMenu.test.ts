@@ -270,7 +270,9 @@ describe("buildRefContextMenuItems remote branch menu items", () => {
       dialogDefaults: {
         merge: { noFastForward: true, squashCommits: false, noCommit: false },
         cherryPick: { recordOrigin: false, noCommit: false },
-        stashUncommittedChanges: { includeUntracked: false }
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
       }
     };
   });
@@ -525,7 +527,9 @@ describe("buildMergeBranchMenuItem Merge dialog (S7)", () => {
       dialogDefaults: {
         merge: { noFastForward: true, squashCommits: false, noCommit: false },
         cherryPick: { recordOrigin: false, noCommit: false },
-        stashUncommittedChanges: { includeUntracked: false }
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
       }
     };
   });
@@ -561,7 +565,9 @@ describe("buildMergeBranchMenuItem Merge dialog (S7)", () => {
       dialogDefaults: {
         merge: { noFastForward: false, squashCommits: true, noCommit: true },
         cherryPick: { recordOrigin: false, noCommit: false },
-        stashUncommittedChanges: { includeUntracked: false }
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
       }
     };
     const item = getMergeItem();
@@ -622,6 +628,15 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
   });
 
   function getTitles(menu: ContextMenuElement[]): string[] {
@@ -834,7 +849,7 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
     });
   });
 
-  it("Remove Worktree shows confirmation dialog with branch name and path (TC-041)", () => {
+  it("Remove Worktree shows form dialog with branch name and path (TC-041)", () => {
     // Given: A local branch with non-main worktree info
     const sourceElem = createMockElement(["head"]);
     const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
@@ -854,9 +869,9 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
       .find((item) => item.title === "Remove Worktree&#8230;");
     removeItem!.onClick();
 
-    // Then: showConfirmationDialog is called with message containing branch name and path
-    expect(showConfirmationDialog).toHaveBeenCalledTimes(1);
-    const dialogMessage = vi.mocked(showConfirmationDialog).mock.calls[0][0];
+    // Then: showFormDialog is called with message containing branch name and path
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const dialogMessage = vi.mocked(showFormDialog).mock.calls[0][0];
     expect(dialogMessage).toContain("feature/x");
     expect(dialogMessage).toContain(WORKTREE_PATH);
   });
@@ -1031,5 +1046,231 @@ describe("Rename Branch dialog worktree warning (S10)", () => {
     expect(showRefInputDialog).toHaveBeenCalledTimes(1);
     const dialogMessage = vi.mocked(showRefInputDialog).mock.calls[0][0];
     expect(dialogMessage).not.toContain("active worktree");
+  });
+});
+
+// --- S11: Create Worktree ダイアログ Open Terminal 設定反映 ---
+
+describe("Create Worktree dialog Open Terminal setting (S11)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("Open Terminal checkbox is checked when dialogDefaults.createWorktree.openTerminal=true (TC-048)", () => {
+    // Given: viewState.dialogDefaults.createWorktree.openTerminal = true
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      null
+    );
+
+    // When: Create Worktree item is clicked
+    const createItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Create Worktree&#8230;");
+    createItem!.onClick();
+
+    // Then: Open Terminal checkbox value is true (checked)
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const openTerminalInput = inputs[1] as DialogCheckboxInput;
+    expect(openTerminalInput.value).toBe(true);
+  });
+
+  it("Open Terminal checkbox is unchecked when dialogDefaults.createWorktree.openTerminal=false (TC-049)", () => {
+    // Given: viewState.dialogDefaults.createWorktree.openTerminal = false
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: false },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      null
+    );
+
+    // When: Create Worktree item is clicked
+    const createItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Create Worktree&#8230;");
+    createItem!.onClick();
+
+    // Then: Open Terminal checkbox value is false (unchecked)
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const openTerminalInput = inputs[1] as DialogCheckboxInput;
+    expect(openTerminalInput.value).toBe(false);
+  });
+});
+
+// --- S12: Remove Worktree ブランチ同時削除ダイアログ ---
+
+describe("Remove Worktree branch deletion dialog (S12)", () => {
+  const WORKTREE_PATH = "/home/user/project-feature";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
+  });
+
+  function clickRemoveWorktree(
+    deleteBranchDefault: boolean
+  ): ReturnType<typeof buildRefContextMenuItems> {
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: deleteBranchDefault }
+      }
+    };
+    const sourceElem = createMockElement(["head"]);
+    const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      worktreeInfo
+    );
+    const removeItem = menu
+      .filter((item): item is ContextMenuElement => item !== null)
+      .find((item) => item.title === "Remove Worktree&#8230;");
+    removeItem!.onClick();
+    return menu;
+  }
+
+  it("showFormDialog is called with checkbox input for Remove Worktree (TC-050)", () => {
+    // Given: A non-main worktree with deleteBranch default = true
+    // When: Remove Worktree item is clicked
+    clickRemoveWorktree(true);
+
+    // Then: showFormDialog is called with one checkbox input
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0].type).toBe("checkbox");
+  });
+
+  it("checkbox default is checked when deleteBranch=true (TC-051)", () => {
+    // Given: viewState.dialogDefaults.removeWorktree.deleteBranch = true
+    // When: Remove Worktree item is clicked
+    clickRemoveWorktree(true);
+
+    // Then: Checkbox value is true (checked)
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const checkbox = inputs[0] as DialogCheckboxInput;
+    expect(checkbox.value).toBe(true);
+  });
+
+  it("checkbox default is unchecked when deleteBranch=false (TC-052)", () => {
+    // Given: viewState.dialogDefaults.removeWorktree.deleteBranch = false
+    // When: Remove Worktree item is clicked
+    clickRemoveWorktree(false);
+
+    // Then: Checkbox value is false (unchecked)
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const checkbox = inputs[0] as DialogCheckboxInput;
+    expect(checkbox.value).toBe(false);
+  });
+
+  it("checkbox has info property with safe delete explanation (TC-053)", () => {
+    // Given: Remove Worktree dialog is displayed
+    // When: Remove Worktree item is clicked
+    clickRemoveWorktree(true);
+
+    // Then: Checkbox info contains safe delete explanation
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const checkbox = inputs[0] as DialogCheckboxInput;
+    expect(checkbox.info).toBeDefined();
+    expect(checkbox.info).toContain("unmerged");
+  });
+
+  it("sendMessage includes deleteBranch=true when checkbox is checked (TC-054)", () => {
+    // Given: Remove Worktree dialog with checkbox checked
+    // When: Form dialog callback is invoked with "checked"
+    clickRemoveWorktree(true);
+    const callback = vi.mocked(showFormDialog).mock.calls[0][3];
+    callback(["checked"]);
+
+    // Then: sendMessage is called with deleteBranch: true
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "removeWorktree",
+        deleteBranch: true
+      })
+    );
+  });
+
+  it("sendMessage includes deleteBranch=false when checkbox is unchecked (TC-055)", () => {
+    // Given: Remove Worktree dialog with checkbox unchecked
+    // When: Form dialog callback is invoked with unchecked value
+    clickRemoveWorktree(true);
+    const callback = vi.mocked(showFormDialog).mock.calls[0][3];
+    callback(["unchecked"]);
+
+    // Then: sendMessage is called with deleteBranch: false
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "removeWorktree",
+        deleteBranch: false
+      })
+    );
+  });
+
+  it("action button name is 'Remove' (TC-056)", () => {
+    // Given: Remove Worktree dialog is displayed
+    // When: Remove Worktree item is clicked
+    clickRemoveWorktree(true);
+
+    // Then: Action button text is "Remove"
+    const actionButton = vi.mocked(showFormDialog).mock.calls[0][2];
+    expect(actionButton).toBe("Remove");
+  });
+
+  it("dialog message contains branch name and worktree path (TC-057)", () => {
+    // Given: Branch "feature/x" with worktree at WORKTREE_PATH
+    // When: Remove Worktree item is clicked
+    clickRemoveWorktree(true);
+
+    // Then: Dialog message contains both branch name and path
+    const dialogMessage = vi.mocked(showFormDialog).mock.calls[0][0];
+    expect(dialogMessage).toContain("feature/x");
+    expect(dialogMessage).toContain(WORKTREE_PATH);
   });
 });

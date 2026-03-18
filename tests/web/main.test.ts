@@ -539,7 +539,9 @@ describe("buildUncommittedContextMenuItems", () => {
       dialogDefaults: {
         merge: { noFastForward: true, squashCommits: false, noCommit: false },
         cherryPick: { recordOrigin: false, noCommit: false },
-        stashUncommittedChanges: { includeUntracked: false }
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
       }
     };
   });
@@ -898,7 +900,9 @@ function setupViewState(): void {
     dialogDefaults: {
       merge: { noFastForward: true, squashCommits: false, noCommit: false },
       cherryPick: { recordOrigin: false, noCommit: false },
-      stashUncommittedChanges: { includeUntracked: false }
+      stashUncommittedChanges: { includeUntracked: false },
+      createWorktree: { openTerminal: true },
+      removeWorktree: { deleteBranch: true }
     }
   };
 }
@@ -4810,7 +4814,9 @@ function setupViewStateWithOrdering(globalOrdering: string, repoOrdering?: strin
     dialogDefaults: {
       merge: { noFastForward: true, squashCommits: false, noCommit: false },
       cherryPick: { recordOrigin: false, noCommit: false },
-      stashUncommittedChanges: { includeUntracked: false }
+      stashUncommittedChanges: { includeUntracked: false },
+      createWorktree: { openTerminal: true },
+      removeWorktree: { deleteBranch: true }
     }
   };
 }

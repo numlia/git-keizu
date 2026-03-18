@@ -88,7 +88,9 @@ vi.mock("../../src/config", () => ({
     dialogDefaults: () => ({
       merge: { noFastForward: true, squashCommits: false, noCommit: false },
       cherryPick: { recordOrigin: false, noCommit: false },
-      stashUncommittedChanges: { includeUntracked: false }
+      stashUncommittedChanges: { includeUntracked: false },
+      createWorktree: { openTerminal: true },
+      removeWorktree: { deleteBranch: true }
     })
   }))
 }));
@@ -1714,7 +1716,9 @@ describe("GitGraphView merge/cherry-pick handler and viewState dialogDefaults (S
     expect(viewState.dialogDefaults).toEqual({
       merge: { noFastForward: true, squashCommits: false, noCommit: false },
       cherryPick: { recordOrigin: false, noCommit: false },
-      stashUncommittedChanges: { includeUntracked: false }
+      stashUncommittedChanges: { includeUntracked: false },
+      createWorktree: { openTerminal: true },
+      removeWorktree: { deleteBranch: true }
     });
   });
 
@@ -2078,15 +2082,16 @@ describe("GitGraphView worktree message handlers", () => {
     // Given: removeWorktree succeeds
     mocks.removeWorktree.mockResolvedValue(null);
 
-    // When: RequestRemoveWorktree message is received
+    // When: RequestRemoveWorktree message is received with deleteBranch=false
     await mocks.messageHandler.current!({
       command: "removeWorktree",
       repo: TEST_REPO,
       worktreePath: "/tmp/wt",
-      branchName: "feature/x"
+      branchName: "feature/x",
+      deleteBranch: false
     });
 
-    // Then: removeWorktree is called and response is sent
+    // Then: removeWorktree is called and response is sent without branchStatus
     expect(mocks.removeWorktree).toHaveBeenCalledTimes(1);
     expect(mocks.removeWorktree).toHaveBeenCalledWith(TEST_REPO, "/tmp/wt");
     expect(mocks.postMessage).toHaveBeenCalledWith({
@@ -2114,5 +2119,183 @@ describe("GitGraphView worktree message handlers", () => {
     expect(mocks.postMessage).toHaveBeenCalledWith({
       command: "openTerminal"
     });
+  });
+});
+
+// --- S16: removeWorktree ハンドラ ブランチ同時削除 ---
+
+describe("GitGraphView removeWorktree branch deletion (S16)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitGraphView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.removeWorktree.mockResolvedValue(null);
+    mocks.deleteBranch.mockResolvedValue(null);
+
+    const mockDataSource = {
+      removeWorktree: mocks.removeWorktree,
+      deleteBranch: mocks.deleteBranch
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitGraphView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitGraphView.currentPanel?.dispose();
+    GitGraphView.currentPanel = undefined;
+  });
+
+  it("deleteBranch=true, worktree success, branch success → status:null, branchStatus:null (TC-053)", async () => {
+    // Given: removeWorktree and deleteBranch both succeed
+    mocks.removeWorktree.mockResolvedValue(null);
+    mocks.deleteBranch.mockResolvedValue(null);
+
+    // When: RequestRemoveWorktree with deleteBranch=true
+    await mocks.messageHandler.current!({
+      command: "removeWorktree",
+      repo: TEST_REPO,
+      worktreePath: "/tmp/wt",
+      branchName: "feature/x",
+      deleteBranch: true
+    });
+
+    // Then: Both operations called, response has status:null, branchStatus:null
+    expect(mocks.removeWorktree).toHaveBeenCalledWith(TEST_REPO, "/tmp/wt");
+    expect(mocks.deleteBranch).toHaveBeenCalledWith(TEST_REPO, "feature/x", false);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "removeWorktree",
+      status: null,
+      branchStatus: null
+    });
+  });
+
+  it("deleteBranch=true, worktree success, branch failure → status:null, branchStatus:error (TC-054)", async () => {
+    // Given: removeWorktree succeeds, deleteBranch fails
+    mocks.removeWorktree.mockResolvedValue(null);
+    mocks.deleteBranch.mockResolvedValue("error: branch not fully merged");
+
+    // When: RequestRemoveWorktree with deleteBranch=true
+    await mocks.messageHandler.current!({
+      command: "removeWorktree",
+      repo: TEST_REPO,
+      worktreePath: "/tmp/wt",
+      branchName: "feature/x",
+      deleteBranch: true
+    });
+
+    // Then: Response has status:null, branchStatus with error message
+    expect(mocks.deleteBranch).toHaveBeenCalledTimes(1);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "removeWorktree",
+      status: null,
+      branchStatus: "error: branch not fully merged"
+    });
+  });
+
+  it("deleteBranch=true, worktree failure → status:error, deleteBranch not called (TC-055)", async () => {
+    // Given: removeWorktree fails
+    mocks.removeWorktree.mockResolvedValue("fatal: modified files present");
+
+    // When: RequestRemoveWorktree with deleteBranch=true
+    await mocks.messageHandler.current!({
+      command: "removeWorktree",
+      repo: TEST_REPO,
+      worktreePath: "/tmp/wt",
+      branchName: "feature/x",
+      deleteBranch: true
+    });
+
+    // Then: deleteBranch is NOT called, response has error status
+    expect(mocks.deleteBranch).not.toHaveBeenCalled();
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "removeWorktree",
+      status: "fatal: modified files present"
+    });
+  });
+
+  it("deleteBranch=false, worktree success → status:null, deleteBranch not called (TC-056)", async () => {
+    // Given: removeWorktree succeeds
+    mocks.removeWorktree.mockResolvedValue(null);
+
+    // When: RequestRemoveWorktree with deleteBranch=false
+    await mocks.messageHandler.current!({
+      command: "removeWorktree",
+      repo: TEST_REPO,
+      worktreePath: "/tmp/wt",
+      branchName: "feature/x",
+      deleteBranch: false
+    });
+
+    // Then: deleteBranch is NOT called, response has status:null only
+    expect(mocks.deleteBranch).not.toHaveBeenCalled();
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "removeWorktree",
+      status: null
+    });
+  });
+
+  it("deleteBranch=undefined (legacy) → deleteBranch not called (TC-057)", async () => {
+    // Given: removeWorktree succeeds, message from old webview without deleteBranch field
+    mocks.removeWorktree.mockResolvedValue(null);
+
+    // When: RequestRemoveWorktree without deleteBranch field
+    await mocks.messageHandler.current!({
+      command: "removeWorktree",
+      repo: TEST_REPO,
+      worktreePath: "/tmp/wt",
+      branchName: "feature/x"
+    });
+
+    // Then: deleteBranch is NOT called (backward compatibility)
+    expect(mocks.deleteBranch).not.toHaveBeenCalled();
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "removeWorktree",
+      status: null
+    });
+  });
+
+  it("forceDelete parameter is always false when deleteBranch=true (TC-058)", async () => {
+    // Given: removeWorktree and deleteBranch both succeed
+    mocks.removeWorktree.mockResolvedValue(null);
+    mocks.deleteBranch.mockResolvedValue(null);
+
+    // When: RequestRemoveWorktree with deleteBranch=true
+    await mocks.messageHandler.current!({
+      command: "removeWorktree",
+      repo: TEST_REPO,
+      worktreePath: "/tmp/wt",
+      branchName: "feature/x",
+      deleteBranch: true
+    });
+
+    // Then: deleteBranch is called with forceDelete=false (safe delete only)
+    expect(mocks.deleteBranch).toHaveBeenCalledWith(TEST_REPO, "feature/x", false);
   });
 });

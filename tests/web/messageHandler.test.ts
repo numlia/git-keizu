@@ -355,3 +355,77 @@ describe("handleMessage createWorktree/removeWorktree/openTerminal response (S6)
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 });
+
+// --- S7: removeWorktree ブランチ削除結果の表示 ---
+
+describe("handleMessage removeWorktree branch deletion result (S7)", () => {
+  let gitGraph: GitGraphViewAPI;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitGraph = createMockGitGraphView();
+  });
+
+  it("refreshes graph when status=null and branchStatus=undefined (TC-020)", () => {
+    // Given: removeWorktree success, branch deletion not requested
+    const msg: ResponseMessage = { command: "removeWorktree", status: null };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitGraph);
+
+    // Then: Graph refreshes, no error dialog
+    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
+    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    expect(showErrorDialog).not.toHaveBeenCalled();
+  });
+
+  it("refreshes graph when status=null and branchStatus=null (TC-021)", () => {
+    // Given: Both worktree and branch deletion succeeded
+    const msg: ResponseMessage = {
+      command: "removeWorktree",
+      status: null,
+      branchStatus: null
+    };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitGraph);
+
+    // Then: Graph refreshes, no error dialog
+    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
+    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    expect(showErrorDialog).not.toHaveBeenCalled();
+  });
+
+  it("refreshes graph and shows branch error when status=null and branchStatus=string (TC-022)", () => {
+    // Given: Worktree deleted but branch deletion failed
+    const branchError = "error: The branch 'feature/x' is not fully merged.";
+    const msg: ResponseMessage = {
+      command: "removeWorktree",
+      status: null,
+      branchStatus: branchError
+    };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitGraph);
+
+    // Then: Graph refreshes AND branch deletion error dialog is shown
+    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
+    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Delete Branch", branchError, null);
+  });
+
+  it("shows worktree error dialog when status=string (TC-023)", () => {
+    // Given: Worktree deletion failed
+    const wtError = "fatal: 'feature/y' contains modified or untracked files";
+    const msg: ResponseMessage = { command: "removeWorktree", status: wtError };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitGraph);
+
+    // Then: Error dialog shown, no refresh
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Remove Worktree", wtError, null);
+    expect(gitGraph.refresh).not.toHaveBeenCalled();
+  });
+});

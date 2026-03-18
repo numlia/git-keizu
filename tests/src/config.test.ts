@@ -371,6 +371,12 @@ describe("dialogDefaults", () => {
       },
       stashUncommittedChanges: {
         includeUntracked: false
+      },
+      createWorktree: {
+        openTerminal: true
+      },
+      removeWorktree: {
+        deleteBranch: true
       }
     });
   });
@@ -497,5 +503,60 @@ describe("commitOrdering", () => {
     const result = config.commitOrdering();
     // Then: returns "author-date"
     expect(result).toBe("author-date");
+  });
+});
+
+// S9: dialogDefaults() createWorktree/removeWorktree 設定
+describe("dialogDefaults createWorktree/removeWorktree", () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  // TC-038: createWorktree.openTerminal default → true
+  it("returns createWorktree.openTerminal=true by default (TC-038)", () => {
+    // Given: no dialog.createWorktree.openTerminal setting configured
+    mockGet.mockImplementation((_key: string, defaultValue: unknown) => defaultValue);
+    // When: reading dialogDefaults
+    const config = getConfig();
+    const result = config.dialogDefaults();
+    // Then: createWorktree.openTerminal is true
+    expect(result.createWorktree.openTerminal).toBe(true);
+  });
+
+  // TC-039: createWorktree.openTerminal=false → false
+  it("returns createWorktree.openTerminal=false when configured (TC-039)", () => {
+    // Given: dialog.createWorktree.openTerminal set to false
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "dialog.createWorktree.openTerminal" ? false : defaultValue
+    );
+    // When: reading dialogDefaults
+    const config = getConfig();
+    const result = config.dialogDefaults();
+    // Then: createWorktree.openTerminal is false
+    expect(result.createWorktree.openTerminal).toBe(false);
+  });
+
+  // TC-040: removeWorktree.deleteBranch default → true
+  it("returns removeWorktree.deleteBranch=true by default (TC-040)", () => {
+    // Given: no dialog.removeWorktree.deleteBranch setting configured
+    mockGet.mockImplementation((_key: string, defaultValue: unknown) => defaultValue);
+    // When: reading dialogDefaults
+    const config = getConfig();
+    const result = config.dialogDefaults();
+    // Then: removeWorktree.deleteBranch is true
+    expect(result.removeWorktree.deleteBranch).toBe(true);
+  });
+
+  // TC-041: removeWorktree.deleteBranch=false → false
+  it("returns removeWorktree.deleteBranch=false when configured (TC-041)", () => {
+    // Given: dialog.removeWorktree.deleteBranch set to false
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "dialog.removeWorktree.deleteBranch" ? false : defaultValue
+    );
+    // When: reading dialogDefaults
+    const config = getConfig();
+    const result = config.dialogDefaults();
+    // Then: removeWorktree.deleteBranch is false
+    expect(result.removeWorktree.deleteBranch).toBe(false);
   });
 });
