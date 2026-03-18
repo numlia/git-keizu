@@ -292,6 +292,16 @@
           "default": false,
           "description": "Default state of \"Include Untracked\" checkbox in the Stash Uncommitted Changes dialog."
         },
+        "git-keizu.dialog.createWorktree.openTerminal": {
+          "type": "boolean",
+          "default": true,
+          "description": "Default state of \"Open Terminal\" checkbox in the Create Worktree dialog."
+        },
+        "git-keizu.dialog.removeWorktree.deleteBranch": {
+          "type": "boolean",
+          "default": true,
+          "description": "Default state of \"Also delete branch\" checkbox in the Remove Worktree dialog."
+        },
         "git-keizu.repository.commits.order": {
           "type": "string",
           "enum": [

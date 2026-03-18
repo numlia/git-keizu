@@ -55,6 +55,12 @@ class Config {
           "dialog.stashUncommittedChanges.includeUntracked",
           false
         )
+      },
+      createWorktree: {
+        openTerminal: this.workspaceConfiguration.get("dialog.createWorktree.openTerminal", true)
+      },
+      removeWorktree: {
+        deleteBranch: this.workspaceConfiguration.get("dialog.removeWorktree.deleteBranch", true)
       }
     };
   }

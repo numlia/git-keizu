@@ -438,12 +438,22 @@ export class GitGraphView {
             this.sendMessage({ command: "createWorktree", status: wtStatus });
             break;
           }
-          case "removeWorktree":
-            this.sendMessage({
-              command: "removeWorktree",
-              status: await this.dataSource.removeWorktree(msg.repo, msg.worktreePath)
-            });
+          case "removeWorktree": {
+            const wtStatus = await this.dataSource.removeWorktree(msg.repo, msg.worktreePath);
+            if (wtStatus !== null) {
+              this.sendMessage({ command: "removeWorktree", status: wtStatus });
+            } else if (msg.deleteBranch === true) {
+              const branchStatus = await this.dataSource.deleteBranch(
+                msg.repo,
+                msg.branchName,
+                false
+              );
+              this.sendMessage({ command: "removeWorktree", status: null, branchStatus });
+            } else {
+              this.sendMessage({ command: "removeWorktree", status: null });
+            }
             break;
+          }
           case "openTerminal": {
             const terminal = vscode.window.createTerminal({
               name: msg.name,

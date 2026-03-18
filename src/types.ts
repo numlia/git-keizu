@@ -97,6 +97,12 @@ export interface DialogDefaults {
   readonly stashUncommittedChanges: {
     readonly includeUntracked: boolean;
   };
+  readonly createWorktree: {
+    readonly openTerminal: boolean;
+  };
+  readonly removeWorktree: {
+    readonly deleteBranch: boolean;
+  };
 }
 
 export interface GitGraphViewState {
@@ -519,10 +525,12 @@ export interface RequestRemoveWorktree {
   repo: string;
   worktreePath: string;
   branchName: string;
+  deleteBranch: boolean;
 }
 export interface ResponseRemoveWorktree {
   command: "removeWorktree";
   status: GitCommandStatus;
+  branchStatus?: GitCommandStatus;
 }
 
 export interface RequestOpenTerminal {

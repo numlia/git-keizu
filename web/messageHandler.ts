@@ -141,7 +141,14 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
       refreshOrError(gitGraph, msg.status, "Unable to Push Tag");
       break;
     case "removeWorktree":
-      refreshOrError(gitGraph, msg.status, "Unable to Remove Worktree");
+      if (msg.status !== null) {
+        showErrorDialog("Unable to Remove Worktree", msg.status, null);
+      } else {
+        gitGraph.refresh(false);
+        if (typeof msg.branchStatus === "string") {
+          showErrorDialog("Unable to Delete Branch", msg.branchStatus, null);
+        }
+      }
       break;
     case "renameBranch":
       refreshOrError(gitGraph, msg.status, "Unable to Rename Branch");

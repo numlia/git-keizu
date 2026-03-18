@@ -313,7 +313,11 @@ export function buildRefContextMenuItems(
                 default: defaultPath,
                 placeholder: null
               },
-              { type: "checkbox" as const, name: "Open Terminal", value: true }
+              {
+                type: "checkbox" as const,
+                name: "Open Terminal",
+                value: viewState.dialogDefaults.createWorktree.openTerminal
+              }
             ],
             "Create Worktree",
             (values) => {
@@ -358,14 +362,24 @@ export function buildRefContextMenuItems(
         menu.push({
           title: `Remove Worktree${ELLIPSIS}`,
           onClick: () => {
-            showConfirmationDialog(
+            showFormDialog(
               `Are you sure you want to remove the worktree for branch '${escapeHtml(refName)}' at '${escapeHtml(worktreeInfo.path)}'?`,
-              () => {
+              [
+                {
+                  type: "checkbox",
+                  name: `Also delete branch '${escapeHtml(refName)}' (git branch -d)`,
+                  value: viewState.dialogDefaults.removeWorktree.deleteBranch,
+                  info: "Uses safe delete — unmerged branches will not be deleted."
+                }
+              ],
+              "Remove",
+              (values) => {
                 sendMessage({
                   command: "removeWorktree",
                   repo: repo,
                   worktreePath: worktreeInfo.path,
-                  branchName: refName
+                  branchName: refName,
+                  deleteBranch: values[0] === "checked"
                 });
               },
               sourceElem
