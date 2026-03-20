@@ -11,9 +11,9 @@ vi.mock("../../web/fileTree", () => ({
 
 import type { ResponseMessage } from "../../src/types";
 import { showErrorDialog } from "../../web/dialogs";
-import { type GitGraphViewAPI, handleMessage } from "../../web/messageHandler";
+import { type GitKeizuViewAPI, handleMessage } from "../../web/messageHandler";
 
-function createMockGitGraphView(): GitGraphViewAPI {
+function createMockGitKeizuView(): GitKeizuViewAPI {
   return {
     hideCommitDetails: vi.fn(),
     showCommitDetails: vi.fn(),
@@ -28,11 +28,11 @@ function createMockGitGraphView(): GitGraphViewAPI {
 }
 
 describe("handleMessage pull response", () => {
-  let gitGraph: GitGraphViewAPI;
+  let gitKeizu: GitKeizuViewAPI;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    gitGraph = createMockGitGraphView();
+    gitKeizu = createMockGitKeizuView();
   });
 
   it("calls refresh on pull success (TC-001)", () => {
@@ -40,11 +40,11 @@ describe("handleMessage pull response", () => {
     const msg: ResponseMessage = { command: "pull", status: null };
 
     // When: handleMessage is called with the success response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
-    // Then: gitGraph.refresh(false) is called for a soft refresh
-    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
-    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    // Then: gitKeizu.refresh(false) is called for a soft refresh
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -54,21 +54,21 @@ describe("handleMessage pull response", () => {
     const msg: ResponseMessage = { command: "pull", status: errorMsg };
 
     // When: handleMessage is called with the error response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
     // Then: showErrorDialog is called with "Unable to Pull" and the git error message
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith("Unable to Pull", errorMsg, null);
-    expect(gitGraph.refresh).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 });
 
 describe("refreshOrError soft refresh argument (S2)", () => {
-  let gitGraph: GitGraphViewAPI;
+  let gitKeizu: GitKeizuViewAPI;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    gitGraph = createMockGitGraphView();
+    gitKeizu = createMockGitKeizuView();
   });
 
   it("calls refresh(false) for soft refresh on deleteBranch success (TC-005)", () => {
@@ -76,11 +76,11 @@ describe("refreshOrError soft refresh argument (S2)", () => {
     const msg: ResponseMessage = { command: "deleteBranch", status: null };
 
     // When: handleMessage is called with the success response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
-    // Then: gitGraph.refresh(false) is called (hard=false means soft refresh)
-    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
-    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    // Then: gitKeizu.refresh(false) is called (hard=false means soft refresh)
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -90,21 +90,21 @@ describe("refreshOrError soft refresh argument (S2)", () => {
     const msg: ResponseMessage = { command: "deleteBranch", status: errorMsg };
 
     // When: handleMessage is called with the error response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
     // Then: showErrorDialog is called and refresh is NOT called
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith("Unable to Delete Branch", errorMsg, null);
-    expect(gitGraph.refresh).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 });
 
 describe("handleMessage push response", () => {
-  let gitGraph: GitGraphViewAPI;
+  let gitKeizu: GitKeizuViewAPI;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    gitGraph = createMockGitGraphView();
+    gitKeizu = createMockGitKeizuView();
   });
 
   it("calls refresh on push success (TC-002)", () => {
@@ -112,11 +112,11 @@ describe("handleMessage push response", () => {
     const msg: ResponseMessage = { command: "push", status: null };
 
     // When: handleMessage is called with the success response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
-    // Then: gitGraph.refresh(false) is called for a soft refresh
-    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
-    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    // Then: gitKeizu.refresh(false) is called for a soft refresh
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -126,33 +126,33 @@ describe("handleMessage push response", () => {
     const msg: ResponseMessage = { command: "push", status: errorMsg };
 
     // When: handleMessage is called with the error response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
     // Then: showErrorDialog is called with "Unable to Push" and the git error message
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith("Unable to Push", errorMsg, null);
-    expect(gitGraph.refresh).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 });
 
 describe("handleMessage selectRepo response (S3)", () => {
-  let gitGraph: GitGraphViewAPI;
+  let gitKeizu: GitKeizuViewAPI;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    gitGraph = createMockGitGraphView();
+    gitKeizu = createMockGitKeizuView();
   });
 
-  it("routes selectRepo message to gitGraph.selectRepo with repo path (TC-007)", () => {
+  it("routes selectRepo message to gitKeizu.selectRepo with repo path (TC-007)", () => {
     // Given: A selectRepo response with a repo path
     const msg: ResponseMessage = { command: "selectRepo", repo: "/path/to/repo" };
 
     // When: handleMessage is called with the selectRepo response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
-    // Then: gitGraph.selectRepo is called with the repo path
-    expect(gitGraph.selectRepo).toHaveBeenCalledTimes(1);
-    expect(gitGraph.selectRepo).toHaveBeenCalledWith("/path/to/repo");
+    // Then: gitKeizu.selectRepo is called with the repo path
+    expect(gitKeizu.selectRepo).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.selectRepo).toHaveBeenCalledWith("/path/to/repo");
   });
 
   it("completes without error on selectRepo message (TC-008)", () => {
@@ -160,17 +160,17 @@ describe("handleMessage selectRepo response (S3)", () => {
     const msg: ResponseMessage = { command: "selectRepo", repo: "/some/other/repo" };
 
     // When/Then: handleMessage processes without throwing
-    expect(() => handleMessage(msg, gitGraph)).not.toThrow();
-    expect(gitGraph.selectRepo).toHaveBeenCalledTimes(1);
+    expect(() => handleMessage(msg, gitKeizu)).not.toThrow();
+    expect(gitKeizu.selectRepo).toHaveBeenCalledTimes(1);
   });
 });
 
 describe("handleMessage deleteRemoteBranch/rebaseBranch response (S4)", () => {
-  let gitGraph: GitGraphViewAPI;
+  let gitKeizu: GitKeizuViewAPI;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    gitGraph = createMockGitGraphView();
+    gitKeizu = createMockGitKeizuView();
   });
 
   it("calls refresh on deleteRemoteBranch success (TC-009)", () => {
@@ -178,11 +178,11 @@ describe("handleMessage deleteRemoteBranch/rebaseBranch response (S4)", () => {
     const msg: ResponseMessage = { command: "deleteRemoteBranch", status: null };
 
     // When: handleMessage is called with the success response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
-    // Then: gitGraph.refresh(false) is called for a soft refresh
-    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
-    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    // Then: gitKeizu.refresh(false) is called for a soft refresh
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -192,12 +192,12 @@ describe("handleMessage deleteRemoteBranch/rebaseBranch response (S4)", () => {
     const msg: ResponseMessage = { command: "deleteRemoteBranch", status: errorMsg };
 
     // When: handleMessage is called with the error response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
     // Then: showErrorDialog is called with "Unable to Delete Remote Branch" and the git error message
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith("Unable to Delete Remote Branch", errorMsg, null);
-    expect(gitGraph.refresh).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 
   it("calls refresh on rebaseBranch success (TC-011)", () => {
@@ -205,11 +205,11 @@ describe("handleMessage deleteRemoteBranch/rebaseBranch response (S4)", () => {
     const msg: ResponseMessage = { command: "rebaseBranch", status: null };
 
     // When: handleMessage is called with the success response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
-    // Then: gitGraph.refresh(false) is called for a soft refresh
-    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
-    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    // Then: gitKeizu.refresh(false) is called for a soft refresh
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -219,21 +219,21 @@ describe("handleMessage deleteRemoteBranch/rebaseBranch response (S4)", () => {
     const msg: ResponseMessage = { command: "rebaseBranch", status: errorMsg };
 
     // When: handleMessage is called with the error response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
     // Then: showErrorDialog is called with "Unable to Rebase Branch" and the git error message
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith("Unable to Rebase Branch", errorMsg, null);
-    expect(gitGraph.refresh).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 });
 
 describe("handleMessage loadCommits authors pass-through (S5)", () => {
-  let gitGraph: GitGraphViewAPI;
+  let gitKeizu: GitKeizuViewAPI;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    gitGraph = createMockGitGraphView();
+    gitKeizu = createMockGitKeizuView();
   });
 
   it("passes authors array to loadCommits (TC-013)", () => {
@@ -248,11 +248,11 @@ describe("handleMessage loadCommits authors pass-through (S5)", () => {
     };
 
     // When: handleMessage is called with the loadCommits response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
-    // Then: gitGraph.loadCommits is called with authors forwarded
-    expect(gitGraph.loadCommits).toHaveBeenCalledTimes(1);
-    expect(gitGraph.loadCommits).toHaveBeenCalledWith(
+    // Then: gitKeizu.loadCommits is called with authors forwarded
+    expect(gitKeizu.loadCommits).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.loadCommits).toHaveBeenCalledWith(
       [],
       null,
       false,
@@ -273,20 +273,20 @@ describe("handleMessage loadCommits authors pass-through (S5)", () => {
     };
 
     // When: handleMessage is called with the loadCommits response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
-    // Then: gitGraph.loadCommits is called with authors as undefined
-    expect(gitGraph.loadCommits).toHaveBeenCalledTimes(1);
-    expect(gitGraph.loadCommits).toHaveBeenCalledWith([], null, false, false, undefined, undefined);
+    // Then: gitKeizu.loadCommits is called with authors as undefined
+    expect(gitKeizu.loadCommits).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.loadCommits).toHaveBeenCalledWith([], null, false, false, undefined, undefined);
   });
 });
 
 describe("handleMessage createWorktree/removeWorktree/openTerminal response (S6)", () => {
-  let gitGraph: GitGraphViewAPI;
+  let gitKeizu: GitKeizuViewAPI;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    gitGraph = createMockGitGraphView();
+    gitKeizu = createMockGitKeizuView();
   });
 
   it("calls refresh on createWorktree success (TC-015)", () => {
@@ -294,11 +294,11 @@ describe("handleMessage createWorktree/removeWorktree/openTerminal response (S6)
     const msg: ResponseMessage = { command: "createWorktree", status: null };
 
     // When: handleMessage is called with the success response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
-    // Then: gitGraph.refresh(false) is called for a soft refresh
-    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
-    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    // Then: gitKeizu.refresh(false) is called for a soft refresh
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -308,12 +308,12 @@ describe("handleMessage createWorktree/removeWorktree/openTerminal response (S6)
     const msg: ResponseMessage = { command: "createWorktree", status: errorMsg };
 
     // When: handleMessage is called with the error response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
     // Then: showErrorDialog is called with "Unable to Create Worktree" and the git error message
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith("Unable to Create Worktree", errorMsg, null);
-    expect(gitGraph.refresh).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 
   it("calls refresh on removeWorktree success (TC-017)", () => {
@@ -321,11 +321,11 @@ describe("handleMessage createWorktree/removeWorktree/openTerminal response (S6)
     const msg: ResponseMessage = { command: "removeWorktree", status: null };
 
     // When: handleMessage is called with the success response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
-    // Then: gitGraph.refresh(false) is called for a soft refresh
-    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
-    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    // Then: gitKeizu.refresh(false) is called for a soft refresh
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -335,12 +335,12 @@ describe("handleMessage createWorktree/removeWorktree/openTerminal response (S6)
     const msg: ResponseMessage = { command: "removeWorktree", status: errorMsg };
 
     // When: handleMessage is called with the error response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
     // Then: showErrorDialog is called with "Unable to Remove Worktree" and the git error message
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith("Unable to Remove Worktree", errorMsg, null);
-    expect(gitGraph.refresh).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 
   it("completes as no-op on openTerminal response (TC-019)", () => {
@@ -348,10 +348,10 @@ describe("handleMessage createWorktree/removeWorktree/openTerminal response (S6)
     const msg: ResponseMessage = { command: "openTerminal" };
 
     // When: handleMessage is called with the openTerminal response
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
     // Then: No refresh or error dialog — terminal launch is handled by extension host
-    expect(gitGraph.refresh).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 });
@@ -359,11 +359,11 @@ describe("handleMessage createWorktree/removeWorktree/openTerminal response (S6)
 // --- S7: removeWorktree ブランチ削除結果の表示 ---
 
 describe("handleMessage removeWorktree branch deletion result (S7)", () => {
-  let gitGraph: GitGraphViewAPI;
+  let gitKeizu: GitKeizuViewAPI;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    gitGraph = createMockGitGraphView();
+    gitKeizu = createMockGitKeizuView();
   });
 
   it("refreshes graph when status=null and branchStatus=undefined (TC-020)", () => {
@@ -371,11 +371,11 @@ describe("handleMessage removeWorktree branch deletion result (S7)", () => {
     const msg: ResponseMessage = { command: "removeWorktree", status: null };
 
     // When: handleMessage is called
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
     // Then: Graph refreshes, no error dialog
-    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
-    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -388,11 +388,11 @@ describe("handleMessage removeWorktree branch deletion result (S7)", () => {
     };
 
     // When: handleMessage is called
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
     // Then: Graph refreshes, no error dialog
-    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
-    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -406,11 +406,11 @@ describe("handleMessage removeWorktree branch deletion result (S7)", () => {
     };
 
     // When: handleMessage is called
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
     // Then: Graph refreshes AND branch deletion error dialog is shown
-    expect(gitGraph.refresh).toHaveBeenCalledTimes(1);
-    expect(gitGraph.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith("Unable to Delete Branch", branchError, null);
   });
@@ -421,11 +421,11 @@ describe("handleMessage removeWorktree branch deletion result (S7)", () => {
     const msg: ResponseMessage = { command: "removeWorktree", status: wtError };
 
     // When: handleMessage is called
-    handleMessage(msg, gitGraph);
+    handleMessage(msg, gitKeizu);
 
     // Then: Error dialog shown, no refresh
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith("Unable to Remove Worktree", wtError, null);
-    expect(gitGraph.refresh).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 });

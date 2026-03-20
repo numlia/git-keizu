@@ -122,16 +122,16 @@ import * as vscode from "vscode";
 import type { AvatarManager } from "../../src/avatarManager";
 import type { DataSource } from "../../src/dataSource";
 import type { ExtensionState } from "../../src/extensionState";
-import { GitGraphView } from "../../src/gitGraphView";
+import { GitKeizuView } from "../../src/gitGraphView";
 import type { RepoManager } from "../../src/repoManager";
 
 const TEST_REPO = "/test/repo";
 
-describe("GitGraphView stash message routing", () => {
+describe("GitKeizuView stash message routing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.applyStash.mockResolvedValue(null);
@@ -179,7 +179,7 @@ describe("GitGraphView stash message routing", () => {
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       mockDataSource,
       mockExtensionState,
@@ -189,12 +189,12 @@ describe("GitGraphView stash message routing", () => {
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   it("routes applyStash message to DataSource.applyStash (TC-001)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     // When: RequestApplyStash message is received
     await mocks.messageHandler.current!({
       command: "applyStash",
@@ -215,7 +215,7 @@ describe("GitGraphView stash message routing", () => {
   });
 
   it("routes popStash message to DataSource.popStash (TC-002)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     // When: RequestPopStash message is received
     await mocks.messageHandler.current!({
       command: "popStash",
@@ -234,7 +234,7 @@ describe("GitGraphView stash message routing", () => {
   });
 
   it("routes dropStash message to DataSource.dropStash (TC-003)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     // When: RequestDropStash message is received
     await mocks.messageHandler.current!({
       command: "dropStash",
@@ -252,7 +252,7 @@ describe("GitGraphView stash message routing", () => {
   });
 
   it("routes branchFromStash message to DataSource.branchFromStash (TC-004)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     // When: RequestBranchFromStash message is received
     await mocks.messageHandler.current!({
       command: "branchFromStash",
@@ -271,7 +271,7 @@ describe("GitGraphView stash message routing", () => {
   });
 
   it("routes pushStash message to DataSource.pushStash (TC-005)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     // When: RequestPushStash message is received
     await mocks.messageHandler.current!({
       command: "pushStash",
@@ -292,7 +292,7 @@ describe("GitGraphView stash message routing", () => {
   });
 
   it("routes resetUncommitted message to DataSource.resetUncommitted (TC-006)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     // When: RequestResetUncommitted message is received
     await mocks.messageHandler.current!({
       command: "resetUncommitted",
@@ -312,7 +312,7 @@ describe("GitGraphView stash message routing", () => {
   });
 
   it("routes cleanUntrackedFiles message to DataSource.cleanUntrackedFiles (TC-007)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     // When: RequestCleanUntrackedFiles message is received
     await mocks.messageHandler.current!({
       command: "cleanUntrackedFiles",
@@ -332,11 +332,11 @@ describe("GitGraphView stash message routing", () => {
   });
 });
 
-describe("GitGraphView compareCommits message routing", () => {
+describe("GitKeizuView compareCommits message routing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.getCommitComparison.mockResolvedValue(null);
@@ -377,7 +377,7 @@ describe("GitGraphView compareCommits message routing", () => {
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       mockDataSource,
       mockExtensionState,
@@ -387,12 +387,12 @@ describe("GitGraphView compareCommits message routing", () => {
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   it("routes compareCommits message to DataSource.getCommitComparison with correct args (TC-008)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     const fromHash = "abc1234567890abcdef1234567890abcdef123456";
     const toHash = "def4567890abcdef1234567890abcdef12345678";
 
@@ -465,11 +465,11 @@ describe("GitGraphView compareCommits message routing", () => {
   });
 });
 
-describe("GitGraphView viewDiff with compareWithHash", () => {
+describe("GitKeizuView viewDiff with compareWithHash", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.getCommitComparison.mockResolvedValue(null);
@@ -510,7 +510,7 @@ describe("GitGraphView viewDiff with compareWithHash", () => {
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       mockDataSource,
       mockExtensionState,
@@ -520,8 +520,8 @@ describe("GitGraphView viewDiff with compareWithHash", () => {
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   it("generates correct URIs for two-commit comparison when compareWithHash is specified (TC-011)", async () => {
@@ -589,14 +589,14 @@ describe("GitGraphView viewDiff with compareWithHash", () => {
   });
 });
 
-describe("GitGraphView pull/push message routing", () => {
+describe("GitKeizuView pull/push message routing", () => {
   const pullMock = vi.fn();
   const pushMock = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     pullMock.mockResolvedValue(null);
@@ -634,7 +634,7 @@ describe("GitGraphView pull/push message routing", () => {
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       mockDataSource,
       mockExtensionState,
@@ -644,12 +644,12 @@ describe("GitGraphView pull/push message routing", () => {
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   it("routes pull message to DataSource.pull and returns ResponsePull (TC-013)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     // When: RequestPull message is received
     await mocks.messageHandler.current!({
       command: "pull",
@@ -666,7 +666,7 @@ describe("GitGraphView pull/push message routing", () => {
   });
 
   it("routes push message to DataSource.push and returns ResponsePush (TC-014)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     // When: RequestPush message is received
     await mocks.messageHandler.current!({
       command: "push",
@@ -683,7 +683,7 @@ describe("GitGraphView pull/push message routing", () => {
   });
 });
 
-describe("GitGraphView createOrShow rootUri handling (S6)", () => {
+describe("GitKeizuView createOrShow rootUri handling (S6)", () => {
   const SCM_REPO = "/scm/repo/path";
   let mockSetLastActiveRepo: ReturnType<typeof vi.fn>;
   let mockRegisterRepoFromUri: ReturnType<typeof vi.fn>;
@@ -691,15 +691,15 @@ describe("GitGraphView createOrShow rootUri handling (S6)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
 
     mockSetLastActiveRepo = vi.fn();
     mockRegisterRepoFromUri = vi.fn().mockResolvedValue(undefined);
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   function createDeps(reposMap: Record<string, unknown> = { [TEST_REPO]: "Test Repo" }) {
@@ -745,7 +745,7 @@ describe("GitGraphView createOrShow rootUri handling (S6)", () => {
     const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
 
     // When: createOrShow is called with rootUri (first time, creates panel)
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       deps.mockDataSource,
       deps.mockExtensionState,
@@ -762,7 +762,7 @@ describe("GitGraphView createOrShow rootUri handling (S6)", () => {
   it("sends ResponseSelectRepo when panel exists and repo is registered (TC-016)", () => {
     // Given: Panel already exists, SCM_REPO is in registered repos
     const deps = createDeps({ [TEST_REPO]: "Test Repo", [SCM_REPO]: "SCM Repo" });
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       deps.mockDataSource,
       deps.mockExtensionState,
@@ -773,7 +773,7 @@ describe("GitGraphView createOrShow rootUri handling (S6)", () => {
 
     // When: createOrShow is called again with rootUri for a registered repo
     const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       deps.mockDataSource,
       deps.mockExtensionState,
@@ -793,7 +793,7 @@ describe("GitGraphView createOrShow rootUri handling (S6)", () => {
   it("calls registerRepoFromUri then sends selectRepo when repo is unregistered (TC-017)", async () => {
     // Given: Panel already exists, SCM_REPO is NOT in registered repos
     const deps = createDeps({ [TEST_REPO]: "Test Repo" });
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       deps.mockDataSource,
       deps.mockExtensionState,
@@ -804,7 +804,7 @@ describe("GitGraphView createOrShow rootUri handling (S6)", () => {
 
     // When: createOrShow is called with rootUri for unregistered repo
     const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       deps.mockDataSource,
       deps.mockExtensionState,
@@ -828,7 +828,7 @@ describe("GitGraphView createOrShow rootUri handling (S6)", () => {
   it("does not send selectRepo when rootUri is not specified (TC-018)", () => {
     // Given: Panel already exists
     const deps = createDeps();
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       deps.mockDataSource,
       deps.mockExtensionState,
@@ -838,7 +838,7 @@ describe("GitGraphView createOrShow rootUri handling (S6)", () => {
     vi.clearAllMocks();
 
     // When: createOrShow is called without rootUri (command palette)
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       deps.mockDataSource,
       deps.mockExtensionState,
@@ -854,17 +854,17 @@ describe("GitGraphView createOrShow rootUri handling (S6)", () => {
   });
 });
 
-describe("GitGraphView viewState keybindings and loadMoreCommitsAutomatically (S7)", () => {
+describe("GitKeizuView viewState keybindings and loadMoreCommitsAutomatically (S7)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   function createPanel(): void {
@@ -898,7 +898,7 @@ describe("GitGraphView viewState keybindings and loadMoreCommitsAutomatically (S
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       mockDataSource,
       mockExtensionState,
@@ -948,11 +948,11 @@ describe("GitGraphView viewState keybindings and loadMoreCommitsAutomatically (S
   });
 });
 
-describe("GitGraphView deleteRemoteBranch/rebaseBranch message routing (S8)", () => {
+describe("GitKeizuView deleteRemoteBranch/rebaseBranch message routing (S8)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.deleteRemoteBranch.mockResolvedValue(null);
@@ -990,7 +990,7 @@ describe("GitGraphView deleteRemoteBranch/rebaseBranch message routing (S8)", ()
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       mockDataSource,
       mockExtensionState,
@@ -1000,12 +1000,12 @@ describe("GitGraphView deleteRemoteBranch/rebaseBranch message routing (S8)", ()
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   it("routes deleteRemoteBranch message to DataSource.deleteRemoteBranch (TC-021)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     // When: RequestDeleteRemoteBranch message is received
     await mocks.messageHandler.current!({
       command: "deleteRemoteBranch",
@@ -1022,7 +1022,7 @@ describe("GitGraphView deleteRemoteBranch/rebaseBranch message routing (S8)", ()
   });
 
   it("routes rebaseBranch message to DataSource.rebaseBranch (TC-022)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     // When: RequestRebaseBranch message is received
     await mocks.messageHandler.current!({
       command: "rebaseBranch",
@@ -1076,11 +1076,11 @@ describe("GitGraphView deleteRemoteBranch/rebaseBranch message routing (S8)", ()
   });
 });
 
-describe("GitGraphView deleteBranch extension (S9)", () => {
+describe("GitKeizuView deleteBranch extension (S9)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.deleteBranch.mockResolvedValue(null);
@@ -1119,7 +1119,7 @@ describe("GitGraphView deleteBranch extension (S9)", () => {
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       mockDataSource,
       mockExtensionState,
@@ -1129,8 +1129,8 @@ describe("GitGraphView deleteBranch extension (S9)", () => {
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   it("calls deleteRemoteBranch for each remote after successful local delete (TC-025)", async () => {
@@ -1251,11 +1251,11 @@ describe("GitGraphView deleteBranch extension (S9)", () => {
   });
 });
 
-describe("GitGraphView loadCommits authorFilter (S10)", () => {
+describe("GitKeizuView loadCommits authorFilter (S10)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.getCommits.mockResolvedValue({
@@ -1298,7 +1298,7 @@ describe("GitGraphView loadCommits authorFilter (S10)", () => {
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       mockDataSource,
       mockExtensionState,
@@ -1308,8 +1308,8 @@ describe("GitGraphView loadCommits authorFilter (S10)", () => {
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   it("passes authors array to dataSource.getCommits when specified (TC-029)", async () => {
@@ -1358,11 +1358,11 @@ describe("GitGraphView loadCommits authorFilter (S10)", () => {
   });
 });
 
-describe("GitGraphView createBranch + checkout orchestration (S11)", () => {
+describe("GitKeizuView createBranch + checkout orchestration (S11)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.createBranch.mockResolvedValue(null);
@@ -1404,7 +1404,7 @@ describe("GitGraphView createBranch + checkout orchestration (S11)", () => {
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       mockDataSource,
       mockExtensionState,
@@ -1414,8 +1414,8 @@ describe("GitGraphView createBranch + checkout orchestration (S11)", () => {
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   it("calls checkoutBranch after successful createBranch when checkout=true (TC-031)", async () => {
@@ -1548,11 +1548,11 @@ describe("GitGraphView createBranch + checkout orchestration (S11)", () => {
 /* S12: loadCommits branches/authors array passthrough                  */
 /* ------------------------------------------------------------------ */
 
-describe("GitGraphView loadCommits branches/authors array passthrough (S12)", () => {
+describe("GitKeizuView loadCommits branches/authors array passthrough (S12)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.getCommits.mockResolvedValue({
@@ -1585,12 +1585,12 @@ describe("GitGraphView loadCommits branches/authors array passthrough (S12)", ()
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow("/test/extension", ds, es, am, rm);
+    GitKeizuView.createOrShow("/test/extension", ds, es, am, rm);
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   it("passes branches and authors arrays to getCommits (TC-037)", async () => {
@@ -1639,11 +1639,11 @@ describe("GitGraphView loadCommits branches/authors array passthrough (S12)", ()
   });
 });
 
-describe("GitGraphView merge/cherry-pick handler and viewState dialogDefaults (S13)", () => {
+describe("GitKeizuView merge/cherry-pick handler and viewState dialogDefaults (S13)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.mergeBranch.mockResolvedValue(null);
     mocks.mergeCommit.mockResolvedValue(null);
@@ -1651,8 +1651,8 @@ describe("GitGraphView merge/cherry-pick handler and viewState dialogDefaults (S
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   function createPanel(): void {
@@ -1689,7 +1689,7 @@ describe("GitGraphView merge/cherry-pick handler and viewState dialogDefaults (S
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow("/test/extension", ds, es, am, rm);
+    GitKeizuView.createOrShow("/test/extension", ds, es, am, rm);
   }
 
   function getPanelHtml(): string {
@@ -1723,7 +1723,7 @@ describe("GitGraphView merge/cherry-pick handler and viewState dialogDefaults (S
   });
 
   it("passes squash=true noCommit=false to DataSource.mergeBranch (TC-040)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     createPanel();
 
     // When: RequestMergeBranch message is received with squash=true, noCommit=false
@@ -1746,7 +1746,7 @@ describe("GitGraphView merge/cherry-pick handler and viewState dialogDefaults (S
   });
 
   it("passes squash=false noCommit=true to DataSource.mergeCommit (TC-041)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     createPanel();
     const commitHash = "abc1234567890abcdef1234567890abcdef123456";
 
@@ -1770,7 +1770,7 @@ describe("GitGraphView merge/cherry-pick handler and viewState dialogDefaults (S
   });
 
   it("passes recordOrigin=true noCommit=true to DataSource.cherrypickCommit (TC-042)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     createPanel();
     const commitHash = "def4567890abcdef1234567890abcdef12345678";
 
@@ -1794,7 +1794,7 @@ describe("GitGraphView merge/cherry-pick handler and viewState dialogDefaults (S
   });
 
   it("passes recordOrigin=false noCommit=false for legacy compat (TC-043)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     createPanel();
     const commitHash = "1234567890abcdef1234567890abcdef12345678";
 
@@ -1818,11 +1818,11 @@ describe("GitGraphView merge/cherry-pick handler and viewState dialogDefaults (S
   });
 });
 
-describe("GitGraphView viewState commitOrdering / loadCommits handler (S14)", () => {
+describe("GitKeizuView viewState commitOrdering / loadCommits handler (S14)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.getCommits.mockResolvedValue({
       commits: [],
@@ -1833,8 +1833,8 @@ describe("GitGraphView viewState commitOrdering / loadCommits handler (S14)", ()
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   function createPanel(): void {
@@ -1861,7 +1861,7 @@ describe("GitGraphView viewState commitOrdering / loadCommits handler (S14)", ()
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow("/test/extension", ds, es, am, rm);
+    GitKeizuView.createOrShow("/test/extension", ds, es, am, rm);
   }
 
   function getPanelHtml(): string {
@@ -1889,7 +1889,7 @@ describe("GitGraphView viewState commitOrdering / loadCommits handler (S14)", ()
   });
 
   it("passes commitOrdering='topo' to dataSource.getCommits (TC-045)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     createPanel();
 
     // When: loadCommits message with commitOrdering="topo" is received
@@ -1910,7 +1910,7 @@ describe("GitGraphView viewState commitOrdering / loadCommits handler (S14)", ()
   });
 
   it("passes commitOrdering='author-date' to dataSource.getCommits (TC-046)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     createPanel();
 
     // When: loadCommits message with commitOrdering="author-date" is received
@@ -1938,7 +1938,7 @@ describe("GitGraphView viewState commitOrdering / loadCommits handler (S14)", ()
   });
 
   it("passes commitOrdering='date' to dataSource.getCommits for default behavior (TC-047)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     createPanel();
 
     // When: loadCommits message with commitOrdering="date" is received
@@ -1959,11 +1959,11 @@ describe("GitGraphView viewState commitOrdering / loadCommits handler (S14)", ()
   });
 });
 
-describe("GitGraphView worktree message handlers", () => {
+describe("GitKeizuView worktree message handlers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.addWorktree.mockResolvedValue(null);
@@ -1994,7 +1994,7 @@ describe("GitGraphView worktree message handlers", () => {
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       mockDataSource,
       mockExtensionState,
@@ -2004,12 +2004,12 @@ describe("GitGraphView worktree message handlers", () => {
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   it("createWorktree without commitHash and openTerminal=false calls addWorktree, no terminal (TC-048)", async () => {
-    // Given: GitGraphView instance with mocked DataSource
+    // Given: GitKeizuView instance with mocked DataSource
     // When: RequestCreateWorktree without commitHash and openTerminal=false
     await mocks.messageHandler.current!({
       command: "createWorktree",
@@ -2101,7 +2101,7 @@ describe("GitGraphView worktree message handlers", () => {
   });
 
   it("openTerminal creates terminal with name and cwd, sends response (TC-052)", async () => {
-    // Given: GitGraphView instance
+    // Given: GitKeizuView instance
     // When: RequestOpenTerminal message is received
     await mocks.messageHandler.current!({
       command: "openTerminal",
@@ -2124,11 +2124,11 @@ describe("GitGraphView worktree message handlers", () => {
 
 // --- S16: removeWorktree ハンドラ ブランチ同時削除 ---
 
-describe("GitGraphView removeWorktree branch deletion (S16)", () => {
+describe("GitKeizuView removeWorktree branch deletion (S16)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.removeWorktree.mockResolvedValue(null);
@@ -2158,7 +2158,7 @@ describe("GitGraphView removeWorktree branch deletion (S16)", () => {
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitGraphView.createOrShow(
+    GitKeizuView.createOrShow(
       "/test/extension",
       mockDataSource,
       mockExtensionState,
@@ -2168,8 +2168,8 @@ describe("GitGraphView removeWorktree branch deletion (S16)", () => {
   });
 
   afterEach(() => {
-    GitGraphView.currentPanel?.dispose();
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
   });
 
   it("deleteBranch=true, worktree success, branch success → status:null, branchStatus:null (TC-053)", async () => {
@@ -2297,5 +2297,76 @@ describe("GitGraphView removeWorktree branch deletion (S16)", () => {
 
     // Then: deleteBranch is called with forceDelete=false (safe delete only)
     expect(mocks.deleteBranch).toHaveBeenCalledWith(TEST_REPO, "feature/x", false);
+  });
+});
+
+describe("GitKeizuView CSS_COLOR_VAR_PREFIX constant verification (S17)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitKeizuView.currentPanel = undefined;
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  function createPanel(): void {
+    const mockDataSource = {} as unknown as DataSource;
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  }
+
+  function getPanelHtml(): string {
+    const panelMock = vi.mocked(vscode.window.createWebviewPanel).mock.results[0].value as {
+      webview: { html: string };
+    };
+    return panelMock.webview.html;
+  }
+
+  it("generates CSS variable definitions with --git-keizu-color prefix (TC-059)", async () => {
+    // Given: config returns graphColours with at least one color
+    // When: panel is created and HTML is generated
+    createPanel();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Then: generated HTML contains --git-keizu-color variable definitions in style attribute
+    const html = getPanelHtml();
+    expect(html).toContain("--git-keizu-color0:");
+  });
+
+  it("generates CSS variable references with var(--git-keizu-color) (TC-060)", async () => {
+    // Given: config returns graphColours with at least one color
+    // When: panel is created and HTML is generated
+    createPanel();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Then: generated HTML contains data-color selectors referencing var(--git-keizu-color)
+    const html = getPanelHtml();
+    expect(html).toContain("var(--git-keizu-color");
   });
 });

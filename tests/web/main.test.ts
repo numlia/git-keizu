@@ -1061,7 +1061,7 @@ function expandCommitWithCompare(fromHash: string, toHash: string): void {
 /* Integration: comparison mode & FindWidget (Task 4.3)               */
 /* ------------------------------------------------------------------ */
 
-describe("GitGraphView frontend integration", () => {
+describe("GitKeizuView frontend integration", () => {
   let restoreStateCaptured = false;
 
   beforeAll(async () => {
@@ -1626,7 +1626,7 @@ describe("GitGraphView frontend integration", () => {
 
     it("restoreState is called with findWidgetState during initialization (TC-048)", () => {
       // Given: prevState had findWidgetState set (configured in beforeAll)
-      // When: GitGraphView was constructed (in beforeAll)
+      // When: GitKeizuView was constructed (in beforeAll)
       // Then: findWidget.restoreState was called during initialization
       expect(restoreStateCaptured).toBe(true);
     });
@@ -3116,7 +3116,7 @@ describe("GitGraphView frontend integration", () => {
 /* FindWidget backward compatibility (separate module scope)          */
 /* ------------------------------------------------------------------ */
 
-describe("GitGraphView findWidgetState backward compatibility", () => {
+describe("GitKeizuView findWidgetState backward compatibility", () => {
   it("prevState without findWidgetState does not call restoreState (TC-049)", async () => {
     // Given: a fresh module scope
     vi.resetModules();
@@ -3134,7 +3134,7 @@ describe("GitGraphView findWidgetState backward compatibility", () => {
     );
     mockFindWidgetInstance.restoreState.mockClear();
 
-    // When: main module is imported (creates GitGraphView)
+    // When: main module is imported (creates GitKeizuView)
     await import("../../web/main");
 
     // Then: FindWidget.restoreState was NOT called
@@ -4065,7 +4065,7 @@ describe("Multi-select filter state management", () => {
 
   describe("Branch multi-select state (S22)", () => {
     it("initializes selectedBranches as empty array (TC-134)", () => {
-      // Given: GitGraphView was constructed with no prevState
+      // Given: GitKeizuView was constructed with no prevState
       // When: saveState is called (implicit on construction)
       // Then: setState includes selectedBranches: []
       const lastSetState = vi.mocked(liveVscode.setState).mock.calls;
@@ -4177,7 +4177,7 @@ describe("Multi-select filter state management", () => {
 
   describe("Author multi-select state (S23)", () => {
     it("initializes selectedAuthors as empty array (TC-139)", () => {
-      // Given: GitGraphView was constructed with no prevState
+      // Given: GitKeizuView was constructed with no prevState
       // When: author callback fires with [] (Show All = default)
       capturedAuthorCallback!([]);
       const msg = vi.mocked(liveVscode.postMessage).mock.calls[0]?.[0] as Record<string, unknown>;
@@ -4527,7 +4527,7 @@ describe("prevState scrollTop restoration (S28)", () => {
       scrollTop: 300
     } as ReturnType<typeof freshVscode.getState>);
 
-    // When: main module is imported (creates GitGraphView)
+    // When: main module is imported (creates GitKeizuView)
     await import("../../web/main");
 
     // Then: scrollContainerElem.scrollTop is set to 300
@@ -4559,7 +4559,7 @@ describe("prevState scrollTop restoration (S28)", () => {
       prevStateNoScrollTop as ReturnType<typeof freshVscode.getState>
     );
 
-    // When: main module is imported (creates GitGraphView)
+    // When: main module is imported (creates GitKeizuView)
     await import("../../web/main");
 
     // Then: scrollTop setter was never called with a restoration value from prevState
@@ -4585,7 +4585,7 @@ describe("prevState scrollTop restoration (S28)", () => {
     const { vscode: freshVscode } = await import("../../web/utils");
     vi.mocked(freshVscode.getState).mockReturnValueOnce(null);
 
-    // When: main module is imported (creates GitGraphView)
+    // When: main module is imported (creates GitKeizuView)
     await import("../../web/main");
 
     // Then: scrollTop remains 0 (no restoration attempted)
@@ -4617,7 +4617,7 @@ describe("prevState scrollTop restoration (S28)", () => {
       scrollTop: 0
     } as ReturnType<typeof freshVscode.getState>);
 
-    // When: main module is imported (creates GitGraphView)
+    // When: main module is imported (creates GitKeizuView)
     await import("../../web/main");
 
     // Then: scrollTop is explicitly set to 0
