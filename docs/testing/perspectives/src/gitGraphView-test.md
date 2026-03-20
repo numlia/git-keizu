@@ -217,3 +217,16 @@
 | TC-056  | deleteBranch=false, worktree 削除成功(null)                          | Equivalence - normal                 | ResponseRemoveWorktree: status=null, branchStatus 未設定。deleteBranch 未呼出    | REQ-4.2-TC3      |
 | TC-057  | deleteBranch=undefined (旧 webview 互換)                             | Boundary - legacy compat             | deleteBranch 未呼出、false としてフォールバック                                  | REQ-4.2 後方互換 |
 | TC-058  | deleteBranch=true 時の forceDelete パラメータ検証                    | Equivalence - constraint             | dataSource.deleteBranch の第3引数が false（安全な削除）固定                      | REQ-4.2-TC4      |
+
+## S17: CSS_COLOR_VAR_PREFIX 定数による変数生成
+
+> Origin: Feature 020 (legacy-branding-cleanup) (aidd-spec-tasks-test)
+> Added: 2026-03-20
+
+**シグネチャ**: `private getHtmlForWebview(uri: vscode.Uri): string`
+**テスト対象パス**: `src/gitGraphView.ts:553-560`
+
+| Case ID | Input / Precondition                                | Perspective (Equivalence / Boundary) | Expected Result                                                                  | Notes                       |
+| ------- | --------------------------------------------------- | ------------------------------------ | -------------------------------------------------------------------------------- | --------------------------- |
+| TC-059  | getHtmlForWebview() 呼び出し、graphColours に色あり | Equivalence - normal                 | 生成 HTML の style 属性に `--git-keizu-color` プレフィックスの変数定義が含まれる | CSS 定数リネーム検証        |
+| TC-060  | getHtmlForWebview() 呼び出し、graphColours に色あり | Equivalence - normal                 | 生成 HTML の data-color セレクタに `var(--git-keizu-color` の変数参照が含まれる  | 定義-参照チェーン一致の検証 |

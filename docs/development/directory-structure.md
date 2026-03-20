@@ -16,7 +16,7 @@ Git Keizu is a VS Code extension composed of two independent TypeScript projects
 <!-- AUTO-GENERATED:root-structure START -->
 
 ```
-neo-git-graph/
+git-keizu/
 ├── .github/              # CI/CD workflows, Dependabot config
 ├── .vscode/              # VS Code debug & task settings
 ├── media/                # Webview CSS stylesheets

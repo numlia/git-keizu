@@ -108,7 +108,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Muted commit branch label visibility**: Branch, remote, and tag labels on muted commits now render at full opacity; previously the mute opacity was applied to the entire commit row cell, causing reference labels to also appear faded
-- **Muted commit column coverage**: The date, author, and commit hash columns now correctly dim when a commit is muted, matching the original Git Graph behavior; previously only the commit message column was affected
+- **Muted commit column coverage**: The date, author, and commit hash columns now correctly dim when a commit is muted, matching the original behavior; previously only the commit message column was affected
 
 ## [0.2.9] - 2026-03-04
 
@@ -150,7 +150,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Commit details field order**: Fields are now ordered Commit → Parents → Author → Committer → Date (previously ...Author → Date → Committer), aligning with the original Git Graph layout
+- **Commit details field order**: Fields are now ordered Commit → Parents → Author → Committer → Date (previously ...Author → Date → Committer), aligning with the original layout
 - **Custom checkboxes**: Native OS checkboxes in dialogs and the "Show Remote Branches" control are replaced with theme-aware styled checkboxes
 - **Graph column auto-layout**: The auto-layout graph column is now capped at 40% of the viewport width to prevent the graph from dominating wide screens; column width adjusts smoothly when the panel is resized
 - **Scroll to expanded commit**: Opening commit details now accounts for the sticky header height, so the selected commit row is never hidden behind the controls bar
@@ -159,7 +159,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **SCM panel button**: A "View Git Graph" button now appears in the VS Code Source Control panel title bar; clicking it opens the graph and automatically selects the repository associated with the SCM provider. The button position can be set to Inline (title bar) or More Actions (`...` menu) via `git-keizu.sourceCodeProviderIntegrationLocation`
+- **SCM panel button**: A "View Git Keizu" button now appears in the VS Code Source Control panel title bar; clicking it opens the graph and automatically selects the repository associated with the SCM provider. The button position can be set to Inline (title bar) or More Actions (`...` menu) via `git-keizu.sourceCodeProviderIntegrationLocation`
 - **Keyboard shortcuts**: Four configurable shortcuts are now available — Find (Ctrl/Cmd+F), Refresh (Ctrl/Cmd+R), Scroll to HEAD (Ctrl/Cmd+H), and Scroll to Stash (Ctrl/Cmd+S); Shift+Stash shortcut moves to the previous stash. Each key can be rebound to any Ctrl/Cmd+letter combination or disabled via `git-keizu.keyboardShortcut.*` settings
 - **Escape key staged dismissal**: Pressing Escape closes UI components one at a time in priority order — context menu → dialog → dropdown → find widget → commit details panel — so a single keypress always leaves you at the right state
 - **Auto load more commits**: Additional commits load automatically when scrolling near the bottom of the commit list; can be disabled via the `git-keizu.loadMoreCommitsAutomatically` setting (default: enabled)

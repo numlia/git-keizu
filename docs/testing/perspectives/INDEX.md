@@ -1,9 +1,9 @@
 # テスト観点表インデックス
 
-> Auto-generated: 2026-03-15T23:00:00+09:00
+> Auto-generated: 2026-03-20T12:00:00+09:00
 > Total files: 18
-> Total sections: 148
-> Total cases: 724
+> Total sections: 149
+> Total cases: 726
 
 ## ソースファイル → 観点表（正引き）
 
@@ -11,7 +11,7 @@
 | ---------------------- | --------------------------- | -------- | ----- | ------------ |
 | src/config.ts          | src/config-test.md          | 9        | 41    | 2026-03-15   |
 | src/dataSource.ts      | src/dataSource-test.md      | 24       | 141   | 2026-03-12   |
-| src/gitGraphView.ts    | src/gitGraphView-test.md    | 16       | 58    | 2026-03-15   |
+| src/gitGraphView.ts    | src/gitGraphView-test.md    | 17       | 60    | 2026-03-20   |
 | src/repoManager.ts     | src/repoManager-test.md     | 1        | 3     | 2026-02-27   |
 | src/types.ts           | src/types-test.md           | 1        | 7     | 2026-02-25   |
 | src/worktree.ts        | src/worktree-test.md        | 1        | 11    | 2026-03-12   |
@@ -48,4 +48,5 @@
 | Feature 015 (commit-sort-order)         | src/config-test.md, src/dataSource-test.md, src/gitGraphView-test.md, web/main-test.md                                                                                               |
 | Feature 016 (worktree-support)          | src/worktree-test.md, src/dataSource-test.md, src/gitGraphView-test.md, web/utils-test.md, web/main-test.md, web/refMenu-test.md, web/commitMenu-test.md, web/messageHandler-test.md |
 | Feature 019 (worktree-enhancements)     | src/config-test.md, web/refMenu-test.md, src/gitGraphView-test.md, web/messageHandler-test.md                                                                                        |
+| Feature 020 (legacy-branding-cleanup)   | src/gitGraphView-test.md                                                                                                                                                             |
 | test-plan (既存テスト)                  | src/dataSource-test.md                                                                                                                                                               |
