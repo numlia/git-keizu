@@ -11,7 +11,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: var(--git-graph-color);
+  background-color: var(--git-keizu-color);
   color: var(--vscode-editor-background);
   font-size: 14px;
   height: 100%;
@@ -25,7 +25,7 @@
   -webkit-text-stroke: 0.3px currentColor;
 }
 .gitRef.stash > .codicon {
-  background-color: var(--git-graph-color);
+  background-color: var(--git-keizu-color);
 }
 
 /* Toolbar icon buttons (search / fetch / current / refresh) */

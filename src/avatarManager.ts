@@ -6,7 +6,7 @@ import * as path from "node:path";
 
 import { DataSource } from "./dataSource";
 import { ExtensionState } from "./extensionState";
-import { GitGraphView } from "./gitGraphView";
+import { GitKeizuView } from "./gitGraphView";
 import { AvatarCache } from "./types";
 
 const ALLOWED_AVATAR_HOSTNAMES = new Set([
@@ -22,7 +22,7 @@ export class AvatarManager {
   private readonly dataSource: DataSource;
   private readonly extensionState: ExtensionState;
   private readonly avatarStorageFolder: string;
-  private view: GitGraphView | null = null;
+  private view: GitKeizuView | null = null;
   private avatars: AvatarCache;
   private queue: AvatarRequestQueue;
   private remoteSourceCache: { [repo: string]: RemoteSource } = {};
@@ -71,7 +71,7 @@ export class AvatarManager {
     }
   }
 
-  public registerView(view: GitGraphView) {
+  public registerView(view: GitKeizuView) {
     this.view = view;
   }
 

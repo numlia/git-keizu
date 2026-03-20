@@ -86,7 +86,7 @@ function buildAuthorOptions(
   return { options, selected: selectedAuthors };
 }
 
-class GitGraphView {
+class GitKeizuView {
   private gitRepos: GG.GitRepoSet;
   private gitBranches: string[] = [];
   private gitBranchHead: string | null = null;
@@ -1572,7 +1572,7 @@ class GitGraphView {
 }
 
 /* Initialization */
-let gitGraph = new GitGraphView(
+let gitKeizu = new GitKeizuView(
   viewState.repos,
   viewState.lastActiveRepo,
   {
@@ -1595,13 +1595,13 @@ const LISTENER_CLEANUP_KEY = "__gitKeizuMessageCleanup";
 const _win = window as unknown as Record<string, unknown>;
 const prevCleanup = _win[LISTENER_CLEANUP_KEY];
 if (typeof prevCleanup === "function") (prevCleanup as () => void)();
-const messageHandler = (event: MessageEvent) => handleMessage(event.data, gitGraph);
+const messageHandler = (event: MessageEvent) => handleMessage(event.data, gitKeizu);
 window.addEventListener("message", messageHandler);
 _win[LISTENER_CLEANUP_KEY] = () => window.removeEventListener("message", messageHandler);
 
 /* Global Listeners */
 document.addEventListener("keyup", (e) => {
-  if (e.key === "Escape") gitGraph.handleEscape();
+  if (e.key === "Escape") gitKeizu.handleEscape();
 });
 document.addEventListener("click", hideContextMenuListener);
 document.addEventListener("contextmenu", hideContextMenuListener);

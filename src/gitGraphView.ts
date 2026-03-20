@@ -13,7 +13,7 @@ import { RepoManager } from "./repoManager";
 import {
   type GitCommandStatus,
   GitFileChangeType,
-  GitGraphViewState,
+  GitKeizuViewState,
   GitRepoSet,
   RequestMessage,
   ResponseMessage,
@@ -21,8 +21,10 @@ import {
 } from "./types";
 import { abbrevCommit, copyToClipboard, getPathFromUri } from "./utils";
 
-export class GitGraphView {
-  public static currentPanel: GitGraphView | undefined;
+const CSS_COLOR_VAR_PREFIX = "--git-keizu-color";
+
+export class GitKeizuView {
+  public static currentPanel: GitKeizuView | undefined;
 
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionPath: string;
@@ -48,10 +50,10 @@ export class GitGraphView {
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
 
-    if (GitGraphView.currentPanel) {
-      GitGraphView.currentPanel.panel.reveal(column);
+    if (GitKeizuView.currentPanel) {
+      GitKeizuView.currentPanel.panel.reveal(column);
       if (rootUri !== undefined) {
-        GitGraphView.currentPanel.selectRepoFromUri(rootUri, repoManager);
+        GitKeizuView.currentPanel.selectRepoFromUri(rootUri, repoManager);
       }
       return;
     }
@@ -73,7 +75,7 @@ export class GitGraphView {
       }
     );
 
-    GitGraphView.currentPanel = new GitGraphView(
+    GitKeizuView.currentPanel = new GitKeizuView(
       panel,
       extensionPath,
       dataSource,
@@ -507,7 +509,7 @@ export class GitGraphView {
   }
 
   public dispose() {
-    GitGraphView.currentPanel = undefined;
+    GitKeizuView.currentPanel = undefined;
     this.panel.dispose();
     this.avatarManager.deregisterView();
     this.repoFileWatcher.stop();
@@ -525,7 +527,7 @@ export class GitGraphView {
   private getHtmlForWebview() {
     const config = getConfig(),
       nonce = getNonce();
-    const viewState: GitGraphViewState = {
+    const viewState: GitKeizuViewState = {
       commitOrdering: config.commitOrdering(),
       dateFormat: config.dateFormat(),
       dialogDefaults: config.dialogDefaults(),
@@ -555,8 +557,8 @@ export class GitGraphView {
       colorVars = "",
       colorParams = "";
     for (let i = 0; i < viewState.graphColours.length; i++) {
-      colorVars += `--git-graph-color${i}:${viewState.graphColours[i]}; `;
-      colorParams += `[data-color="${i}"]{--git-graph-color:var(--git-graph-color${i});} `;
+      colorVars += `${CSS_COLOR_VAR_PREFIX}${i}:${viewState.graphColours[i]}; `;
+      colorParams += `[data-color="${i}"]{${CSS_COLOR_VAR_PREFIX}:var(${CSS_COLOR_VAR_PREFIX}${i});} `;
     }
     if (numRepos > 0) {
       body = `<body style="${colorVars}">
@@ -586,7 +588,7 @@ export class GitGraphView {
 			</body>`;
     } else {
       body = `<body class="unableToLoad" style="${colorVars}">
-			<h2>Unable to load Git Graph</h2>
+			<h2>Unable to load Git Keizu</h2>
 			<p>Either the current workspace does not contain a Git repository, or the Git executable could not be found.</p>
 			<p>If you are using a portable Git installation, make sure you have set the Visual Studio Code Setting "git.path" to the path of your portable installation (e.g. "C:\\Program Files\\Git\\bin\\git.exe" on Windows).</p>
 			</body>`;

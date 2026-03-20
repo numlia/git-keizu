@@ -10,7 +10,7 @@ import { showErrorDialog } from "./dialogs";
 import { generateGitFileTree } from "./fileTree";
 import { refreshGraphOrDisplayError } from "./utils";
 
-export interface GitGraphViewAPI {
+export interface GitKeizuViewAPI {
   hideCommitDetails(): void;
   showCommitDetails(commitDetails: GitCommitDetails, fileTree: GitFolder): void;
   showCompareResult(fileChanges: GitFileChange[], fromHash: string, toHash: string): void;
@@ -29,35 +29,35 @@ export interface GitGraphViewAPI {
   selectRepo(repo: string): void;
 }
 
-export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void {
+export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void {
   switch (msg.command) {
     case "addTag":
-      refreshOrError(gitGraph, msg.status, "Unable to Add Tag");
+      refreshOrError(gitKeizu, msg.status, "Unable to Add Tag");
       break;
     case "applyStash":
-      refreshOrError(gitGraph, msg.status, "Unable to Apply Stash");
+      refreshOrError(gitKeizu, msg.status, "Unable to Apply Stash");
       break;
     case "branchFromStash":
-      refreshOrError(gitGraph, msg.status, "Unable to Create Branch from Stash");
+      refreshOrError(gitKeizu, msg.status, "Unable to Create Branch from Stash");
       break;
     case "checkoutBranch":
-      refreshOrError(gitGraph, msg.status, "Unable to Checkout Branch");
+      refreshOrError(gitKeizu, msg.status, "Unable to Checkout Branch");
       break;
     case "checkoutCommit":
-      refreshOrError(gitGraph, msg.status, "Unable to Checkout Commit");
+      refreshOrError(gitKeizu, msg.status, "Unable to Checkout Commit");
       break;
     case "cherrypickCommit":
-      refreshOrError(gitGraph, msg.status, "Unable to Cherry Pick Commit");
+      refreshOrError(gitKeizu, msg.status, "Unable to Cherry Pick Commit");
       break;
     case "cleanUntrackedFiles":
-      refreshOrError(gitGraph, msg.status, "Unable to Clean Untracked Files");
+      refreshOrError(gitKeizu, msg.status, "Unable to Clean Untracked Files");
       break;
     case "commitDetails":
       if (msg.commitDetails === null) {
-        gitGraph.hideCommitDetails();
+        gitKeizu.hideCommitDetails();
         showErrorDialog("Unable to load commit details", null, null);
       } else {
-        gitGraph.showCommitDetails(
+        gitKeizu.showCommitDetails(
           msg.commitDetails,
           generateGitFileTree(msg.commitDetails.fileChanges)
         );
@@ -67,7 +67,7 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
       if (msg.fileChanges === null) {
         showErrorDialog("Unable to load commit comparison", null, null);
       } else {
-        gitGraph.showCompareResult(msg.fileChanges, msg.fromHash, msg.toHash);
+        gitKeizu.showCompareResult(msg.fileChanges, msg.fromHash, msg.toHash);
       }
       break;
     case "copyToClipboard":
@@ -75,34 +75,34 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
         showErrorDialog(`Unable to Copy ${msg.type} to Clipboard`, null, null);
       break;
     case "createBranch":
-      refreshOrError(gitGraph, msg.status, "Unable to Create Branch");
+      refreshOrError(gitKeizu, msg.status, "Unable to Create Branch");
       break;
     case "createWorktree":
-      refreshOrError(gitGraph, msg.status, "Unable to Create Worktree");
+      refreshOrError(gitKeizu, msg.status, "Unable to Create Worktree");
       break;
     case "deleteBranch":
-      refreshOrError(gitGraph, msg.status, "Unable to Delete Branch");
+      refreshOrError(gitKeizu, msg.status, "Unable to Delete Branch");
       break;
     case "deleteRemoteBranch":
-      refreshOrError(gitGraph, msg.status, "Unable to Delete Remote Branch");
+      refreshOrError(gitKeizu, msg.status, "Unable to Delete Remote Branch");
       break;
     case "deleteTag":
-      refreshOrError(gitGraph, msg.status, "Unable to Delete Tag");
+      refreshOrError(gitKeizu, msg.status, "Unable to Delete Tag");
       break;
     case "dropStash":
-      refreshOrError(gitGraph, msg.status, "Unable to Drop Stash");
+      refreshOrError(gitKeizu, msg.status, "Unable to Drop Stash");
       break;
     case "fetch":
-      refreshOrError(gitGraph, msg.status, "Unable to Fetch");
+      refreshOrError(gitKeizu, msg.status, "Unable to Fetch");
       break;
     case "fetchAvatar":
-      gitGraph.loadAvatar(msg.email, msg.image);
+      gitKeizu.loadAvatar(msg.email, msg.image);
       break;
     case "loadBranches":
-      gitGraph.loadBranches(msg.branches, msg.head, msg.hard, msg.isRepo);
+      gitKeizu.loadBranches(msg.branches, msg.head, msg.hard, msg.isRepo);
       break;
     case "loadCommits":
-      gitGraph.loadCommits(
+      gitKeizu.loadCommits(
         msg.commits,
         msg.head,
         msg.moreCommitsAvailable,
@@ -112,61 +112,61 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
       );
       break;
     case "loadRepos":
-      gitGraph.loadRepos(msg.repos, msg.lastActiveRepo);
+      gitKeizu.loadRepos(msg.repos, msg.lastActiveRepo);
       break;
     case "mergeBranch":
-      refreshOrError(gitGraph, msg.status, "Unable to Merge Branch");
+      refreshOrError(gitKeizu, msg.status, "Unable to Merge Branch");
       break;
     case "openTerminal":
       break;
     case "mergeCommit":
-      refreshOrError(gitGraph, msg.status, "Unable to Merge Commit");
+      refreshOrError(gitKeizu, msg.status, "Unable to Merge Commit");
       break;
     case "rebaseBranch":
-      refreshOrError(gitGraph, msg.status, "Unable to Rebase Branch");
+      refreshOrError(gitKeizu, msg.status, "Unable to Rebase Branch");
       break;
     case "popStash":
-      refreshOrError(gitGraph, msg.status, "Unable to Pop Stash");
+      refreshOrError(gitKeizu, msg.status, "Unable to Pop Stash");
       break;
     case "pull":
-      refreshOrError(gitGraph, msg.status, "Unable to Pull");
+      refreshOrError(gitKeizu, msg.status, "Unable to Pull");
       break;
     case "push":
-      refreshOrError(gitGraph, msg.status, "Unable to Push");
+      refreshOrError(gitKeizu, msg.status, "Unable to Push");
       break;
     case "pushStash":
-      refreshOrError(gitGraph, msg.status, "Unable to Stash Changes");
+      refreshOrError(gitKeizu, msg.status, "Unable to Stash Changes");
       break;
     case "pushTag":
-      refreshOrError(gitGraph, msg.status, "Unable to Push Tag");
+      refreshOrError(gitKeizu, msg.status, "Unable to Push Tag");
       break;
     case "removeWorktree":
       if (msg.status !== null) {
         showErrorDialog("Unable to Remove Worktree", msg.status, null);
       } else {
-        gitGraph.refresh(false);
+        gitKeizu.refresh(false);
         if (typeof msg.branchStatus === "string") {
           showErrorDialog("Unable to Delete Branch", msg.branchStatus, null);
         }
       }
       break;
     case "renameBranch":
-      refreshOrError(gitGraph, msg.status, "Unable to Rename Branch");
+      refreshOrError(gitKeizu, msg.status, "Unable to Rename Branch");
       break;
     case "refresh":
-      gitGraph.refresh(false);
+      gitKeizu.refresh(false);
       break;
     case "resetToCommit":
-      refreshOrError(gitGraph, msg.status, "Unable to Reset to Commit");
+      refreshOrError(gitKeizu, msg.status, "Unable to Reset to Commit");
       break;
     case "resetUncommitted":
-      refreshOrError(gitGraph, msg.status, "Unable to Reset Uncommitted Changes");
+      refreshOrError(gitKeizu, msg.status, "Unable to Reset Uncommitted Changes");
       break;
     case "revertCommit":
-      refreshOrError(gitGraph, msg.status, "Unable to Revert Commit");
+      refreshOrError(gitKeizu, msg.status, "Unable to Revert Commit");
       break;
     case "selectRepo":
-      gitGraph.selectRepo(msg.repo);
+      gitKeizu.selectRepo(msg.repo);
       break;
     case "viewDiff":
       if (msg.success === false) showErrorDialog("Unable to view diff of file", null, null);
@@ -174,6 +174,6 @@ export function handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): 
   }
 }
 
-function refreshOrError(gitGraph: GitGraphViewAPI, status: string | null, errorMessage: string) {
-  refreshGraphOrDisplayError(status, errorMessage, () => gitGraph.refresh(false), showErrorDialog);
+function refreshOrError(gitKeizu: GitKeizuViewAPI, status: string | null, errorMessage: string) {
+  refreshGraphOrDisplayError(status, errorMessage, () => gitKeizu.refresh(false), showErrorDialog);
 }

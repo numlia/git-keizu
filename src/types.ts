@@ -105,7 +105,7 @@ export interface DialogDefaults {
   };
 }
 
-export interface GitGraphViewState {
+export interface GitKeizuViewState {
   commitOrdering: CommitOrdering;
   dateFormat: DateFormat;
   dialogDefaults: DialogDefaults;

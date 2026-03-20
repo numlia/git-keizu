@@ -375,7 +375,7 @@ body.unableToLoad p {
 .commitHeadDot {
   width: 6px;
   height: 6px;
-  border: 2px solid var(--git-graph-color);
+  border: 2px solid var(--git-keizu-color);
   display: inline-block;
   border-radius: 6px;
   margin-right: 5px;
@@ -411,7 +411,7 @@ body.unableToLoad p {
 }
 .gitRef.active,
 .gitRef.stash {
-  border-color: var(--git-graph-color);
+  border-color: var(--git-keizu-color);
 }
 .gitRef.head {
   padding-right: 0;

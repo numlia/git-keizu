@@ -7,7 +7,7 @@ declare global {
     setState(state: WebViewState): void;
   };
 
-  var viewState: GG.GitGraphViewState;
+  var viewState: GG.GitKeizuViewState;
 
   interface Config {
     fetchAvatars: boolean;

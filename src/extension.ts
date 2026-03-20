@@ -4,7 +4,7 @@ import { AvatarManager } from "./avatarManager";
 import { DataSource } from "./dataSource";
 import { DiffDocProvider } from "./diffDocProvider";
 import { ExtensionState } from "./extensionState";
-import { GitGraphView } from "./gitGraphView";
+import { GitKeizuView } from "./gitGraphView";
 import { RepoManager } from "./repoManager";
 import { StatusBarItem } from "./statusBarItem";
 
@@ -30,7 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
           rootUri = candidate;
         }
       }
-      GitGraphView.createOrShow(
+      GitKeizuView.createOrShow(
         context.extensionPath,
         dataSource,
         extensionState,
