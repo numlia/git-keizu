@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.11] - 2026-03-20
+
+### Changed
+
+- **CSS variable prefix**: Graph colour custom properties have been renamed from `--git-graph-color*` to `--git-keizu-color*` to align with the extension's branding; if you have custom CSS referencing `--git-graph-color-N`, update it to `--git-keizu-color-N` — no backward-compatible fallback is provided
+- **Error screen wording**: The "unable to load repository" screen now reads "Unable to load Git Keizu" instead of "Unable to load Git Graph"
+
 ## [0.5.10] - 2026-03-18
 
 ### Added
@@ -241,7 +248,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.10...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.11...HEAD
+[0.5.11]: https://github.com/numlia/git-keizu/compare/v0.5.10...v0.5.11
 [0.5.10]: https://github.com/numlia/git-keizu/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/numlia/git-keizu/compare/v0.5.8...v0.5.9
 [0.5.8]: https://github.com/numlia/git-keizu/compare/v0.5.7...v0.5.8
