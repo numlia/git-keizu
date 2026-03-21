@@ -141,3 +141,73 @@
 | TC-039  | dialog.createWorktree.openTerminal=false  | Equivalence - normal (custom)        | createWorktree.openTerminal=false を返す | カスタム値               |
 | TC-040  | dialog.removeWorktree.deleteBranch 未指定 | Equivalence - normal (default)       | removeWorktree.deleteBranch=true を返す  | デフォルト値             |
 | TC-041  | dialog.removeWorktree.deleteBranch=false  | Equivalence - normal (custom)        | removeWorktree.deleteBranch=false を返す | カスタム値               |
+
+## S10: Config fallback defaults vs package.json — 単純値比較（24設定）
+
+> Origin: Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test)
+> Added: 2026-03-21
+
+**テスト対象パス**: `src/config.ts`（全 getter メソッド）
+**テストファイル**: `tests/src/config-defaults.test.ts`
+
+各 Config メソッドの fallback 値（モックが fallback を返す状態）が `package.json` の `contributes.configuration.properties` のデフォルト値と一致することを検証する。
+
+| Case ID | Input / Precondition                                              | Perspective (Equivalence / Boundary) | Expected Result                   | Notes            |
+| ------- | ----------------------------------------------------------------- | ------------------------------------ | --------------------------------- | ---------------- |
+| TC-042  | dateFormat fallback                                               | Equivalence - normal (cross-check)   | package.json default と一致       | string 型        |
+| TC-043  | dateType fallback                                                 | Equivalence - normal (cross-check)   | package.json default と一致       | string 型        |
+| TC-044  | fetchAvatars fallback                                             | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-045  | graphStyle fallback                                               | Equivalence - normal (cross-check)   | package.json default と一致       | string 型        |
+| TC-046  | initialLoadCommits fallback                                       | Equivalence - normal (cross-check)   | package.json default と一致       | number 型        |
+| TC-047  | loadMoreCommits fallback                                          | Equivalence - normal (cross-check)   | package.json default (100) と一致 | REQ-9.1 修正対象 |
+| TC-048  | loadMoreCommitsAutomatically fallback                             | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-049  | maxDepthOfRepoSearch fallback                                     | Equivalence - normal (cross-check)   | package.json default と一致       | number 型        |
+| TC-050  | showCurrentBranchByDefault fallback                               | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-051  | showStatusBarItem fallback                                        | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-052  | showUncommittedChanges fallback                                   | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-053  | tabIconColourTheme fallback                                       | Equivalence - normal (cross-check)   | package.json default と一致       | string 型        |
+| TC-054  | sourceCodeProviderIntegrationLocation fallback                    | Equivalence - normal (cross-check)   | package.json default と一致       | string 型        |
+| TC-055  | repository.commits.order fallback                                 | Equivalence - normal (cross-check)   | package.json default と一致       | string 型        |
+| TC-056  | repository.commits.mute.mergeCommits fallback                     | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-057  | repository.commits.mute.commitsThatAreNotAncestorsOfHead fallback | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-058  | dialog.merge.noFastForward fallback                               | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-059  | dialog.merge.squashCommits fallback                               | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-060  | dialog.merge.noCommit fallback                                    | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-061  | dialog.cherryPick.recordOrigin fallback                           | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-062  | dialog.cherryPick.noCommit fallback                               | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-063  | dialog.stashUncommittedChanges.includeUntracked fallback          | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-064  | dialog.createWorktree.openTerminal fallback                       | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+| TC-065  | dialog.removeWorktree.deleteBranch fallback                       | Equivalence - normal (cross-check)   | package.json default と一致       | boolean 型       |
+
+> **失敗系ケースについて**: 本テストは静的値の一致検証であり、入力バリエーションや分岐が存在しない。テスト自体が不一致検出メカニズムとして機能し、任意の fallback が package.json と異なればテストが失敗して対象キー名と値を報告する。このため、従来型の個別失敗系ケースは仕様上意味を持たず省略する。
+
+## S11: Config fallback defaults vs package.json — keybinding 変換後比較（4設定）
+
+> Origin: Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test)
+> Added: 2026-03-21
+
+**テスト対象パス**: `src/config.ts`（keyboardShortcut\* メソッド + parseKeybinding）
+**テストファイル**: `tests/src/config-defaults.test.ts`
+
+keybinding 設定は `parseKeybinding()` により変換されるため、package.json の `"CTRL/CMD + X"` から末尾文字の小文字が期待値となる。
+
+| Case ID | Input / Precondition                                    | Perspective (Equivalence / Boundary)           | Expected Result | Notes                  |
+| ------- | ------------------------------------------------------- | ---------------------------------------------- | --------------- | ---------------------- |
+| TC-066  | keyboardShortcutFind fallback ("CTRL/CMD + F")          | Equivalence - normal (cross-check + transform) | "f" を返す      | parseKeybinding 変換後 |
+| TC-067  | keyboardShortcutRefresh fallback ("CTRL/CMD + R")       | Equivalence - normal (cross-check + transform) | "r" を返す      | parseKeybinding 変換後 |
+| TC-068  | keyboardShortcutScrollToHead fallback ("CTRL/CMD + H")  | Equivalence - normal (cross-check + transform) | "h" を返す      | parseKeybinding 変換後 |
+| TC-069  | keyboardShortcutScrollToStash fallback ("CTRL/CMD + S") | Equivalence - normal (cross-check + transform) | "s" を返す      | parseKeybinding 変換後 |
+
+## S12: Config fallback defaults vs package.json — graphColours filter 後比較
+
+> Origin: Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test)
+> Added: 2026-03-21
+
+**テスト対象パス**: `src/config.ts`（graphColours メソッド）
+**テストファイル**: `tests/src/config-defaults.test.ts`
+
+`graphColours()` は fallback 配列に filter を適用する。package.json の12色はすべて有効な6桁HEXであるため、filter 後も同一配列となる。
+
+| Case ID | Input / Precondition              | Perspective (Equivalence / Boundary)        | Expected Result                                    | Notes                               |
+| ------- | --------------------------------- | ------------------------------------------- | -------------------------------------------------- | ----------------------------------- |
+| TC-070  | graphColours fallback（12色配列） | Equivalence - normal (cross-check + filter) | package.json default の12色配列と一致（deepEqual） | REQ-9.2 修正対象。filter は全色通過 |
