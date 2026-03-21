@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.12] - 2026-03-21
+
+### Fixed
+
+- **Config fallback values aligned with setting schema**: The `loadMoreCommits` fallback (used when VS Code cannot read the setting schema) has been corrected from 75 to 100, matching the documented default; the `graphColours` fallback palette has been expanded from 6 to 12 colours to match the full palette defined in the setting schema
+
 ## [0.5.11] - 2026-03-20
 
 ### Changed
@@ -248,7 +254,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.11...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.12...HEAD
+[0.5.12]: https://github.com/numlia/git-keizu/compare/v0.5.11...v0.5.12
 [0.5.11]: https://github.com/numlia/git-keizu/compare/v0.5.10...v0.5.11
 [0.5.10]: https://github.com/numlia/git-keizu/compare/v0.5.9...v0.5.10
 [0.5.9]: https://github.com/numlia/git-keizu/compare/v0.5.8...v0.5.9
