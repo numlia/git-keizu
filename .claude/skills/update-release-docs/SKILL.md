@@ -12,8 +12,8 @@ main ブランチとの差分と指定された要件ドキュメントを参照
 
 ## 前提条件
 
-- リポジトリルート: `/home/numlia/work/ai/git-keizu`
-- 最初の Bash tool call で必ず `cd /home/numlia/work/ai/git-keizu` を実行すること
+- リポジトリルート: `~/work/ai/git-keizu`
+- 最初の Bash tool call で必ず `cd ~/work/ai/git-keizu` を実行すること
 - 現在のブランチが機能ブランチ（main ではない）であること
 
 ## 引数（$ARGUMENTS）
@@ -55,7 +55,7 @@ main ブランチとの差分と指定された要件ドキュメントを参照
 ### Step 1: リポジトリルートへ移動
 
 ```bash
-cd /home/numlia/work/ai/git-keizu
+cd ~/work/ai/git-keizu
 ```
 
 ### Step 2: 情報収集（並列実行可）
