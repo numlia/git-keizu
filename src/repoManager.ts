@@ -332,3 +332,8 @@ async function doesPathExist(path: string): Promise<boolean> {
     return false;
   }
 }
+
+export const repoManagerTestInternals = {
+  doesPathExist,
+  isDirectory
+};

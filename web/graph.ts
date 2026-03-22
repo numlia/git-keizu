@@ -462,7 +462,7 @@ export class Graph {
   }
 
   public getMutedCommits(currentHash: string | null): boolean[] {
-    const muted = new Array<boolean>(this.commits.length).fill(false);
+    const muted = Array.from({ length: this.commits.length }, () => false);
     const muteConfig = this.config.mute;
 
     // Mute merge commits (excluding stash commits)
