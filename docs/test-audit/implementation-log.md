@@ -1,9 +1,9 @@
 # Test Implementation Log
 
-> Generated: 2026-03-22T20:15:09.325+09:00
-> Test Plans Processed: 6
-> Total Tests Generated: 292
-> Total Tests Passed: 292
+> Generated: 2026-03-23T00:27:09+09:00
+> Test Plans Processed: 15
+> Total Tests Generated: 312
+> Total Tests Passed: 312
 > Total Tests Failed: 0
 > Total Tests Skipped: 0
 
@@ -27,6 +27,7 @@
 | avatarManager-test.md | src/avatarManager.ts | tests/src/avatarManager.io.test.ts | 18 | 18 | 0 | 0 |
 | avatarManager-test.md | src/avatarManager.ts | tests/src/avatarManager.queue.test.ts | 18 | 18 | 0 | 0 |
 | statusBarItem-test.md | src/statusBarItem.ts | tests/src/statusBarItem.test.ts | 13 | 13 | 0 | 0 |
+| extension-test.md | src/extension.ts | tests/src/extension.test.ts | 20 | 20 | 0 | 0 |
 
 ## Details
 
@@ -436,6 +437,45 @@ N/A (targeted multi-file execution; coverage not collected)
 
 ```bash
 npx --yes pnpm@10.29.3 exec vitest run tests/src/avatarManager.public.test.ts
+```
+
+### カバレッジ
+
+N/A (targeted single-file execution; coverage not collected)
+
+### src/extension.ts
+
+**テストプラン**: `docs/testing/perspectives/src/extension-test.md`
+**ソースファイル**: `src/extension.ts`
+**テストファイル**: `tests/src/extension.test.ts`
+
+| Case ID | テスト名                                                                     | 結果 | リトライ数 | 備考                                                   |
+| ------- | ---------------------------------------------------------------------------- | ---- | ---------- | ------------------------------------------------------ |
+| TC-001  | initializes dependencies, registers disposables, and logs activation success | PASS | 0          | -                                                      |
+| TC-002  | rethrows output channel creation failures before dependency setup starts     | PASS | 0          | External - vscode.window.createOutputChannel failure   |
+| TC-003  | rethrows RepoManager constructor failures before disposables are registered  | PASS | 1          | External - RepoManager constructor failure             |
+| TC-004  | rethrows subscription push failures after all disposables are prepared       | PASS | 1          | External - ExtensionContext.subscriptions.push failure |
+| TC-005  | rethrows activation log failures after successful registration               | PASS | 1          | External - OutputChannel.appendLine failure            |
+| TC-006  | forwards a Uri argument as rootUri to GitKeizuView.createOrShow              | PASS | 0          | -                                                      |
+| TC-007  | forwards an object rootUri property when it contains a Uri instance          | PASS | 0          | -                                                      |
+| TC-008  | falls back to undefined when rootUri exists but is not a Uri instance        | PASS | 0          | Boundary - invalid rootUri shape                       |
+| TC-009  | falls back to undefined for nullish and primitive command arguments          | PASS | 0          | Boundary - nullish or primitive arg                    |
+| TC-010  | rethrows createOrShow failures from the view command handler                 | PASS | 0          | External - GitKeizuView.createOrShow failure           |
+| TC-011  | delegates to AvatarManager.clearCache exactly once                           | PASS | 0          | -                                                      |
+| TC-012  | rethrows AvatarManager.clearCache failures from the command handler          | PASS | 0          | External - AvatarManager.clearCache failure            |
+| TC-013  | refreshes the status bar item when showStatusBarItem changes                 | PASS | 0          | -                                                      |
+| TC-014  | regenerates git command formats when dateType changes                        | PASS | 0          | -                                                      |
+| TC-015  | notifies RepoManager when maxDepthOfRepoSearch changes                       | PASS | 0          | -                                                      |
+| TC-016  | registers the git path when git.path changes                                 | PASS | 0          | -                                                      |
+| TC-017  | performs no action when no watched setting changes                           | PASS | 0          | Equivalence - normal (no-op)                           |
+| TC-018  | gives priority to showStatusBarItem when multiple watched settings match     | PASS | 0          | Boundary - overlapping configuration matches           |
+| TC-019  | rethrows routed configuration handler failures                               | PASS | 0          | External - configuration handler failure               |
+| TC-020  | returns undefined and performs no additional work before or after activation | PASS | 0          | -                                                      |
+
+### テスト実行コマンド
+
+```bash
+npx --yes pnpm@10.29.3 exec vitest run tests/src/extension.test.ts
 ```
 
 ### カバレッジ
