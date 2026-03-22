@@ -20,7 +20,7 @@ project-specific examples and conventions based on the language and framework us
 
 ## 2. Assertion Accuracy Examples (BAD / GOOD)
 
-### 2.1 Do not type-convert before asserting (Strategy Rule Section 2.5)
+### 2.1 Do not type-convert before asserting (Strategy Rule Section 2.1)
 
 ```typescript
 // BAD: Converting with String() before comparison
@@ -40,7 +40,7 @@ expect(JSON.stringify(result)).toBe(JSON.stringify(expected));
 expect(result).toEqual(expected);
 ```
 
-### 2.2 Do not conflate empty/absent values (Strategy Rule Section 2.6)
+### 2.2 Do not conflate empty/absent values (Strategy Rule Section 2.1)
 
 TS/JS empty values: `undefined`, `null`, `""`, `0`, `false`, `[]` each have distinct semantics.
 
@@ -63,7 +63,7 @@ expect(result ?? undefined).toBeUndefined();
 expect(result).toBeNull();
 ```
 
-### 2.3 No redundant safe access after existence check (Strategy Rule Section 2.7)
+### 2.3 No redundant safe access after existence check (Strategy Rule Section 2.1)
 
 ```typescript
 // BAD: Using ?. right after confirming existence with expect
