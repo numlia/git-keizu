@@ -1,0 +1,193 @@
+# テスト観点表: src/repoFileWatcher.ts
+
+> Source: `src/repoFileWatcher.ts`
+> Generated: 2026-03-22T00:00:00+09:00
+> Language: TypeScript
+> Test Framework: Vitest
+
+## 1. ソース概要
+
+| 項目            | 値                                                                                     |
+| --------------- | -------------------------------------------------------------------------------------- |
+| ファイルパス    | `src/repoFileWatcher.ts`                                                               |
+| 主要な責務      | リポジトリ内のファイル変更を監視し、変更検知時にデバウンス付きでコールバックを呼び出す |
+| 関数/メソッド数 | 6 (constructor, start, stop, mute, unmute, refresh)                                    |
+| 総分岐数        | 6                                                                                      |
+| エラーパス数    | 0                                                                                      |
+| 外部依存数      | 3 (createFileSystemWatcher, onDid\* イベント登録, dispose)                             |
+
+## S1: constructor() コンストラクタ
+
+> Origin: test-plan (既存コード分析)
+> Added: 2026-03-22
+
+**シグネチャ**: `constructor(repoChangeCallback: () => void)`
+**テスト対象パス**: `src/repoFileWatcher.ts:16-18`
+
+| Case ID | Input / Precondition       | Perspective (Equivalence / Boundary) | Expected Result                                                                            | Notes |
+| ------- | -------------------------- | ------------------------------------ | ------------------------------------------------------------------------------------------ | ----- |
+| TC-001  | repoChangeCallback=vi.fn() | Equivalence - normal                 | RepoFileWatcherインスタンスが生成される。内部状態: fsWatcher=null, muted=false, resumeAt=0 | -     |
+
+## S2: start(repo) ファイル監視開始
+
+> Origin: test-plan (既存コード分析)
+> Added: 2026-03-22
+
+**シグネチャ**: `public start(repo: string)`
+**テスト対象パス**: `src/repoFileWatcher.ts:20-30`
+
+| Case ID | Input / Precondition                                | Perspective (Equivalence / Boundary) | Expected Result                                                                                                                    | Notes                     |
+| ------- | --------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| TC-002  | repo="/path/to/repo", fsWatcher=null (初回呼び出し) | Equivalence - normal                 | createFileSystemWatcher が `/path/to/repo/**` で1回呼ばれる。onDidCreate, onDidChange, onDidDelete の3イベントリスナーが登録される | L26-29                    |
+| TC-003  | repo="/new/repo", fsWatcher=既存 (再呼び出し)       | Equivalence - normal (branch)        | 既存watcherのdispose()が1回呼ばれた後、新しいwatcherが `/new/repo/**` で作成される                                                 | L21 true分岐              |
+| TC-004  | repo="" (空文字列)                                  | Boundary - empty                     | createFileSystemWatcher が `/**` で呼ばれる。予期しない監視範囲になる可能性                                                        | L26のテンプレートリテラル |
+| TC-005  | repo="/path/to/repo/" (末尾スラッシュ)              | Boundary - format                    | createFileSystemWatcher が `/path/to/repo//**` で呼ばれる。二重スラッシュを含むglob                                                | L26                       |
+
+## S3: stop() ファイル監視停止
+
+> Origin: test-plan (既存コード分析)
+> Added: 2026-03-22
+
+**シグネチャ**: `public stop()`
+**テスト対象パス**: `src/repoFileWatcher.ts:32-37`
+
+| Case ID | Input / Precondition             | Perspective (Equivalence / Boundary) | Expected Result                                                  | Notes         |
+| ------- | -------------------------------- | ------------------------------------ | ---------------------------------------------------------------- | ------------- |
+| TC-006  | fsWatcher=監視中のwatcher        | Equivalence - normal                 | fsWatcher.dispose()が1回呼ばれる。fsWatcherがnullに設定される    | L34-35        |
+| TC-007  | fsWatcher=null (未開始/停止済み) | Equivalence - abnormal               | 何も実行されない。エラーが発生しない                             | L33 false分岐 |
+| TC-008  | stop()を2回連続呼び出し          | Boundary - repeated call             | 1回目: dispose呼出+null設定。2回目: 何も実行されない。エラーなし | L33           |
+
+## S4: mute() ミュート設定
+
+> Origin: test-plan (既存コード分析)
+> Added: 2026-03-22
+
+**シグネチャ**: `public mute()`
+**テスト対象パス**: `src/repoFileWatcher.ts:39-41`
+
+| Case ID | Input / Precondition   | Perspective (Equivalence / Boundary) | Expected Result             | Notes |
+| ------- | ---------------------- | ------------------------------------ | --------------------------- | ----- |
+| TC-009  | 初期状態 (muted=false) | Equivalence - normal                 | mutedプロパティがtrueになる | L40   |
+
+## S5: unmute() ミュート解除
+
+> Origin: test-plan (既存コード分析)
+> Added: 2026-03-22
+
+**シグネチャ**: `public unmute()`
+**テスト対象パス**: `src/repoFileWatcher.ts:43-46`
+
+| Case ID | Input / Precondition             | Perspective (Equivalence / Boundary) | Expected Result                                                   | Notes                         |
+| ------- | -------------------------------- | ------------------------------------ | ----------------------------------------------------------------- | ----------------------------- |
+| TC-010  | mute()呼び出し後                 | Equivalence - normal                 | mutedがfalseになる。resumeAtが現在時刻+1500ms付近の値に設定される | L44-45                        |
+| TC-011  | unmute()呼び出し時のresumeAt精度 | Boundary - timing                    | resumeAtの値がDate.now()+1500の±50ms以内である                    | L45: 1500ms猶予期間の精度検証 |
+
+## S6: refresh(uri) ミュート/猶予期間ガード
+
+> Origin: test-plan (既存コード分析)
+> Added: 2026-03-22
+
+**シグネチャ**: `private async refresh(uri: vscode.Uri)`
+**テスト対象パス**: `src/repoFileWatcher.ts:48-58`
+
+| Case ID | Input / Precondition                                         | Perspective (Equivalence / Boundary) | Expected Result                                                                        | Notes             |
+| ------- | ------------------------------------------------------------ | ------------------------------------ | -------------------------------------------------------------------------------------- | ----------------- |
+| TC-012  | muted=true, uri=マッチする有効なパス                         | Equivalence - abnormal               | 早期リターン。repoChangeCallbackが呼ばれない                                           | L49               |
+| TC-013  | muted=false, 現在時刻 < resumeAt (猶予期間内)                | Equivalence - abnormal               | 早期リターン。repoChangeCallbackが呼ばれない                                           | L51               |
+| TC-014  | muted=false, 現在時刻 == resumeAt (境界値ちょうど)           | Boundary - exact                     | 早期リターンしない。`<` は厳密比較のため等値は通過し、コールバックがスケジュールされる | L51: `<` not `<=` |
+| TC-015  | muted=false, 現在時刻 > resumeAt (猶予期間後), マッチするURI | Equivalence - normal                 | 猶予期間チェックを通過し、コールバックがスケジュールされる                             | L51通過           |
+
+## S7: refresh(uri) fileChangeRegexフィルタ
+
+> Origin: test-plan (既存コード分析)
+> Added: 2026-03-22
+
+**テスト対象パス**: `src/repoFileWatcher.ts:50` (regex: L5-6)
+
+fileChangeRegex は3パターンのOR:
+
+1. `.git/` 配下の特定ファイル (config, index, HEAD, refs/stash, refs/heads/\*, refs/remotes/\*, refs/tags/\*)
+2. `.git` で始まらない全ファイル
+3. `.git` + 非スラッシュ文字のファイル (.gitignore等)
+
+| Case ID | Input / Precondition                                         | Perspective (Equivalence / Boundary) | Expected Result                                                                                                         | Notes                       |
+| ------- | ------------------------------------------------------------ | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| TC-016  | uri path=".git/config" (replace後)                           | Equivalence - normal                 | パターン1にマッチ。コールバックがスケジュールされる                                                                     | Git設定ファイル             |
+| TC-017  | uri path=".git/refs/heads/main" (replace後)                  | Equivalence - normal                 | パターン1にマッチ。コールバックがスケジュールされる                                                                     | ブランチ参照                |
+| TC-018  | uri path="src/index.ts" (replace後)                          | Equivalence - normal                 | パターン2にマッチ。コールバックがスケジュールされる                                                                     | 一般ソースファイル          |
+| TC-019  | uri path=".gitignore" (replace後)                            | Equivalence - normal                 | パターン3にマッチ。コールバックがスケジュールされる                                                                     | .gitドットファイル          |
+| TC-020  | uri path=".git/objects/ab/cd1234" (replace後)                | Equivalence - abnormal               | どのパターンにもマッチしない。早期リターン                                                                              | L50: Gitオブジェクト        |
+| TC-021  | uri path=".git/hooks/pre-commit" (replace後)                 | Equivalence - abnormal               | どのパターンにもマッチしない。早期リターン                                                                              | L50: Gitフック              |
+| TC-022  | uri path=".git/logs/HEAD" (replace後)                        | Equivalence - abnormal               | どのパターンにもマッチしない。早期リターン                                                                              | L50: Gitログ                |
+| TC-023  | uri path=".git/COMMIT_EDITMSG" (replace後)                   | Equivalence - abnormal               | どのパターンにもマッチしない。早期リターン                                                                              | L50: コミットメッセージ編集 |
+| TC-024  | uri path=".git/" (ディレクトリのみ)                          | Boundary - edge                      | パターン1: config等に不一致。パターン2: `.git`で始まるため不一致。パターン3: スラッシュ含むため不一致。早期リターン     | 3パターンすべて不一致       |
+| TC-025  | uri path=".git" (スラッシュなし)                             | Boundary - edge                      | パターン1: スラッシュ不足で不一致。パターン2: `.git`で始まるため不一致。パターン3: `[^/]+`が0文字で不一致。早期リターン | `.git`ちょうどの境界        |
+| TC-026  | uri path="" (repoプレフィックス除去後に空文字)               | Boundary - empty                     | パターン2 `^(?!\.git).*$` にマッチ（空文字は`.git`で始まらない）。コールバックがスケジュールされる                      | L50: replace結果が空の場合  |
+| TC-027  | uri path=".git/refs/heads/" (末尾スラッシュ、ブランチ名なし) | Boundary - format                    | パターン1の `refs\/heads\/.*` にマッチ（`.*`は空文字列も許容）。コールバックがスケジュールされる                        | L5: `.*`の空マッチ          |
+
+## S8: refresh(uri) デバウンス動作
+
+> Origin: test-plan (既存コード分析)
+> Added: 2026-03-22
+
+**テスト対象パス**: `src/repoFileWatcher.ts:53-58`
+
+| Case ID | Input / Precondition                    | Perspective (Equivalence / Boundary) | Expected Result                                                                     | Notes              |
+| ------- | --------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------- | ------------------ |
+| TC-028  | マッチするURI1回、refreshTimeout=null   | Equivalence - normal                 | setTimeout(750ms)でrepoChangeCallbackがスケジュールされる。clearTimeoutは呼ばれない | L53 false → L56-58 |
+| TC-029  | 500ms以内に3回連続でマッチするURIの変更 | Equivalence - normal                 | clearTimeoutが2回呼ばれる。750ms後に最後の1回分のrepoChangeCallbackのみ実行される   | L53-54でデバウンス |
+| TC-030  | refreshTimeout=null (初回)              | Equivalence - normal                 | clearTimeoutが呼ばれない。setTimeoutのみ呼ばれる                                    | L53 false分岐      |
+| TC-031  | refreshTimeout=既存タイムアウトあり     | Equivalence - normal                 | clearTimeout(既存ID)が1回呼ばれた後、新しいsetTimeoutが設定される                   | L53 true → L54     |
+
+## 3. テストケースサマリー
+
+| カテゴリ (Perspective列で分類)   | ケース数 |
+| -------------------------------- | -------- |
+| 正常系（Equivalence - normal）   | 15       |
+| 異常系（Equivalence - abnormal） | 7        |
+| 境界値（Boundary - ...）         | 9        |
+| 型・形式（Type - ...）           | 0        |
+| 外部依存（External - ...）       | 0        |
+| **合計**                         | **31**   |
+
+### 失敗系/正常系比率チェック
+
+| 項目                                        | 値                   |
+| ------------------------------------------- | -------------------- |
+| 正常系（Perspective: Equivalence - normal） | 15件                 |
+| 失敗系（Perspective: 上記以外すべて）       | 16件                 |
+| 比率                                        | 16/15 = 1.07         |
+| 判定                                        | OK: 失敗系 >= 正常系 |
+
+## 4. 外部依存とモック方針
+
+| 外部依存                                      | 種別               | モック方針                                                                                   | 関連ケース                     |
+| --------------------------------------------- | ------------------ | -------------------------------------------------------------------------------------------- | ------------------------------ |
+| vscode.workspace.createFileSystemWatcher      | VS Code API        | vi.fn()で戻り値にonDidCreate/onDidChange/onDidDelete/disposeのモックを持つオブジェクトを返す | TC-002, TC-003, TC-004, TC-005 |
+| fsWatcher.onDidCreate/onDidChange/onDidDelete | VS Code API        | コールバック登録をキャプチャし、テストからイベントを発火できるようにする                     | TC-012〜TC-031                 |
+| fsWatcher.dispose()                           | VS Code API        | vi.fn()でモック                                                                              | TC-003, TC-006, TC-007, TC-008 |
+| getPathFromUri                                | 内部ユーティリティ | vi.mock("./utils")でモック。URIからパス文字列を返すように設定                                | TC-016〜TC-027                 |
+| Date (現在時刻)                               | 組み込み           | vi.useFakeTimers()で時刻制御                                                                 | TC-011, TC-013, TC-014, TC-015 |
+| setTimeout/clearTimeout                       | 組み込み           | vi.useFakeTimers()でタイマー制御                                                             | TC-028〜TC-031                 |
+
+## 5. 既存テストとのギャップ
+
+既存テスト分析はスキップ
+
+## 6. 網羅性検証
+
+| 検証項目             | 結果                                    |
+| -------------------- | --------------------------------------- |
+| 関数カバレッジ       | 6/6 関数 (100%)                         |
+| 分岐カバレッジ       | 12/12 分岐 (100%) — 6分岐 x true/false  |
+| エラーパスカバレッジ | 0/0 パス (N/A) — エラーハンドリングなし |
+| 境界値カバレッジ     | 9/9 候補 (100%)                         |
+| 失敗系/正常系比率    | 16/15 OK                                |
+
+## 7. Next Step
+
+テストコード生成:
+
+```
+/test-gen docs/testing/perspectives/src/repoFileWatcher-test.md
+```
