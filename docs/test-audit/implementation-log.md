@@ -1,9 +1,9 @@
 # Test Implementation Log
 
-> Generated: 2026-03-22T18:25:37.114+09:00
-> Test Plans Processed: 5
-> Total Tests Generated: 279
-> Total Tests Passed: 279
+> Generated: 2026-03-22T20:15:09.325+09:00
+> Test Plans Processed: 6
+> Total Tests Generated: 292
+> Total Tests Passed: 292
 > Total Tests Failed: 0
 > Total Tests Skipped: 0
 
@@ -26,6 +26,7 @@
 | avatarManager-test.md | src/avatarManager.ts | tests/src/avatarManager.remoteFetch.test.ts | 21 | 21 | 0 | 0 |
 | avatarManager-test.md | src/avatarManager.ts | tests/src/avatarManager.io.test.ts | 18 | 18 | 0 | 0 |
 | avatarManager-test.md | src/avatarManager.ts | tests/src/avatarManager.queue.test.ts | 18 | 18 | 0 | 0 |
+| statusBarItem-test.md | src/statusBarItem.ts | tests/src/statusBarItem.test.ts | 13 | 13 | 0 | 0 |
 
 ## Details
 
@@ -435,6 +436,38 @@ N/A (targeted multi-file execution; coverage not collected)
 
 ```bash
 npx --yes pnpm@10.29.3 exec vitest run tests/src/avatarManager.public.test.ts
+```
+
+### カバレッジ
+
+N/A (targeted single-file execution; coverage not collected)
+
+### src/statusBarItem.ts
+
+**テストプラン**: `docs/testing/perspectives/src/statusBarItem-test.md`
+**ソースファイル**: `src/statusBarItem.ts`
+**テストファイル**: `tests/src/statusBarItem.test.ts`
+
+| Case ID | テスト名                                                             | 結果 | リトライ数 | 備考 |
+| ------- | -------------------------------------------------------------------- | ---- | ---------- | ---- |
+| TC-001  | creates and registers the status bar item with the expected metadata | PASS | 0          | -    |
+| TC-002  | rethrows createStatusBarItem failures without registering the item   | PASS | 0          | -    |
+| TC-003  | rethrows subscription push failures after configuring the item       | PASS | 0          | -    |
+| TC-004  | stores a positive repo count and refreshes once                      | PASS | 0          | -    |
+| TC-005  | stores zero repos and refreshes once                                 | PASS | 0          | -    |
+| TC-006  | stores a negative repo count and refreshes once                      | PASS | 0          | -    |
+| TC-007  | shows the item when config is enabled and repos are present          | PASS | 0          | -    |
+| TC-008  | hides the item when repo count is zero                               | PASS | 0          | -    |
+| TC-009  | hides the item when config disables it even with repos present       | PASS | 0          | -    |
+| TC-010  | hides the item when repo count is negative                           | PASS | 0          | -    |
+| TC-011  | rethrows config read failures before showing or hiding               | PASS | 0          | -    |
+| TC-012  | rethrows show failures in the visible branch                         | PASS | 0          | -    |
+| TC-013  | rethrows hide failures in the hidden branch                          | PASS | 0          | -    |
+
+### テスト実行コマンド
+
+```bash
+npx --yes pnpm@10.29.3 exec vitest run tests/src/statusBarItem.test.ts
 ```
 
 ### カバレッジ
