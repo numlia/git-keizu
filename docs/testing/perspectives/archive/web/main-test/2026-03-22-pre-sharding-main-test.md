@@ -1,9 +1,16 @@
 # テスト観点表: web/main.ts
 
+> Source: `web/main.ts`
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
+
 ## S1: スタッシュ行描画（行構成・ラベル）
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 3.4
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -19,6 +26,8 @@
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 4.4
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -40,6 +49,8 @@
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 5.4
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -60,6 +71,8 @@
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 6.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -73,6 +86,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 4.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -98,6 +113,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 4.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -113,6 +130,8 @@
 
 > Origin: Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)
 > Added: 2026-02-26
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private calculateCdvHeight(): number`
 **テスト対象パス**: `web/main.ts`
@@ -131,6 +150,8 @@
 
 > Origin: Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)
 > Added: 2026-02-26
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -146,6 +167,8 @@
 
 > Origin: Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)
 > Added: 2026-02-26
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private updateCommitDetailsHeight(): void`
 **テスト対象パス**: `web/main.ts`
@@ -160,6 +183,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `handleKeyboardShortcut(e: KeyboardEvent): void`
 **テスト対象パス**: `web/main.ts`
@@ -181,6 +206,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `scrollToStash(forward: boolean): void`
 **テスト対象パス**: `web/main.ts`
@@ -200,6 +227,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `handleEscape(): void`
 **テスト対象パス**: `web/main.ts`
@@ -220,6 +249,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -237,6 +268,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `selectRepo(repo: string): void`
 **テスト対象パス**: `web/main.ts`
@@ -250,6 +283,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -266,6 +301,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -281,6 +318,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -294,6 +333,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -307,6 +348,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -322,6 +365,8 @@
 
 > Origin: Feature 010 (mute-branch-label-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-05
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private renderTable(): void`
 **テスト対象パス**: `web/main.ts:610`
@@ -339,6 +384,8 @@
 
 > Origin: Feature 011 (author-filter-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-05
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `public loadCommits(commits, commitHead, moreAvailable, hard, authors?)`
 **テスト対象パス**: `web/main.ts`
@@ -355,6 +402,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -370,6 +419,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -386,6 +437,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -402,6 +455,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -416,6 +471,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -429,6 +486,8 @@
 
 > Origin: Feature 013 (scroll-position-restore) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private saveState(): void`
 **テスト対象パス**: `web/main.ts:526-542`
@@ -442,6 +501,8 @@
 
 > Origin: Feature 013 (scroll-position-restore) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts:222-260`
 
@@ -456,6 +517,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -470,6 +533,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -484,6 +549,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -497,6 +564,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -512,6 +581,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -526,6 +597,8 @@
 
 > Origin: Feature 015 (commit-sort-order) (aidd-spec-tasks-test)
 > Added: 2026-03-10
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 
@@ -546,6 +619,8 @@
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
 

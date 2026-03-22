@@ -1,12 +1,16 @@
 # テスト観点表: src/worktree.ts
 
 > Source: `src/worktree.ts`
-> Generated: 2026-03-12T22:00:00+09:00
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
 
 ## S1: parseWorktreeList() porcelain 出力パース
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `parseWorktreeList(stdout: string): WorktreeMap`
 **テスト対象パス**: `src/worktree.ts`

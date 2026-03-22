@@ -1,9 +1,16 @@
 # テスト観点表: web/graph.ts
 
+> Source: `web/graph.ts`
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
+
 ## S1: スタッシュコミットの頂点描画
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 3.4
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/graph.ts`
 
@@ -16,6 +23,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `constructor(id: number)`
 **テスト対象パス**: `web/graph.ts`
@@ -30,6 +39,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `addChild(vertex: Vertex): void`
 **テスト対象パス**: `web/graph.ts`
@@ -44,6 +55,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `getParents(): Vertex[]`
 **テスト対象パス**: `web/graph.ts`
@@ -58,6 +71,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/graph.ts`
 
@@ -70,6 +85,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `isMerge(): boolean`
 **テスト対象パス**: `web/graph.ts`
@@ -85,6 +102,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `loadCommits(commits: GitCommitNode[], commitHead: string | null, commitLookup: { [hash: string]: number }): void`
 **テスト対象パス**: `web/graph.ts`
@@ -101,6 +120,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/graph.ts`
 
@@ -114,6 +135,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `addLine(p1: Point, p2: Point, isCommitted: boolean, lockedFirst: boolean): void`
 **テスト対象パス**: `web/graph.ts`
@@ -128,6 +151,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `getMutedCommits(currentHash: string | null): boolean[]`
 **テスト対象パス**: `web/graph.ts`
@@ -143,6 +168,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/graph.ts`
 
@@ -158,6 +185,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/graph.ts`
 
@@ -172,6 +201,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `getChildren(): Vertex[]`
 **テスト対象パス**: `web/graph.ts`
@@ -186,6 +217,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `getFirstParentIndex(i: number): number`
 **テスト対象パス**: `web/graph.ts`
@@ -201,6 +234,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `getFirstChildIndex(i: number): number`
 **テスト対象パス**: `web/graph.ts`
@@ -216,6 +251,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `getAlternativeParentIndex(i: number): number`
 **テスト対象パス**: `web/graph.ts`
@@ -230,6 +267,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `getAlternativeChildIndex(i: number): number`
 **テスト対象パス**: `web/graph.ts`

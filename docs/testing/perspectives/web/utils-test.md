@@ -1,9 +1,16 @@
 # テスト観点表: web/utils.ts
 
+> Source: `web/utils.ts`
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
+
 ## S1: svgIcons SVGアイコン検証
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 1.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/utils.ts`
 
@@ -16,6 +23,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `buildCommitRowAttributes(hash: string, stash: GG.GitCommitStash | null, muted: boolean): string`
 **テスト対象パス**: `web/utils.ts`
@@ -32,6 +41,8 @@
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/utils.ts`
 

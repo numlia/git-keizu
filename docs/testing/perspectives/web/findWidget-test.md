@@ -1,9 +1,16 @@
 # テスト観点表: web/findWidget.ts
 
+> Source: `web/findWidget.ts`
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
+
 ## S1: FindWidget DOM生成・表示管理
 
 > Origin: Feature 002 (menubar-search-diff) Task 3.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/findWidget.ts`
 
@@ -19,6 +26,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 3.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/findWidget.ts`
 
@@ -32,6 +41,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 3.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/findWidget.ts`
 
@@ -50,6 +61,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 3.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/findWidget.ts`
 
@@ -66,6 +79,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 3.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/findWidget.ts`
 
@@ -81,6 +96,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 3.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/findWidget.ts`
 
@@ -94,6 +111,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 3.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/findWidget.ts`
 

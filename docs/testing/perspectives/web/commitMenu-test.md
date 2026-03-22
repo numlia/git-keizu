@@ -1,12 +1,16 @@
 # テスト観点表: web/commitMenu.ts
 
 > Source: `web/commitMenu.ts`
-> Generated: 2026-03-07T00:00:00+09:00
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
 
 ## S1: Create Branch ダイアログ（checkout チェックボックス付き）
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/commitMenu.ts:59-75`
 
@@ -23,6 +27,8 @@
 
 > Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
 > Added: 2026-03-09
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/commitMenu.ts:184-210`
 
@@ -42,6 +48,8 @@
 
 > Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
 > Added: 2026-03-09
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/commitMenu.ts:98-140`
 
@@ -58,6 +66,8 @@
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/commitMenu.ts`
 

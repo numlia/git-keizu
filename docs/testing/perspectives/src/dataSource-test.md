@@ -1,9 +1,16 @@
 # テスト観点表: src/dataSource.ts
 
+> Source: `src/dataSource.ts`
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
+
 ## S1: getStashes() スタッシュデータ取得
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 3.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `getStashes(repo: string): Promise<GitStash[]>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -21,6 +28,8 @@
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 3.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/dataSource.ts`
 
@@ -37,6 +46,8 @@
 
 > Origin: test-plan (既存テスト)
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/dataSource.ts`
 
@@ -55,6 +66,8 @@
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 4.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/dataSource.ts`
 
@@ -73,6 +86,8 @@
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 5.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/dataSource.ts`
 
@@ -96,6 +111,8 @@
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 4.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `fetch(repo: string): Promise<GitCommandStatus>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -111,6 +128,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 2.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `getCommitComparison(repo: string, fromHash: string, toHash: string): Promise<GitFileChange[] | null>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -137,6 +156,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 2.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `getUncommittedDetails(repo: string): Promise<GitCommitDetails | null>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -155,6 +176,8 @@
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 2.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `checkoutBranch(repo: string, branchName: string, remoteBranch: string | null): Promise<GitCommandStatus>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -169,6 +192,8 @@
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 3.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/dataSource.ts`
 
@@ -186,6 +211,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `deleteRemoteBranch(repo: string, remoteName: string, branchName: string): Promise<GitCommandStatus>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -200,6 +227,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `rebaseBranch(repo: string, branchName: string): Promise<GitCommandStatus>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -214,6 +243,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/dataSource.ts`
 
@@ -228,6 +259,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/dataSource.ts`
 
@@ -241,6 +274,8 @@
 
 > Origin: Feature 011 (author-filter-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-05
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `getAuthors(repo: string): Promise<string[]>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -259,6 +294,8 @@
 
 > Origin: Feature 011 (author-filter-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-05
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/dataSource.ts`
 
@@ -271,6 +308,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private getGitLog(repo: string, branches: string[], num: number, showRemoteBranches: boolean, authors: string[])`
 **テスト対象パス**: `src/dataSource.ts:753-758`
@@ -288,6 +327,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private getGitLog(repo: string, branches: string[], num: number, showRemoteBranches: boolean, authors: string[])`
 **テスト対象パス**: `src/dataSource.ts:753-758`
@@ -303,6 +344,8 @@
 
 > Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
 > Added: 2026-03-09
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `mergeBranch(repo: string, branchName: string, createNewCommit: boolean, squash: boolean, noCommit: boolean): Promise<GitCommandStatus>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -323,6 +366,8 @@
 
 > Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
 > Added: 2026-03-09
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `cherrypickCommit(repo: string, commitHash: string, parentIndex: number, recordOrigin: boolean, noCommit: boolean): Promise<GitCommandStatus>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -341,6 +386,8 @@
 
 > Origin: Feature 015 (commit-sort-order) (aidd-spec-tasks-test)
 > Added: 2026-03-10
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private getGitLog(repo: string, branches: string[], num: number, showRemoteBranches: boolean, authors: string[], commitOrdering: CommitOrdering)`
 **テスト対象パス**: `src/dataSource.ts`
@@ -358,6 +405,8 @@
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `getWorktrees(repo: string): Promise<WorktreeMap>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -372,6 +421,8 @@
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `addWorktree(repo: string, path: string, branchName: string, commitHash?: string): Promise<GitCommandStatus>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -388,6 +439,8 @@
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `removeWorktree(repo: string, worktreePath: string): Promise<GitCommandStatus>`
 **テスト対象パス**: `src/dataSource.ts`

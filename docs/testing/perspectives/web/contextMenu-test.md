@@ -1,9 +1,16 @@
 # テスト観点表: web/contextMenu.ts
 
+> Source: `web/contextMenu.ts`
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
+
 ## S1: showContextMenu() 位置計算ロジック
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 1.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `showContextMenu(e: MouseEvent, items: ContextMenuElement[], sourceElem: HTMLElement): void`
 **テスト対象パス**: `web/contextMenu.ts`

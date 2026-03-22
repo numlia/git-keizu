@@ -1,9 +1,16 @@
 # テスト観点表: web/messageHandler.ts
 
+> Source: `web/messageHandler.ts`
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
+
 ## S1: handleMessage() pull/pushレスポンス処理
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 3.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
 **テスト対象パス**: `web/messageHandler.ts`
@@ -19,6 +26,8 @@
 
 > Origin: Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)
 > Added: 2026-02-26
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `refreshOrError(gitGraph: GitGraphViewAPI, status: string | null, errorMessage: string): void`
 **テスト対象パス**: `web/messageHandler.ts:142-144`
@@ -32,6 +41,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
 **テスト対象パス**: `web/messageHandler.ts`
@@ -45,6 +56,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
 **テスト対象パス**: `web/messageHandler.ts`
@@ -60,6 +73,8 @@
 
 > Origin: Feature 011 (author-filter-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-05
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
 **テスト対象パス**: `web/messageHandler.ts`
@@ -73,6 +88,8 @@
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
 **テスト対象パス**: `web/messageHandler.ts`
@@ -89,6 +106,8 @@
 
 > Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-15
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
 **テスト対象パス**: `web/messageHandler.ts`

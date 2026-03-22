@@ -1,25 +1,16 @@
 # テスト観点表: src/avatarManager.ts
 
 > Source: `src/avatarManager.ts`
-> Generated: 2026-03-22T08:43:54.937Z
+> Generated: 2026-03-22T13:23:24Z
 > Language: TypeScript
 > Test Framework: Vitest 4.x
-
-## 1. ソース概要
-
-| 項目            | 値                                                                                                                   |
-| --------------- | -------------------------------------------------------------------------------------------------------------------- |
-| ファイルパス    | `src/avatarManager.ts`                                                                                               |
-| 主要な責務      | GitHub / GitLab / Gravatar からアバターを取得し、キャッシュ・ローカル保存・Webview通知・取得リトライキュー制御を担う |
-| 関数/メソッド数 | 20 (AvatarManager: 14, AvatarRequestQueue: 6)                                                                        |
-| 総分岐数        | 43                                                                                                                   |
-| エラーパス数    | 15                                                                                                                   |
-| 外部依存数      | 14 (DataSource: 1, ExtensionState: 5, GitKeizuView: 1, HTTP/API: 3, File I/O: 2, Timers: 2)                          |
 
 ## S1: constructor 初期化とキュー開始フック
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `constructor(dataSource: DataSource, extensionState: ExtensionState)`
 **テスト対象パス**: `src/avatarManager.ts:34-47`
@@ -34,6 +25,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `public fetchAvatarImage(email: string, repo: string, commits: string[])`
 **テスト対象パス**: `src/avatarManager.ts:49-72`
@@ -51,6 +44,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `public registerView(view: GitKeizuView)`
 **テスト対象パス**: `src/avatarManager.ts:74-76`
@@ -63,6 +58,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `public deregisterView()`
 **テスト対象パス**: `src/avatarManager.ts:78-80`
@@ -75,6 +72,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `public removeAvatarFromCache(email: string)`
 **テスト対象パス**: `src/avatarManager.ts:82-85`
@@ -87,6 +86,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `public clearCache()`
 **テスト対象パス**: `src/avatarManager.ts:87-90`
@@ -99,6 +100,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private async fetchAvatarsInterval()`
 **テスト対象パス**: `src/avatarManager.ts:92-113`
@@ -116,6 +119,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private async getRemoteSource(avatarRequest: AvatarRequestItem)`
 **テスト対象パス**: `src/avatarManager.ts:115-143`
@@ -133,6 +138,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private fetchFromGithub(avatarRequest: AvatarRequestItem, owner: string, repo: string)`
 **テスト対象パス**: `src/avatarManager.ts:145-217`
@@ -155,6 +162,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private fetchFromGitLab(avatarRequest: AvatarRequestItem)`
 **テスト対象パス**: `src/avatarManager.ts:219-276`
@@ -173,6 +182,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private async fetchFromGravatar(avatarRequest: AvatarRequestItem)`
 **テスト対象パス**: `src/avatarManager.ts:278-293`
@@ -187,6 +198,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private async downloadAvatarImage(email: string, imageUrl: string): Promise<string | null>`
 **テスト対象パス**: `src/avatarManager.ts:295-355`
@@ -207,6 +220,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private saveAvatar(email: string, image: string, identicon: boolean)`
 **テスト対象パス**: `src/avatarManager.ts:357-369`
@@ -222,6 +237,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private async sendAvatarToWebView(email: string, onError: () => void)`
 **テスト対象パス**: `src/avatarManager.ts:371-388`
@@ -238,6 +255,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `constructor(itemsAvailableCallback: () => void)`
 **テスト対象パス**: `src/avatarManager.ts:396-398`
@@ -250,6 +269,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `public add(email: string, repo: string, commits: string[], immediate: boolean)`
 **テスト対象パス**: `src/avatarManager.ts:401-423`
@@ -266,6 +287,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `public addItem(item: AvatarRequestItem, checkAfter: number, failedAttempt: boolean)`
 **テスト対象パス**: `src/avatarManager.ts:426-430`
@@ -279,6 +302,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `public hasItems()`
 **テスト対象パス**: `src/avatarManager.ts:433-435`
@@ -292,6 +317,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `public takeItem()`
 **テスト対象パス**: `src/avatarManager.ts:438-442`
@@ -307,6 +334,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private insertItem(item: AvatarRequestItem)`
 **テスト対象パス**: `src/avatarManager.ts:445-457`
@@ -317,60 +346,3 @@
 | TC-080  | `checkAfter` がばらばらの項目を順に挿入  | Equivalence - normal                 | バイナリ挿入により `queue` が `checkAfter` 昇順で保持される                     | L446-455 |
 | TC-081  | 既存項目と同じ `checkAfter` の項目を挿入 | Boundary - equal                     | `<=` 比較により既存同値項目の後ろへ挿入される                                   | L452     |
 | TC-082  | 挿入前キュー長 > 0                       | Equivalence - abnormal               | `itemsAvailableCallback()` は呼ばれない                                         | L456     |
-
-## 3. テストケースサマリー
-
-| カテゴリ (Perspective列で分類)   | ケース数 |
-| -------------------------------- | -------- |
-| 正常系（Equivalence - normal）   | 37       |
-| 異常系（Equivalence - abnormal） | 21       |
-| 境界値（Boundary - ...）         | 10       |
-| 型・形式（Type - ...）           | 0        |
-| 外部依存（External - ...）       | 14       |
-| **合計**                         | **82**   |
-
-### 失敗系/正常系比率チェック
-
-| 項目                                        | 値                   |
-| ------------------------------------------- | -------------------- |
-| 正常系（Perspective: Equivalence - normal） | 37件                 |
-| 失敗系（Perspective: 上記以外すべて）       | 45件                 |
-| 比率                                        | 45/37 = 1.22         |
-| 判定                                        | OK: 失敗系 >= 正常系 |
-
-## 4. 外部依存とモック方針
-
-| 外部依存                                                                                                               | 種別                | モック方針                                                                                          | 関連ケース                                             |
-| ---------------------------------------------------------------------------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------ |
-| `ExtensionState` (`getAvatarStoragePath`, `getAvatarCache`, `removeAvatarFromCache`, `clearAvatarCache`, `saveAvatar`) | State persistence   | `vi.fn()` を持つフェイクオブジェクトを注入し、戻り値と呼び出し引数を検証する                        | TC-001, TC-012, TC-013, TC-056〜TC-059                 |
-| `DataSource.getRemoteUrl`                                                                                              | Repository metadata | `vi.fn().mockResolvedValue(...)` / `mockResolvedValue(null)` で返却値パターンを切り替える           | TC-020〜TC-025                                         |
-| `https.get` (GitHub API)                                                                                               | HTTP/API            | `IncomingMessage` 風のイベントエミッタを返し、`data`/`end`/`error` と headers/statusCode を制御する | TC-026〜TC-036                                         |
-| `https.get` (GitLab API)                                                                                               | HTTP/API            | GitHub API と同様にレスポンスとエラーをスタブする                                                   | TC-037〜TC-043                                         |
-| `https.get` (avatar image download)                                                                                    | HTTP/API            | コンテンツタイプ、ステータス、chunk列、`error` を切り替える                                         | TC-044〜TC-055                                         |
-| `node:fs/promises.writeFile`                                                                                           | File                | `resolve` / `reject` を切り替えて保存成功と失敗を検証する                                           | TC-051〜TC-053                                         |
-| `node:fs/promises.readFile`                                                                                            | File                | `Buffer.from(...)` を返すケースと reject ケースを用意する                                           | TC-062〜TC-064                                         |
-| `GitKeizuView.sendMessage`                                                                                             | Webview             | `sendMessage: vi.fn()` を持つViewモックを注入し、payloadを厳密比較する                              | TC-010, TC-062                                         |
-| `setInterval` / `clearInterval` / fake timers                                                                          | Timer               | `vi.useFakeTimers()` と `vi.spyOn(global, ...)` で開始・停止・時刻境界を制御する                    | TC-002, TC-003, TC-014〜TC-019, TC-026, TC-037, TC-077 |
-| `Date` / `Date.now()` semantics                                                                                        | Built-in time       | fake timers で stale 判定・backoff 時刻・queue deadline を固定する                                  | TC-006, TC-007, TC-029, TC-035〜TC-043, TC-076〜TC-078 |
-
-## 5. 既存テストとのギャップ
-
-既存テスト分析はスキップ
-
-## 6. 網羅性検証
-
-| 検証項目             | 結果                                                           |
-| -------------------- | -------------------------------------------------------------- |
-| 関数カバレッジ       | 20/20 関数 (100%)                                              |
-| 分岐カバレッジ       | 43/43 分岐 (100%) — if / switch / ternary / guard を全件対象化 |
-| エラーパスカバレッジ | 15/15 パス (100%)                                              |
-| 境界値カバレッジ     | 34/34 候補 (100%)                                              |
-| 失敗系/正常系比率    | 45/37 OK                                                       |
-
-## 7. Next Step
-
-テストコード生成:
-
-```
-/test-gen docs/testing/perspectives/src/avatarManager-test.md
-```

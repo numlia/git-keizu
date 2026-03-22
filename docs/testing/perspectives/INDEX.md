@@ -1,78 +1,79 @@
 # テスト観点表インデックス
 
-> Auto-generated: 2026-03-22T11:04:05Z
-> Total files: 26
-> Total sections: 230
+> Auto-generated: 2026-03-22T14:25:09Z
+> Total sources: 26
+> Total physical files: 30
+> Total sections: 236
 > Total cases: 1135
 
 ## ソースファイル → 観点表（正引き）
 
-| Source File | Perspectives File | Sections | Cases | Last Updated |
-| ----------- | ----------------- | -------- | ----- | ------------ |
-| src/avatarManager.ts | src/avatarManager-test.md | 20 | 82 | 2026-03-22 |
-| src/config.ts | src/config-test.md | 12 | 70 | 2026-02-27 |
-| src/dataSource.ts | src/dataSource-test.md | 24 | 141 | 2026-03-12 |
-| src/diffDocProvider.ts | src/diffDocProvider-test.md | 6 | 30 | 2026-03-21 |
-| src/extensionState.ts | src/extensionState-test.md | 12 | 34 | 2026-03-22 |
-| src/gitGraphView.ts | src/gitGraphView-test.md | 17 | 60 | 2026-03-20 |
-| src/repoFileWatcher.ts | src/repoFileWatcher-test.md | 8 | 31 | 2026-03-22 |
-| src/repoManager.ts | src/repoManager-test.md | 18 | 104 | 2026-03-22 |
-| src/statusBarItem.ts | src/statusBarItem-test.md | 3 | 13 | 2026-03-22 |
-| src/types.ts | src/types-test.md | 1 | 7 | 2026-02-25 |
-| src/worktree.ts | src/worktree-test.md | 1 | 11 | 2026-03-12 |
-| web/branchLabels.ts | web/branchLabels-test.md | 1 | 17 | 2026-03-21 |
-| web/commitMenu.ts | web/commitMenu-test.md | 4 | 28 | 2026-03-07 |
-| web/contextMenu.ts | web/contextMenu-test.md | 1 | 7 | 2026-02-25 |
-| web/dates.ts | web/dates-test.md | 1 | 31 | 2026-03-21 |
-| web/dialogs.ts | web/dialogs-test.md | 3 | 16 | 2026-03-09 |
-| web/dropdown.ts | web/dropdown-test.md | 10 | 38 | 2026-02-27 |
-| web/fileTree.ts | web/fileTree-test.md | 1 | 10 | 2026-03-01 |
-| web/findWidget.ts | web/findWidget-test.md | 7 | 32 | 2026-02-25 |
-| web/graph.ts | web/graph-test.md | 17 | 59 | 2026-03-08 |
-| web/main.ts | web/main-test.md | 35 | 201 | 2026-03-12 |
-| web/messageHandler.ts | web/messageHandler-test.md | 7 | 23 | 2026-03-15 |
-| web/refMenu.ts | web/refMenu-test.md | 10 | 51 | 2026-03-15 |
-| web/stashMenu.ts | web/stashMenu-test.md | 7 | 28 | 2026-03-21 |
-| web/uncommittedMenu.ts | web/uncommittedMenu-test.md | 1 | 3 | 2026-03-09 |
-| web/utils.ts | web/utils-test.md | 3 | 8 | 2026-03-12 |
+| Source File            | Storage Mode | Perspectives Entry          | Shards | Sections | Cases | Last Updated |
+| ---------------------- | ------------ | --------------------------- | ------ | -------- | ----- | ------------ |
+| src/avatarManager.ts   | single-file  | src/avatarManager-test.md   | 1      | 20       | 82    | 2026-03-22   |
+| src/config.ts          | single-file  | src/config-test.md          | 1      | 12       | 70    | 2026-03-22   |
+| src/dataSource.ts      | single-file  | src/dataSource-test.md      | 1      | 24       | 141   | 2026-03-22   |
+| src/diffDocProvider.ts | single-file  | src/diffDocProvider-test.md | 1      | 6        | 30    | 2026-03-22   |
+| src/extensionState.ts  | single-file  | src/extensionState-test.md  | 1      | 12       | 34    | 2026-03-22   |
+| src/gitGraphView.ts    | single-file  | src/gitGraphView-test.md    | 1      | 17       | 60    | 2026-03-22   |
+| src/repoFileWatcher.ts | single-file  | src/repoFileWatcher-test.md | 1      | 8        | 31    | 2026-03-22   |
+| src/repoManager.ts     | single-file  | src/repoManager-test.md     | 1      | 18       | 104   | 2026-03-22   |
+| src/statusBarItem.ts   | single-file  | src/statusBarItem-test.md   | 1      | 3        | 13    | 2026-03-22   |
+| src/types.ts           | single-file  | src/types-test.md           | 1      | 1        | 7     | 2026-03-22   |
+| src/worktree.ts        | single-file  | src/worktree-test.md        | 1      | 1        | 11    | 2026-03-22   |
+| web/branchLabels.ts    | single-file  | web/branchLabels-test.md    | 1      | 1        | 17    | 2026-03-22   |
+| web/commitMenu.ts      | single-file  | web/commitMenu-test.md      | 1      | 4        | 28    | 2026-03-22   |
+| web/contextMenu.ts     | single-file  | web/contextMenu-test.md     | 1      | 1        | 7     | 2026-03-22   |
+| web/dates.ts           | single-file  | web/dates-test.md           | 1      | 7        | 31    | 2026-03-22   |
+| web/dialogs.ts         | single-file  | web/dialogs-test.md         | 1      | 3        | 16    | 2026-03-22   |
+| web/dropdown.ts        | single-file  | web/dropdown-test.md        | 1      | 10       | 38    | 2026-03-22   |
+| web/fileTree.ts        | single-file  | web/fileTree-test.md        | 1      | 1        | 10    | 2026-03-22   |
+| web/findWidget.ts      | single-file  | web/findWidget-test.md      | 1      | 7        | 32    | 2026-03-22   |
+| web/graph.ts           | single-file  | web/graph-test.md           | 1      | 17       | 59    | 2026-03-22   |
+| web/main.ts            | sharded      | web/main-test/INDEX.md      | 5      | 35       | 201   | 2026-03-22   |
+| web/messageHandler.ts  | single-file  | web/messageHandler-test.md  | 1      | 7        | 23    | 2026-03-22   |
+| web/refMenu.ts         | single-file  | web/refMenu-test.md         | 1      | 10       | 51    | 2026-03-22   |
+| web/stashMenu.ts       | single-file  | web/stashMenu-test.md       | 1      | 7        | 28    | 2026-03-22   |
+| web/uncommittedMenu.ts | single-file  | web/uncommittedMenu-test.md | 1      | 1        | 3     | 2026-03-22   |
+| web/utils.ts           | single-file  | web/utils-test.md           | 1      | 3        | 8     | 2026-03-22   |
 
 ## Feature/Issue → 観点表（逆引き）
 
-| Feature / Issue | Perspectives Files |
-| --------------- | ------------------ |
-| Feature 001 (menu-bar-enhancement) Task 1.2 | src/types-test.md, web/utils-test.md |
-| Feature 001 (menu-bar-enhancement) Task 3.2 | src/dataSource-test.md |
-| Feature 001 (menu-bar-enhancement) Task 3.4 | web/graph-test.md, web/main-test.md |
-| Feature 001 (menu-bar-enhancement) Task 4.2 | src/dataSource-test.md, src/gitGraphView-test.md |
-| Feature 001 (menu-bar-enhancement) Task 4.4 | web/main-test.md |
-| Feature 001 (menu-bar-enhancement) Task 5.2 | src/dataSource-test.md, src/gitGraphView-test.md |
-| Feature 001 (menu-bar-enhancement) Task 5.4 | web/main-test.md |
-| Feature 001 (menu-bar-enhancement) Task 6.2 | web/main-test.md |
-| Feature 002 (menubar-search-diff) Task 2.2 | src/dataSource-test.md |
-| Feature 002 (menubar-search-diff) Task 2.4 | src/gitGraphView-test.md |
-| Feature 002 (menubar-search-diff) Task 3.3 | web/findWidget-test.md |
-| Feature 002 (menubar-search-diff) Task 4.3 | web/main-test.md |
-| Feature 003 (ux-fixes-and-enhancements) Task 1.3 | web/contextMenu-test.md |
-| Feature 003 (ux-fixes-and-enhancements) Task 2.2 | src/dataSource-test.md, web/refMenu-test.md |
-| Feature 003 (ux-fixes-and-enhancements) Task 3.3 | src/dataSource-test.md, src/gitGraphView-test.md, web/messageHandler-test.md, web/refMenu-test.md |
-| Feature 003 (ux-fixes-and-enhancements) Task 4.2 | src/dataSource-test.md |
-| Feature 003 (ux-fixes-and-enhancements) Task 5.2 | web/dialogs-test.md |
-| Feature 004 (webview-ux-polish) (aidd-spec-tasks-test) | web/main-test.md, web/messageHandler-test.md |
-| Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test) | src/config-test.md, src/gitGraphView-test.md, src/repoManager-test.md, web/dropdown-test.md, web/main-test.md, web/messageHandler-test.md |
-| Feature 006 (git-graph-parity) (aidd-spec-tasks-test) | src/dataSource-test.md, src/gitGraphView-test.md, web/fileTree-test.md, web/main-test.md, web/messageHandler-test.md, web/refMenu-test.md |
-| Feature 009 (merge-commit-fix) (aidd-spec-tasks-test) | src/config-test.md, web/graph-test.md, web/utils-test.md |
-| Feature 010 (mute-branch-label-fix) (aidd-spec-tasks-test) | web/main-test.md |
-| Feature 011 (author-filter-fix) (aidd-spec-tasks-test) | src/dataSource-test.md, web/main-test.md, web/messageHandler-test.md |
-| Feature 012 (ui-enhancements) (aidd-spec-tasks-test) | src/dataSource-test.md, src/gitGraphView-test.md, web/commitMenu-test.md, web/dropdown-test.md, web/main-test.md |
-| Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test) | web/graph-test.md, web/main-test.md |
-| Feature 013 (scroll-position-restore) (aidd-spec-tasks-test) | web/main-test.md |
-| Feature 014 (dialog-defaults) (aidd-spec-tasks-test) | src/config-test.md, src/dataSource-test.md, src/gitGraphView-test.md, web/commitMenu-test.md, web/dialogs-test.md, web/refMenu-test.md, web/uncommittedMenu-test.md |
-| Feature 015 (commit-sort-order) (aidd-spec-tasks-test) | src/config-test.md, src/dataSource-test.md, src/gitGraphView-test.md, web/main-test.md |
-| Feature 016 (worktree-support) (aidd-spec-tasks-test) | src/dataSource-test.md, src/gitGraphView-test.md, src/worktree-test.md, web/commitMenu-test.md, web/main-test.md, web/messageHandler-test.md, web/refMenu-test.md, web/utils-test.md |
-| Feature 019 (worktree-enhancements) (aidd-spec-tasks-test) | src/config-test.md, src/gitGraphView-test.md, web/messageHandler-test.md, web/refMenu-test.md |
-| Feature 020 (legacy-branding-cleanup) (aidd-spec-tasks-test) | src/gitGraphView-test.md |
-| Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test) | src/config-test.md |
-| test-plan | web/stashMenu-test.md |
-| test-plan (既存コード分析) | src/avatarManager-test.md, src/repoFileWatcher-test.md, src/statusBarItem-test.md |
-| test-plan (既存コード網羅) | src/repoManager-test.md |
-| test-plan (既存テスト) | src/dataSource-test.md |
+| Feature / Issue                                                       | Perspectives Entries                                                                                                                                                                       |
+| --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Feature 001 (menu-bar-enhancement) Task 1.2                           | src/types-test.md, web/utils-test.md                                                                                                                                                       |
+| Feature 001 (menu-bar-enhancement) Task 3.2                           | src/dataSource-test.md                                                                                                                                                                     |
+| Feature 001 (menu-bar-enhancement) Task 3.4                           | web/graph-test.md, web/main-test/INDEX.md                                                                                                                                                  |
+| Feature 001 (menu-bar-enhancement) Task 4.2                           | src/dataSource-test.md, src/gitGraphView-test.md                                                                                                                                           |
+| Feature 001 (menu-bar-enhancement) Task 4.4                           | web/main-test/INDEX.md                                                                                                                                                                     |
+| Feature 001 (menu-bar-enhancement) Task 5.2                           | src/dataSource-test.md, src/gitGraphView-test.md                                                                                                                                           |
+| Feature 001 (menu-bar-enhancement) Task 5.4                           | web/main-test/INDEX.md                                                                                                                                                                     |
+| Feature 001 (menu-bar-enhancement) Task 6.2                           | web/main-test/INDEX.md                                                                                                                                                                     |
+| Feature 002 (menubar-search-diff) Task 2.2                            | src/dataSource-test.md                                                                                                                                                                     |
+| Feature 002 (menubar-search-diff) Task 2.4                            | src/gitGraphView-test.md                                                                                                                                                                   |
+| Feature 002 (menubar-search-diff) Task 3.3                            | web/findWidget-test.md                                                                                                                                                                     |
+| Feature 002 (menubar-search-diff) Task 4.3                            | web/main-test/INDEX.md                                                                                                                                                                     |
+| Feature 003 (ux-fixes-and-enhancements) Task 1.3                      | web/contextMenu-test.md                                                                                                                                                                    |
+| Feature 003 (ux-fixes-and-enhancements) Task 2.2                      | src/dataSource-test.md, web/refMenu-test.md                                                                                                                                                |
+| Feature 003 (ux-fixes-and-enhancements) Task 3.3                      | src/dataSource-test.md, src/gitGraphView-test.md, web/messageHandler-test.md, web/refMenu-test.md                                                                                          |
+| Feature 003 (ux-fixes-and-enhancements) Task 4.2                      | src/dataSource-test.md                                                                                                                                                                     |
+| Feature 003 (ux-fixes-and-enhancements) Task 5.2                      | web/dialogs-test.md                                                                                                                                                                        |
+| Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)                | web/main-test/INDEX.md, web/messageHandler-test.md                                                                                                                                         |
+| Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)          | src/config-test.md, src/gitGraphView-test.md, src/repoManager-test.md, web/dropdown-test.md, web/main-test/INDEX.md, web/messageHandler-test.md                                            |
+| Feature 006 (git-graph-parity) (aidd-spec-tasks-test)                 | src/dataSource-test.md, src/gitGraphView-test.md, web/fileTree-test.md, web/main-test/INDEX.md, web/messageHandler-test.md, web/refMenu-test.md                                            |
+| Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)                 | src/config-test.md, web/graph-test.md, web/utils-test.md                                                                                                                                   |
+| Feature 010 (mute-branch-label-fix) (aidd-spec-tasks-test)            | web/main-test/INDEX.md                                                                                                                                                                     |
+| Feature 011 (author-filter-fix) (aidd-spec-tasks-test)                | src/dataSource-test.md, web/main-test/INDEX.md, web/messageHandler-test.md                                                                                                                 |
+| Feature 012 (ui-enhancements) (aidd-spec-tasks-test)                  | src/dataSource-test.md, src/gitGraphView-test.md, web/commitMenu-test.md, web/dropdown-test.md, web/main-test/INDEX.md                                                                     |
+| Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)             | web/graph-test.md, web/main-test/INDEX.md                                                                                                                                                  |
+| Feature 013 (scroll-position-restore) (aidd-spec-tasks-test)          | web/main-test/INDEX.md                                                                                                                                                                     |
+| Feature 014 (dialog-defaults) (aidd-spec-tasks-test)                  | src/config-test.md, src/dataSource-test.md, src/gitGraphView-test.md, web/commitMenu-test.md, web/dialogs-test.md, web/refMenu-test.md, web/uncommittedMenu-test.md                        |
+| Feature 015 (commit-sort-order) (aidd-spec-tasks-test)                | src/config-test.md, src/dataSource-test.md, src/gitGraphView-test.md, web/main-test/INDEX.md                                                                                               |
+| Feature 016 (worktree-support) (aidd-spec-tasks-test)                 | src/dataSource-test.md, src/gitGraphView-test.md, src/worktree-test.md, web/commitMenu-test.md, web/main-test/INDEX.md, web/messageHandler-test.md, web/refMenu-test.md, web/utils-test.md |
+| Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)            | src/config-test.md, src/gitGraphView-test.md, web/messageHandler-test.md, web/refMenu-test.md                                                                                              |
+| Feature 020 (legacy-branding-cleanup) (aidd-spec-tasks-test)          | src/gitGraphView-test.md                                                                                                                                                                   |
+| Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test) | src/config-test.md                                                                                                                                                                         |
+| test-plan                                                             | web/stashMenu-test.md                                                                                                                                                                      |
+| test-plan (既存コード分析)                                            | src/avatarManager-test.md, src/diffDocProvider-test.md, src/extensionState-test.md, src/repoFileWatcher-test.md, src/statusBarItem-test.md, web/branchLabels-test.md, web/dates-test.md    |
+| test-plan (既存コード網羅)                                            | src/repoManager-test.md                                                                                                                                                                    |
+| test-plan (既存テスト)                                                | src/dataSource-test.md                                                                                                                                                                     |

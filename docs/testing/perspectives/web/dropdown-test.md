@@ -1,12 +1,16 @@
 # テスト観点表: web/dropdown.ts
 
 > Source: `web/dropdown.ts`
-> Generated: 2026-02-27T00:00:00+09:00
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
 
 ## S1: isOpen() 展開状態判定
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `isOpen(): boolean`
 **テスト対象パス**: `web/dropdown.ts`
@@ -21,6 +25,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `close(): void`
 **テスト対象パス**: `web/dropdown.ts`
@@ -34,6 +40,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/dropdown.ts`
 
@@ -47,6 +55,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/dropdown.ts`
 
@@ -60,6 +70,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/dropdown.ts`
 
@@ -74,6 +86,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/dropdown.ts`
 
@@ -88,6 +102,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/dropdown.ts`
 
@@ -103,6 +119,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/dropdown.ts`
 
@@ -119,6 +137,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/dropdown.ts`
 
@@ -133,6 +153,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/dropdown.ts`
 

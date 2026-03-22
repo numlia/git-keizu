@@ -1,24 +1,16 @@
-# Test Plan: branchLabels
+# テスト観点表: web/branchLabels.ts
 
-> Generated: 2026-03-21T00:00:00+09:00
 > Source: `web/branchLabels.ts`
+> Generated: 2026-03-22T13:23:24Z
 > Language: TypeScript
 > Test Framework: Vitest
 
-## 1. ソース概要
+## S1: getBranchLabels
 
-| 項目            | 値                                                                                                    |
-| --------------- | ----------------------------------------------------------------------------------------------------- |
-| ファイルパス    | `web/branchLabels.ts`                                                                                 |
-| 主要な責務      | GitRef配列をhead/remote/tagに分類し、リモートブランチをローカルブランチに紐付けるラベル構造を生成する |
-| 関数/メソッド数 | 1                                                                                                     |
-| 総分岐数        | 5                                                                                                     |
-| エラーパス数    | 0                                                                                                     |
-| 外部依存数      | 0                                                                                                     |
-
-## 2. テスト観点表
-
-### 2.1 getBranchLabels
+> Origin: test-plan (既存コード分析)
+> Added: 2026-03-21
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `export function getBranchLabels(refs: GG.GitRef[]): BranchLabels`
 **テスト対象パス**: `web/branchLabels.ts:14-46`
@@ -42,49 +34,3 @@
 | TC-015  | refs=[{hash:"a",name:"feature/xyz",type:"head"}, {hash:"b",name:"origin/feature/xyz",type:"remote"}]（複数スラッシュ）                         | Boundary - multiple slashes                 | heads=[{name:"feature/xyz",remotes:["origin"]}], remotes=[], tags=[]                                | L33: 最初の"/"で分割 → remoteName="origin", branchName="feature/xyz" → headLookup一致     |
 | TC-016  | refs=[{hash:"a",name:"",type:"remote"}]（空文字名）                                                                                            | Boundary - empty string                     | heads=[], remotes=[{hash:"a",name:"",type:"remote"}], tags=[]                                       | L33: indexOf("/")=-1 → remainingRemotesへ                                                 |
 | TC-017  | refs=[{hash:"a",name:"main",type:"head"}, {hash:"b",name:"origin/main",type:"remote"}] で "main" がheads配列のindex=0                          | Boundary - index zero                       | heads=[{name:"main",remotes:["origin"]}], remotes=[], tags=[]                                       | L37: headLookup["main"]=0、typeof 0 === "number" → 正しくtrue判定（falsyな0を安全に処理） |
-
-## 3. テストケースサマリー
-
-| カテゴリ (Perspective列で分類)   | ケース数 |
-| -------------------------------- | -------- |
-| 正常系（Equivalence - normal）   | 7        |
-| 異常系（Equivalence - abnormal） | 0        |
-| 境界値（Boundary - ...）         | 10       |
-| 型・形式（Type - ...）           | 0        |
-| 外部依存（External - ...）       | 0        |
-| **合計**                         | **17**   |
-
-### 失敗系/正常系比率チェック
-
-| 項目                                        | 値                   |
-| ------------------------------------------- | -------------------- |
-| 正常系（Perspective: Equivalence - normal） | 7件                  |
-| 失敗系（Perspective: 上記以外すべて）       | 10件                 |
-| 比率                                        | 10/7 = 1.43          |
-| 判定                                        | OK: 失敗系 >= 正常系 |
-
-## 4. 外部依存とモック方針
-
-該当なし
-
-## 5. 既存テストとのギャップ
-
-既存テスト分析はスキップ
-
-## 6. 網羅性検証
-
-| 検証項目             | 結果              |
-| -------------------- | ----------------- |
-| 関数カバレッジ       | 1/1 関数 (100%)   |
-| 分岐カバレッジ       | 5/5 分岐 (100%)   |
-| エラーパスカバレッジ | 0/0 パス (N/A)    |
-| 境界値カバレッジ     | 10/10 候補 (100%) |
-| 失敗系/正常系比率    | 10/7 OK           |
-
-## 7. Next Step
-
-テストコード生成:
-
-```
-/test-gen docs/testing/perspectives/web/branchLabels-test.md
-```

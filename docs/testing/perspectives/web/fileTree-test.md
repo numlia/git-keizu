@@ -1,12 +1,16 @@
 # テスト観点表: web/fileTree.ts
 
 > Source: `web/fileTree.ts`
-> Generated: 2026-03-01T00:00:00+09:00
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
 
 ## S1: generateGitFileListHtml() フラットファイルリスト描画
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `generateGitFileListHtml(gitFiles: GG.GitFileChange[]): string`
 **テスト対象パス**: `web/fileTree.ts`

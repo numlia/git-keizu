@@ -1,9 +1,16 @@
 # テスト観点表: web/dialogs.ts
 
+> Source: `web/dialogs.ts`
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
+
 ## S1: showFormDialog() フォーカス優先順位
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 5.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `showFormDialog(title: string, inputs: DialogInput[], actionName: string, actioned: (values: string[]) => void, sourceElem: HTMLElement | null): void`
 **テスト対象パス**: `web/dialogs.ts`
@@ -19,6 +26,8 @@
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 5.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `showFormDialog() 内部 keydown イベントハンドラ`
 **テスト対象パス**: `web/dialogs.ts`
@@ -37,6 +46,8 @@
 
 > Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
 > Added: 2026-03-09
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/dialogs.ts`
 

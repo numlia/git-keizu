@@ -1,9 +1,16 @@
 # テスト観点表: src/gitGraphView.ts
 
+> Source: `src/gitGraphView.ts`
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
+
 ## S1: スタッシュメッセージルーティング
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 4.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -18,6 +25,8 @@
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 5.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -31,6 +40,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 2.4
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -44,6 +55,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 2.4
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -56,6 +69,8 @@
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 3.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -68,6 +83,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -82,6 +99,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -94,6 +113,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -108,6 +129,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -122,6 +145,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -134,6 +159,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts:223-228`
 
@@ -150,6 +177,8 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts:279-291`
 
@@ -162,6 +191,8 @@
 
 > Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
 > Added: 2026-03-09
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -177,6 +208,8 @@
 
 > Origin: Feature 015 (commit-sort-order) (aidd-spec-tasks-test)
 > Added: 2026-03-10
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -191,6 +224,8 @@
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -206,6 +241,8 @@
 
 > Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-15
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -222,6 +259,8 @@
 
 > Origin: Feature 020 (legacy-branding-cleanup) (aidd-spec-tasks-test)
 > Added: 2026-03-20
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `private getHtmlForWebview(uri: vscode.Uri): string`
 **テスト対象パス**: `src/gitGraphView.ts:553-560`

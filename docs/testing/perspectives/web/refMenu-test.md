@@ -1,9 +1,16 @@
 # テスト観点表: web/refMenu.ts
 
+> Source: `web/refMenu.ts`
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
+
 ## S1: checkoutBranchAction() ブランチ名提案ロジック
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 2.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `checkoutBranchAction(repo: string, sourceElem: HTMLElement, refName: string, isRemoteCombined?: boolean): void`
 **テスト対象パス**: `web/refMenu.ts`
@@ -21,6 +28,8 @@
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 3.3
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `buildRefContextMenuItems(repo: string, refName: string, sourceElem: HTMLElement, isRemote: boolean, gitBranchHead: string | null): (ContextMenuElement | null)[]`
 **テスト対象パス**: `web/refMenu.ts`
@@ -36,6 +45,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `parseRemoteRef(refName: string): { remoteName: string; branchName: string }`
 **テスト対象パス**: `web/refMenu.ts`
@@ -52,6 +63,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/refMenu.ts`
 
@@ -67,6 +80,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/refMenu.ts`
 
@@ -81,6 +96,8 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/refMenu.ts`
 
@@ -95,6 +112,8 @@
 
 > Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
 > Added: 2026-03-09
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/refMenu.ts:30-55`
 
@@ -109,6 +128,8 @@
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/refMenu.ts`
 
@@ -128,7 +149,8 @@
 
 > Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-15
-> Updated: 2026-03-17 (S9→S11, TC-ID renumbered to avoid collision with existing S9/S10)
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/refMenu.ts`
 
@@ -141,7 +163,8 @@
 
 > Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-15
-> Updated: 2026-03-17 (S10→S12, TC-ID renumbered to avoid collision with existing S9/S10)
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `web/refMenu.ts`
 

@@ -1,9 +1,16 @@
 # テスト観点表: src/types.ts
 
+> Source: `src/types.ts`
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
+
 ## S1: UNCOMMITTED_CHANGES_HASH / VALID_UNCOMMITTED_RESET_MODES 定数検証
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 1.2
 > Added: 2026-02-25
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/types.ts`
 

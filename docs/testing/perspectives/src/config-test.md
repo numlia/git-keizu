@@ -1,12 +1,16 @@
 # テスト観点表: src/config.ts
 
 > Source: `src/config.ts`
-> Generated: 2026-02-27T00:00:00+09:00
+> Generated: 2026-03-22T13:23:24Z
+> Language: TypeScript
+> Test Framework: Vitest
 
 ## S1: parseKeybinding() ショートカット設定値パース
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `parseKeybinding(value: string, defaultValue: string): string | null`
 **テスト対象パス**: `src/config.ts`
@@ -28,6 +32,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `sourceCodeProviderIntegrationLocation(): string`
 **テスト対象パス**: `src/config.ts`
@@ -42,6 +48,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/config.ts`
 
@@ -58,6 +66,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `loadMoreCommitsAutomatically(): boolean`
 **テスト対象パス**: `src/config.ts`
@@ -71,6 +81,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `muteCommitsMergeCommits(): boolean`
 **テスト対象パス**: `src/config.ts`
@@ -85,6 +97,8 @@
 
 > Origin: Feature 009 (merge-commit-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-04
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `muteCommitsNotAncestorsOfHead(): boolean`
 **テスト対象パス**: `src/config.ts`
@@ -99,6 +113,8 @@
 
 > Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
 > Added: 2026-03-09
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `dialogDefaults(): DialogDefaults`
 **テスト対象パス**: `src/config.ts`
@@ -117,6 +133,8 @@
 
 > Origin: Feature 015 (commit-sort-order) (aidd-spec-tasks-test)
 > Added: 2026-03-10
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `commitOrdering(): CommitOrdering`
 **テスト対象パス**: `src/config.ts`
@@ -131,6 +149,8 @@
 
 > Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-15
+> Status: active
+> Supersedes: -
 
 **シグネチャ**: `dialogDefaults(): DialogDefaults`
 **テスト対象パス**: `src/config.ts`
@@ -146,6 +166,8 @@
 
 > Origin: Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test)
 > Added: 2026-03-21
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/config.ts`（全 getter メソッド）
 **テストファイル**: `tests/src/config-defaults.test.ts`
@@ -185,6 +207,8 @@
 
 > Origin: Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test)
 > Added: 2026-03-21
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/config.ts`（keyboardShortcut\* メソッド + parseKeybinding）
 **テストファイル**: `tests/src/config-defaults.test.ts`
@@ -202,6 +226,8 @@ keybinding 設定は `parseKeybinding()` により変換されるため、packag
 
 > Origin: Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test)
 > Added: 2026-03-21
+> Status: active
+> Supersedes: -
 
 **テスト対象パス**: `src/config.ts`（graphColours メソッド）
 **テストファイル**: `tests/src/config-defaults.test.ts`
