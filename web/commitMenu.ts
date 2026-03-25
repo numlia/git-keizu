@@ -82,7 +82,11 @@ export function buildCommitContextMenuItems(
           [
             { type: "text-ref" as const, name: "Branch Name: ", default: "" },
             { type: "text" as const, name: "Path: ", default: pathPrefix, placeholder: null },
-            { type: "checkbox" as const, name: "Open Terminal", value: true }
+            {
+              type: "checkbox" as const,
+              name: "Open Terminal",
+              value: viewState.dialogDefaults.createWorktree.openTerminal
+            }
           ],
           "Create Worktree",
           (values) => {
