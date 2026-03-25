@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.13] - 2026-03-25
+
+### Fixed
+
+- **Create Worktree "Open Terminal" default now consistent from both entry points**: When opening "Create Worktree Here..." from a commit's context menu, the "Open Terminal" checkbox now correctly reads its initial state from `git-keizu.dialog.createWorktree.openTerminal` — previously this entry point always showed the checkbox as checked regardless of the setting, while the branch label entry point already honored it correctly
+
 ## [0.5.12] - 2026-03-21
 
 ### Fixed
@@ -254,7 +260,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.12...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.13...HEAD
+[0.5.13]: https://github.com/numlia/git-keizu/compare/v0.5.12...v0.5.13
 [0.5.12]: https://github.com/numlia/git-keizu/compare/v0.5.11...v0.5.12
 [0.5.11]: https://github.com/numlia/git-keizu/compare/v0.5.10...v0.5.11
 [0.5.10]: https://github.com/numlia/git-keizu/compare/v0.5.9...v0.5.10
