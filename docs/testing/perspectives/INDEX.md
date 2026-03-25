@@ -1,10 +1,10 @@
 # テスト観点表インデックス
 
-> Auto-generated: 2026-03-22T15:15:20Z
+> Auto-generated: 2026-03-25T17:30:00Z
 > Total sources: 27
 > Total physical files: 31
-> Total sections: 241
-> Total cases: 1155
+> Total sections: 242
+> Total cases: 1157
 
 ## ソースファイル → 観点表（正引き）
 
@@ -23,7 +23,7 @@
 | src/types.ts           | single-file  | src/types-test.md           | 1      | 1        | 7     | 2026-03-22   |
 | src/worktree.ts        | single-file  | src/worktree-test.md        | 1      | 1        | 11    | 2026-03-22   |
 | web/branchLabels.ts    | single-file  | web/branchLabels-test.md    | 1      | 1        | 17    | 2026-03-22   |
-| web/commitMenu.ts      | single-file  | web/commitMenu-test.md      | 1      | 4        | 28    | 2026-03-22   |
+| web/commitMenu.ts      | single-file  | web/commitMenu-test.md      | 1      | 5        | 30    | 2026-03-25   |
 | web/contextMenu.ts     | single-file  | web/contextMenu-test.md     | 1      | 1        | 7     | 2026-03-22   |
 | web/dates.ts           | single-file  | web/dates-test.md           | 1      | 7        | 31    | 2026-03-22   |
 | web/dialogs.ts         | single-file  | web/dialogs-test.md         | 1      | 3        | 16    | 2026-03-22   |
@@ -74,6 +74,7 @@
 | Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)            | src/config-test.md, src/gitGraphView-test.md, web/messageHandler-test.md, web/refMenu-test.md                                                                                                                  |
 | Feature 020 (legacy-branding-cleanup) (aidd-spec-tasks-test)          | src/gitGraphView-test.md                                                                                                                                                                                       |
 | Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test) | src/config-test.md                                                                                                                                                                                             |
+| Feature 023 (worktree-dialog-defaults) (aidd-spec-tasks-test)         | web/commitMenu-test.md                                                                                                                                                                                         |
 | test-plan                                                             | web/stashMenu-test.md                                                                                                                                                                                          |
 | test-plan (既存コード分析)                                            | src/avatarManager-test.md, src/diffDocProvider-test.md, src/extension-test.md, src/extensionState-test.md, src/repoFileWatcher-test.md, src/statusBarItem-test.md, web/branchLabels-test.md, web/dates-test.md |
 | test-plan (既存コード網羅)                                            | src/repoManager-test.md                                                                                                                                                                                        |
