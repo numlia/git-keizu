@@ -14,8 +14,8 @@
 
 **テスト対象パス**: `web/uncommittedMenu.ts:16-43`
 
-| Case ID | Input / Precondition                                                    | Perspective (Equivalence / Boundary) | Expected Result                                                                     | Notes        |
-| ------- | ----------------------------------------------------------------------- | ------------------------------------ | ----------------------------------------------------------------------------------- | ------------ |
-| TC-001  | viewState.dialogDefaults.stashUncommittedChanges.includeUntracked=true  | Equivalence - normal                 | Include Untracked checkbox が ON（checked）で表示される                             | 設定反映     |
-| TC-002  | viewState.dialogDefaults.stashUncommittedChanges.includeUntracked=false | Equivalence - normal                 | Include Untracked checkbox が OFF（unchecked）で表示される                          | 設定反映     |
-| TC-003  | Stash Push ダイアログの全体構成                                         | Equivalence - normal                 | text（Message）+ checkbox（Include Untracked）の 2 要素で showFormDialog が呼ばれる | 既存構成維持 |
+| Case ID | Input / Precondition                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                     | Notes        |
+| ------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ------------ |
+| TC-001  | viewState.dialogDefaults.stashUncommittedChanges.includeUntracked=true  | Normal - standard                                                          | Include Untracked checkbox が ON（checked）で表示される                             | 設定反映     |
+| TC-002  | viewState.dialogDefaults.stashUncommittedChanges.includeUntracked=false | Normal - standard                                                          | Include Untracked checkbox が OFF（unchecked）で表示される                          | 設定反映     |
+| TC-003  | Stash Push ダイアログの全体構成                                         | Normal - standard                                                          | text（Message）+ checkbox（Include Untracked）の 2 要素で showFormDialog が呼ばれる | 既存構成維持 |
