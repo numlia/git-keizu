@@ -489,6 +489,23 @@ describe("Cherry-pick dialog (S3)", () => {
 // --- S4: Create Worktree Here ダイアログ ---
 
 describe("Create Worktree Here dialog (S4)", () => {
+  const DEFAULT_DIALOG_DEFAULTS = {
+    merge: { noFastForward: true, squashCommits: false, noCommit: false },
+    cherryPick: { recordOrigin: false, noCommit: false },
+    stashUncommittedChanges: { includeUntracked: false },
+    createWorktree: { openTerminal: true },
+    removeWorktree: { deleteBranch: true }
+  };
+
+  function setupViewState(overrides?: Partial<typeof DEFAULT_DIALOG_DEFAULTS.createWorktree>) {
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        ...DEFAULT_DIALOG_DEFAULTS,
+        createWorktree: { ...DEFAULT_DIALOG_DEFAULTS.createWorktree, ...overrides }
+      }
+    };
+  }
+
   function getCreateWorktreeItem() {
     const items = buildCommitContextMenuItems(
       REPO,
@@ -503,6 +520,7 @@ describe("Create Worktree Here dialog (S4)", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    setupViewState();
   });
 
   it("calls showFormDialog with text-ref + text + checkbox (3 fields) (TC-022)", () => {
@@ -546,16 +564,30 @@ describe("Create Worktree Here dialog (S4)", () => {
     expect(inputs[1].default).toBe("../repo-");
   });
 
-  it("Open Terminal checkbox defaults to ON (TC-025)", () => {
-    // Given: Create Worktree Here menu item
+  it("Open Terminal checkbox reflects dialogDefaults.createWorktree.openTerminal=true (TC-025/TC-029)", () => {
+    // Given: viewState.dialogDefaults.createWorktree.openTerminal = true
+    setupViewState({ openTerminal: true });
     const item = getCreateWorktreeItem();
 
-    // When: onClick is triggered
+    // When: Create Worktree Here menu item onClick is triggered
     item.onClick();
 
-    // Then: Open Terminal checkbox value defaults to true
+    // Then: Open Terminal checkbox value is true
     const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
     expect((inputs[2] as DialogCheckboxInput).value).toBe(true);
+  });
+
+  it("Open Terminal checkbox reflects dialogDefaults.createWorktree.openTerminal=false (TC-030)", () => {
+    // Given: viewState.dialogDefaults.createWorktree.openTerminal = false
+    setupViewState({ openTerminal: false });
+    const item = getCreateWorktreeItem();
+
+    // When: Create Worktree Here menu item onClick is triggered
+    item.onClick();
+
+    // Then: Open Terminal checkbox value is false
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect((inputs[2] as DialogCheckboxInput).value).toBe(false);
   });
 
   it("sends RequestCreateWorktree with all fields on submit (TC-026)", () => {
