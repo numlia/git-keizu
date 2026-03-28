@@ -97,3 +97,21 @@
 | TC-030  | viewState.dialogDefaults.createWorktree.openTerminal = false | Normal - standard                                                          | showFormDialog の第2引数の index 2 チェックボックス要素の value が false | 新規: false パターン追加        |
 
 > **境界値候補の省略理由**: `viewState.dialogDefaults.createWorktree.openTerminal` は extension host が `config.ts` 経由で常に boolean 値を設定するため、null / undefined / empty は仕様上発生しない。boolean の完全なドメイン（true / false）は Normal ケースで網羅済み。
+
+## S6: Create Worktree Here パス正規化
+
+> Origin: Feature 024 (worktree-path-normalize) (aidd-spec-tasks-test)
+> Added: 2026-03-27
+> Status: active
+> Supersedes: -
+
+**テスト対象パス**: `web/commitMenu.ts:106-113`
+
+| Case ID | Input / Precondition                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                  | Notes                                |
+| ------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| TC-031  | Branch Name 入力 "feature/x"、Path 未編集                            | Normal - standard                                                          | Path が `../<repoName>-feature-x` に更新される                                                   | REQ-9.3: 正規化適用                  |
+| TC-032  | Branch Name 入力 "a/b/c"、Path 未編集                                | Normal - standard                                                          | Path が `../<repoName>-a-b-c` に更新される                                                       | REQ-9.3: 複数スラッシュの正規化      |
+| TC-033  | Branch Name 変更 "a/b" → "c/d"、Path 未編集                          | Normal - dynamic                                                           | expectedPath が sanitize("a/b") = "a-b" で計算され一致、Path が `../<repoName>-c-d` に更新される | REQ-9.3: lastBranchName は生の値保持 |
+| TC-034  | Branch Name "feature/x" 入力後、Path 手動編集、再度 Branch Name 変更 | Boundary - manual edit                                                     | 手動編集後の Path が保持される（自動更新されない）                                               | REQ-9.3: 正規化下での手動編集検出    |
+
+> **境界値候補の省略理由**: パス入力フィールドの値は文字列結合で構成され、正規化チェーン中に null / undefined は発生しない。手動編集検出（TC-034）が正規化下での主要な境界ケースである。

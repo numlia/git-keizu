@@ -49,3 +49,27 @@
 | Case ID | Input / Precondition     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                | Notes   |
 | ------- | ------------------------ | -------------------------------------------------------------------------- | ------------------------------ | ------- |
 | TC-008  | svgIcons.worktree を参照 | Normal - standard                                                          | 空でない文字列で `<svg` を含む | REQ-2.1 |
+
+## S4: sanitizeBranchNameForPath() branch名パス正規化
+
+> Origin: Feature 024 (worktree-path-normalize) (aidd-spec-tasks-test)
+> Added: 2026-03-27
+> Status: active
+> Supersedes: -
+
+**シグネチャ**: `sanitizeBranchNameForPath(branchName: string): string`
+**テスト対象パス**: `web/utils.ts`
+
+| Case ID | Input / Precondition              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                   | Notes                                |
+| ------- | --------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------ |
+| TC-009  | branchName = "feature/x"          | Normal - standard                                                          | 返却値が `"feature-x"` である                                     | REQ-9.1-TC1: / → -                   |
+| TC-010  | branchName = "feature/sub/branch" | Normal - standard                                                          | 返却値が `"feature-sub-branch"` である                            | REQ-9.1-TC2: 複数スラッシュ          |
+| TC-011  | branchName = "feature//x"         | Normal - consecutive                                                       | 返却値が `"feature-x"` である（連続 / を1つの - に折り畳み）      | REQ-9.1-TC3                          |
+| TC-012  | branchName = "path\\file"         | Normal - standard                                                          | 返却値が `"path-file"` である                                     | REQ-9.1-TC4: バックスラッシュ        |
+| TC-013  | branchName = "fix:bug"            | Normal - standard                                                          | 返却値が `"fix-bug"` である                                       | REQ-9.1-TC4: コロン                  |
+| TC-014  | branchName = 'a\*b?c"d<e>f\|g'    | Normal - standard                                                          | 返却値が `"a-b-c-d-e-f-g"` である                                 | REQ-9.1-TC4: 残り6種 (\* ? " < > \|) |
+| TC-015  | branchName = "feature branch"     | Normal - standard                                                          | 返却値が `"feature-branch"` である                                | REQ-9.1-TC4: 半角スペース            |
+| TC-016  | branchName = "main"               | Normal - no-change                                                         | 返却値が `"main"` である（無変更）                                | REQ-9.1-TC5                          |
+| TC-017  | branchName = "feature/ x"         | Normal - consecutive                                                       | 返却値が `"feature-x"` である（/ + スペースを1つの - に折り畳み） | REQ-9.1-TC6                          |
+| TC-018  | branchName = ""                   | Boundary - empty                                                           | 返却値が `""` である                                              | 空文字列                             |
+| TC-019  | branchName = "feature-x"          | Normal - idempotent                                                        | 返却値が `"feature-x"` である                                     | 冪等性: f(f(x)) === f(x)             |
