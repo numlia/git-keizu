@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.14] - 2026-03-28
+
+### Fixed
+
+- **Worktree default path normalizes slash-containing branch names**: Branch names such as `feature/x` now produce `../repo-feature-x` as the default worktree path instead of the unintended `../repo-feature/x` (which would silently create a nested directory structure); the normalization covers `\`, `:`, `*`, `?`, `"`, `<`, `>`, `|`, and space in addition to `/` — consecutive unsafe characters collapse into a single `-`. Applies to both the "Create Worktree..." dialog (from branch context menu) and the "Create Worktree Here..." dialog (from commit context menu, where the path auto-updates as you type the branch name)
+
 ## [0.5.13] - 2026-03-25
 
 ### Fixed
@@ -260,7 +266,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.13...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.14...HEAD
+[0.5.14]: https://github.com/numlia/git-keizu/compare/v0.5.13...v0.5.14
 [0.5.13]: https://github.com/numlia/git-keizu/compare/v0.5.12...v0.5.13
 [0.5.12]: https://github.com/numlia/git-keizu/compare/v0.5.11...v0.5.12
 [0.5.11]: https://github.com/numlia/git-keizu/compare/v0.5.10...v0.5.11
