@@ -9,16 +9,24 @@ vi.mock("../../web/dialogs", () => ({
   showActionRunningDialog: vi.fn()
 }));
 
-vi.mock("../../web/utils", () => ({
-  escapeHtml: vi.fn((str: string) => str),
-  sendMessage: vi.fn(),
-  getRepoName: vi.fn((repoPath: string) => {
-    const sep = Math.max(repoPath.lastIndexOf("/"), repoPath.lastIndexOf("\\"));
-    return sep >= 0 ? repoPath.substring(sep + 1) : repoPath;
-  }),
-  svgIcons: { alert: "<svg>alert</svg>" },
-  ELLIPSIS: "&#8230;"
-}));
+vi.mock("../../web/utils", () => {
+  const pathUnsafeChars = /[\\/:*?"<>| ]+/g;
+  const pathUnsafeCharReplacement = "-";
+
+  return {
+    escapeHtml: vi.fn((str: string) => str),
+    sendMessage: vi.fn(),
+    getRepoName: vi.fn((repoPath: string) => {
+      const sep = Math.max(repoPath.lastIndexOf("/"), repoPath.lastIndexOf("\\"));
+      return sep >= 0 ? repoPath.substring(sep + 1) : repoPath;
+    }),
+    sanitizeBranchNameForPath: vi.fn((branchName: string) =>
+      branchName.replace(pathUnsafeChars, pathUnsafeCharReplacement)
+    ),
+    svgIcons: { alert: "<svg>alert</svg>" },
+    ELLIPSIS: "&#8230;"
+  };
+});
 
 import {
   showCheckboxDialog,
@@ -27,7 +35,7 @@ import {
   showRefInputDialog
 } from "../../web/dialogs";
 import { buildRefContextMenuItems, checkoutBranchAction, parseRemoteRef } from "../../web/refMenu";
-import { getRepoName, sendMessage } from "../../web/utils";
+import { getRepoName, sanitizeBranchNameForPath, sendMessage } from "../../web/utils";
 
 function createMockElement(classes: string[]): HTMLElement {
   const classList = {
@@ -764,7 +772,7 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
     expect((inputs[1] as DialogCheckboxInput).value).toBe(true);
   });
 
-  it("Path default value is '../<repoName>-<branchName>' format (TC-038)", () => {
+  it("Path default value uses the normalized branch name (TC-038)", () => {
     // Given: A local branch with no worktree
     const sourceElem = createMockElement(["head"]);
     const menu = buildRefContextMenuItems(
@@ -783,11 +791,12 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
       .find((item) => item.title === "Create Worktree&#8230;");
     createItem!.onClick();
 
-    // Then: Path default is "../repo-feature/x" (getRepoName extracts "repo" from "/test/repo")
+    // Then: Path default uses the normalized branch name "../repo-feature-x"
     const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
     const pathInput = inputs[0] as DialogTextInput;
-    expect(pathInput.default).toBe("../repo-feature/x");
+    expect(pathInput.default).toBe("../repo-feature-x");
     expect(getRepoName).toHaveBeenCalledWith(REPO);
+    expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("feature/x");
   });
 
   it("Open Terminal Here sends openTerminal message (TC-039)", () => {

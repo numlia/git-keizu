@@ -5,6 +5,7 @@ import {
   buildCommitRowAttributes,
   escapeHtml,
   pad2,
+  sanitizeBranchNameForPath,
   svgIcons,
   UNCOMMITTED_CHANGES_HASH,
   unescapeHtml,
@@ -71,6 +72,110 @@ describe("unescapeHtml", () => {
   it("round-trips with escapeHtml", () => {
     const original = '<a href="test">it\'s & done</a>';
     expect(unescapeHtml(escapeHtml(original))).toBe(original);
+  });
+});
+
+describe("sanitizeBranchNameForPath", () => {
+  it("replaces a slash with a hyphen (TC-009)", () => {
+    // Given: a branch name containing a slash
+    const branchName = "feature/x";
+    // When: sanitizeBranchNameForPath is called
+    const result = sanitizeBranchNameForPath(branchName);
+    // Then: the slash is replaced with a hyphen
+    expect(result).toBe("feature-x");
+  });
+
+  it("replaces multiple slashes across path segments (TC-010)", () => {
+    // Given: a branch name containing multiple slashes
+    const branchName = "feature/sub/branch";
+    // When: sanitizeBranchNameForPath is called
+    const result = sanitizeBranchNameForPath(branchName);
+    // Then: every slash sequence is normalized to a single hyphen
+    expect(result).toBe("feature-sub-branch");
+  });
+
+  it("collapses consecutive slashes into one hyphen (TC-011)", () => {
+    // Given: a branch name containing consecutive slashes
+    const branchName = "feature//x";
+    // When: sanitizeBranchNameForPath is called
+    const result = sanitizeBranchNameForPath(branchName);
+    // Then: the consecutive unsafe characters become one hyphen
+    expect(result).toBe("feature-x");
+  });
+
+  it("replaces a backslash with a hyphen (TC-012)", () => {
+    // Given: a branch name containing a backslash
+    const branchName = "path\\file";
+    // When: sanitizeBranchNameForPath is called
+    const result = sanitizeBranchNameForPath(branchName);
+    // Then: the backslash is replaced with a hyphen
+    expect(result).toBe("path-file");
+  });
+
+  it("replaces a colon with a hyphen (TC-013)", () => {
+    // Given: a branch name containing a colon
+    const branchName = "fix:bug";
+    // When: sanitizeBranchNameForPath is called
+    const result = sanitizeBranchNameForPath(branchName);
+    // Then: the colon is replaced with a hyphen
+    expect(result).toBe("fix-bug");
+  });
+
+  it("replaces the remaining unsafe characters with hyphens (TC-014)", () => {
+    // Given: a branch name containing asterisk, question mark, quote, angle brackets, and pipe
+    const branchName = 'a*b?c"d<e>f|g';
+    // When: sanitizeBranchNameForPath is called
+    const result = sanitizeBranchNameForPath(branchName);
+    // Then: each unsafe character is normalized to a hyphen
+    expect(result).toBe("a-b-c-d-e-f-g");
+  });
+
+  it("replaces a half-width space with a hyphen (TC-015)", () => {
+    // Given: a branch name containing a half-width space
+    const branchName = "feature branch";
+    // When: sanitizeBranchNameForPath is called
+    const result = sanitizeBranchNameForPath(branchName);
+    // Then: the space is replaced with a hyphen
+    expect(result).toBe("feature-branch");
+  });
+
+  it("returns a safe branch name unchanged (TC-016)", () => {
+    // Given: a branch name without unsafe characters
+    const branchName = "main";
+    // When: sanitizeBranchNameForPath is called
+    const result = sanitizeBranchNameForPath(branchName);
+    // Then: the original string is returned unchanged
+    expect(result).toBe("main");
+  });
+
+  it("collapses mixed consecutive unsafe characters into one hyphen (TC-017)", () => {
+    // Given: a branch name containing mixed consecutive unsafe characters
+    const branchName = "feature/ x";
+    // When: sanitizeBranchNameForPath is called
+    const result = sanitizeBranchNameForPath(branchName);
+    // Then: the consecutive unsafe run is replaced by one hyphen
+    expect(result).toBe("feature-x");
+  });
+
+  it("returns an empty string unchanged (TC-018)", () => {
+    // Given: an empty branch name
+    const branchName = "";
+    // When: sanitizeBranchNameForPath is called
+    const result = sanitizeBranchNameForPath(branchName);
+    // Then: the empty string is returned unchanged
+    expect(result).toBe("");
+  });
+
+  it("is idempotent for an already normalized branch name (TC-019)", () => {
+    // Given: an already normalized branch name
+    const branchName = "feature-x";
+    // When: sanitizeBranchNameForPath is called twice
+    const once = sanitizeBranchNameForPath(branchName);
+    const twice = sanitizeBranchNameForPath(once);
+    // Then: the second result matches the first result
+    expect(once).toBe("feature-x");
+    expect(twice).toBe("feature-x");
+    expect(twice).toBe(once);
   });
 });
 

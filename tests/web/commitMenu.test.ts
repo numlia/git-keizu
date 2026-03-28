@@ -8,20 +8,28 @@ vi.mock("../../web/dialogs", () => ({
   showSelectDialog: vi.fn()
 }));
 
-vi.mock("../../web/utils", () => ({
-  abbrevCommit: vi.fn((h: string) => h.substring(0, 8)),
-  escapeHtml: vi.fn((str: string) => str),
-  sendMessage: vi.fn(),
-  getRepoName: vi.fn((repoPath: string) => {
-    const i = Math.max(repoPath.lastIndexOf("/"), repoPath.lastIndexOf("\\"));
-    return i >= 0 ? repoPath.substring(i + 1) : repoPath;
-  }),
-  ELLIPSIS: "&#8230;"
-}));
+vi.mock("../../web/utils", () => {
+  const pathUnsafeChars = /[\\/:*?"<>| ]+/g;
+  const pathUnsafeCharReplacement = "-";
+
+  return {
+    abbrevCommit: vi.fn((h: string) => h.substring(0, 8)),
+    escapeHtml: vi.fn((str: string) => str),
+    sendMessage: vi.fn(),
+    getRepoName: vi.fn((repoPath: string) => {
+      const i = Math.max(repoPath.lastIndexOf("/"), repoPath.lastIndexOf("\\"));
+      return i >= 0 ? repoPath.substring(i + 1) : repoPath;
+    }),
+    sanitizeBranchNameForPath: vi.fn((branchName: string) =>
+      branchName.replace(pathUnsafeChars, pathUnsafeCharReplacement)
+    ),
+    ELLIPSIS: "&#8230;"
+  };
+});
 
 import { buildCommitContextMenuItems } from "../../web/commitMenu";
 import { showFormDialog } from "../../web/dialogs";
-import { sendMessage } from "../../web/utils";
+import { sanitizeBranchNameForPath, sendMessage } from "../../web/utils";
 
 const REPO = "/test/repo";
 const HASH = "abc1234567890def";
@@ -673,6 +681,132 @@ describe("Create Worktree Here dialog (S4)", () => {
     inputHandler();
 
     // Then: Path remains unchanged (manual edit detected, auto-update stopped)
+    expect(mockPathInput.value).toBe("/custom/path");
+  });
+});
+
+describe("Create Worktree Here path normalization (S6)", () => {
+  const DEFAULT_DIALOG_DEFAULTS = {
+    merge: { noFastForward: true, squashCommits: false, noCommit: false },
+    cherryPick: { recordOrigin: false, noCommit: false },
+    stashUncommittedChanges: { includeUntracked: false },
+    createWorktree: { openTerminal: true },
+    removeWorktree: { deleteBranch: true }
+  };
+
+  function setupViewState() {
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: DEFAULT_DIALOG_DEFAULTS
+    };
+  }
+
+  function getCreateWorktreeItem() {
+    const items = buildCommitContextMenuItems(
+      REPO,
+      HASH,
+      PARENT_HASHES,
+      [],
+      {},
+      createMockElement()
+    );
+    return items.find((item) => item !== null && item.title.includes("Create Worktree Here"))!;
+  }
+
+  function setupPathAutoUpdateHarness() {
+    const item = getCreateWorktreeItem();
+    item.onClick();
+
+    const afterCreate = vi.mocked(showFormDialog).mock.calls[0][5];
+    expect(afterCreate).toBeDefined();
+
+    const addEventListener = vi.fn();
+    const mockBranchInput = {
+      value: "",
+      addEventListener
+    } as unknown as HTMLInputElement & { value: string };
+    const mockPathInput = { value: "../repo-" } as unknown as HTMLInputElement & {
+      value: string;
+    };
+    const mockDialogEl = {
+      querySelector: vi.fn((selector: string) => {
+        if (selector === "#dialogInput0") return mockBranchInput;
+        if (selector === "#dialogInput1") return mockPathInput;
+        return null;
+      })
+    } as unknown as HTMLElement;
+
+    afterCreate!(mockDialogEl);
+
+    const inputListenerCall = addEventListener.mock.calls.find((call) => call[0] === "input");
+    expect(inputListenerCall).toBeDefined();
+
+    return {
+      mockBranchInput,
+      mockPathInput,
+      inputHandler: inputListenerCall![1] as () => void
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupViewState();
+  });
+
+  it("updates Path with a normalized branch name for feature/x (TC-031)", () => {
+    // Given: Create Worktree Here dialog is shown and Path has not been edited
+    const { inputHandler, mockBranchInput, mockPathInput } = setupPathAutoUpdateHarness();
+
+    // When: Branch Name is changed to "feature/x"
+    mockBranchInput.value = "feature/x";
+    inputHandler();
+
+    // Then: Path is updated to the normalized default path
+    expect(mockPathInput.value).toBe("../repo-feature-x");
+    expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("feature/x");
+  });
+
+  it("updates Path with normalized nested segments for a/b/c (TC-032)", () => {
+    // Given: Create Worktree Here dialog is shown and Path has not been edited
+    const { inputHandler, mockBranchInput, mockPathInput } = setupPathAutoUpdateHarness();
+
+    // When: Branch Name is changed to "a/b/c"
+    mockBranchInput.value = "a/b/c";
+    inputHandler();
+
+    // Then: Path is updated using the normalized nested branch name
+    expect(mockPathInput.value).toBe("../repo-a-b-c");
+    expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("a/b/c");
+  });
+
+  it("uses the normalized previous branch name when deciding whether Path was manually edited (TC-033)", () => {
+    // Given: Create Worktree Here dialog is shown and Path is still following automatic updates
+    const { inputHandler, mockBranchInput, mockPathInput } = setupPathAutoUpdateHarness();
+    mockBranchInput.value = "a/b";
+    inputHandler();
+
+    // When: Branch Name changes again from "a/b" to "c/d"
+    mockBranchInput.value = "c/d";
+    inputHandler();
+
+    // Then: Path continues to auto-update because the previous normalized path matched
+    expect(mockPathInput.value).toBe("../repo-c-d");
+    expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("");
+    expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("a/b");
+    expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("c/d");
+  });
+
+  it("preserves a manually edited Path after normalization has already run (TC-034)", () => {
+    // Given: Create Worktree Here dialog auto-updated Path once, then the user edited Path manually
+    const { inputHandler, mockBranchInput, mockPathInput } = setupPathAutoUpdateHarness();
+    mockBranchInput.value = "feature/x";
+    inputHandler();
+    mockPathInput.value = "/custom/path";
+
+    // When: Branch Name changes again to another slash-containing value
+    mockBranchInput.value = "other/branch";
+    inputHandler();
+
+    // Then: the manually edited Path is preserved instead of being overwritten
     expect(mockPathInput.value).toBe("/custom/path");
   });
 });
