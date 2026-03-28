@@ -1,6 +1,12 @@
 import type { GitCommitNode, GitResetMode } from "../src/types";
 import { showConfirmationDialog, showFormDialog, showSelectDialog } from "./dialogs";
-import { abbrevCommit, ELLIPSIS, getRepoName, sendMessage } from "./utils";
+import {
+  abbrevCommit,
+  ELLIPSIS,
+  getRepoName,
+  sanitizeBranchNameForPath,
+  sendMessage
+} from "./utils";
 
 export function buildCommitContextMenuItems(
   repo: string,
@@ -106,9 +112,9 @@ export function buildCommitContextMenuItems(
             let lastBranchName = "";
             branchInput.addEventListener("input", () => {
               const currentPath = pathInput.value;
-              const expectedPath = `${pathPrefix}${lastBranchName}`;
+              const expectedPath = `${pathPrefix}${sanitizeBranchNameForPath(lastBranchName)}`;
               if (currentPath === expectedPath || currentPath === pathPrefix) {
-                pathInput.value = `${pathPrefix}${branchInput.value}`;
+                pathInput.value = `${pathPrefix}${sanitizeBranchNameForPath(branchInput.value)}`;
               }
               lastBranchName = branchInput.value;
             });

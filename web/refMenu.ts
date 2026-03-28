@@ -5,7 +5,14 @@ import {
   showFormDialog,
   showRefInputDialog
 } from "./dialogs";
-import { ELLIPSIS, escapeHtml, getRepoName, sendMessage, svgIcons } from "./utils";
+import {
+  ELLIPSIS,
+  escapeHtml,
+  getRepoName,
+  sanitizeBranchNameForPath,
+  sendMessage,
+  svgIcons
+} from "./utils";
 
 export interface ParsedRemoteRef {
   remoteName: string;
@@ -300,7 +307,7 @@ export function buildRefContextMenuItems(
     }
     if (worktreeInfo === null || worktreeInfo === undefined) {
       const repoName = getRepoName(repo);
-      const defaultPath = `../${repoName}-${refName}`;
+      const defaultPath = `../${repoName}-${sanitizeBranchNameForPath(refName)}`;
       menu.push(null, {
         title: `Create Worktree${ELLIPSIS}`,
         onClick: () => {

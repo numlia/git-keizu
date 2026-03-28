@@ -60,6 +60,8 @@ const htmlUnescapes: { [key: string]: string } = {
 };
 const htmlEscaper = /[&<>"'/]/g;
 const htmlUnescaper = /&lt;|&gt;|&amp;|&quot;|&#x27;|&#x2F;/g;
+const pathUnsafeChars = /[\\/:*?"<>| ]+/g;
+const pathUnsafeCharReplacement = "-";
 export const refInvalid = /^[-/].*|[\\" ><~^:?*[]|\.\.|\/\/|\/\.|@{|[./]$|\.lock$|^@$/;
 export const ELLIPSIS = "&#8230;";
 
@@ -91,6 +93,10 @@ export function escapeHtml(str: string) {
 }
 export function unescapeHtml(str: string) {
   return str.replace(htmlUnescaper, (match) => htmlUnescapes[match]);
+}
+
+export function sanitizeBranchNameForPath(branchName: string) {
+  return branchName.replace(pathUnsafeChars, pathUnsafeCharReplacement);
 }
 
 export function addListenerToClass(className: string, event: string, eventListener: EventListener) {
