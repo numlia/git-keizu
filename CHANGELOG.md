@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.15] - 2026-04-03
+
+### Fixed
+
+- **Merge commit file list now shows correct files**: Clicking a merge commit in the graph now shows only the files actually changed by that merge — previously, files changed in other parent diffs could appear alongside the real changes, producing an inflated or inaccurate file count; root commits continue to use `git diff-tree --root` while commits with parents now use `git diff <hash>^ <hash>`
+
 ## [0.5.14] - 2026-03-28
 
 ### Fixed
@@ -266,7 +272,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.14...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.15...HEAD
+[0.5.15]: https://github.com/numlia/git-keizu/compare/v0.5.14...v0.5.15
 [0.5.14]: https://github.com/numlia/git-keizu/compare/v0.5.13...v0.5.14
 [0.5.13]: https://github.com/numlia/git-keizu/compare/v0.5.12...v0.5.13
 [0.5.12]: https://github.com/numlia/git-keizu/compare/v0.5.11...v0.5.12
