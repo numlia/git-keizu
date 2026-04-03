@@ -307,6 +307,15 @@ body.unableToLoad p {
   text-overflow: ellipsis;
   overflow-x: hidden;
 }
+/* Loading state */
+#cdvLoading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  gap: 6px;
+  opacity: 0.7;
+}
 /* Close button */
 #commitDetailsClose {
   position: absolute;

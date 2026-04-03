@@ -203,7 +203,12 @@ export class GitKeizuView {
               commitDetails:
                 msg.commitHash === UNCOMMITTED_CHANGES_HASH
                   ? await this.dataSource.getUncommittedDetails(msg.repo)
-                  : await this.dataSource.commitDetails(msg.repo, msg.commitHash, msg.hasParents)
+                  : await this.dataSource.commitDetails(
+                      msg.repo,
+                      msg.commitHash,
+                      msg.hasParents,
+                      msg.isStash
+                    )
             });
             break;
           case "compareCommits":

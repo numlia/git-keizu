@@ -215,6 +215,7 @@ export interface RequestCommitDetails {
   repo: string;
   commitHash: string;
   hasParents: boolean;
+  isStash: boolean;
 }
 export interface ResponseCommitDetails {
   command: "commitDetails";

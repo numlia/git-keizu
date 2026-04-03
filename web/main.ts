@@ -728,6 +728,9 @@ class GitKeizuView {
         this.saveState();
         if (this.expandedCommit.commitDetails !== null && this.expandedCommit.fileTree !== null) {
           this.showCommitDetails(this.expandedCommit.commitDetails, this.expandedCommit.fileTree);
+        } else if (this.expandedCommit.loading) {
+          elem.classList.add("commitDetailsOpen");
+          this.renderCommitDetailsView();
         } else {
           this.loadCommitDetails(elem);
         }
@@ -1273,24 +1276,59 @@ class GitKeizuView {
   /* Commit Details */
   private loadCommitDetails(sourceElem: HTMLElement) {
     this.hideCommitDetails();
+    const hash = sourceElem.dataset.hash!;
+    const commit = this.commits[this.commitLookup[hash]];
     this.expandedCommit = {
       id: parseInt(sourceElem.dataset.id!, 10),
-      hash: sourceElem.dataset.hash!,
+      hash: hash,
       srcElem: sourceElem,
       compareWithHash: null,
       compareWithSrcElem: null,
       commitDetails: null,
-      fileTree: null
+      fileTree: null,
+      loading: true
     };
+    sourceElem.classList.add("commitDetailsOpen");
     this.saveState();
-    const hash = sourceElem.dataset.hash!;
-    const commit = this.commits[this.commitLookup[hash]];
+    this.renderCommitDetailsView();
     sendMessage({
       command: "commitDetails",
       repo: this.currentRepo!,
       commitHash: hash,
-      hasParents: commit !== undefined && commit.parentHashes.length > 0
+      hasParents: commit !== undefined && commit.parentHashes.length > 0,
+      isStash: commit !== undefined && commit.stash !== null
     });
+  }
+  private renderCommitDetailsView() {
+    if (this.expandedCommit === null || this.expandedCommit.srcElem === null) return;
+
+    let elem = document.getElementById("commitDetails");
+    if (elem === null) {
+      elem = document.createElement("tr");
+      elem.id = "commitDetails";
+      insertAfter(elem, this.expandedCommit.srcElem);
+    }
+
+    const cdvHeight = this.calculateCdvHeight();
+    elem.style.height = `${cdvHeight}px`;
+
+    if (this.expandedCommit.loading) {
+      const loadingLabel =
+        this.expandedCommit.hash === UNCOMMITTED_CHANGES_HASH
+          ? "Uncommitted Changes"
+          : "Commit Details";
+      elem.innerHTML =
+        `<td></td><td colspan="${COMMIT_DETAILS_COLSPAN}">` +
+        `<div id="cdvLoading">${svgIcons.loading} Loading ${loadingLabel} ...</div>` +
+        `<div id="commitDetailsClose">${svgIcons.close}</div>` +
+        "</td>";
+      document.getElementById("commitDetailsClose")!.addEventListener("click", () => {
+        this.hideCommitDetails();
+      });
+    }
+
+    this.renderGraph();
+    this.scrollToExpandedCommit(elem);
   }
   private getCommitOrder(hash1: string, hash2: string): { from: string; to: string } {
     // Backend expects UNCOMMITTED_CHANGES_HASH in fromHash to trigger working tree diff
@@ -1330,12 +1368,11 @@ class GitKeizuView {
       this.expandedCommit.hash !== commitDetails.hash
     )
       return;
-    let elem = document.getElementById("commitDetails");
-    if (typeof elem === "object" && elem !== null) elem.remove();
 
     const isCompareMode = this.expandedCommit.compareWithHash !== null;
     this.expandedCommit.commitDetails = commitDetails;
     this.expandedCommit.fileTree = fileTree;
+    this.expandedCommit.loading = false;
     this.expandedCommit.srcElem.classList.add("commitDetailsOpen");
     this.saveState();
 
@@ -1359,16 +1396,21 @@ class GitKeizuView {
       `<div id="commitDetailsClose">${svgIcons.close}</div>` +
       "</td>";
 
-    const newElem = document.createElement("tr");
-    newElem.id = "commitDetails";
-    newElem.innerHTML = html;
-    insertAfter(newElem, this.expandedCommit.srcElem);
+    let elem = document.getElementById("commitDetails");
+    if (elem !== null) {
+      elem.innerHTML = html;
+    } else {
+      elem = document.createElement("tr");
+      elem.id = "commitDetails";
+      elem.innerHTML = html;
+      insertAfter(elem, this.expandedCommit.srcElem);
+    }
 
     const cdvHeight = this.calculateCdvHeight();
-    newElem.style.height = `${cdvHeight}px`;
+    elem.style.height = `${cdvHeight}px`;
 
     this.renderGraph();
-    this.scrollToExpandedCommit(newElem);
+    this.scrollToExpandedCommit(elem);
 
     document.getElementById("commitDetailsClose")!.addEventListener("click", () => {
       this.hideCommitDetails();

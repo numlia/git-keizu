@@ -250,13 +250,21 @@ export class DataSource {
   public async commitDetails(
     repo: string,
     commitHash: string,
-    hasParents: boolean
+    hasParents: boolean,
+    isStash: boolean
   ): Promise<GitCommitDetails | null> {
     if (!isValidCommitHash(commitHash)) {
       return null;
     }
     try {
-      const [details, stashes] = await Promise.all([
+      const nameStatusArgs = this.buildDiffArgs(
+        isStash,
+        hasParents,
+        NAME_STATUS_OPTION,
+        commitHash
+      );
+      const numStatArgs = this.buildDiffArgs(isStash, hasParents, NUMSTAT_OPTION, commitHash);
+      const [details, nameStatus, numStat] = await Promise.all([
         this.spawnGit<GitCommitDetails | null>(
           ["show", "--quiet", commitHash, `--format=${this.gitCommitDetailsFormat}`],
           repo,
@@ -279,17 +287,12 @@ export class DataSource {
           },
           null
         ),
-        this.getStashes(repo)
-      ]);
-
-      if (details === null) return null;
-      const stash = stashes.find((entry) => entry.hash === commitHash) ?? null;
-      const nameStatusArgs = this.buildDiffArgs(stash, hasParents, NAME_STATUS_OPTION, commitHash);
-      const numStatArgs = this.buildDiffArgs(stash, hasParents, NUMSTAT_OPTION, commitHash);
-      const [nameStatus, numStat] = await Promise.all([
         this.spawnGit<string[]>(nameStatusArgs, repo, (stdout) => stdout.split(eolRegex), []),
         this.spawnGit<string[]>(numStatArgs, repo, (stdout) => stdout.split(eolRegex), [])
       ]);
+
+      if (details === null) return null;
+
       const fileLookup: { [file: string]: number } = {};
 
       for (let i = 0; i < nameStatus.length; i++) {
@@ -947,12 +950,12 @@ export class DataSource {
   }
 
   private buildDiffArgs(
-    stash: GitStash | null,
+    isStash: boolean,
     hasParents: boolean,
     statOption: string,
     commitHash: string
   ): string[] {
-    if (stash !== null) {
+    if (isStash) {
       return [
         ...NO_QUOTE_PATH_CONFIG,
         "stash",

@@ -2123,7 +2123,7 @@ describe("commitDetails stash diff handling", () => {
     });
 
     // When: commitDetails is called for a stash hash
-    const result = await ds.commitDetails(REPO, stashHash);
+    const result = await ds.commitDetails(REPO, stashHash, true, true);
 
     // Then: stash show output is parsed (single untracked file only)
     expect(result).not.toBeNull();
@@ -2181,8 +2181,8 @@ describe("commitDetails stash diff handling", () => {
       return createMockProcess("");
     });
 
-    // When: commitDetails is called for a regular commit
-    const result = await ds.commitDetails(REPO, commitHash);
+    // When: commitDetails is called for a regular (root) commit
+    const result = await ds.commitDetails(REPO, commitHash, false, false);
 
     // Then: diff-tree output is parsed, while hash header lines are ignored
     expect(result).not.toBeNull();
@@ -2248,7 +2248,7 @@ describe("commitDetails committerEmail", () => {
     setupSpawnForDetails(detailsOutput);
 
     // When: commitDetails is called
-    const result = await ds.commitDetails(REPO, "abc123def456");
+    const result = await ds.commitDetails(REPO, "abc123def456", false, false);
 
     // Then: committerEmail is correctly parsed
     expect(result).not.toBeNull();
@@ -2270,7 +2270,7 @@ describe("commitDetails committerEmail", () => {
     setupSpawnForDetails(detailsOutput);
 
     // When: commitDetails is called
-    const result = await ds.commitDetails(REPO, "abc123def456");
+    const result = await ds.commitDetails(REPO, "abc123def456", false, false);
 
     // Then: committerEmail is an empty string
     expect(result).not.toBeNull();
@@ -2292,7 +2292,7 @@ describe("commitDetails committerEmail", () => {
     setupSpawnForDetails(detailsOutput);
 
     // When: commitDetails is called
-    const result = await ds.commitDetails(REPO, "abc123def456");
+    const result = await ds.commitDetails(REPO, "abc123def456", false, false);
 
     // Then: all fields are correctly parsed including committerEmail
     expect(result).not.toBeNull();

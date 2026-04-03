@@ -63,6 +63,7 @@ declare global {
     compareWithSrcElem: HTMLElement | null;
     commitDetails: GG.GitCommitDetails | null;
     fileTree: GitFolder | null;
+    loading: boolean;
   }
 
   interface GitFile {
