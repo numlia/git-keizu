@@ -1283,10 +1283,13 @@ class GitKeizuView {
       fileTree: null
     };
     this.saveState();
+    const hash = sourceElem.dataset.hash!;
+    const commit = this.commits[this.commitLookup[hash]];
     sendMessage({
       command: "commitDetails",
       repo: this.currentRepo!,
-      commitHash: sourceElem.dataset.hash!
+      commitHash: hash,
+      hasParents: commit !== undefined && commit.parentHashes.length > 0
     });
   }
   private getCommitOrder(hash1: string, hash2: string): { from: string; to: string } {

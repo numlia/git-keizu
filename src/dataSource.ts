@@ -247,7 +247,11 @@ export class DataSource {
     };
   }
 
-  public async commitDetails(repo: string, commitHash: string): Promise<GitCommitDetails | null> {
+  public async commitDetails(
+    repo: string,
+    commitHash: string,
+    hasParents: boolean
+  ): Promise<GitCommitDetails | null> {
     if (!isValidCommitHash(commitHash)) {
       return null;
     }
@@ -280,52 +284,8 @@ export class DataSource {
 
       if (details === null) return null;
       const stash = stashes.find((entry) => entry.hash === commitHash) ?? null;
-      const nameStatusArgs =
-        stash === null
-          ? [
-              ...NO_QUOTE_PATH_CONFIG,
-              "diff-tree",
-              NAME_STATUS_OPTION,
-              "-r",
-              "-m",
-              "--root",
-              DIFF_FIND_RENAMES_OPTION,
-              DIFF_FILTER_AMDR_OPTION,
-              commitHash
-            ]
-          : [
-              ...NO_QUOTE_PATH_CONFIG,
-              "stash",
-              "show",
-              STASH_SHOW_INCLUDE_UNTRACKED_OPTION,
-              NAME_STATUS_OPTION,
-              DIFF_FIND_RENAMES_OPTION,
-              DIFF_FILTER_AMDR_OPTION,
-              commitHash
-            ];
-      const numStatArgs =
-        stash === null
-          ? [
-              ...NO_QUOTE_PATH_CONFIG,
-              "diff-tree",
-              NUMSTAT_OPTION,
-              "-r",
-              "-m",
-              "--root",
-              DIFF_FIND_RENAMES_OPTION,
-              DIFF_FILTER_AMDR_OPTION,
-              commitHash
-            ]
-          : [
-              ...NO_QUOTE_PATH_CONFIG,
-              "stash",
-              "show",
-              STASH_SHOW_INCLUDE_UNTRACKED_OPTION,
-              NUMSTAT_OPTION,
-              DIFF_FIND_RENAMES_OPTION,
-              DIFF_FILTER_AMDR_OPTION,
-              commitHash
-            ];
+      const nameStatusArgs = this.buildDiffArgs(stash, hasParents, NAME_STATUS_OPTION, commitHash);
+      const numStatArgs = this.buildDiffArgs(stash, hasParents, NUMSTAT_OPTION, commitHash);
       const [nameStatus, numStat] = await Promise.all([
         this.spawnGit<string[]>(nameStatusArgs, repo, (stdout) => stdout.split(eolRegex), []),
         this.spawnGit<string[]>(numStatArgs, repo, (stdout) => stdout.split(eolRegex), [])
@@ -986,23 +946,64 @@ export class DataSource {
     );
   }
 
+  private buildDiffArgs(
+    stash: GitStash | null,
+    hasParents: boolean,
+    statOption: string,
+    commitHash: string
+  ): string[] {
+    if (stash !== null) {
+      return [
+        ...NO_QUOTE_PATH_CONFIG,
+        "stash",
+        "show",
+        STASH_SHOW_INCLUDE_UNTRACKED_OPTION,
+        statOption,
+        DIFF_FIND_RENAMES_OPTION,
+        DIFF_FILTER_AMDR_OPTION,
+        commitHash
+      ];
+    }
+    if (hasParents) {
+      return [
+        ...NO_QUOTE_PATH_CONFIG,
+        "diff",
+        statOption,
+        DIFF_FIND_RENAMES_OPTION,
+        DIFF_FILTER_AMDR_OPTION,
+        `${commitHash}^`,
+        commitHash
+      ];
+    }
+    return [
+      ...NO_QUOTE_PATH_CONFIG,
+      "diff-tree",
+      statOption,
+      "-r",
+      "--root",
+      DIFF_FIND_RENAMES_OPTION,
+      DIFF_FILTER_AMDR_OPTION,
+      commitHash
+    ];
+  }
+
   private runGitCommandSpawn(args: string[], repo: string) {
     return new Promise<GitCommandStatus>((resolve) => {
       let stdout = "",
         stderr = "",
         err = false;
       const cmd = cp.spawn(this.gitPath, args, { cwd: repo });
-      cmd.stdout.on("data", (d) => {
+      cmd.stdout.on("data", (d: string | Uint8Array) => {
         stdout += d;
       });
-      cmd.stderr.on("data", (d) => {
+      cmd.stderr.on("data", (d: string | Uint8Array) => {
         stderr += d;
       });
-      cmd.on("error", (e) => {
+      cmd.on("error", (e: Error) => {
         resolve(e.message.split(eolRegex).join("\n"));
         err = true;
       });
-      cmd.on("close", (code) => {
+      cmd.on("close", (code: number | null) => {
         if (err) return;
         if (code === 0) {
           resolve(null);
@@ -1024,14 +1025,14 @@ export class DataSource {
       let stdout = "",
         err = false;
       const cmd = cp.spawn(this.gitPath, args, { cwd: repo });
-      cmd.stdout.on("data", (d) => {
+      cmd.stdout.on("data", (d: string | Uint8Array) => {
         stdout += d;
       });
       cmd.on("error", () => {
         resolve(errorValue);
         err = true;
       });
-      cmd.on("close", (code) => {
+      cmd.on("close", (code: number | null) => {
         if (err) return;
         resolve(code === 0 ? successValue(stdout) : errorValue);
       });

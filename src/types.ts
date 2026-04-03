@@ -214,6 +214,7 @@ export interface RequestCommitDetails {
   command: "commitDetails";
   repo: string;
   commitHash: string;
+  hasParents: boolean;
 }
 export interface ResponseCommitDetails {
   command: "commitDetails";
