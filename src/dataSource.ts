@@ -31,16 +31,12 @@ const STASH_FORMAT_FIELD_COUNT = 7;
 const STASH_SHOW_INCLUDE_UNTRACKED_OPTION = "-u";
 const DIFF_FILTER_AMDR_OPTION = "--diff-filter=AMDR";
 const DIFF_FIND_RENAMES_OPTION = "--find-renames";
+const NULL_BYTE_OPTION = "-z";
+const NULL_BYTE_SEPARATOR = "\0";
 const NAME_STATUS_OPTION = "--name-status";
 const NUMSTAT_OPTION = "--numstat";
 const TAB_SEPARATOR = "\t";
-const NAME_STATUS_MIN_COLUMN_COUNT = 2;
-const NUMSTAT_COLUMN_COUNT = 3;
-const FILE_CHANGE_TYPE_INDEX = 0;
-const NAME_STATUS_OLD_FILE_PATH_INDEX = 1;
-const NUMSTAT_ADDITIONS_INDEX = 0;
-const NUMSTAT_DELETIONS_INDEX = 1;
-const NUMSTAT_FILE_NAME_INDEX = 2;
+const NUMSTAT_FIELD_COUNT = 3;
 const VALID_FILE_CHANGE_TYPES: ReadonlySet<string> = new Set(["A", "M", "D", "R"]);
 
 export const COMMIT_ORDER_FLAGS: Readonly<Record<CommitOrdering, string>> = {
@@ -264,7 +260,13 @@ export class DataSource {
         commitHash
       );
       const numStatArgs = this.buildDiffArgs(isStash, hasParents, NUMSTAT_OPTION, commitHash);
-      const [details, nameStatus, numStat] = await Promise.all([
+      const isRootCommit = !hasParents && !isStash;
+      const splitDiffOutput = (stdout: string): string[] => {
+        const fields = stdout.split(NULL_BYTE_SEPARATOR);
+        if (isRootCommit) fields.shift();
+        return fields;
+      };
+      const [details, nameStatusFields, numStatFields] = await Promise.all([
         this.spawnGit<GitCommitDetails | null>(
           ["show", "--quiet", commitHash, `--format=${this.gitCommitDetailsFormat}`],
           repo,
@@ -287,55 +289,62 @@ export class DataSource {
           },
           null
         ),
-        this.spawnGit<string[]>(nameStatusArgs, repo, (stdout) => stdout.split(eolRegex), []),
-        this.spawnGit<string[]>(numStatArgs, repo, (stdout) => stdout.split(eolRegex), [])
+        this.spawnGit<string[]>(nameStatusArgs, repo, splitDiffOutput, []),
+        this.spawnGit<string[]>(numStatArgs, repo, splitDiffOutput, [])
       ]);
 
       if (details === null) return null;
 
       const fileLookup: { [file: string]: number } = {};
 
-      for (let i = 0; i < nameStatus.length; i++) {
-        let line = nameStatus[i].split(TAB_SEPARATOR);
-        const statusToken = line[FILE_CHANGE_TYPE_INDEX] ?? "";
-        const changeType = statusToken[FILE_CHANGE_TYPE_INDEX] ?? "";
-        if (
-          line.length < NAME_STATUS_MIN_COLUMN_COUNT ||
-          !VALID_FILE_CHANGE_TYPES.has(changeType)
-        ) {
-          continue;
+      let ns = 0;
+      while (ns < nameStatusFields.length && nameStatusFields[ns] !== "") {
+        const statusChar = (nameStatusFields[ns] ?? "")[0] ?? "";
+        if (!VALID_FILE_CHANGE_TYPES.has(statusChar)) break;
+        if (statusChar === "R") {
+          const oldPath = getPathFromStr(nameStatusFields[ns + 1] ?? "");
+          const newPath = getPathFromStr(nameStatusFields[ns + 2] ?? "");
+          fileLookup[newPath] = details.fileChanges.length;
+          details.fileChanges.push({
+            oldFilePath: oldPath,
+            newFilePath: newPath,
+            type: statusChar as GitFileChangeType,
+            additions: null,
+            deletions: null
+          });
+          ns += 3;
+        } else {
+          const filePath = getPathFromStr(nameStatusFields[ns + 1] ?? "");
+          fileLookup[filePath] = details.fileChanges.length;
+          details.fileChanges.push({
+            oldFilePath: filePath,
+            newFilePath: filePath,
+            type: statusChar as GitFileChangeType,
+            additions: null,
+            deletions: null
+          });
+          ns += 2;
         }
-        let oldFilePath = getPathFromStr(line[NAME_STATUS_OLD_FILE_PATH_INDEX] ?? ""),
-          newFilePath = getPathFromStr(line[line.length - 1] ?? "");
-        fileLookup[newFilePath] = details.fileChanges.length;
-        details.fileChanges.push({
-          oldFilePath: oldFilePath,
-          newFilePath: newFilePath,
-          type: <GitFileChangeType>changeType,
-          additions: null,
-          deletions: null
-        });
       }
 
-      for (let i = 0; i < numStat.length; i++) {
-        let line = numStat[i].split(TAB_SEPARATOR);
-        if (line.length !== NUMSTAT_COLUMN_COUNT) continue;
-        let fileName = (line[NUMSTAT_FILE_NAME_INDEX] ?? "")
-          .replace(/(.*){.* => (.*)}/, "$1$2")
-          .replace(/.* => (.*)/, "$1");
-        const fileChangeIndex = fileLookup[fileName];
-        if (
-          typeof fileChangeIndex === "number" &&
-          details.fileChanges[fileChangeIndex] !== undefined
-        ) {
-          const additions = parseInt(line[NUMSTAT_ADDITIONS_INDEX] ?? "", 10);
-          const deletions = parseInt(line[NUMSTAT_DELETIONS_INDEX] ?? "", 10);
-          details.fileChanges[fileChangeIndex].additions = Number.isNaN(additions)
-            ? null
-            : additions;
-          details.fileChanges[fileChangeIndex].deletions = Number.isNaN(deletions)
-            ? null
-            : deletions;
+      let ni = 0;
+      while (ni < numStatFields.length && numStatFields[ni] !== "") {
+        const parts = numStatFields[ni].split(TAB_SEPARATOR);
+        if (parts.length !== NUMSTAT_FIELD_COUNT) break;
+        const additions = parseInt(parts[0], 10);
+        const deletions = parseInt(parts[1], 10);
+        let filePath: string;
+        if (parts[2] !== "") {
+          filePath = getPathFromStr(parts[2]);
+          ni += 1;
+        } else {
+          filePath = getPathFromStr(numStatFields[ni + 2] ?? "");
+          ni += 3;
+        }
+        const idx = fileLookup[filePath];
+        if (typeof idx === "number" && details.fileChanges[idx] !== undefined) {
+          details.fileChanges[idx].additions = Number.isNaN(additions) ? null : additions;
+          details.fileChanges[idx].deletions = Number.isNaN(deletions) ? null : deletions;
         }
       }
       return details;
@@ -957,35 +966,35 @@ export class DataSource {
   ): string[] {
     if (isStash) {
       return [
-        ...NO_QUOTE_PATH_CONFIG,
         "stash",
         "show",
         STASH_SHOW_INCLUDE_UNTRACKED_OPTION,
         statOption,
         DIFF_FIND_RENAMES_OPTION,
         DIFF_FILTER_AMDR_OPTION,
+        NULL_BYTE_OPTION,
         commitHash
       ];
     }
     if (hasParents) {
       return [
-        ...NO_QUOTE_PATH_CONFIG,
         "diff",
         statOption,
         DIFF_FIND_RENAMES_OPTION,
         DIFF_FILTER_AMDR_OPTION,
+        NULL_BYTE_OPTION,
         `${commitHash}^`,
         commitHash
       ];
     }
     return [
-      ...NO_QUOTE_PATH_CONFIG,
       "diff-tree",
       statOption,
       "-r",
       "--root",
       DIFF_FIND_RENAMES_OPTION,
       DIFF_FILTER_AMDR_OPTION,
+      NULL_BYTE_OPTION,
       commitHash
     ];
   }

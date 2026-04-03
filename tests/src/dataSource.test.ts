@@ -2092,31 +2092,16 @@ describe("commitDetails stash diff handling", () => {
       "committer@example.com"
     ].join(SEP);
     const detailsOutput = `${detailsLine}\nWIP on main: abc message\n`;
-    const stashOutput = [
-      makeStashLine(
-        stashHash,
-        "parent111",
-        "parent222",
-        "parent333",
-        "stash@{0}",
-        "Author Name",
-        "author@example.com",
-        1700000000,
-        "WIP on main: abc message"
-      ),
-      ""
-    ].join("\n");
-    const nameStatusOutput = "A\tuntracked.txt\n";
-    const numStatOutput = "1\t0\tuntracked.txt\n";
+    const nameStatusOutput = "A\0untracked.txt\0";
+    const numStatOutput = "1\t0\tuntracked.txt\0";
 
     spawnMock.mockImplementation((_cmd: unknown, args: unknown) => {
       const argArray = args as string[];
       if (argArray[0] === "show") return createMockProcess(detailsOutput);
-      if (argArray[0] === "reflog") return createMockProcess(stashOutput);
-      if (argArray[2] === "stash" && argArray.includes("--name-status")) {
+      if (argArray[0] === "stash" && argArray.includes("--name-status")) {
         return createMockProcess(nameStatusOutput);
       }
-      if (argArray[2] === "stash" && argArray.includes("--numstat")) {
+      if (argArray[0] === "stash" && argArray.includes("--numstat")) {
         return createMockProcess(numStatOutput);
       }
       return createMockProcess("");
@@ -2139,15 +2124,17 @@ describe("commitDetails stash diff handling", () => {
 
     const stashShowCalls = spawnMock.mock.calls.filter((call) => {
       const argArray = call[1] as string[];
-      return argArray[2] === "stash" && argArray[3] === "show";
+      return argArray[0] === "stash" && argArray[1] === "show";
     });
     expect(stashShowCalls).toHaveLength(2);
     expect(stashShowCalls[0][1] as string[]).toContain("-u");
+    expect(stashShowCalls[0][1] as string[]).toContain("-z");
     expect(stashShowCalls[1][1] as string[]).toContain("-u");
+    expect(stashShowCalls[1][1] as string[]).toContain("-z");
 
     const diffTreeCalls = spawnMock.mock.calls.filter((call) => {
       const argArray = call[1] as string[];
-      return argArray[2] === "diff-tree";
+      return argArray[0] === "diff-tree";
     });
     expect(diffTreeCalls).toHaveLength(0);
   });
@@ -2165,17 +2152,16 @@ describe("commitDetails stash diff handling", () => {
       "committer@example.com"
     ].join(SEP);
     const detailsOutput = `${detailsLine}\nregular commit\n`;
-    const nameStatusOutput = `${commitHash}\nM\ttracked.txt\n`;
-    const numStatOutput = `${commitHash}\n1\t1\ttracked.txt\n`;
+    const nameStatusOutput = commitHash + "\0M\0tracked.txt\0";
+    const numStatOutput = commitHash + "\x001\t1\ttracked.txt\0";
 
     spawnMock.mockImplementation((_cmd: unknown, args: unknown) => {
       const argArray = args as string[];
       if (argArray[0] === "show") return createMockProcess(detailsOutput);
-      if (argArray[0] === "reflog") return createMockProcess("");
-      if (argArray[2] === "diff-tree" && argArray.includes("--name-status")) {
+      if (argArray[0] === "diff-tree" && argArray.includes("--name-status")) {
         return createMockProcess(nameStatusOutput);
       }
-      if (argArray[2] === "diff-tree" && argArray.includes("--numstat")) {
+      if (argArray[0] === "diff-tree" && argArray.includes("--numstat")) {
         return createMockProcess(numStatOutput);
       }
       return createMockProcess("");
@@ -2184,7 +2170,7 @@ describe("commitDetails stash diff handling", () => {
     // When: commitDetails is called for a regular (root) commit
     const result = await ds.commitDetails(REPO, commitHash, false, false);
 
-    // Then: diff-tree output is parsed, while hash header lines are ignored
+    // Then: diff-tree output is parsed, while hash header is skipped
     expect(result).not.toBeNull();
     expect(result!.fileChanges).toEqual([
       {
@@ -2198,13 +2184,15 @@ describe("commitDetails stash diff handling", () => {
 
     const diffTreeCalls = spawnMock.mock.calls.filter((call) => {
       const argArray = call[1] as string[];
-      return argArray[2] === "diff-tree";
+      return argArray[0] === "diff-tree";
     });
     expect(diffTreeCalls).toHaveLength(2);
+    expect(diffTreeCalls[0][1] as string[]).toContain("-z");
+    expect(diffTreeCalls[1][1] as string[]).toContain("-z");
 
     const stashShowCalls = spawnMock.mock.calls.filter((call) => {
       const argArray = call[1] as string[];
-      return argArray[2] === "stash" && argArray[3] === "show";
+      return argArray[0] === "stash" && argArray[1] === "show";
     });
     expect(stashShowCalls).toHaveLength(0);
   });
