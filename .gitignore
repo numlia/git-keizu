@@ -4,3 +4,4 @@ out
 *.vsix
 notes/*
 !notes/.gitkeep
+.insaits_audit_session.jsonl
