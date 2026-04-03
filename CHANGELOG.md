@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.16] - 2026-04-04
+
+### Changed
+
+- **Commit details load noticeably faster**: A loading indicator appears immediately when you click a commit for instant visual feedback; the git commands that power the diff panel now run in parallel rather than sequentially, reducing perceived latency especially on large repositories or slower machines
+
 ## [0.5.15] - 2026-04-03
 
 ### Fixed
@@ -272,7 +278,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.15...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.16...HEAD
+[0.5.16]: https://github.com/numlia/git-keizu/compare/v0.5.15...v0.5.16
 [0.5.15]: https://github.com/numlia/git-keizu/compare/v0.5.14...v0.5.15
 [0.5.14]: https://github.com/numlia/git-keizu/compare/v0.5.13...v0.5.14
 [0.5.13]: https://github.com/numlia/git-keizu/compare/v0.5.12...v0.5.13
