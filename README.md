@@ -45,6 +45,7 @@ An actively maintained fork of [Git Graph](https://github.com/mhutchie/vscode-gi
 - **Muted merge commits**: Merge commits are shown with dimmed text (commit message, date, author, and hash) by default, making non-merge commits easier to spot in a busy history. Branch labels always render at full opacity regardless of mute state. Non-ancestor commits can also be muted via settings (`git-keizu.repository.commits.mute.*`).
 - **Author Filter**: A multi-select dropdown in the toolbar lets you filter commits by author — select one or more names to show only their commits, or choose "Show All" to clear the filter. The author list covers all authors reachable from HEAD (not just the currently loaded commits), so no one is missed even in long histories.
 - **Commit Details**: Click on a commit to see what changed and view diffs for any file. A loading indicator appears immediately when you click, and the diff data loads in parallel for faster response. The panel height adjusts to your viewport size, and the view only scrolls enough to bring the panel into view — no jarring auto-center on every click. Parent hashes are clickable links that jump straight to the parent commit's details.
+- **Open File from commit details**: Each file entry in the commit details panel shows an "Open File" icon on hover (not shown for deleted files); clicking it opens the working-tree copy in VS Code in preview mode. If the file has since been renamed, Git Keizu resolves the new path automatically via git rename tracking — if the file cannot be found, an error dialog is shown. Use `git-keizu.openNewTabEditorGroup` to choose which editor group the file opens in.
 - **File View Toggle**: Switch between Tree View (folder hierarchy) and List View (flat alphabetical list of full paths) in the commit details panel; the chosen mode is saved per repository.
 - **Branch filter**: A multi-select dropdown in the toolbar lets you filter the graph to one or more branches simultaneously; selecting no individual branch returns to "Show All" (all branches visible).
 - **Branch Actions**: Right-click to create, checkout, delete, rename, merge, or rebase branches. The Create Branch dialog includes a "Check out" checkbox (on by default) to automatically switch to the new branch after creation. The Merge dialog exposes "Squash Commits" and "No Commit" options in addition to the existing "No Fast Forward" checkbox. When deleting a local branch, an optional checkbox lets you also delete the corresponding remote branch in one step.
@@ -84,22 +85,23 @@ All settings are under the `git-keizu.*` namespace.
 
 ### General
 
-| Setting                                 | Default        | Description                                                  |
-| --------------------------------------- | -------------- | ------------------------------------------------------------ |
-| `dateFormat`                            | `Date & Time`  | Date format: `Date & Time`, `Date Only`, or `Relative`       |
-| `dateType`                              | `Author Date`  | Date type: `Author Date` or `Commit Date`                    |
-| `fetchAvatars`                          | `false`        | Fetch commit author avatars from GitHub, GitLab, or Gravatar |
-| `graphColours`                          | _(12 colours)_ | Colours used on the graph (HEX or RGB array)                 |
-| `graphStyle`                            | `rounded`      | Graph line style: `rounded` or `angular`                     |
-| `initialLoadCommits`                    | `300`          | Number of commits to initially load                          |
-| `loadMoreCommits`                       | `100`          | Number of additional commits to load at a time               |
-| `loadMoreCommitsAutomatically`          | `true`         | Automatically load more commits when scrolling to the bottom |
-| `maxDepthOfRepoSearch`                  | `0`            | Maximum depth of subfolders to search for repositories       |
-| `showCurrentBranchByDefault`            | `false`        | Show only the current branch when the graph is opened        |
-| `showStatusBarItem`                     | `true`         | Show a Status Bar item to open Git Keizu                     |
-| `showUncommittedChanges`                | `true`         | Show uncommitted changes row in the graph                    |
-| `tabIconColourTheme`                    | `colour`       | Tab icon theme: `colour` or `grey`                           |
-| `sourceCodeProviderIntegrationLocation` | `Inline`       | SCM title bar button position: `Inline` or `More Actions`    |
+| Setting                                 | Default        | Description                                                                      |
+| --------------------------------------- | -------------- | -------------------------------------------------------------------------------- |
+| `dateFormat`                            | `Date & Time`  | Date format: `Date & Time`, `Date Only`, or `Relative`                           |
+| `dateType`                              | `Author Date`  | Date type: `Author Date` or `Commit Date`                                        |
+| `fetchAvatars`                          | `false`        | Fetch commit author avatars from GitHub, GitLab, or Gravatar                     |
+| `graphColours`                          | _(12 colours)_ | Colours used on the graph (HEX or RGB array)                                     |
+| `graphStyle`                            | `rounded`      | Graph line style: `rounded` or `angular`                                         |
+| `initialLoadCommits`                    | `300`          | Number of commits to initially load                                              |
+| `loadMoreCommits`                       | `100`          | Number of additional commits to load at a time                                   |
+| `loadMoreCommitsAutomatically`          | `true`         | Automatically load more commits when scrolling to the bottom                     |
+| `openNewTabEditorGroup`                 | `Active`       | Editor group for "Open File" in commit details: `Active`, `Beside`, `One`–`Nine` |
+| `maxDepthOfRepoSearch`                  | `0`            | Maximum depth of subfolders to search for repositories                           |
+| `showCurrentBranchByDefault`            | `false`        | Show only the current branch when the graph is opened                            |
+| `showStatusBarItem`                     | `true`         | Show a Status Bar item to open Git Keizu                                         |
+| `showUncommittedChanges`                | `true`         | Show uncommitted changes row in the graph                                        |
+| `tabIconColourTheme`                    | `colour`       | Tab icon theme: `colour` or `grey`                                               |
+| `sourceCodeProviderIntegrationLocation` | `Inline`       | SCM title bar button position: `Inline` or `More Actions`                        |
 
 ### Keyboard Shortcuts (`keyboardShortcut*`)
 

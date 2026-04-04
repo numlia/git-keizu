@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.17] - 2026-04-04
+
+### Added
+
+- **Open File from commit details**: Each file entry in the commit details panel now shows an "Open File" icon on hover (icon is hidden for deleted files); clicking it opens the current working-tree copy of that file in VS Code in preview mode. If the file has since been renamed, Git Keizu automatically resolves the new path via git rename tracking and opens it — if the file cannot be found or opened, an error dialog explains what went wrong.
+- **Configurable editor group for Open File**: A new `git-keizu.openNewTabEditorGroup` setting lets you choose which editor group the opened file lands in — `Active` (default, same group as the current editor), `Beside` (opens to the side), or any numbered group `One` through `Nine`.
+
 ## [0.5.16] - 2026-04-04
 
 ### Changed
@@ -278,7 +285,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.16...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.17...HEAD
+[0.5.17]: https://github.com/numlia/git-keizu/compare/v0.5.16...v0.5.17
 [0.5.16]: https://github.com/numlia/git-keizu/compare/v0.5.15...v0.5.16
 [0.5.15]: https://github.com/numlia/git-keizu/compare/v0.5.14...v0.5.15
 [0.5.14]: https://github.com/numlia/git-keizu/compare/v0.5.13...v0.5.14
