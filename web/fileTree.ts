@@ -56,9 +56,13 @@ function buildFileItemHtml(gitFile: GitFileChange, displayName: string): string 
     gitFile.type !== "A" && gitFile.type !== "D" && diffPossible
       ? `<span class="gitFileAddDel">(<span class="gitFileAdditions" title="${gitFile.additions} addition${gitFile.additions !== 1 ? "s" : ""}">+${gitFile.additions}</span>|<span class="gitFileDeletions" title="${gitFile.deletions} deletion${gitFile.deletions !== 1 ? "s" : ""}">-${gitFile.deletions}</span>)</span>`
       : "";
+  const fileActionsHtml =
+    gitFile.type !== "D"
+      ? `<span class="gitFileActions"><span class="gitFileAction openFile" title="Open File">${svgIcons.goToFile}</span></span>`
+      : "";
   const oldPath = encodeURIComponent(gitFile.oldFilePath);
   const newPath = encodeURIComponent(gitFile.newFilePath);
-  return `<li class="gitFile ${gitFile.type}${diffPossible ? " gitDiffPossible" : ""}" data-oldfilepath="${oldPath}" data-newfilepath="${newPath}" data-type="${gitFile.type}"${binaryTitle}><span class="gitFileIcon">${svgIcons.file}</span>${displayName}${renameHtml}${addDelHtml}</li>`;
+  return `<li class="gitFile ${gitFile.type}${diffPossible ? " gitDiffPossible" : ""}" data-oldfilepath="${oldPath}" data-newfilepath="${newPath}" data-type="${gitFile.type}"${binaryTitle}><span class="gitFileIcon">${svgIcons.file}</span>${displayName}${renameHtml}${addDelHtml}${fileActionsHtml}</li>`;
 }
 
 export function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GitFileChange[]) {

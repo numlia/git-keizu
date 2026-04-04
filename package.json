@@ -326,6 +326,24 @@
           "type": "boolean",
           "default": false,
           "description": "Display commit messages that are not ancestors of HEAD with reduced opacity."
+        },
+        "git-keizu.openNewTabEditorGroup": {
+          "type": "string",
+          "enum": [
+            "Active",
+            "Beside",
+            "One",
+            "Two",
+            "Three",
+            "Four",
+            "Five",
+            "Six",
+            "Seven",
+            "Eight",
+            "Nine"
+          ],
+          "default": "Active",
+          "description": "Specifies the editor group in which a file is opened when clicking the 'Open File' icon in commit details."
         }
       }
     }

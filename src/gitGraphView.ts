@@ -19,7 +19,7 @@ import {
   ResponseMessage,
   UNCOMMITTED_CHANGES_HASH
 } from "./types";
-import { abbrevCommit, copyToClipboard, getPathFromUri } from "./utils";
+import { abbrevCommit, copyToClipboard, getPathFromUri, openFile } from "./utils";
 
 const CSS_COLOR_VAR_PREFIX = "--git-keizu-color";
 
@@ -492,6 +492,18 @@ export class GitKeizuView {
               )
             });
             break;
+          case "openFile": {
+            const viewColumn = getConfig().openNewTabEditorGroup();
+            const status = await openFile(
+              msg.repo,
+              msg.filePath,
+              msg.commitHash,
+              this.dataSource,
+              viewColumn
+            );
+            this.sendMessage({ command: "openFile", status });
+            break;
+          }
         }
         this.repoFileWatcher.unmute();
       },

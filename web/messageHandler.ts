@@ -117,6 +117,11 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
     case "mergeBranch":
       refreshOrError(gitKeizu, msg.status, "Unable to Merge Branch");
       break;
+    case "openFile":
+      if (msg.status !== null) {
+        showErrorDialog("Unable to open file", msg.status, null);
+      }
+      break;
     case "openTerminal":
       break;
     case "mergeCommit":

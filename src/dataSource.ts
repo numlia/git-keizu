@@ -30,6 +30,7 @@ const LOG_FORMAT_FIELD_COUNT = 6;
 const STASH_FORMAT_FIELD_COUNT = 7;
 const STASH_SHOW_INCLUDE_UNTRACKED_OPTION = "-u";
 const DIFF_FILTER_AMDR_OPTION = "--diff-filter=AMDR";
+const DIFF_FILTER_R_OPTION = "--diff-filter=R";
 const DIFF_FIND_RENAMES_OPTION = "--find-renames";
 const NULL_BYTE_OPTION = "-z";
 const NULL_BYTE_SEPARATOR = "\0";
@@ -561,6 +562,43 @@ export class DataSource {
       return Promise.resolve("");
     }
     return this.spawnGit(["show", `${commitHash}:${filePath}`], repo, (stdout) => stdout, "");
+  }
+
+  public getNewPathOfRenamedFile(
+    repo: string,
+    commitHash: string,
+    oldFilePath: string
+  ): Promise<string | null> {
+    if (!isValidCommitHash(commitHash)) {
+      return Promise.resolve(null);
+    }
+    if (oldFilePath.split("/").includes("..")) {
+      return Promise.resolve(null);
+    }
+    return this.spawnGit<string | null>(
+      [
+        "diff",
+        DIFF_FILTER_R_OPTION,
+        DIFF_FIND_RENAMES_OPTION,
+        NULL_BYTE_OPTION,
+        commitHash,
+        "HEAD",
+        "--",
+        oldFilePath
+      ],
+      repo,
+      (stdout) => {
+        const fields = stdout.split(NULL_BYTE_SEPARATOR);
+        // Format: status\0oldPath\0newPath\0...
+        for (let i = 0; i < fields.length; i++) {
+          if ((fields[i] ?? "")[0] === "R" && i + 2 < fields.length) {
+            return getPathFromStr(fields[i + 2] ?? "");
+          }
+        }
+        return null;
+      },
+      null
+    );
   }
 
   public getRemoteUrl(repo: string) {

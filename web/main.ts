@@ -1573,6 +1573,18 @@ class GitKeizuView {
       );
       this.saveState();
     });
+    addListenerToClass("openFile", "click", (e) => {
+      e.stopPropagation();
+      if (this.expandedCommit === null) return;
+      const sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;
+      const filePath = decodeURIComponent(sourceElem.dataset.newfilepath!);
+      sendMessage({
+        command: "openFile",
+        repo: this.currentRepo!,
+        filePath,
+        commitHash: this.expandedCommit.hash
+      });
+    });
     addListenerToClass("gitFile", "click", (e) => {
       let sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;
       if (this.expandedCommit === null || !sourceElem.classList.contains("gitDiffPossible")) return;

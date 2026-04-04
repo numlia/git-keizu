@@ -79,6 +79,12 @@
   margin-right: 8px;
   vertical-align: top;
 }
+.gitFileAction .codicon {
+  font-size: 13px;
+}
+.gitFileAction:hover .codicon {
+  color: var(--vscode-editor-foreground);
+}
 
 /* Loading spinner */
 #loadingHeader .codicon {

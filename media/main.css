@@ -371,6 +371,19 @@ body.unableToLoad p {
 .gitFileRename {
   cursor: help;
 }
+.gitFileActions {
+  display: inline-flex;
+  opacity: 0;
+  margin-left: 8px;
+  transition: opacity 0.15s;
+}
+.gitFile:hover .gitFileActions {
+  opacity: 1;
+}
+.gitFileAction {
+  cursor: pointer;
+  padding: 0 2px;
+}
 /* Avatar */
 .commit .avatar > img {
   display: inline-block;

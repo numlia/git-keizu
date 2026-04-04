@@ -535,6 +535,17 @@ export interface ResponseRemoveWorktree {
   branchStatus?: GitCommandStatus;
 }
 
+export interface RequestOpenFile {
+  command: "openFile";
+  repo: string;
+  filePath: string;
+  commitHash: string;
+}
+export interface ResponseOpenFile {
+  command: "openFile";
+  status: GitCommandStatus;
+}
+
 export interface RequestOpenTerminal {
   command: "openTerminal";
   repo: string;
@@ -618,6 +629,7 @@ export type RequestMessage =
   | RequestLoadRepos
   | RequestMergeBranch
   | RequestMergeCommit
+  | RequestOpenFile
   | RequestOpenTerminal
   | RequestPopStash
   | RequestPushStash
@@ -657,6 +669,7 @@ export type ResponseMessage =
   | ResponseLoadRepos
   | ResponseMergeBranch
   | ResponseMergeCommit
+  | ResponseOpenFile
   | ResponseOpenTerminal
   | ResponsePopStash
   | ResponsePushStash

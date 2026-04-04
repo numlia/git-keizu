@@ -12,6 +12,33 @@ import {
 const KEYBINDING_PATTERN = /^CTRL\/CMD \+ [A-Z]$/;
 const UNASSIGNED = "UNASSIGNED";
 
+export type OpenNewTabEditorGroupValue =
+  | "Active"
+  | "Beside"
+  | "One"
+  | "Two"
+  | "Three"
+  | "Four"
+  | "Five"
+  | "Six"
+  | "Seven"
+  | "Eight"
+  | "Nine";
+
+const VIEW_COLUMN_MAPPING: Record<OpenNewTabEditorGroupValue, vscode.ViewColumn> = {
+  Active: vscode.ViewColumn.Active,
+  Beside: vscode.ViewColumn.Beside,
+  One: vscode.ViewColumn.One,
+  Two: vscode.ViewColumn.Two,
+  Three: vscode.ViewColumn.Three,
+  Four: vscode.ViewColumn.Four,
+  Five: vscode.ViewColumn.Five,
+  Six: vscode.ViewColumn.Six,
+  Seven: vscode.ViewColumn.Seven,
+  Eight: vscode.ViewColumn.Eight,
+  Nine: vscode.ViewColumn.Nine
+};
+
 /**
  * Parse a keybinding setting value into a lowercase key letter or null.
  * - Valid format (e.g. "CTRL/CMD + F") → lowercase letter ("f")
@@ -174,6 +201,11 @@ class Config {
       "repository.commits.mute.commitsThatAreNotAncestorsOfHead",
       false
     );
+  }
+
+  public openNewTabEditorGroup(): vscode.ViewColumn {
+    const value = this.workspaceConfiguration.get<string>("openNewTabEditorGroup", "Active");
+    return VIEW_COLUMN_MAPPING[value as OpenNewTabEditorGroupValue] ?? vscode.ViewColumn.Active;
   }
 
   public gitPath(): string {
