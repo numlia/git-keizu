@@ -237,3 +237,22 @@ keybinding 設定は `parseKeybinding()` により変換されるため、packag
 | Case ID | Input / Precondition              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                    | Notes                               |
 | ------- | --------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------- | ----------------------------------- |
 | TC-070  | graphColours fallback（12色配列） | Normal - cross-check + filter                                              | package.json default の12色配列と一致（deepEqual） | REQ-9.2 修正対象。filter は全色通過 |
+
+## S13: openNewTabEditorGroup() エディタグループ設定
+
+> Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
+> Added: 2026-04-04
+> Status: active
+> Supersedes: -
+
+**シグネチャ**: `openNewTabEditorGroup(): vscode.ViewColumn`
+**テスト対象パス**: `src/config.ts`
+
+| Case ID | Input / Precondition                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                     | Notes                        |
+| ------- | ------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------- | ---------------------------- |
+| TC-071  | openNewTabEditorGroup 設定が未設定               | Normal - default fallback                                                  | vscode.ViewColumn.Active が返される | デフォルト値のフォールバック |
+| TC-072  | openNewTabEditorGroup = "Active"                 | Normal - explicit active                                                   | vscode.ViewColumn.Active が返される | 明示的な Active 指定         |
+| TC-073  | openNewTabEditorGroup = "Beside"                 | Normal - beside                                                            | vscode.ViewColumn.Beside が返される | 隣のグループ                 |
+| TC-074  | openNewTabEditorGroup = "One"                    | Normal - numbered group                                                    | vscode.ViewColumn.One が返される    | 番号指定グループ             |
+| TC-075  | openNewTabEditorGroup = "Nine"                   | Boundary - max group                                                       | vscode.ViewColumn.Nine が返される   | 最大グループ番号             |
+| TC-076  | openNewTabEditorGroup = "InvalidValue"（不正値） | Validation - invalid value                                                 | vscode.ViewColumn.Active が返される | フォールバック動作           |

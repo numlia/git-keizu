@@ -449,3 +449,24 @@
 | ------- | ------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------- | ----------- |
 | TC-140  | 有効な worktreePath                  | Normal - standard                                                          | git args: `["worktree", "remove", worktreePath]`。null を返す | REQ-4.1     |
 | TC-141  | 未コミット変更がある worktree の削除 | Exception - handled error                                                  | エラーメッセージ文字列を返す                                  | REQ-4.1-TC5 |
+
+## S25: getNewPathOfRenamedFile() リネーム追跡
+
+> Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
+> Added: 2026-04-04
+> Status: active
+> Supersedes: -
+
+**シグネチャ**: `getNewPathOfRenamedFile(repo: string, commitHash: string, oldFilePath: string): Promise<string | null>`
+**テスト対象パス**: `src/dataSource.ts`
+
+| Case ID | Input / Precondition                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                           | Notes                              |
+| ------- | ----------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| TC-142  | リネームされたファイル（old.ts → new.ts）の diff 出力 | Normal - rename found                                                      | "new.ts" が返される                                                                                       | null-byte 区切りパース             |
+| TC-143  | リネームされていないファイル（空の diff 出力）        | Normal - no rename                                                         | null が返される                                                                                           | マッチなし                         |
+| TC-144  | 無効なコミットハッシュ（非16進数文字列）              | Validation - invalid hash                                                  | null が返される。cp.spawn が呼ばれないことを検証する                                                      | isValidCommitHash() ガード         |
+| TC-145  | ".." を含むファイルパス                               | Validation - path traversal                                                | null が返される。cp.spawn が呼ばれないことを検証する                                                      | パストラバーサルガード             |
+| TC-146  | git diff コマンドが exit code 非0 で終了              | Exception - git error                                                      | null が返される                                                                                           | spawnGit errorValue フォールバック |
+| TC-147  | spawn が error イベントを emit                        | Exception - spawn error                                                    | null が返される                                                                                           | プロセスエラー                     |
+| TC-148  | git diff の stdout が空                               | Boundary - empty output                                                    | null が返される                                                                                           | 空出力                             |
+| TC-149  | 有効な入力で git diff を実行                          | Normal - args verification                                                 | cp.spawn が ["diff", "--diff-filter=R", "--find-renames", "-z", hash, "HEAD", "--", "file.ts"] で呼ばれる | git 引数の正確性検証               |

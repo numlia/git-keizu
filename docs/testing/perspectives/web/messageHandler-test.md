@@ -118,3 +118,18 @@
 | TC-021  | status=null, branchStatus=null             | Normal - standard                                                          | グラフリフレッシュ（worktree + ブランチ両方削除成功）    | REQ-4.2-TC1 |
 | TC-022  | status=null, branchStatus="error msg"      | Normal - partial success                                                   | グラフリフレッシュ + ブランチ削除失敗エラー表示          | REQ-4.2-TC2 |
 | TC-023  | status="error msg", branchStatus=undefined | Exception - handled error                                                  | エラーダイアログ "Unable to Remove Worktree"（既存動作） | REQ-4.2-TC5 |
+
+## S8: handleMessage() openFile レスポンス処理
+
+> Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
+> Added: 2026-04-04
+> Status: active
+> Supersedes: -
+
+**シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
+**テスト対象パス**: `web/messageHandler.ts`
+
+| Case ID | Input / Precondition                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                     | Notes                         |
+| ------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------- |
+| TC-024  | ResponseOpenFile: command="openFile", status=null            | Normal - success                                                           | showErrorDialog が呼ばれない。gitGraph のメソッドも呼ばれない（ノーオペレーション） | 成功時は何もしない            |
+| TC-025  | ResponseOpenFile: command="openFile", status="error message" | Exception - error display                                                  | showErrorDialog が ("Unable to open file", "error message", null) で呼ばれる        | removeWorktree パターンと同一 |

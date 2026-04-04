@@ -1,18 +1,18 @@
 # テスト観点表インデックス
 
-> Auto-generated: 2026-03-27T15:30:00Z
-> Total sources: 27
-> Total physical files: 31
-> Total sections: 244
-> Total cases: 1172
+> Auto-generated: 2026-04-04T12:00:00Z
+> Total sources: 28
+> Total physical files: 33
+> Total sections: 253
+> Total cases: 1211
 
 ## ソースファイル → 観点表（正引き）
 
 | Source File            | Storage Mode | Perspectives Entry          | Shards | Sections | Cases | Last Updated |
 | ---------------------- | ------------ | --------------------------- | ------ | -------- | ----- | ------------ |
 | src/avatarManager.ts   | single-file  | src/avatarManager-test.md   | 1      | 20       | 82    | 2026-03-22   |
-| src/config.ts          | single-file  | src/config-test.md          | 1      | 12       | 70    | 2026-03-22   |
-| src/dataSource.ts      | single-file  | src/dataSource-test.md      | 1      | 24       | 141   | 2026-03-22   |
+| src/config.ts          | single-file  | src/config-test.md          | 1      | 13       | 76    | 2026-04-04   |
+| src/dataSource.ts      | single-file  | src/dataSource-test.md      | 1      | 25       | 149   | 2026-04-04   |
 | src/diffDocProvider.ts | single-file  | src/diffDocProvider-test.md | 1      | 6        | 30    | 2026-03-22   |
 | src/extension.ts       | single-file  | src/extension-test.md       | 1      | 5        | 20    | 2026-03-22   |
 | src/extensionState.ts  | single-file  | src/extensionState-test.md  | 1      | 12       | 34    | 2026-03-22   |
@@ -21,6 +21,7 @@
 | src/repoManager.ts     | single-file  | src/repoManager-test.md     | 1      | 18       | 104   | 2026-03-22   |
 | src/statusBarItem.ts   | single-file  | src/statusBarItem-test.md   | 1      | 3        | 13    | 2026-03-22   |
 | src/types.ts           | single-file  | src/types-test.md           | 1      | 1        | 7     | 2026-03-22   |
+| src/utils.ts           | single-file  | src/utils-test.md           | 1      | 5        | 12    | 2026-04-04   |
 | src/worktree.ts        | single-file  | src/worktree-test.md        | 1      | 1        | 11    | 2026-03-22   |
 | web/branchLabels.ts    | single-file  | web/branchLabels-test.md    | 1      | 1        | 17    | 2026-03-22   |
 | web/commitMenu.ts      | single-file  | web/commitMenu-test.md      | 1      | 6        | 34    | 2026-03-27   |
@@ -28,11 +29,11 @@
 | web/dates.ts           | single-file  | web/dates-test.md           | 1      | 7        | 31    | 2026-03-22   |
 | web/dialogs.ts         | single-file  | web/dialogs-test.md         | 1      | 3        | 16    | 2026-03-22   |
 | web/dropdown.ts        | single-file  | web/dropdown-test.md        | 1      | 10       | 38    | 2026-03-22   |
-| web/fileTree.ts        | single-file  | web/fileTree-test.md        | 1      | 1        | 10    | 2026-03-22   |
+| web/fileTree.ts        | single-file  | web/fileTree-test.md        | 1      | 2        | 16    | 2026-04-04   |
 | web/findWidget.ts      | single-file  | web/findWidget-test.md      | 1      | 7        | 32    | 2026-03-22   |
 | web/graph.ts           | single-file  | web/graph-test.md           | 1      | 17       | 59    | 2026-03-22   |
-| web/main.ts            | sharded      | web/main-test/INDEX.md      | 5      | 35       | 201   | 2026-03-22   |
-| web/messageHandler.ts  | single-file  | web/messageHandler-test.md  | 1      | 7        | 23    | 2026-03-22   |
+| web/main.ts            | sharded      | web/main-test/INDEX.md      | 6      | 36       | 206   | 2026-04-04   |
+| web/messageHandler.ts  | single-file  | web/messageHandler-test.md  | 1      | 8        | 25    | 2026-04-04   |
 | web/refMenu.ts         | single-file  | web/refMenu-test.md         | 1      | 10       | 51    | 2026-03-27   |
 | web/stashMenu.ts       | single-file  | web/stashMenu-test.md       | 1      | 7        | 28    | 2026-03-22   |
 | web/uncommittedMenu.ts | single-file  | web/uncommittedMenu-test.md | 1      | 1        | 3     | 2026-03-22   |
@@ -76,6 +77,7 @@
 | Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test) | src/config-test.md                                                                                                                                                                                             |
 | Feature 023 (worktree-dialog-defaults) (aidd-spec-tasks-test)         | web/commitMenu-test.md                                                                                                                                                                                         |
 | Feature 024 (worktree-path-normalize) (aidd-spec-tasks-test)          | web/utils-test.md, web/commitMenu-test.md, web/refMenu-test.md                                                                                                                                                 |
+| Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)          | src/utils-test.md, src/config-test.md, src/dataSource-test.md, web/fileTree-test.md, web/main-test/INDEX.md, web/messageHandler-test.md                                                                        |
 | test-plan                                                             | web/stashMenu-test.md                                                                                                                                                                                          |
 | test-plan (既存コード分析)                                            | src/avatarManager-test.md, src/diffDocProvider-test.md, src/extension-test.md, src/extensionState-test.md, src/repoFileWatcher-test.md, src/statusBarItem-test.md, web/branchLabels-test.md, web/dates-test.md |
 | test-plan (既存コード網羅)                                            | src/repoManager-test.md                                                                                                                                                                                        |

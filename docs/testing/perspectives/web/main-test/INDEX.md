@@ -2,12 +2,12 @@
 
 > Source: `web/main.ts`
 > Storage Mode: sharded
-> Generated: 2026-03-22T14:25:09Z
+> Generated: 2026-04-04T12:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 5
-> Total Sections: 35
-> Total Cases: 201
+> Total Shards: 6
+> Total Sections: 36
+> Total Cases: 206
 
 ## Shards
 
@@ -18,6 +18,7 @@
 | 03-compare-find-01.md       | compare-find       | 3        | 25    | 2026-03-22   |
 | 04-keyboard-selection-01.md | keyboard-selection | 7        | 38    | 2026-03-22   |
 | 05-state-response-01.md     | state-response     | 12       | 52    | 2026-03-22   |
+| 06-file-actions-01.md       | file-actions       | 1        | 5     | 2026-04-04   |
 
 ## Origin Coverage
 
@@ -38,3 +39,4 @@
 | Feature 013 (scroll-position-restore) (aidd-spec-tasks-test) | 05-state-response-01.md                                                                   |
 | Feature 015 (commit-sort-order) (aidd-spec-tasks-test)       | 02-context-menu-01.md                                                                     |
 | Feature 016 (worktree-support) (aidd-spec-tasks-test)        | 01-rendering-01.md                                                                        |
+| Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test) | 06-file-actions-01.md                                                                     |
