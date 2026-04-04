@@ -10,6 +10,19 @@ vi.mock("vscode", () => ({
     getConfiguration: vi.fn(() => ({
       get: mockGet
     }))
+  },
+  ViewColumn: {
+    Active: -1,
+    Beside: -2,
+    One: 1,
+    Two: 2,
+    Three: 3,
+    Four: 4,
+    Five: 5,
+    Six: 6,
+    Seven: 7,
+    Eight: 8,
+    Nine: 9
   }
 }));
 
@@ -135,6 +148,35 @@ describe("Config fallback defaults vs package.json", () => {
       // Then: the filtered fallback array matches package.json default (all 12 colors pass filter)
       const expected = getPackageDefault("graphColours");
       expect(actual).toEqual(expected);
+    });
+  });
+
+  // S13: Group 4 — openNewTabEditorGroup ViewColumn mapping comparison (TC-077)
+  describe("Group 4: openNewTabEditorGroup ViewColumn mapping comparison", () => {
+    const viewColumnMapping: Record<string, number> = {
+      Active: -1,
+      Beside: -2,
+      One: 1,
+      Two: 2,
+      Three: 3,
+      Four: 4,
+      Five: 5,
+      Six: 6,
+      Seven: 7,
+      Eight: 8,
+      Nine: 9
+    };
+
+    // TC-077: openNewTabEditorGroup fallback (after ViewColumn mapping) matches package.json default
+    it("TC-077: openNewTabEditorGroup fallback (after mapping) matches package.json default", () => {
+      // Given: mock returns fallback values (configured in beforeEach)
+      // When: reading openNewTabEditorGroup via fallback (VIEW_COLUMN_MAPPING applied internally)
+      const config = getConfig();
+      const actual = config.openNewTabEditorGroup();
+      // Then: the mapped fallback matches VIEW_COLUMN_MAPPING applied to package.json default
+      const pkgDefault = getPackageDefault("openNewTabEditorGroup") as string;
+      const expected = viewColumnMapping[pkgDefault];
+      expect(actual).toBe(expected);
     });
   });
 });

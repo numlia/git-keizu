@@ -429,3 +429,42 @@ describe("handleMessage removeWorktree branch deletion result (S7)", () => {
     expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 });
+
+// S8: openFile レスポンスハンドラ
+describe("handleMessage openFile response (S8)", () => {
+  let gitKeizu: GitKeizuViewAPI;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitKeizu = createMockGitKeizuView();
+  });
+
+  // TC-024: 成��レスポンス（status null）で何もしない
+  it("does nothing on success response with status null (TC-024)", () => {
+    // Given: ResponseOpenFile with status=null (success)
+    const msg: ResponseMessage = { command: "openFile", status: null };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: showErrorDialog is not called, no gitKeizu methods called
+    expect(showErrorDialog).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+    expect(gitKeizu.hideCommitDetails).not.toHaveBeenCalled();
+  });
+
+  // TC-025: エラーレスポンスでエラーダイアログが表示される
+  it("shows error dialog on error response (TC-025)", () => {
+    // Given: ResponseOpenFile with status="error message"
+    const errorMessage = "The file src/file.ts doesn't currently exist in this repository.";
+    const msg: ResponseMessage = { command: "openFile", status: errorMessage };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: showErrorDialog is called with the error details
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith("Unable to open file", errorMessage, null);
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+});

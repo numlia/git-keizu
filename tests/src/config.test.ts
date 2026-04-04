@@ -7,6 +7,19 @@ vi.mock("vscode", () => ({
     getConfiguration: vi.fn(() => ({
       get: mockGet
     }))
+  },
+  ViewColumn: {
+    Active: -1,
+    Beside: -2,
+    One: 1,
+    Two: 2,
+    Three: 3,
+    Four: 4,
+    Five: 5,
+    Six: 6,
+    Seven: 7,
+    Eight: 8,
+    Nine: 9
   }
 }));
 
@@ -558,5 +571,88 @@ describe("dialogDefaults createWorktree/removeWorktree", () => {
     const result = config.dialogDefaults();
     // Then: removeWorktree.deleteBranch is false
     expect(result.removeWorktree.deleteBranch).toBe(false);
+  });
+});
+
+// S13: openNewTabEditorGroup() エディタグループ設定
+describe("openNewTabEditorGroup", () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  // TC-071: default (未設定) → ViewColumn.Active
+  it("returns ViewColumn.Active by default when not configured", () => {
+    // Given: no openNewTabEditorGroup setting configured
+    mockGet.mockImplementation((_key: string, defaultValue: unknown) => defaultValue);
+    // When: reading openNewTabEditorGroup
+    const config = getConfig();
+    const result = config.openNewTabEditorGroup();
+    // Then: returns ViewColumn.Active (-1)
+    expect(result).toBe(-1);
+  });
+
+  // TC-072: "Active" → ViewColumn.Active
+  it("returns ViewColumn.Active when set to 'Active'", () => {
+    // Given: openNewTabEditorGroup set to "Active"
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "openNewTabEditorGroup" ? "Active" : defaultValue
+    );
+    // When: reading openNewTabEditorGroup
+    const config = getConfig();
+    const result = config.openNewTabEditorGroup();
+    // Then: returns ViewColumn.Active (-1)
+    expect(result).toBe(-1);
+  });
+
+  // TC-073: "Beside" → ViewColumn.Beside
+  it("returns ViewColumn.Beside when set to 'Beside'", () => {
+    // Given: openNewTabEditorGroup set to "Beside"
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "openNewTabEditorGroup" ? "Beside" : defaultValue
+    );
+    // When: reading openNewTabEditorGroup
+    const config = getConfig();
+    const result = config.openNewTabEditorGroup();
+    // Then: returns ViewColumn.Beside (-2)
+    expect(result).toBe(-2);
+  });
+
+  // TC-074: "One" → ViewColumn.One
+  it("returns ViewColumn.One when set to 'One'", () => {
+    // Given: openNewTabEditorGroup set to "One"
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "openNewTabEditorGroup" ? "One" : defaultValue
+    );
+    // When: reading openNewTabEditorGroup
+    const config = getConfig();
+    const result = config.openNewTabEditorGroup();
+    // Then: returns ViewColumn.One (1)
+    expect(result).toBe(1);
+  });
+
+  // TC-075: "Nine" → ViewColumn.Nine
+  it("returns ViewColumn.Nine when set to 'Nine'", () => {
+    // Given: openNewTabEditorGroup set to "Nine"
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "openNewTabEditorGroup" ? "Nine" : defaultValue
+    );
+    // When: reading openNewTabEditorGroup
+    const config = getConfig();
+    const result = config.openNewTabEditorGroup();
+    // Then: returns ViewColumn.Nine (9)
+    expect(result).toBe(9);
+  });
+
+  // TC-076: "InvalidValue" → ViewColumn.Active (フォールバック)
+  it("returns ViewColumn.Active for invalid value (fallback)", () => {
+    // Given: openNewTabEditorGroup set to an invalid value
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "openNewTabEditorGroup" ? "InvalidValue" : defaultValue
+    );
+    // When: reading openNewTabEditorGroup
+    const config = getConfig();
+    const result = config.openNewTabEditorGroup();
+    // Then: falls back to ViewColumn.Active (-1)
+    expect(result).toBe(-1);
   });
 });

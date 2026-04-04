@@ -3235,3 +3235,122 @@ describe("removeWorktree", () => {
     expect(result).toContain("modified or untracked");
   });
 });
+
+// S25: getNewPathOfRenamedFile() リネーム追跡
+describe("getNewPathOfRenamedFile", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+  const VALID_HASH = "abc123def456";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // TC-142: リネームされたファイルの新パスを返す
+  it("returns new path when file was renamed (TC-142)", async () => {
+    // Given: git diff output indicating old.ts was renamed to new.ts (null-byte separated)
+    const diffOutput = `R100\0old.ts\0new.ts\0`;
+    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: diffOutput }));
+
+    // When: getNewPathOfRenamedFile is called with the old file path
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
+
+    // Then: the new file path is returned
+    expect(result).toBe("new.ts");
+  });
+
+  // TC-143: リネームされていないファイルは null を返す
+  it("returns null when file was not renamed (TC-143)", async () => {
+    // Given: git diff output is empty (no renames detected)
+    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "" }));
+
+    // When: getNewPathOfRenamedFile is called for an unchanged file
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "unchanged.ts");
+
+    // Then: null is returned
+    expect(result).toBeNull();
+  });
+
+  // TC-144: 無効なコミットハッシュで null を返し、spawn は呼ばれない
+  it("returns null for invalid commit hash without spawning git (TC-144)", async () => {
+    // Given: an invalid commit hash (contains non-hex characters)
+    const invalidHash = "not-a-valid-hash!@#";
+
+    // When: getNewPathOfRenamedFile is called with the invalid hash
+    const result = await ds.getNewPathOfRenamedFile(REPO, invalidHash, "file.ts");
+
+    // Then: null is returned and git is not invoked
+    expect(result).toBeNull();
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  // TC-145: ".." を含むパスは null を返し、spawn は呼ばれない
+  it("returns null for path traversal attempt without spawning git (TC-145)", async () => {
+    // Given: a file path containing ".." (path traversal)
+    const traversalPath = "../etc/passwd";
+
+    // When: getNewPathOfRenamedFile is called with the traversal path
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, traversalPath);
+
+    // Then: null is returned and git is not invoked
+    expect(result).toBeNull();
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  // TC-146: git diff が非0 exit code で null を返す
+  it("returns null when git diff exits with non-zero code (TC-146)", async () => {
+    // Given: git diff command fails with exit code 128
+    spawnMock.mockImplementation(() => createCommandMockProcess({ exitCode: 128 }));
+
+    // When: getNewPathOfRenamedFile is called
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "file.ts");
+
+    // Then: null is returned (error fallback)
+    expect(result).toBeNull();
+  });
+
+  // TC-147: spawn が error イベントを emit すると null を返す
+  it("returns null when spawn emits an error event (TC-147)", async () => {
+    // Given: spawn emits an error event
+    spawnMock.mockImplementation(() => createCommandMockProcess({ emitError: true }));
+
+    // When: getNewPathOfRenamedFile is called
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "file.ts");
+
+    // Then: null is returned (error fallback)
+    expect(result).toBeNull();
+  });
+
+  // TC-148: git diff の stdout が空なら null を返す
+  it("returns null when git diff stdout is empty (TC-148)", async () => {
+    // Given: git diff returns empty stdout (no rename data)
+    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "" }));
+
+    // When: getNewPathOfRenamedFile is called
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "file.ts");
+
+    // Then: null is returned
+    expect(result).toBeNull();
+  });
+
+  // TC-149: 正しい git 引数で spawn が呼ばれることを検証
+  it("passes correct arguments to git diff (TC-149)", async () => {
+    // Given: valid inputs and a successful git diff
+    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "" }));
+
+    // When: getNewPathOfRenamedFile is called
+    await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "file.ts");
+
+    // Then: spawn is called with the correct diff arguments
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["diff", "--diff-filter=R", "--find-renames", "-z", VALID_HASH, "HEAD", "--", "file.ts"],
+      { cwd: REPO }
+    );
+  });
+});

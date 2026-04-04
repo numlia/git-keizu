@@ -217,4 +217,109 @@ describe("generateGitFileListHtml", () => {
     expect(items[0].classList.contains("gitFile")).toBe(true);
     expect(items[0].classList.contains("M")).toBe(true);
   });
+
+  // S2: アクションアイコン（ファイルを開く）の条件付きレンダリング
+
+  // TC-011: 変更ファイルにアクションアイコンが表示される
+  it("renders open-file action icon for modified file (TC-011)", () => {
+    // Given: a modified file (type "M")
+    const files = [makeFile({ type: "M" })];
+
+    // When: flat list HTML is generated
+    const html = generateGitFileListHtml(files);
+    const fragment = parseHtml(html);
+
+    // Then: action icon with openFile class is present
+    const actionIcon = fragment.querySelector(".gitFileAction.openFile");
+    expect(actionIcon).not.toBeNull();
+  });
+
+  // TC-012: 追加ファイルにアクションアイコンが表示される
+  it("renders open-file action icon for added file (TC-012)", () => {
+    // Given: an added file (type "A")
+    const files = [makeFile({ type: "A", additions: null, deletions: null })];
+
+    // When: flat list HTML is generated
+    const html = generateGitFileListHtml(files);
+    const fragment = parseHtml(html);
+
+    // Then: action icon with openFile class is present
+    const actionIcon = fragment.querySelector(".gitFileAction.openFile");
+    expect(actionIcon).not.toBeNull();
+  });
+
+  // TC-013: リネームファイルにアクションアイコンが表示される
+  it("renders open-file action icon for renamed file (TC-013)", () => {
+    // Given: a renamed file (type "R")
+    const files = [
+      makeFile({
+        oldFilePath: "src/old.ts",
+        newFilePath: "src/new.ts",
+        type: "R",
+        additions: 0,
+        deletions: 0
+      })
+    ];
+
+    // When: flat list HTML is generated
+    const html = generateGitFileListHtml(files);
+    const fragment = parseHtml(html);
+
+    // Then: action icon with openFile class is present
+    const actionIcon = fragment.querySelector(".gitFileAction.openFile");
+    expect(actionIcon).not.toBeNull();
+  });
+
+  // TC-014: 削除ファイルにはアクションアイコンが表示されない
+  it("does not render open-file action icon for deleted file (TC-014)", () => {
+    // Given: a deleted file (type "D")
+    const files = [makeFile({ type: "D", additions: null, deletions: null })];
+
+    // When: flat list HTML is generated
+    const html = generateGitFileListHtml(files);
+    const fragment = parseHtml(html);
+
+    // Then: no action icon is present
+    const actionIcon = fragment.querySelector(".gitFileAction.openFile");
+    expect(actionIcon).toBeNull();
+  });
+
+  // TC-015: アイコンに codicon-go-to-file クラスが含まれる
+  it("action icon contains codicon-go-to-file class (TC-015)", () => {
+    // Given: a modified file (type "M")
+    const files = [makeFile({ type: "M" })];
+
+    // When: flat list HTML is generated
+    const html = generateGitFileListHtml(files);
+    const fragment = parseHtml(html);
+
+    // Then: icon element contains codicon-go-to-file class
+    const icon = fragment.querySelector(".codicon-go-to-file");
+    expect(icon).not.toBeNull();
+  });
+
+  // TC-016: 混在ファイルタイプでアイコン数が非削除ファイル数と一致する
+  it("renders action icons only for non-deleted files (TC-016)", () => {
+    // Given: 4 files of types A, M, D, R
+    const files: GitFileChange[] = [
+      makeFile({ newFilePath: "a.ts", type: "A", additions: null, deletions: null }),
+      makeFile({ newFilePath: "m.ts", type: "M" }),
+      makeFile({ newFilePath: "d.ts", type: "D", additions: null, deletions: null }),
+      makeFile({
+        oldFilePath: "old.ts",
+        newFilePath: "r.ts",
+        type: "R",
+        additions: 0,
+        deletions: 0
+      })
+    ];
+
+    // When: flat list HTML is generated
+    const html = generateGitFileListHtml(files);
+    const fragment = parseHtml(html);
+
+    // Then: exactly 3 action icons (A, M, R — not D)
+    const actionIcons = fragment.querySelectorAll(".gitFileAction.openFile");
+    expect(actionIcons).toHaveLength(3);
+  });
 });

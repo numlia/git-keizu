@@ -5360,3 +5360,174 @@ describe("worktree icon drawing and data attributes (S35)", () => {
     vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* S36: bindFileViewListeners() openFile クリックハンドラ             */
+/* ------------------------------------------------------------------ */
+
+describe("openFile click handler", () => {
+  let liveVscode: typeof vscode;
+  let liveFileTreeHtml: typeof generateGitFileTreeHtml;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    liveVscode = utilsMod.vscode;
+    vi.mocked(liveVscode.getState).mockReturnValueOnce(null);
+
+    const fileTreeMod = await import("../../web/fileTree");
+    liveFileTreeHtml = fileTreeMod.generateGitFileTreeHtml;
+
+    await import("../../web/main");
+    loadTestCommits();
+  });
+
+  beforeEach(() => {
+    resetCommitState();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function expandCommitWithFiles(hash: string, fileTreeHtml: string): void {
+    vi.mocked(liveFileTreeHtml).mockReturnValueOnce(fileTreeHtml);
+    clickCommit(hash);
+    dispatchMessage({
+      command: "commitDetails",
+      commitDetails: {
+        ...makeCommitDetails(hash),
+        fileChanges: [
+          {
+            oldFilePath: "src/file.ts",
+            newFilePath: "src/file.ts",
+            type: "M",
+            additions: 1,
+            deletions: 0
+          }
+        ]
+      }
+    });
+    vi.clearAllMocks();
+  }
+
+  const FILE_TREE_HTML =
+    '<table><tr class="gitFile M gitDiffPossible" data-oldfilepath="src%2Ffile.ts" data-newfilepath="src%2Ffile.ts" data-type="M"><td><span class="gitFileActions"><span class="gitFileAction openFile" title="Open File">icon</span></span></td></tr></table>';
+
+  // TC-202: アイコンクリックで正しいメッセージが送信される
+  it("sends openFile message with correct payload on click (TC-202)", () => {
+    // Given: a commit is expanded with a file list containing an openFile icon
+    expandCommitWithFiles(COMMIT_HASH_1, FILE_TREE_HTML);
+
+    // When: the openFile icon is clicked
+    const openFileElem = document.querySelector(".gitFileAction.openFile");
+    expect(openFileElem).not.toBeNull();
+    openFileElem!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Then: postMessage is called with the correct openFile command
+    expect(liveVscode.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "openFile",
+        repo: TEST_REPO,
+        filePath: "src/file.ts",
+        commitHash: COMMIT_HASH_1
+      })
+    );
+  });
+
+  // TC-203: クリック時にイベント伝播が停止される
+  it("stops propagation so parent gitFile handler does not fire (TC-203)", () => {
+    // Given: a commit is expanded with a file tree
+    expandCommitWithFiles(COMMIT_HASH_1, FILE_TREE_HTML);
+
+    // When: the openFile icon is clicked
+    const openFileElem = document.querySelector(".gitFileAction.openFile");
+    expect(openFileElem).not.toBeNull();
+    openFileElem!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Then: only openFile message is sent (no viewDiff from parent .gitFile handler)
+    expect(liveVscode.postMessage).toHaveBeenCalledTimes(1);
+    expect(liveVscode.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ command: "openFile" })
+    );
+  });
+
+  // TC-204: expandedCommit が null の場合メッセージが送信されない
+  it("does not send message when expandedCommit is null (TC-204)", () => {
+    // Given: a commit is expanded then collapsed (expandedCommit becomes null)
+    expandCommitWithFiles(COMMIT_HASH_1, FILE_TREE_HTML);
+
+    // Re-click the same commit to collapse (expandedCommit becomes null)
+    clickCommit(COMMIT_HASH_1);
+    vi.clearAllMocks();
+
+    // Inject an openFile element manually into the DOM for testing
+    const container = document.getElementById("commitTable");
+    if (container) {
+      const span = document.createElement("span");
+      span.className = "gitFileAction openFile";
+      const li = document.createElement("li");
+      li.className = "gitFile M";
+      li.dataset.newfilepath = "src%2Ffile.ts";
+      li.appendChild(span);
+      container.appendChild(li);
+    }
+
+    // When: the openFile icon is clicked (but expandedCommit is null)
+    const openFileElem = document.querySelector(".gitFileAction.openFile");
+    if (openFileElem) {
+      openFileElem.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    }
+
+    // Then: no message is sent
+    expect(liveVscode.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ command: "openFile" })
+    );
+  });
+
+  // TC-205: URL エンコードされたパスが正しくデコードされる
+  it("decodes URI-encoded file path in message (TC-205)", () => {
+    // Given: file tree with URL-encoded path containing space
+    const encodedHtml =
+      '<table><tr class="gitFile M gitDiffPossible" data-oldfilepath="src%2Fmy%20file.ts" data-newfilepath="src%2Fmy%20file.ts" data-type="M"><td><span class="gitFileActions"><span class="gitFileAction openFile" title="Open File">icon</span></span></td></tr></table>';
+    expandCommitWithFiles(COMMIT_HASH_1, encodedHtml);
+
+    // When: the openFile icon is clicked
+    const openFileElem = document.querySelector(".gitFileAction.openFile");
+    expect(openFileElem).not.toBeNull();
+    openFileElem!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Then: filePath is decoded to "src/my file.ts"
+    expect(liveVscode.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "openFile",
+        filePath: "src/my file.ts"
+      })
+    );
+  });
+
+  // TC-206: 日本語ファイル名が正しくデコードされる
+  it("decodes Japanese file path correctly (TC-206)", () => {
+    // Given: file tree with Japanese file name (URI-encoded)
+    const japaneseEncoded = encodeURIComponent("src/テスト.ts");
+    const jpHtml = `<table><tr class="gitFile M gitDiffPossible" data-oldfilepath="${japaneseEncoded}" data-newfilepath="${japaneseEncoded}" data-type="M"><td><span class="gitFileActions"><span class="gitFileAction openFile" title="Open File">icon</span></span></td></tr></table>`;
+    expandCommitWithFiles(COMMIT_HASH_1, jpHtml);
+
+    // When: the openFile icon is clicked
+    const openFileElem = document.querySelector(".gitFileAction.openFile");
+    expect(openFileElem).not.toBeNull();
+    openFileElem!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Then: filePath is decoded to the Japanese path
+    expect(liveVscode.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "openFile",
+        filePath: "src/テスト.ts"
+      })
+    );
+  });
+});
