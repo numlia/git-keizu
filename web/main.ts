@@ -9,6 +9,7 @@ import {
 import { getCommitDate } from "./dates";
 import { hideDialog, isDialogActive } from "./dialogs";
 import { Dropdown } from "./dropdown";
+import { buildFileContextMenuItems, resolveFileRow, sendOpenFileAction } from "./fileMenu";
 import {
   alterGitFileTree,
   generateGitFileListHtml,
@@ -1575,15 +1576,16 @@ class GitKeizuView {
     });
     addListenerToClass("openFile", "click", (e) => {
       e.stopPropagation();
-      if (this.expandedCommit === null) return;
-      const sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;
-      const filePath = decodeURIComponent(sourceElem.dataset.newfilepath!);
-      sendMessage({
-        command: "openFile",
-        repo: this.currentRepo!,
-        filePath,
-        commitHash: this.expandedCommit.hash
-      });
+      sendOpenFileAction(resolveFileRow(<Element>e.target), this.expandedCommit, this.currentRepo);
+    });
+    addListenerToClass("gitFile", "contextmenu", (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const sourceElem = resolveFileRow(<Element>(<MouseEvent>e).target);
+      if (sourceElem === null) return;
+      const items = buildFileContextMenuItems(sourceElem, this.expandedCommit, this.currentRepo);
+      if (items.length === 0) return;
+      showContextMenu(<MouseEvent>e, items, sourceElem);
     });
     addListenerToClass("gitFile", "click", (e) => {
       let sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;
