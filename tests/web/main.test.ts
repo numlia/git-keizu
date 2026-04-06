@@ -5531,3 +5531,212 @@ describe("openFile click handler", () => {
     );
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* S37: bindFileViewListeners() file row context menu 導線            */
+/* ------------------------------------------------------------------ */
+
+describe("file row context menu handler", () => {
+  let liveVscode: typeof vscode;
+  let liveFileTreeHtml: typeof generateGitFileTreeHtml;
+  let liveShowContextMenu: typeof showContextMenu;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    liveVscode = utilsMod.vscode;
+    vi.mocked(liveVscode.getState).mockReturnValueOnce(null);
+
+    const fileTreeMod = await import("../../web/fileTree");
+    liveFileTreeHtml = fileTreeMod.generateGitFileTreeHtml;
+
+    const ctxMenuMod = await import("../../web/contextMenu");
+    liveShowContextMenu = ctxMenuMod.showContextMenu;
+
+    await import("../../web/main");
+    loadTestCommits();
+  });
+
+  beforeEach(() => {
+    resetCommitState();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  function expandCommitWithFiles(hash: string, fileTreeHtml: string): void {
+    vi.mocked(liveFileTreeHtml).mockReturnValueOnce(fileTreeHtml);
+    clickCommit(hash);
+    dispatchMessage({
+      command: "commitDetails",
+      commitDetails: {
+        ...makeCommitDetails(hash),
+        fileChanges: [
+          {
+            oldFilePath: "src/file.ts",
+            newFilePath: "src/file.ts",
+            type: "M",
+            additions: 1,
+            deletions: 0
+          }
+        ]
+      }
+    });
+    vi.clearAllMocks();
+  }
+
+  const TREE_FILE_HTML =
+    '<table><tr class="gitFile M gitDiffPossible" data-oldfilepath="src%2Ffile.ts" data-newfilepath="src%2Ffile.ts" data-type="M"><td><span class="gitFileActions"><span class="gitFileAction openFile" title="Open File">icon</span></span></td></tr></table>';
+
+  const LIST_FILE_HTML =
+    '<ul class="gitFolderContents"><li class="gitFile M gitDiffPossible" data-oldfilepath="src%2Ffile.ts" data-newfilepath="src%2Ffile.ts" data-type="M"><span class="gitFileIcon">icon</span>src/file.ts<span class="gitFileActions"><span class="gitFileAction openFile" title="Open File">icon</span></span></li></ul>';
+
+  const DELETED_FILE_HTML =
+    '<table><tr class="gitFile D" data-oldfilepath="src%2Fdeleted.ts" data-newfilepath="src%2Fdeleted.ts" data-type="D"><td></td></tr></table>';
+
+  // TC-207: tree 表示の .gitFile 行を右クリックで showContextMenu が呼ばれる
+  it("shows context menu with single 'Open File' item on tree row right click (TC-207)", () => {
+    // Given: a commit is expanded with a tree view file list
+    expandCommitWithFiles(COMMIT_HASH_1, TREE_FILE_HTML);
+
+    // When: the .gitFile row is right-clicked
+    const fileRow = document.querySelector(".gitFile");
+    expect(fileRow).not.toBeNull();
+    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // Then: showContextMenu is called with 1 item titled "Open File"
+    expect(liveShowContextMenu).toHaveBeenCalledTimes(1);
+    const items = vi.mocked(liveShowContextMenu).mock.calls[0][1];
+    expect(items).toHaveLength(1);
+    expect(items[0]).not.toBeNull();
+    expect(items[0]!.title).toBe("Open File");
+    // sourceElem is the .gitFile row
+    const sourceElem = vi.mocked(liveShowContextMenu).mock.calls[0][2];
+    expect(sourceElem).toBe(fileRow);
+  });
+
+  // TC-208: list 表示の .gitFile 行を右クリックでも同じ menu が出る
+  it("shows context menu with single 'Open File' item on list row right click (TC-208)", () => {
+    // Given: a commit is expanded with a list view file list
+    expandCommitWithFiles(COMMIT_HASH_1, LIST_FILE_HTML);
+
+    // When: the .gitFile row is right-clicked
+    const fileRow = document.querySelector(".gitFile");
+    expect(fileRow).not.toBeNull();
+    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // Then: showContextMenu is called with the same single-item menu
+    expect(liveShowContextMenu).toHaveBeenCalledTimes(1);
+    const items = vi.mocked(liveShowContextMenu).mock.calls[0][1];
+    expect(items).toHaveLength(1);
+    expect(items[0]!.title).toBe("Open File");
+  });
+
+  // TC-209: right click 時に preventDefault/stopPropagation が適用され viewDiff が送られない
+  it("prevents default and does not send viewDiff on right click (TC-209)", () => {
+    // Given: a commit is expanded with a gitDiffPossible file row
+    expandCommitWithFiles(COMMIT_HASH_1, TREE_FILE_HTML);
+
+    // When: the .gitFile row is right-clicked
+    const fileRow = document.querySelector(".gitFile");
+    expect(fileRow).not.toBeNull();
+    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // Then: viewDiff is not sent via postMessage
+    expect(liveVscode.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ command: "viewDiff" })
+    );
+  });
+
+  // TC-210: deleted file row でも showContextMenu が呼ばれ items は 1 件
+  it("shows context menu for deleted file row without openFile icon (TC-210)", () => {
+    // Given: a commit is expanded with a deleted file row (no .openFile icon)
+    expandCommitWithFiles(COMMIT_HASH_1, DELETED_FILE_HTML);
+
+    // When: the deleted .gitFile row is right-clicked
+    const fileRow = document.querySelector(".gitFile");
+    expect(fileRow).not.toBeNull();
+    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // Then: showContextMenu is still called with 1 item
+    expect(liveShowContextMenu).toHaveBeenCalledTimes(1);
+    const items = vi.mocked(liveShowContextMenu).mock.calls[0][1];
+    expect(items).toHaveLength(1);
+    expect(items[0]!.title).toBe("Open File");
+  });
+
+  // TC-211: menu item の onClick で openFile payload が送られ viewDiff は送られない
+  it("sends openFile payload when menu item onClick is invoked (TC-211)", () => {
+    // Given: a commit is expanded and right-click menu is shown
+    expandCommitWithFiles(COMMIT_HASH_1, TREE_FILE_HTML);
+    const fileRow = document.querySelector(".gitFile");
+    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // When: the menu item's onClick is invoked
+    const items = vi.mocked(liveShowContextMenu).mock.calls[0][1];
+    items[0]!.onClick();
+
+    // Then: openFile payload is sent
+    expect(liveVscode.postMessage).toHaveBeenCalledWith({
+      command: "openFile",
+      repo: TEST_REPO,
+      filePath: "src/file.ts",
+      commitHash: COMMIT_HASH_1
+    });
+    // And viewDiff is not sent
+    expect(liveVscode.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ command: "viewDiff" })
+    );
+  });
+
+  // TC-212: expandedCommit が null の状態では showContextMenu が呼ばれない
+  it("does not show context menu when expandedCommit is null (TC-212)", () => {
+    // Given: a commit is expanded then collapsed (expandedCommit becomes null)
+    expandCommitWithFiles(COMMIT_HASH_1, TREE_FILE_HTML);
+    clickCommit(COMMIT_HASH_1);
+    vi.clearAllMocks();
+
+    // Inject a .gitFile element manually for testing
+    const container = document.getElementById("commitTable");
+    if (container) {
+      const li = document.createElement("li");
+      li.className = "gitFile M";
+      li.dataset.newfilepath = "src%2Ffile.ts";
+      container.appendChild(li);
+    }
+
+    // When: the .gitFile row is right-clicked (but expandedCommit is null)
+    const fileRow = document.querySelector(".gitFile");
+    if (fileRow) {
+      fileRow.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    }
+
+    // Then: showContextMenu is not called and no message is sent
+    expect(liveShowContextMenu).not.toHaveBeenCalled();
+    expect(liveVscode.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ command: "openFile" })
+    );
+  });
+
+  // TC-213: items が Open File のみで divider や追加 action を含まない
+  it("menu items contain only 'Open File' with no dividers or extras (TC-213)", () => {
+    // Given: a valid file row with expanded commit
+    expandCommitWithFiles(COMMIT_HASH_1, TREE_FILE_HTML);
+
+    // When: the .gitFile row is right-clicked
+    const fileRow = document.querySelector(".gitFile");
+    expect(fileRow).not.toBeNull();
+    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // Then: items array has exactly 1 non-null element and no dividers
+    const items = vi.mocked(liveShowContextMenu).mock.calls[0][1];
+    expect(items).toHaveLength(1);
+    expect(items.every((item) => item !== null)).toBe(true);
+    expect(items[0]!.title).toBe("Open File");
+  });
+});
