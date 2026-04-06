@@ -1,10 +1,10 @@
 # テスト観点表インデックス
 
-> Auto-generated: 2026-04-04T12:00:00Z
-> Total sources: 28
-> Total physical files: 33
-> Total sections: 253
-> Total cases: 1211
+> Auto-generated: 2026-04-04T15:52:21Z
+> Total sources: 29
+> Total physical files: 34
+> Total sections: 256
+> Total cases: 1229
 
 ## ソースファイル → 観点表（正引き）
 
@@ -30,9 +30,10 @@
 | web/dialogs.ts         | single-file  | web/dialogs-test.md         | 1      | 3        | 16    | 2026-03-22   |
 | web/dropdown.ts        | single-file  | web/dropdown-test.md        | 1      | 10       | 38    | 2026-03-22   |
 | web/fileTree.ts        | single-file  | web/fileTree-test.md        | 1      | 2        | 16    | 2026-04-04   |
+| web/fileMenu.ts        | single-file  | web/fileMenu-test.md        | 1      | 2        | 11    | 2026-04-04   |
 | web/findWidget.ts      | single-file  | web/findWidget-test.md      | 1      | 7        | 32    | 2026-03-22   |
 | web/graph.ts           | single-file  | web/graph-test.md           | 1      | 17       | 59    | 2026-03-22   |
-| web/main.ts            | sharded      | web/main-test/INDEX.md      | 6      | 36       | 206   | 2026-04-04   |
+| web/main.ts            | sharded      | web/main-test/INDEX.md      | 6      | 37       | 213   | 2026-04-04   |
 | web/messageHandler.ts  | single-file  | web/messageHandler-test.md  | 1      | 8        | 25    | 2026-04-04   |
 | web/refMenu.ts         | single-file  | web/refMenu-test.md         | 1      | 10       | 51    | 2026-03-27   |
 | web/stashMenu.ts       | single-file  | web/stashMenu-test.md       | 1      | 7        | 28    | 2026-03-22   |
@@ -78,6 +79,7 @@
 | Feature 023 (worktree-dialog-defaults) (aidd-spec-tasks-test)         | web/commitMenu-test.md                                                                                                                                                                                         |
 | Feature 024 (worktree-path-normalize) (aidd-spec-tasks-test)          | web/utils-test.md, web/commitMenu-test.md, web/refMenu-test.md                                                                                                                                                 |
 | Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)          | src/utils-test.md, src/config-test.md, src/dataSource-test.md, web/fileTree-test.md, web/main-test/INDEX.md, web/messageHandler-test.md                                                                        |
+| Feature 027 (commit-file-context-menu) (aidd-spec-tasks-test)         | web/fileMenu-test.md, web/main-test/INDEX.md                                                                                                                                                                   |
 | test-plan                                                             | web/stashMenu-test.md                                                                                                                                                                                          |
 | test-plan (既存コード分析)                                            | src/avatarManager-test.md, src/diffDocProvider-test.md, src/extension-test.md, src/extensionState-test.md, src/repoFileWatcher-test.md, src/statusBarItem-test.md, web/branchLabels-test.md, web/dates-test.md |
 | test-plan (既存コード網羅)                                            | src/repoManager-test.md                                                                                                                                                                                        |
