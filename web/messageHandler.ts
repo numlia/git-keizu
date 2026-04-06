@@ -6,7 +6,7 @@ import type {
   ResponseMessage,
   WorktreeMap
 } from "../src/types";
-import { showErrorDialog } from "./dialogs";
+import { hideDialog, showErrorDialog } from "./dialogs";
 import { generateGitFileTree } from "./fileTree";
 import { refreshGraphOrDisplayError } from "./utils";
 
@@ -143,6 +143,7 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       refreshOrError(gitKeizu, msg.status, "Unable to Stash Changes");
       break;
     case "pushTag":
+      hideDialog();
       refreshOrError(gitKeizu, msg.status, "Unable to Push Tag");
       break;
     case "removeWorktree":
