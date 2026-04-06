@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.18] - 2026-04-06
+
+### Added
+
+- **Right-click context menu for commit detail files**: Right-clicking any file row in the commit details panel now opens a context menu with an "Open File" option — works in both Tree View and List View, and also appears for deleted files (opening a deleted file follows the existing error path). The existing left-click diff and hover "Open File" icon continue to work as before.
+
+### Fixed
+
+- **Push Tag dialog closes after success**: The "Pushing Tag…" loading dialog now dismisses automatically once the push completes — previously it would remain open indefinitely even after the tag had been successfully pushed.
+
 ## [0.5.17] - 2026-04-04
 
 ### Added
@@ -285,7 +295,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.17...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.18...HEAD
+[0.5.18]: https://github.com/numlia/git-keizu/compare/v0.5.17...v0.5.18
 [0.5.17]: https://github.com/numlia/git-keizu/compare/v0.5.16...v0.5.17
 [0.5.16]: https://github.com/numlia/git-keizu/compare/v0.5.15...v0.5.16
 [0.5.15]: https://github.com/numlia/git-keizu/compare/v0.5.14...v0.5.15
