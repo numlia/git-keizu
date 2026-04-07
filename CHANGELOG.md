@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.19] - 2026-04-07
+
+### Fixed
+
+- **Push works for new and renamed branches**: The Push action on the current branch now uses `git push --set-upstream origin HEAD`, so it succeeds even for newly created branches or branches that have just been renamed — previously, pushing without a configured upstream would fail with "fatal: The current branch … has no upstream branch"
+- **Rename Branch updates upstream tracking automatically**: The Rename Branch dialog now includes an "Update upstream tracking" checkbox (on by default); when checked, renaming updates the git tracking config so the branch correctly follows the new remote name — for branches that have never been pushed, the remote is also configured so the next Push works without any extra steps
+
 ## [0.5.18] - 2026-04-06
 
 ### Added
@@ -295,7 +302,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.18...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.19...HEAD
+[0.5.19]: https://github.com/numlia/git-keizu/compare/v0.5.18...v0.5.19
 [0.5.18]: https://github.com/numlia/git-keizu/compare/v0.5.17...v0.5.18
 [0.5.17]: https://github.com/numlia/git-keizu/compare/v0.5.16...v0.5.17
 [0.5.16]: https://github.com/numlia/git-keizu/compare/v0.5.15...v0.5.16
