@@ -1024,9 +1024,9 @@ describe("Rename Branch dialog worktree warning (S10)", () => {
       .find((item) => item.title === "Rename Branch&#8230;");
     renameItem!.onClick();
 
-    // Then: showRefInputDialog message contains worktree warning with path
-    expect(showRefInputDialog).toHaveBeenCalledTimes(1);
-    const dialogMessage = vi.mocked(showRefInputDialog).mock.calls[0][0];
+    // Then: showFormDialog message contains worktree warning with path
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const dialogMessage = vi.mocked(showFormDialog).mock.calls[0][0];
     expect(dialogMessage).toContain(WORKTREE_PATH);
     expect(dialogMessage).toContain("active worktree");
     expect(dialogMessage).toContain("directory name");
@@ -1051,9 +1051,9 @@ describe("Rename Branch dialog worktree warning (S10)", () => {
       .find((item) => item.title === "Rename Branch&#8230;");
     renameItem!.onClick();
 
-    // Then: showRefInputDialog message does NOT contain worktree warning
-    expect(showRefInputDialog).toHaveBeenCalledTimes(1);
-    const dialogMessage = vi.mocked(showRefInputDialog).mock.calls[0][0];
+    // Then: showFormDialog message does NOT contain worktree warning
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const dialogMessage = vi.mocked(showFormDialog).mock.calls[0][0];
     expect(dialogMessage).not.toContain("active worktree");
   });
 });

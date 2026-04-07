@@ -1799,15 +1799,17 @@ describe("push command", () => {
     vi.restoreAllMocks();
   });
 
-  it("push passes correct args: ['push'] (TC-074)", async () => {
+  it("push passes correct args: ['push', '--set-upstream', 'origin', 'HEAD'] (TC-074)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
     // When: push(repo) is called
     const result = await ds.push(REPO);
 
-    // Then: spawn is called with ["push"] and correct cwd
-    expect(spawnMock).toHaveBeenCalledWith("git", ["push"], { cwd: REPO });
+    // Then: spawn is called with --set-upstream args and correct cwd
+    expect(spawnMock).toHaveBeenCalledWith("git", ["push", "--set-upstream", "origin", "HEAD"], {
+      cwd: REPO
+    });
     expect(result).toBeNull();
   });
 
