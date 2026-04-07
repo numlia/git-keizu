@@ -667,8 +667,33 @@ export class DataSource {
     );
   }
 
-  public renameBranch(repo: string, oldName: string, newName: string) {
-    return this.runGitCommandSpawn(["branch", "-m", oldName, newName], repo);
+  public async renameBranch(
+    repo: string,
+    oldName: string,
+    newName: string,
+    updateUpstream: boolean
+  ) {
+    const status = await this.runGitCommandSpawn(["branch", "-m", oldName, newName], repo);
+    if (status !== null || !updateUpstream) {
+      return status;
+    }
+    // If no remote is configured for this branch (e.g. a newly created branch that was never
+    // pushed), set it to "origin" so that subsequent pushes work without --set-upstream.
+    const remoteConfigured = await this.runGitCommandSpawn(
+      ["config", "--get", `branch.${newName}.remote`],
+      repo
+    );
+    if (remoteConfigured !== null) {
+      const setRemote = await this.runGitCommandSpawn(
+        ["config", `branch.${newName}.remote`, "origin"],
+        repo
+      );
+      if (setRemote !== null) return setRemote;
+    }
+    return this.runGitCommandSpawn(
+      ["config", `branch.${newName}.merge`, `refs/heads/${newName}`],
+      repo
+    );
   }
 
   public mergeBranch(
@@ -816,7 +841,7 @@ export class DataSource {
   }
 
   public push(repo: string) {
-    return this.runGitCommandSpawn(["push"], repo);
+    return this.runGitCommandSpawn(["push", "--set-upstream", "origin", "HEAD"], repo);
   }
 
   public fetch(repo: string) {

@@ -263,16 +263,20 @@ export function buildRefContextMenuItems(
           worktreeInfo !== null && worktreeInfo !== undefined
             ? `<br><span class="dialogWarning">${svgIcons.alert} This branch has an active worktree at <b>${escapeHtml(worktreeInfo.path)}</b>. Renaming will not update the worktree directory name.</span>`
             : "";
-        showRefInputDialog(
+        showFormDialog(
           `Enter the new name for branch <b><i>${escapeHtml(refName)}</i></b>:${renameWorktreeWarning}`,
-          refName,
+          [
+            { type: "text-ref", name: "", default: refName },
+            { type: "checkbox", name: "Update upstream tracking", value: true }
+          ],
           "Rename Branch",
-          (newName) => {
+          (values) => {
             sendMessage({
               command: "renameBranch",
               repo: repo,
               oldName: refName,
-              newName: newName
+              newName: values[0],
+              updateUpstream: values[1] === "checked"
             });
           },
           null

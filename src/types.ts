@@ -394,6 +394,7 @@ export interface RequestRenameBranch {
   repo: string;
   oldName: string;
   newName: string;
+  updateUpstream: boolean;
 }
 export interface ResponseRenameBranch {
   command: "renameBranch";

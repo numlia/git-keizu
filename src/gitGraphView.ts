@@ -371,7 +371,12 @@ export class GitKeizuView {
           case "renameBranch":
             this.sendMessage({
               command: "renameBranch",
-              status: await this.dataSource.renameBranch(msg.repo, msg.oldName, msg.newName)
+              status: await this.dataSource.renameBranch(
+                msg.repo,
+                msg.oldName,
+                msg.newName,
+                msg.updateUpstream
+              )
             });
             break;
           case "resetToCommit":
