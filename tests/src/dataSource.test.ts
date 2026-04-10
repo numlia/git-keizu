@@ -578,6 +578,51 @@ describe("stash integration in getCommits", () => {
   });
 });
 
+describe("root commit parentHashes parsing", () => {
+  let ds: DataSource;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns empty parentHashes array for root commit (TC-120)", async () => {
+    // Given: A root commit with no parent (empty parentHash field from git log %P)
+    const logOutput =
+      makeCommitLine("abc111", "", "Alice", "a@t.com", 1700000001, "initial commit") + "\n";
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: Root commit has empty parentHashes array (not [""])
+    expect(result.commits).toHaveLength(1);
+    expect(result.commits[0].parentHashes).toEqual([]);
+  });
+
+  it("returns single-element parentHashes for normal commit (TC-121)", async () => {
+    // Given: A normal commit with one parent
+    const logOutput = [
+      makeCommitLine("abc222", "abc111", "Alice", "a@t.com", 1700000002, "second commit"),
+      makeCommitLine("abc111", "", "Alice", "a@t.com", 1700000001, "initial commit"),
+      ""
+    ].join("\n");
+    setupSpawnForCommits({ logOutput, stashOutput: "" });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: Normal commit has single parent, root commit has empty array
+    expect(result.commits).toHaveLength(2);
+    expect(result.commits[0].parentHashes).toEqual(["abc111"]);
+    expect(result.commits[1].parentHashes).toEqual([]);
+  });
+});
+
 describe("getCommitFile", () => {
   let ds: DataSource;
   const spawnMock = vi.mocked(cp.spawn);
@@ -2197,6 +2242,40 @@ describe("commitDetails stash diff handling", () => {
       return argArray[0] === "stash" && argArray[1] === "show";
     });
     expect(stashShowCalls).toHaveLength(0);
+  });
+
+  it("returns empty parents array for root commit in commitDetails (TC-122)", async () => {
+    // Given: A root commit with no parent (empty parents field from git show %P)
+    const commitHash = "aaa111bbb222";
+    const detailsLine = [
+      commitHash,
+      "", // empty parents field for root commit
+      "Author Name",
+      "author@example.com",
+      "1700000000",
+      "Committer Name",
+      "committer@example.com"
+    ].join(SEP);
+    const detailsOutput = `${detailsLine}\ninitial commit\n`;
+    const nameStatusOutput = commitHash + "\0A\0README.md\0";
+    const numStatOutput = commitHash + "\x001\t0\tREADME.md\0";
+
+    spawnMock.mockImplementation((_cmd: unknown, args: unknown) => {
+      const argArray = args as string[];
+      if (argArray[0] === "show") return createMockProcess(detailsOutput);
+      if (argArray[0] === "diff-tree") {
+        if (argArray.includes("--name-status")) return createMockProcess(nameStatusOutput);
+        if (argArray.includes("--numstat")) return createMockProcess(numStatOutput);
+      }
+      return createMockProcess("");
+    });
+
+    // When: commitDetails is called for a root commit (hasParents=false)
+    const result = await ds.commitDetails(REPO, commitHash, false, false);
+
+    // Then: parents is empty array (not [""])
+    expect(result).not.toBeNull();
+    expect(result!.parents).toEqual([]);
   });
 });
 
