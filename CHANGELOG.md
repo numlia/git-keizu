@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.20] - 2026-04-10
+
+### Fixed
+
+- **Root commit file list now shows correctly**: Clicking the initial (root) commit in the graph now displays the files changed in that commit — previously the file list was always empty for root commits because an empty parent hash field (`%P`) was parsed as `[""]` instead of `[]`, causing `hasParents` to be incorrectly `true` and triggering the wrong diff command path
+
 ## [0.5.19] - 2026-04-07
 
 ### Fixed
@@ -302,7 +308,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.19...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.20...HEAD
+[0.5.20]: https://github.com/numlia/git-keizu/compare/v0.5.19...v0.5.20
 [0.5.19]: https://github.com/numlia/git-keizu/compare/v0.5.18...v0.5.19
 [0.5.18]: https://github.com/numlia/git-keizu/compare/v0.5.17...v0.5.18
 [0.5.17]: https://github.com/numlia/git-keizu/compare/v0.5.16...v0.5.17
