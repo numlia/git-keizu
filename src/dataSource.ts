@@ -278,7 +278,7 @@ export class DataSource {
             let commitInfo = lines[0].split(gitLogSeparator);
             return {
               hash: commitInfo[COMMIT_DETAILS_FIELD.HASH],
-              parents: commitInfo[COMMIT_DETAILS_FIELD.PARENTS].split(" "),
+              parents: commitInfo[COMMIT_DETAILS_FIELD.PARENTS].split(" ").filter(Boolean),
               author: commitInfo[COMMIT_DETAILS_FIELD.AUTHOR],
               email: commitInfo[COMMIT_DETAILS_FIELD.EMAIL],
               date: parseInt(commitInfo[COMMIT_DETAILS_FIELD.DATE], 10),
@@ -945,7 +945,7 @@ export class DataSource {
           if (line.length !== LOG_FORMAT_FIELD_COUNT) break;
           gitCommits.push({
             hash: line[0],
-            parentHashes: line[1].split(" "),
+            parentHashes: line[1].split(" ").filter(Boolean),
             author: line[2],
             email: line[3],
             date: parseInt(line[4], 10),
