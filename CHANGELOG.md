@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.21] - 2026-04-25
+
+### Added
+
+- **Open worktree in new window**: Right-clicking a worktree branch now shows "Open in New Window" — opens the worktree folder as a new VS Code window, so you can jump straight into it without any terminal commands
+- **Reveal worktree in file manager**: Right-clicking a worktree branch now shows "Reveal in File Manager" — opens the OS file manager at the worktree path for quick file access without leaving VS Code
+
 ## [0.5.20] - 2026-04-10
 
 ### Fixed
@@ -308,7 +315,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.20...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.21...HEAD
+[0.5.21]: https://github.com/numlia/git-keizu/compare/v0.5.20...v0.5.21
 [0.5.20]: https://github.com/numlia/git-keizu/compare/v0.5.19...v0.5.20
 [0.5.19]: https://github.com/numlia/git-keizu/compare/v0.5.18...v0.5.19
 [0.5.18]: https://github.com/numlia/git-keizu/compare/v0.5.17...v0.5.18
