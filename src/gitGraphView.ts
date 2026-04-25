@@ -475,6 +475,21 @@ export class GitKeizuView {
             this.sendMessage({ command: "openTerminal" });
             break;
           }
+          case "openWorktreeInNewWindow":
+            await vscode.commands.executeCommand(
+              "vscode.openFolder",
+              vscode.Uri.file(path.resolve(msg.repo, msg.path)),
+              { forceNewWindow: true }
+            );
+            this.sendMessage({ command: "openWorktreeInNewWindow" });
+            break;
+          case "revealWorktreeInOS":
+            await vscode.commands.executeCommand(
+              "revealFileInOS",
+              vscode.Uri.file(path.resolve(msg.repo, msg.path))
+            );
+            this.sendMessage({ command: "revealWorktreeInOS" });
+            break;
           case "fetch":
             this.sendMessage({
               command: "fetch",

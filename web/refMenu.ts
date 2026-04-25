@@ -348,6 +348,26 @@ export function buildRefContextMenuItems(
       menu.push(
         null,
         {
+          title: "Open in New Window",
+          onClick: () => {
+            sendMessage({
+              command: "openWorktreeInNewWindow",
+              repo: repo,
+              path: worktreeInfo.path
+            });
+          }
+        },
+        {
+          title: "Reveal in File Manager",
+          onClick: () => {
+            sendMessage({
+              command: "revealWorktreeInOS",
+              repo: repo,
+              path: worktreeInfo.path
+            });
+          }
+        },
+        {
           title: "Open Terminal Here",
           onClick: () => {
             sendMessage({

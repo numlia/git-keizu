@@ -557,6 +557,24 @@ export interface ResponseOpenTerminal {
   command: "openTerminal";
 }
 
+export interface RequestOpenWorktreeInNewWindow {
+  command: "openWorktreeInNewWindow";
+  repo: string;
+  path: string;
+}
+export interface ResponseOpenWorktreeInNewWindow {
+  command: "openWorktreeInNewWindow";
+}
+
+export interface RequestRevealWorktreeInOS {
+  command: "revealWorktreeInOS";
+  repo: string;
+  path: string;
+}
+export interface ResponseRevealWorktreeInOS {
+  command: "revealWorktreeInOS";
+}
+
 export interface RequestFetch {
   command: "fetch";
   repo: string;
@@ -632,6 +650,7 @@ export type RequestMessage =
   | RequestMergeCommit
   | RequestOpenFile
   | RequestOpenTerminal
+  | RequestOpenWorktreeInNewWindow
   | RequestPopStash
   | RequestPushStash
   | RequestPushTag
@@ -640,6 +659,7 @@ export type RequestMessage =
   | RequestRenameBranch
   | RequestResetToCommit
   | RequestResetUncommitted
+  | RequestRevealWorktreeInOS
   | RequestRevertCommit
   | RequestSaveRepoState
   | RequestViewDiff;
@@ -672,6 +692,7 @@ export type ResponseMessage =
   | ResponseMergeCommit
   | ResponseOpenFile
   | ResponseOpenTerminal
+  | ResponseOpenWorktreeInNewWindow
   | ResponsePopStash
   | ResponsePushStash
   | ResponsePushTag
@@ -682,5 +703,6 @@ export type ResponseMessage =
   | ResponseRenameBranch
   | ResponseResetToCommit
   | ResponseResetUncommitted
+  | ResponseRevealWorktreeInOS
   | ResponseRevertCommit
   | ResponseViewDiff;
