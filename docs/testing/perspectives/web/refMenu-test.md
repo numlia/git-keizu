@@ -178,3 +178,23 @@
 | TC-055  | チェックOFF + Remove ボタン押下                            | Normal - standard                                                          | sendMessage に deleteBranch: false が含まれる                     | REQ-4.1              |
 | TC-056  | ダイアログのアクションボタン名                             | Normal - standard                                                          | ボタンテキストが "Remove" である                                  | REQ-4.1              |
 | TC-057  | 確認メッセージの内容                                       | Normal - standard                                                          | メッセージにブランチ名と worktree パスが含まれる                  | REQ-4.1 既存動作維持 |
+
+## S13: Context menu 整理対応 (032)
+
+> Origin: Feature 032 (context-menu-reorg) Task 7
+> Added: 2026-04-30
+> Status: active
+> Supersedes: -
+
+**シグネチャ**: `buildRefContextMenuItems(repo: string, refName: string, sourceElem: HTMLElement, isRemoteCombined: boolean, gitBranchHead: string | null, remotes?: string[], worktreeInfo?: { path: string; isMainWorktree: boolean } | null): ContextMenuElement[]`
+**テスト対象パス**: `web/refMenu.ts`
+
+| Case ID | Input / Precondition                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                  | Notes                    |
+| ------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| TC-058  | tag 分岐 (`sourceElem.classList.contains("tag") === true`)            | Normal - unchanged branch type                                             | 戻り値が `Delete Tag...`, `Push Tag...`, `null`, `Copy Tag Name to Clipboard` の 4 要素のままである                                                              | tag は現状維持           |
+| TC-059  | remote 分岐 (`refName = "origin/feature"`)                            | Normal - submenu layout                                                    | 上段 2 件が `Checkout Branch...`, `Merge into current branch...`、index 3 が `More...` submenu、child は `Delete Remote Branch...` 1 件                          | remote 整理              |
+| TC-060  | local HEAD 分岐、`worktreeInfo = null`                                | Normal - current branch layout                                             | `Pull`, `Push`, `null`, `More...`(Rename 1 件), `null`, `Copy Branch Name to Clipboard` の順で並ぶ                                                               | Rename は submenu へ移動 |
+| TC-061  | local HEAD 分岐、`worktreeInfo = { path, isMainWorktree: true }`      | Normal - current branch with worktree                                      | `Pull`, `Push` の後に worktree 4 項目、次に `More...`(Rename 1 件)、末尾に Copy が入り、`Remove Worktree...` は含まれない                                        | main worktree 維持       |
+| TC-062  | local non-HEAD 分岐、`worktreeInfo = null`                            | Normal - non-head no worktree                                              | `Checkout Branch`, `Merge into current branch...`, `Rebase current branch on Branch...`, `null`, `Create Worktree...`, `null`, `More...`, `null`, `Copy...` の順 | 非 HEAD の基本構成       |
+| TC-063  | local non-HEAD 分岐、`worktreeInfo = { path, isMainWorktree: false }` | Normal - non-head with worktree                                            | worktree 4 項目の後に `More...` submenu があり、child titles が `Rename Branch...`, `Delete Branch...`, `Remove Worktree...` の順になる                          | 動的 submenu             |
+| TC-064  | remote / local-HEAD / local-non-HEAD の各分岐                         | Validation - divider rules                                                 | いずれの配列でも連続 `null` が無く、先頭・末尾が `null` でない                                                                                                   | 区切り線ルール           |

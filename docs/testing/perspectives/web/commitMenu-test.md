@@ -115,3 +115,20 @@
 | TC-034  | Branch Name "feature/x" 入力後、Path 手動編集、再度 Branch Name 変更 | Boundary - manual edit                                                     | 手動編集後の Path が保持される（自動更新されない）                                               | REQ-9.3: 正規化下での手動編集検出    |
 
 > **境界値候補の省略理由**: パス入力フィールドの値は文字列結合で構成され、正規化チェーン中に null / undefined は発生しない。手動編集検出（TC-034）が正規化下での主要な境界ケースである。
+
+## S7: Context menu 整理対応 (032)
+
+> Origin: Feature 032 (context-menu-reorg) Task 7
+> Added: 2026-04-30
+> Status: active
+> Supersedes: -
+
+**シグネチャ**: `buildCommitContextMenuItems(repo: string, hash: string, parentHashes: string[], commits: GitCommitNode[], commitLookup: { [hash: string]: number }, sourceElem: HTMLElement): ContextMenuElement[]`
+**テスト対象パス**: `web/commitMenu.ts`
+
+| Case ID | Input / Precondition                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                 | Notes                    |
+| ------- | ------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| TC-035  | parentHashes が 1 件の通常コミット   | Normal - ordered layout                                                    | 戻り値が 8 要素で、index 0-3 が `Create Branch...`, `Create Worktree Here...`, `Cherry Pick...`, `Merge into current branch...` | 上段の高頻度項目         |
+| TC-036  | 同上                                 | Validation - submenu contents                                              | index 5 が `title === "More..."` の submenu で、child titles が `Add Tag...`, `Checkout...`, `Revert...`, `Reset...` の順       | 低頻度・破壊的操作の集約 |
+| TC-037  | parentHashes が 2 件のマージコミット | Normal - moved action path                                                 | `More...` 配下の `Revert...` と上段の `Cherry Pick...` の `onClick` が、既存どおり merge commit 向けダイアログ経路を呼ぶ        | 既存挙動保持             |
+| TC-038  | 通常コミット                         | Boundary - divider placement                                               | `null` が連続せず、先頭と末尾が `null` でなく、末尾が `Copy Commit Hash to Clipboard` である                                    | 区切り線ルール           |

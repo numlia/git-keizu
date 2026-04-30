@@ -1,10 +1,10 @@
 # テスト観点表インデックス
 
-> Auto-generated: 2026-04-04T15:52:21Z
+> Auto-generated: 2026-04-30T00:00:00Z
 > Total sources: 29
 > Total physical files: 34
-> Total sections: 256
-> Total cases: 1229
+> Total sections: 260
+> Total cases: 1252
 
 ## ソースファイル → 観点表（正引き）
 
@@ -24,8 +24,8 @@
 | src/utils.ts           | single-file  | src/utils-test.md           | 1      | 5        | 12    | 2026-04-04   |
 | src/worktree.ts        | single-file  | src/worktree-test.md        | 1      | 1        | 11    | 2026-03-22   |
 | web/branchLabels.ts    | single-file  | web/branchLabels-test.md    | 1      | 1        | 17    | 2026-03-22   |
-| web/commitMenu.ts      | single-file  | web/commitMenu-test.md      | 1      | 6        | 34    | 2026-03-27   |
-| web/contextMenu.ts     | single-file  | web/contextMenu-test.md     | 1      | 1        | 7     | 2026-03-22   |
+| web/commitMenu.ts      | single-file  | web/commitMenu-test.md      | 1      | 7        | 38    | 2026-04-30   |
+| web/contextMenu.ts     | single-file  | web/contextMenu-test.md     | 1      | 2        | 17    | 2026-04-30   |
 | web/dates.ts           | single-file  | web/dates-test.md           | 1      | 7        | 31    | 2026-03-22   |
 | web/dialogs.ts         | single-file  | web/dialogs-test.md         | 1      | 3        | 16    | 2026-03-22   |
 | web/dropdown.ts        | single-file  | web/dropdown-test.md        | 1      | 10       | 38    | 2026-03-22   |
@@ -35,8 +35,8 @@
 | web/graph.ts           | single-file  | web/graph-test.md           | 1      | 17       | 59    | 2026-03-22   |
 | web/main.ts            | sharded      | web/main-test/INDEX.md      | 6      | 37       | 213   | 2026-04-04   |
 | web/messageHandler.ts  | single-file  | web/messageHandler-test.md  | 1      | 8        | 25    | 2026-04-04   |
-| web/refMenu.ts         | single-file  | web/refMenu-test.md         | 1      | 10       | 51    | 2026-03-27   |
-| web/stashMenu.ts       | single-file  | web/stashMenu-test.md       | 1      | 7        | 28    | 2026-03-22   |
+| web/refMenu.ts         | single-file  | web/refMenu-test.md         | 1      | 11       | 58    | 2026-04-30   |
+| web/stashMenu.ts       | single-file  | web/stashMenu-test.md       | 1      | 8        | 30    | 2026-04-30   |
 | web/uncommittedMenu.ts | single-file  | web/uncommittedMenu-test.md | 1      | 1        | 3     | 2026-03-22   |
 | web/utils.ts           | single-file  | web/utils-test.md           | 1      | 4        | 19    | 2026-03-27   |
 
@@ -80,6 +80,7 @@
 | Feature 024 (worktree-path-normalize) (aidd-spec-tasks-test)          | web/utils-test.md, web/commitMenu-test.md, web/refMenu-test.md                                                                                                                                                 |
 | Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)          | src/utils-test.md, src/config-test.md, src/dataSource-test.md, web/fileTree-test.md, web/main-test/INDEX.md, web/messageHandler-test.md                                                                        |
 | Feature 027 (commit-file-context-menu) (aidd-spec-tasks-test)         | web/fileMenu-test.md, web/main-test/INDEX.md                                                                                                                                                                   |
+| Feature 032 (context-menu-reorg) Task 7                               | web/commitMenu-test.md, web/contextMenu-test.md, web/refMenu-test.md, web/stashMenu-test.md                                                                                                                    |
 | test-plan                                                             | web/stashMenu-test.md                                                                                                                                                                                          |
 | test-plan (既存コード分析)                                            | src/avatarManager-test.md, src/diffDocProvider-test.md, src/extension-test.md, src/extensionState-test.md, src/repoFileWatcher-test.md, src/statusBarItem-test.md, web/branchLabels-test.md, web/dates-test.md |
 | test-plan (既存コード網羅)                                            | src/repoManager-test.md                                                                                                                                                                                        |

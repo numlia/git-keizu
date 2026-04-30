@@ -117,3 +117,18 @@
 | TC-026  | selector=null (TypeScript型違反 runtime)             | Boundary - null                                                            | escapeHtml(null) の挙動に依存（エラーまたは "null" 文字列化）                                            | TS型は string だが runtime では null の可能性 |
 | TC-027  | hash=null (TypeScript型違反 runtime)                 | Boundary - null                                                            | sendMessage の data に null が渡される                                                                   | 同上                                          |
 | TC-028  | selector="a".repeat(10000) (極長文字列)              | Boundary - max length                                                      | escapeHtml と sendMessage に切り詰めなく渡される（関数内に truncation 処理なし）                         | -                                             |
+
+## S8: Context menu 整理対応 (032)
+
+> Origin: Feature 032 (context-menu-reorg) Task 7
+> Added: 2026-04-30
+> Status: active
+> Supersedes: -
+
+**シグネチャ**: `buildStashContextMenuItems(repo: string, hash: string, selector: string, sourceElem: HTMLElement): ContextMenuElement[]`
+**テスト対象パス**: `web/stashMenu.ts`
+
+| Case ID | Input / Precondition                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                | Notes          |
+| ------- | ------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | -------------- |
+| TC-029  | repo/hash/selector が有効な通常ケース | Normal - submenu layout                                                    | 戻り値が 7 要素で、index 0=`Apply Stash...`, 1=`Pop Stash...`, 2=`null`, 3=`More...`, 4=`null`, 5=`Copy Stash Name...`, 6=`Copy Stash Hash...` | 新しい基本順序 |
+| TC-030  | `More...` 要素を `submenu` として参照 | Validation - submenu contents                                              | submenu child titles が `Create Branch from Stash...`, `Drop Stash...` の 2 件で、child 内に `null` は含まれない                               | divider 無し   |
