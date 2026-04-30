@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.22] - 2026-04-30
+
+### Changed
+
+- **Context menus reorganized with "More…" submenu**: Commit, branch, and stash context menus have been restructured so the most-used actions appear at the top — Create Branch, Create Worktree Here, Cherry Pick, and Merge for commits; Checkout, Merge, Pull, and Push for branches; Apply Stash and Pop Stash for stashes. Less-used and destructive actions (Add Tag, Rename Branch, Delete Branch, Revert, Reset, Drop Stash, Create Branch from Stash, and Delete Remote Branch) are now grouped under a "More…" submenu that expands on hover. Dividers are placed only between groups of different roles; leading, trailing, and consecutive dividers have been removed throughout
+
 ## [0.5.21] - 2026-04-25
 
 ### Added
@@ -315,7 +321,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.21...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.22...HEAD
+[0.5.22]: https://github.com/numlia/git-keizu/compare/v0.5.21...v0.5.22
 [0.5.21]: https://github.com/numlia/git-keizu/compare/v0.5.20...v0.5.21
 [0.5.20]: https://github.com/numlia/git-keizu/compare/v0.5.19...v0.5.20
 [0.5.19]: https://github.com/numlia/git-keizu/compare/v0.5.18...v0.5.19
