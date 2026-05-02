@@ -614,6 +614,33 @@ export class DataSource {
     return this.spawnGit<boolean>(["rev-parse", "--git-dir"], path, () => true, false);
   }
 
+  public async getRepositoryStateWatchPaths(repo: string): Promise<string[]> {
+    const [gitDir, gitCommonDir] = await Promise.all([
+      this.spawnGit<string | null>(
+        ["rev-parse", "--git-dir"],
+        repo,
+        (stdout) => stdout.trim() || null,
+        null
+      ),
+      this.spawnGit<string | null>(
+        ["rev-parse", "--git-common-dir"],
+        repo,
+        (stdout) => stdout.trim() || null,
+        null
+      )
+    ]);
+
+    const watchPaths = new Set<string>();
+    for (const watchPath of [gitDir, gitCommonDir]) {
+      if (watchPath === null || watchPath === "") continue;
+      watchPaths.add(
+        path.normalize(path.isAbsolute(watchPath) ? watchPath : path.resolve(repo, watchPath))
+      );
+    }
+
+    return Array.from(watchPaths);
+  }
+
   public addTag(
     repo: string,
     tagName: string,

@@ -296,7 +296,8 @@ export class GitKeizuView {
             if (msg.repo !== this.currentRepo) {
               this.currentRepo = msg.repo;
               this.extensionState.setLastActiveRepo(msg.repo);
-              this.repoFileWatcher.start(msg.repo);
+              const watchRoots = await this.dataSource.getRepositoryStateWatchPaths(msg.repo);
+              this.repoFileWatcher.start(watchRoots);
             }
             break;
           }

@@ -1,14 +1,35 @@
+import * as path from "node:path";
+
 import * as vscode from "vscode";
 
 import { getPathFromUri } from "./utils";
 
-const fileChangeRegex =
-  /(^\.git\/(config|index|HEAD|refs\/stash|refs\/heads\/.*|refs\/remotes\/.*|refs\/tags\/.*)$)|(^(?!\.git).*$)|(^\.git[^/]+$)/;
+const watchedRepositoryStateFiles = new Set([
+  "HEAD",
+  "index",
+  "config",
+  "packed-refs",
+  "refs/stash"
+]);
+const watchedRepositoryStatePrefixes = ["refs/heads/", "refs/remotes/", "refs/tags/"];
+
+function normaliseWatchPath(pathValue: string) {
+  return pathValue.split(path.sep).join("/");
+}
+
+function isWatchedRepositoryStatePath(pathValue: string) {
+  return (
+    watchedRepositoryStateFiles.has(pathValue) ||
+    watchedRepositoryStatePrefixes.some(
+      (prefix) => pathValue.startsWith(prefix) && pathValue !== prefix
+    )
+  );
+}
 
 export class RepoFileWatcher {
-  private repo: string | null = null;
+  private watchRoots: string[] = [];
   private readonly repoChangeCallback: () => void;
-  private fsWatcher: vscode.FileSystemWatcher | null = null;
+  private fsWatchers: vscode.FileSystemWatcher[] = [];
   private refreshTimeout: NodeJS.Timeout | null = null;
   private muted: boolean = false;
   private resumeAt: number = 0;
@@ -17,23 +38,25 @@ export class RepoFileWatcher {
     this.repoChangeCallback = repoChangeCallback;
   }
 
-  public start(repo: string) {
-    if (this.fsWatcher !== null) {
-      this.stop();
-    }
+  public start(watchRoots: string[]) {
+    this.stop();
 
-    this.repo = repo;
-    this.fsWatcher = vscode.workspace.createFileSystemWatcher(`${repo}/**`);
-    this.fsWatcher.onDidCreate((uri) => this.refresh(uri));
-    this.fsWatcher.onDidChange((uri) => this.refresh(uri));
-    this.fsWatcher.onDidDelete((uri) => this.refresh(uri));
+    this.watchRoots = watchRoots.map((watchRoot) => path.normalize(watchRoot));
+    this.fsWatchers = this.watchRoots.map((watchRoot) => {
+      const fsWatcher = vscode.workspace.createFileSystemWatcher(`${watchRoot}/**`);
+      fsWatcher.onDidCreate((uri) => this.refresh(uri));
+      fsWatcher.onDidChange((uri) => this.refresh(uri));
+      fsWatcher.onDidDelete((uri) => this.refresh(uri));
+      return fsWatcher;
+    });
   }
 
   public stop() {
-    if (this.fsWatcher !== null) {
-      this.fsWatcher.dispose();
-      this.fsWatcher = null;
+    for (const fsWatcher of this.fsWatchers) {
+      fsWatcher.dispose();
     }
+    this.fsWatchers = [];
+    this.watchRoots = [];
   }
 
   public mute() {
@@ -45,9 +68,19 @@ export class RepoFileWatcher {
     this.resumeAt = new Date().getTime() + 1500;
   }
 
-  private async refresh(uri: vscode.Uri) {
+  private refresh(uri: vscode.Uri) {
     if (this.muted) return;
-    if (!getPathFromUri(uri).replace(`${this.repo}/`, "").match(fileChangeRegex)) return;
+    const filePath = path.normalize(getPathFromUri(uri));
+    const matchingPath = this.watchRoots
+      .map((watchRoot) => path.relative(watchRoot, filePath))
+      .find(
+        (candidate) =>
+          candidate !== "" &&
+          !candidate.startsWith("..") &&
+          !path.isAbsolute(candidate) &&
+          isWatchedRepositoryStatePath(normaliseWatchPath(candidate))
+      );
+    if (matchingPath === undefined) return;
     if (new Date().getTime() < this.resumeAt) return;
 
     if (this.refreshTimeout !== null) {
