@@ -28,6 +28,10 @@ const mocks = vi.hoisted(() => ({
   removeWorktree: vi.fn(),
   createTerminal: vi.fn(),
   terminalShow: vi.fn(),
+  repoFileWatcherStart: vi.fn(),
+  repoFileWatcherStop: vi.fn(),
+  panelDisposeHandler: null as (() => void) | null,
+  panelViewStateHandler: null as (() => void) | null,
   messageHandler: { current: null as ((msg: unknown) => Promise<void>) | null }
 }));
 
@@ -43,8 +47,12 @@ vi.mock("vscode", () => ({
         cspSource: "test-csp",
         html: ""
       },
-      onDidDispose: vi.fn(),
-      onDidChangeViewState: vi.fn(),
+      onDidDispose: vi.fn((handler: () => void) => {
+        mocks.panelDisposeHandler = handler;
+      }),
+      onDidChangeViewState: vi.fn((handler: () => void) => {
+        mocks.panelViewStateHandler = handler;
+      }),
       reveal: vi.fn(),
       visible: true,
       iconPath: null,
@@ -100,8 +108,8 @@ vi.mock("../../src/repoFileWatcher", () => {
     return {
       mute: mocks.mute,
       unmute: mocks.unmute,
-      start: vi.fn(),
-      stop: vi.fn()
+      start: mocks.repoFileWatcherStart,
+      stop: mocks.repoFileWatcherStop
     };
   }
   return { RepoFileWatcher: MockRepoFileWatcher };
@@ -2368,5 +2376,217 @@ describe("GitKeizuView CSS_COLOR_VAR_PREFIX constant verification (S17)", () => 
     // Then: generated HTML contains data-color selectors referencing var(--git-keizu-color)
     const html = getPanelHtml();
     expect(html).toContain("var(--git-keizu-color");
+  });
+});
+
+describe("GitKeizuView loadBranches watcher orchestration", () => {
+  const repoA = "/test/repo-a";
+  const repoB = "/test/repo-b";
+
+  function createViewDeps() {
+    const getBranches = vi.fn().mockResolvedValue({
+      branches: ["main"],
+      head: "main",
+      error: false
+    });
+    const getRepositoryStateWatchPaths = vi
+      .fn()
+      .mockResolvedValue([`${repoA}/.git`, "/shared/.git"]);
+    const isGitRepository = vi.fn().mockResolvedValue(true);
+    const setLastActiveRepo = vi.fn();
+
+    const dataSource = {
+      getBranches,
+      getRepositoryStateWatchPaths,
+      isGitRepository
+    } as unknown as DataSource;
+
+    const extensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo
+    } as unknown as ExtensionState;
+
+    const avatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const repoManager = {
+      getRepos: vi.fn(() => ({ [repoA]: "Repo A", [repoB]: "Repo B" })),
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    return {
+      avatarManager,
+      dataSource,
+      extensionState,
+      getBranches,
+      getRepositoryStateWatchPaths,
+      isGitRepository,
+      repoManager,
+      setLastActiveRepo
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    mocks.panelDisposeHandler = null;
+    mocks.panelViewStateHandler = null;
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  it("resolves watch roots on repo change and starts RepoFileWatcher with them (TC-061)", async () => {
+    // Case: TC-061
+    // Given: A fresh GitKeizuView and a loadBranches request for repoA
+    const deps = createViewDeps();
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      deps.dataSource,
+      deps.extensionState,
+      deps.avatarManager,
+      deps.repoManager
+    );
+
+    // When: loadBranches is received for a new repo
+    await mocks.messageHandler.current!({
+      command: "loadBranches",
+      repo: repoA,
+      showRemoteBranches: true,
+      hard: false
+    });
+
+    // Then: The watch roots are resolved once and RepoFileWatcher.start receives the returned array
+    expect(deps.getBranches).toHaveBeenCalledTimes(1);
+    expect(deps.getBranches).toHaveBeenCalledWith(repoA, true);
+    expect(deps.getRepositoryStateWatchPaths).toHaveBeenCalledTimes(1);
+    expect(deps.getRepositoryStateWatchPaths).toHaveBeenCalledWith(repoA);
+    expect(deps.setLastActiveRepo).toHaveBeenCalledTimes(1);
+    expect(deps.setLastActiveRepo).toHaveBeenCalledWith(repoA);
+    expect(mocks.repoFileWatcherStart).toHaveBeenCalledTimes(1);
+    expect(mocks.repoFileWatcherStart).toHaveBeenCalledWith([`${repoA}/.git`, "/shared/.git"]);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "loadBranches",
+      branches: ["main"],
+      head: "main",
+      hard: false,
+      isRepo: true
+    });
+  });
+
+  it("does not restart RepoFileWatcher when loadBranches repeats for the same repo (TC-062)", async () => {
+    // Case: TC-062
+    // Given: GitKeizuView already loaded repoA once
+    const deps = createViewDeps();
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      deps.dataSource,
+      deps.extensionState,
+      deps.avatarManager,
+      deps.repoManager
+    );
+    await mocks.messageHandler.current!({
+      command: "loadBranches",
+      repo: repoA,
+      showRemoteBranches: false,
+      hard: false
+    });
+    vi.clearAllMocks();
+
+    // When: loadBranches is received again for the same repo
+    await mocks.messageHandler.current!({
+      command: "loadBranches",
+      repo: repoA,
+      showRemoteBranches: false,
+      hard: true
+    });
+
+    // Then: Branches are reloaded but the watcher is not restarted and watch roots are not resolved again
+    expect(deps.getBranches).toHaveBeenCalledTimes(1);
+    expect(deps.getRepositoryStateWatchPaths).not.toHaveBeenCalled();
+    expect(deps.setLastActiveRepo).not.toHaveBeenCalled();
+    expect(mocks.repoFileWatcherStart).not.toHaveBeenCalled();
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "loadBranches",
+      branches: ["main"],
+      head: "main",
+      hard: true,
+      isRepo: true
+    });
+  });
+
+  it("checks git repository state on branch-load failure and still starts watching after repo change (TC-063)", async () => {
+    // Case: TC-063
+    // Given: getBranches reports an error and watch roots resolve for repoB
+    const deps = createViewDeps();
+    deps.getBranches.mockResolvedValueOnce({
+      branches: [],
+      head: null,
+      error: true
+    });
+    deps.getRepositoryStateWatchPaths.mockResolvedValueOnce([`${repoB}/.git`]);
+    deps.isGitRepository.mockResolvedValueOnce(false);
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      deps.dataSource,
+      deps.extensionState,
+      deps.avatarManager,
+      deps.repoManager
+    );
+
+    // When: loadBranches is received for repoB
+    await mocks.messageHandler.current!({
+      command: "loadBranches",
+      repo: repoB,
+      showRemoteBranches: false,
+      hard: false
+    });
+
+    // Then: isGitRepository is queried for the error case and RepoFileWatcher starts with repoB roots
+    expect(deps.isGitRepository).toHaveBeenCalledTimes(1);
+    expect(deps.isGitRepository).toHaveBeenCalledWith(repoB);
+    expect(deps.getRepositoryStateWatchPaths).toHaveBeenCalledTimes(1);
+    expect(deps.getRepositoryStateWatchPaths).toHaveBeenCalledWith(repoB);
+    expect(mocks.repoFileWatcherStart).toHaveBeenCalledWith([`${repoB}/.git`]);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "loadBranches",
+      branches: [],
+      head: null,
+      hard: false,
+      isRepo: false
+    });
+  });
+
+  it("stops RepoFileWatcher when the panel becomes hidden (TC-064)", () => {
+    // Case: TC-064
+    // Given: GitKeizuView is created and the panel view state handler is registered
+    const deps = createViewDeps();
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      deps.dataSource,
+      deps.extensionState,
+      deps.avatarManager,
+      deps.repoManager
+    );
+    const panelMock = vi.mocked(vscode.window.createWebviewPanel).mock.results[0].value as {
+      visible: boolean;
+    };
+    expect(mocks.panelViewStateHandler).not.toBeNull();
+
+    // When: The panel transitions from visible to hidden
+    panelMock.visible = false;
+    mocks.panelViewStateHandler?.();
+
+    // Then: RepoFileWatcher.stop is called once
+    expect(mocks.repoFileWatcherStop).toHaveBeenCalledTimes(1);
   });
 });

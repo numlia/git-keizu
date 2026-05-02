@@ -3183,6 +3183,139 @@ describe("getWorktrees", () => {
   });
 });
 
+describe("getRepositoryStateWatchPaths", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  type RevParsePlan = {
+    emitError?: boolean;
+    exitCode?: number;
+    stdout?: string;
+  };
+
+  function setupRevParse(plans: { gitCommonDir?: RevParsePlan; gitDir?: RevParsePlan }) {
+    spawnMock.mockImplementation((_cmd, args) => {
+      const argList = args as string[];
+      if (argList[0] !== "rev-parse") {
+        return createMockProcess("");
+      }
+      if (argList[1] === "--git-dir") {
+        const plan = plans.gitDir ?? { stdout: "" };
+        return createMockProcess(plan.stdout ?? "", plan.exitCode ?? 0, plan.emitError ?? false);
+      }
+      if (argList[1] === "--git-common-dir") {
+        const plan = plans.gitCommonDir ?? { stdout: "" };
+        return createMockProcess(plan.stdout ?? "", plan.exitCode ?? 0, plan.emitError ?? false);
+      }
+      return createMockProcess("");
+    });
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns one absolute watch path for a main worktree with duplicate relative git dirs (TC-150)", async () => {
+    // Case: TC-150
+    // Given: rev-parse returns the same relative .git path for git-dir and git-common-dir
+    setupRevParse({
+      gitDir: { stdout: ".git\n" },
+      gitCommonDir: { stdout: ".git\n" }
+    });
+
+    // When: getRepositoryStateWatchPaths(repo) is called
+    const result = await ds.getRepositoryStateWatchPaths(REPO);
+
+    // Then: One deduplicated absolute watch path is returned and both rev-parse commands are executed once
+    expect(result).toEqual([`${REPO}/.git`]);
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+    expect(spawnMock).toHaveBeenNthCalledWith(1, "git", ["rev-parse", "--git-dir"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenNthCalledWith(2, "git", ["rev-parse", "--git-common-dir"], {
+      cwd: REPO
+    });
+  });
+
+  it("returns both linked worktree git-dir and shared common-dir in call order (TC-151)", async () => {
+    // Case: TC-151
+    // Given: rev-parse returns distinct absolute paths for linked worktree and shared common-dir
+    setupRevParse({
+      gitDir: { stdout: "/main/.git/worktrees/feature-x\n" },
+      gitCommonDir: { stdout: "/main/.git\n" }
+    });
+
+    // When: getRepositoryStateWatchPaths(repo) is called
+    const result = await ds.getRepositoryStateWatchPaths(REPO);
+
+    // Then: Both absolute paths are returned with the worktree-specific git-dir first
+    expect(result).toEqual(["/main/.git/worktrees/feature-x", "/main/.git"]);
+  });
+
+  it("normalises mixed relative and absolute rev-parse outputs to absolute paths (TC-152)", async () => {
+    // Case: TC-152
+    // Given: rev-parse returns a relative git-dir and an absolute git-common-dir
+    setupRevParse({
+      gitDir: { stdout: "./.git/worktrees/feature-x\n" },
+      gitCommonDir: { stdout: "/shared/repo/.git\n" }
+    });
+
+    // When: getRepositoryStateWatchPaths(repo) is called
+    const result = await ds.getRepositoryStateWatchPaths(REPO);
+
+    // Then: The relative value is resolved from repo and the absolute value is preserved
+    expect(result).toEqual([`${REPO}/.git/worktrees/feature-x`, "/shared/repo/.git"]);
+  });
+
+  it("falls back to the git-dir path when git-common-dir resolution fails (TC-153)", async () => {
+    // Case: TC-153
+    // Given: git-dir succeeds and git-common-dir exits non-zero
+    setupRevParse({
+      gitDir: { stdout: ".git\n" },
+      gitCommonDir: { exitCode: 128, stdout: "" }
+    });
+
+    // When: getRepositoryStateWatchPaths(repo) is called
+    const result = await ds.getRepositoryStateWatchPaths(REPO);
+
+    // Then: Only the resolved git-dir path is returned
+    expect(result).toEqual([`${REPO}/.git`]);
+  });
+
+  it("falls back to the git-common-dir path when git-dir resolution fails (TC-154)", async () => {
+    // Case: TC-154
+    // Given: git-dir emits an error and git-common-dir succeeds
+    setupRevParse({
+      gitDir: { emitError: true },
+      gitCommonDir: { stdout: "/main/.git\n" }
+    });
+
+    // When: getRepositoryStateWatchPaths(repo) is called
+    const result = await ds.getRepositoryStateWatchPaths(REPO);
+
+    // Then: Only the git-common-dir path is returned
+    expect(result).toEqual(["/main/.git"]);
+  });
+
+  it("returns an empty array when both rev-parse commands fail (TC-155)", async () => {
+    // Case: TC-155
+    // Given: Both rev-parse commands fail to resolve watch paths
+    setupRevParse({
+      gitDir: { exitCode: 128 },
+      gitCommonDir: { emitError: true }
+    });
+
+    // When: getRepositoryStateWatchPaths(repo) is called
+    const result = await ds.getRepositoryStateWatchPaths(REPO);
+
+    // Then: An empty watch root array is returned as the fallback
+    expect(result).toEqual([]);
+  });
+});
+
 describe("addWorktree", () => {
   let ds: DataSource;
   const spawnMock = vi.mocked(cp.spawn);
