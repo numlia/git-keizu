@@ -93,6 +93,7 @@ vi.mock("../../src/config", () => ({
     muteCommitsNotAncestorsOfHead: () => false,
     commitOrdering: () => "date",
     showCurrentBranchByDefault: () => false,
+    showRecentActions: () => true,
     dialogDefaults: () => ({
       merge: { noFastForward: true, squashCommits: false, noCommit: false },
       cherryPick: { recordOrigin: false, noCommit: false },
@@ -1728,6 +1729,19 @@ describe("GitKeizuView merge/cherry-pick handler and viewState dialogDefaults (S
       createWorktree: { openTerminal: true },
       removeWorktree: { deleteBranch: true }
     });
+  });
+
+  it("includes showRecentActions in viewState from Config (TC-065)", async () => {
+    // Case: TC-065
+    // Given: config.showRecentActions() returns true in the default mock
+
+    // When: panel is created
+    createPanel();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Then: viewState in HTML contains showRecentActions=true
+    const viewState = parseViewState(getPanelHtml());
+    expect(viewState.showRecentActions).toBe(true);
   });
 
   it("passes squash=true noCommit=false to DataSource.mergeBranch (TC-040)", async () => {

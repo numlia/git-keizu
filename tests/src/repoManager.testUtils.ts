@@ -197,7 +197,8 @@ function createStatResult(directory: boolean): StatResult {
 function cloneRepoState(state: GitRepoState): GitRepoState {
   return {
     ...state,
-    columnWidths: state.columnWidths === null ? null : [...state.columnWidths]
+    columnWidths: state.columnWidths === null ? null : [...state.columnWidths],
+    recentActions: state.recentActions === undefined ? undefined : [...state.recentActions]
   };
 }
 

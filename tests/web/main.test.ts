@@ -163,6 +163,7 @@ vi.mock("../../web/contextMenu", () => ({
   hideContextMenu: vi.fn(),
   hideContextMenuListener: vi.fn(),
   isContextMenuActive: vi.fn(() => false),
+  recordRecentAction: vi.fn(),
   showContextMenu: vi.fn()
 }));
 

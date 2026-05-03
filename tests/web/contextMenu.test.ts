@@ -11,7 +11,10 @@ const OFFSET = 2;
 
 let showContextMenu: typeof import("../../web/contextMenu").showContextMenu;
 let hideContextMenu: typeof import("../../web/contextMenu").hideContextMenu;
+let recordRecentAction: typeof import("../../web/contextMenu").recordRecentAction;
 let contextMenuEl: HTMLUListElement;
+
+import { vscode } from "../../web/utils";
 
 beforeAll(async () => {
   // Given: contextMenu DOM element exists before module loads
@@ -22,6 +25,7 @@ beforeAll(async () => {
   const mod = await import("../../web/contextMenu");
   showContextMenu = mod.showContextMenu;
   hideContextMenu = mod.hideContextMenu;
+  recordRecentAction = mod.recordRecentAction;
 });
 
 beforeEach(() => {
@@ -48,6 +52,14 @@ beforeEach(() => {
         toJSON: () => {}
       }) as DOMRect
   );
+
+  (globalThis as Record<string, unknown>).viewState = {
+    repos: { "/test/repo": { columnWidths: null } },
+    showRecentActions: false
+  };
+  vi.mocked(vscode.postMessage).mockClear();
+  vi.mocked(vscode.getState).mockReturnValue(null);
+  vi.mocked(vscode.setState).mockClear();
 });
 
 afterEach(() => {
@@ -530,5 +542,191 @@ describe("showContextMenu submenu behavior (S2)", () => {
 
     // Then: no regular-item callback is invoked
     expect(firstClick).not.toHaveBeenCalled();
+  });
+});
+
+describe("showContextMenu recent actions (S3)", () => {
+  function getRenderedMenuSnapshot(): Array<{ className: string; text: string; html: string }> {
+    return Array.from(contextMenuEl.querySelectorAll("li")).map((el) => ({
+      className: el.className,
+      text: (el.textContent ?? "").replace("▸", "").trim(),
+      html: el.innerHTML
+    }));
+  }
+
+  it("does not prepend Recent items when showRecentActions is disabled (TC-018)", () => {
+    // Case: TC-018
+    // Given: matching recent history exists but the setting is disabled
+    (globalThis as Record<string, unknown>).viewState = {
+      repos: { "/test/repo": { columnWidths: null } },
+      showRecentActions: false
+    };
+    const sourceElem = createSourceElem();
+    const items: ContextMenuElement[] = [
+      { title: "Create Branch", recentActionId: "commit.createBranch", onClick: vi.fn() },
+      { title: "Merge", recentActionId: "commit.merge", onClick: vi.fn() }
+    ];
+
+    // When: showContextMenu is called with recentActions
+    showContextMenu(
+      createMouseEvent(100, 100),
+      items,
+      sourceElem,
+      ["commit.merge", "commit.createBranch"]
+    );
+
+    // Then: the menu renders only the original items without a prepended divider block
+    expect(getRenderedMenuSnapshot()).toEqual([
+      { className: "contextMenuItem", text: "Create Branch", html: "Create Branch" },
+      { className: "contextMenuItem", text: "Merge", html: "Merge" }
+    ]);
+  });
+
+  it("prepends matching Recent items in history order when enabled (TC-019)", () => {
+    // Case: TC-019
+    // Given: Recent display is enabled and two matching recent actions exist
+    (globalThis as Record<string, unknown>).viewState = {
+      repos: { "/test/repo": { columnWidths: null } },
+      showRecentActions: true
+    };
+    const sourceElem = createSourceElem();
+    const items: ContextMenuElement[] = [
+      { title: "Create Branch", recentActionId: "commit.createBranch", onClick: vi.fn() },
+      { title: "Merge", recentActionId: "commit.merge", onClick: vi.fn() },
+      { title: "Copy", onClick: vi.fn() }
+    ];
+
+    // When: showContextMenu is called with recentActions ordered by recency
+    showContextMenu(
+      createMouseEvent(100, 100),
+      items,
+      sourceElem,
+      ["commit.merge", "commit.createBranch"]
+    );
+
+    // Then: matching recent items are prepended before a divider and the normal menu remains intact
+    expect(getRenderedMenuSnapshot()).toEqual([
+      {
+        className: "contextMenuLabel",
+        text: "Recent",
+        html: '<span class="codicon codicon-history"></span><span class="contextMenuLabelText">Recent</span>'
+      },
+      { className: "contextMenuItem", text: "Merge", html: "Merge" },
+      { className: "contextMenuItem", text: "Create Branch", html: "Create Branch" },
+      { className: "contextMenuDivider", text: "", html: "" },
+      { className: "contextMenuItem", text: "Create Branch", html: "Create Branch" },
+      { className: "contextMenuItem", text: "Merge", html: "Merge" },
+      { className: "contextMenuItem", text: "Copy", html: "Copy" }
+    ]);
+  });
+
+  it("does not create a Recent block when fewer than two eligible actions exist (TC-020)", () => {
+    // Case: TC-020
+    // Given: Recent display is enabled but the menu has only one recent-eligible item
+    (globalThis as Record<string, unknown>).viewState = {
+      repos: { "/test/repo": { columnWidths: null } },
+      showRecentActions: true
+    };
+    const sourceElem = createSourceElem();
+    const items: ContextMenuElement[] = [
+      { title: "Open File", recentActionId: "file.openFile", onClick: vi.fn() },
+      { title: "Copy", onClick: vi.fn() }
+    ];
+
+    // When: showContextMenu is called with a matching recent action
+    showContextMenu(createMouseEvent(100, 100), items, sourceElem, ["file.openFile"]);
+
+    // Then: the menu renders without a prepended Recent block
+    expect(getRenderedMenuSnapshot()).toEqual([
+      { className: "contextMenuItem", text: "Open File", html: "Open File" },
+      { className: "contextMenuItem", text: "Copy", html: "Copy" }
+    ]);
+  });
+
+  it("can lift submenu actions into Recent while preserving the original submenu (TC-021)", () => {
+    // Case: TC-021
+    // Given: a submenu child and a top-level item are both recent-eligible
+    (globalThis as Record<string, unknown>).viewState = {
+      repos: { "/test/repo": { columnWidths: null } },
+      showRecentActions: true
+    };
+    const sourceElem = createSourceElem();
+    const items: ContextMenuElement[] = [
+      { title: "Create Branch", recentActionId: "commit.createBranch", onClick: vi.fn() },
+      {
+        title: "More...",
+        submenu: [{ title: "Add Tag", recentActionId: "commit.addTag", onClick: vi.fn() }]
+      }
+    ];
+
+    // When: showContextMenu is called with a submenu action in recent history
+    showContextMenu(
+      createMouseEvent(100, 100),
+      items,
+      sourceElem,
+      ["commit.addTag", "commit.createBranch"]
+    );
+
+    // Then: the recent block contains the submenu item while the original submenu still exists
+    expect(getRenderedMenuSnapshot()).toEqual([
+      {
+        className: "contextMenuLabel",
+        text: "Recent",
+        html: '<span class="codicon codicon-history"></span><span class="contextMenuLabelText">Recent</span>'
+      },
+      { className: "contextMenuItem", text: "Add Tag", html: "Add Tag" },
+      { className: "contextMenuItem", text: "Create Branch", html: "Create Branch" },
+      { className: "contextMenuDivider", text: "", html: "" },
+      { className: "contextMenuItem", text: "Create Branch", html: "Create Branch" },
+      {
+        className: "contextMenuItem contextMenuParent",
+        text: "More...",
+        html: 'More...<span class="contextMenuArrow">▸</span>'
+      }
+    ]);
+    expect(document.querySelectorAll("ul.contextMenuSubmenu")).toHaveLength(1);
+  });
+
+  it("updates local repo state and sends saveRepoState when recording a recent action (TC-022)", () => {
+    // Case: TC-022
+    // Given: repo state already has one recent action and webview state is available
+    const persistedState = {
+      gitRepos: {
+        "/test/repo": { columnWidths: null, recentActions: ["commit.merge"] }
+      }
+    } as unknown as WebViewState;
+    (globalThis as Record<string, unknown>).viewState = {
+      repos: {
+        "/test/repo": { columnWidths: null, recentActions: ["commit.merge"] }
+      },
+      showRecentActions: true
+    };
+    vi.mocked(vscode.getState).mockReturnValue(persistedState);
+
+    // When: recordRecentAction is called for a new action
+    recordRecentAction("/test/repo", "commit.createBranch");
+
+    // Then: local state is updated, webview state is refreshed, and saveRepoState is posted
+    expect(viewState.repos["/test/repo"].recentActions).toEqual([
+      "commit.createBranch",
+      "commit.merge"
+    ]);
+    expect(vscode.setState).toHaveBeenCalledWith({
+      ...persistedState,
+      gitRepos: {
+        "/test/repo": {
+          columnWidths: null,
+          recentActions: ["commit.createBranch", "commit.merge"]
+        }
+      }
+    });
+    expect(vscode.postMessage).toHaveBeenCalledWith({
+      command: "saveRepoState",
+      repo: "/test/repo",
+      state: {
+        columnWidths: null,
+        recentActions: ["commit.createBranch", "commit.merge"]
+      }
+    });
   });
 });

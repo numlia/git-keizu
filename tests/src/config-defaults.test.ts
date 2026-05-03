@@ -179,4 +179,19 @@ describe("Config fallback defaults vs package.json", () => {
       expect(actual).toBe(expected);
     });
   });
+
+  describe("Group 5: menu.showRecentActions fallback comparison", () => {
+    it("TC-080: menu.showRecentActions fallback matches package.json default", () => {
+      // Case: TC-080
+      // Given: mock returns fallback values (configured in beforeEach)
+
+      // When: reading showRecentActions via fallback
+      const config = getConfig();
+      const actual = config.showRecentActions();
+
+      // Then: the fallback matches the package.json default
+      const expected = getPackageDefault("menu.showRecentActions");
+      expect(actual).toBe(expected);
+    });
+  });
 });

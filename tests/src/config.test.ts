@@ -270,6 +270,41 @@ describe("loadMoreCommitsAutomatically", () => {
   });
 });
 
+// S14: showRecentActions() Recent 表示設定
+describe("showRecentActions", () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  it("returns true by default (TC-078)", () => {
+    // Case: TC-078
+    // Given: default configuration
+    mockGet.mockImplementation((_key: string, defaultValue: unknown) => defaultValue);
+
+    // When: reading showRecentActions
+    const config = getConfig();
+    const result = config.showRecentActions();
+
+    // Then: returns true
+    expect(result).toBe(true);
+  });
+
+  it("returns false when explicitly disabled (TC-079)", () => {
+    // Case: TC-079
+    // Given: menu.showRecentActions is explicitly disabled
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "menu.showRecentActions" ? false : defaultValue
+    );
+
+    // When: reading showRecentActions
+    const config = getConfig();
+    const result = config.showRecentActions();
+
+    // Then: returns false
+    expect(result).toBe(false);
+  });
+});
+
 // S5: muteCommitsMergeCommits() マージコミット mute 設定
 describe("muteCommitsMergeCommits", () => {
   beforeEach(() => {

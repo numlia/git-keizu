@@ -681,4 +681,96 @@ describe("ExtensionState", () => {
       expect(fs.unlink).toHaveBeenCalledWith("/storage/path/avatars/ok.png");
     });
   });
+
+  describe("saveRepos recentActions normalization", () => {
+    it("TC-035: deduplicates recentActions while preserving first occurrence order", async () => {
+      // Case: TC-035
+      // Given: repo state contains duplicated recent action ids in newest-first order
+      const repoSet: GitRepoSet = {
+        "/repo": {
+          columnWidths: [120, 240],
+          recentActions: [
+            "commit.createBranch",
+            "commit.createWorktree",
+            "commit.createBranch",
+            "ref.push"
+          ]
+        }
+      };
+      const state = new ExtensionState(toExtensionContext(mockContext));
+      await flushPromises();
+
+      // When: saveRepos is called
+      state.saveRepos(repoSet);
+
+      // Then: workspaceState.update receives deduplicated recentActions in original order
+      expect(mockContext.workspaceState.update).toHaveBeenCalledWith("repoStates", {
+        "/repo": {
+          columnWidths: [120, 240],
+          recentActions: ["commit.createBranch", "commit.createWorktree", "ref.push"]
+        }
+      });
+    });
+
+    it("TC-036: trims recentActions to the newest five items", async () => {
+      // Case: TC-036
+      // Given: repo state contains more than five unique recent action ids
+      const repoSet: GitRepoSet = {
+        "/repo": {
+          columnWidths: null,
+          recentActions: [
+            "commit.createBranch",
+            "commit.createWorktree",
+            "commit.cherryPick",
+            "commit.merge",
+            "commit.addTag",
+            "ref.push"
+          ]
+        }
+      };
+      const state = new ExtensionState(toExtensionContext(mockContext));
+      await flushPromises();
+
+      // When: saveRepos is called
+      state.saveRepos(repoSet);
+
+      // Then: only the first five recent actions are persisted
+      expect(mockContext.workspaceState.update).toHaveBeenCalledWith("repoStates", {
+        "/repo": {
+          columnWidths: null,
+          recentActions: [
+            "commit.createBranch",
+            "commit.createWorktree",
+            "commit.cherryPick",
+            "commit.merge",
+            "commit.addTag"
+          ]
+        }
+      });
+    });
+
+    it("TC-037: leaves other repo state fields unchanged while handling empty or undefined recentActions", async () => {
+      // Case: TC-037
+      // Given: repo states include undefined and empty recentActions plus other persisted fields
+      const repoSet: GitRepoSet = {
+        "/repo-a": {
+          columnWidths: [100, 200],
+          commitOrdering: "author-date"
+        },
+        "/repo-b": {
+          columnWidths: null,
+          fileViewType: "list",
+          recentActions: []
+        }
+      };
+      const state = new ExtensionState(toExtensionContext(mockContext));
+      await flushPromises();
+
+      // When: saveRepos is called
+      state.saveRepos(repoSet);
+
+      // Then: non-recentActions fields are preserved and empty/undefined recentActions remain valid
+      expect(mockContext.workspaceState.update).toHaveBeenCalledWith("repoStates", repoSet);
+    });
+  });
 });

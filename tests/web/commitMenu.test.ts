@@ -8,6 +8,10 @@ vi.mock("../../web/dialogs", () => ({
   showSelectDialog: vi.fn()
 }));
 
+vi.mock("../../web/contextMenu", () => ({
+  recordRecentAction: vi.fn()
+}));
+
 vi.mock("../../web/utils", () => {
   const pathUnsafeChars = /[\\/:*?"<>| ]+/g;
   const pathUnsafeCharReplacement = "-";
@@ -28,6 +32,7 @@ vi.mock("../../web/utils", () => {
 });
 
 import { buildCommitContextMenuItems } from "../../web/commitMenu";
+import { recordRecentAction } from "../../web/contextMenu";
 import { showFormDialog, showSelectDialog } from "../../web/dialogs";
 import { sanitizeBranchNameForPath, sendMessage } from "../../web/utils";
 
@@ -954,5 +959,98 @@ describe("Commit context menu structure (S7)", () => {
 
     // Then: there are no leading, trailing, or consecutive dividers
     expect(hasInvalidDividers).toBe(false);
+  });
+});
+
+describe("Commit recent action metadata (S8)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
+  });
+
+  it("assigns recentActionId to the supported top-level actions (TC-039)", () => {
+    // Case: TC-039
+    // Given: a regular commit menu
+    const items = buildCommitContextMenuItems(REPO, HASH, PARENT_HASHES, [], {}, createMockElement());
+
+    // When: supported top-level actions are inspected
+
+    // Then: each supported action exposes the expected recentActionId
+    expect(findTopLevelMenuItem(items, "Create Branch&#8230;").recentActionId).toBe(
+      "commit.createBranch"
+    );
+    expect(findTopLevelMenuItem(items, "Create Worktree Here&#8230;").recentActionId).toBe(
+      "commit.createWorktree"
+    );
+    expect(findTopLevelMenuItem(items, "Cherry Pick&#8230;").recentActionId).toBe(
+      "commit.cherryPick"
+    );
+    expect(findTopLevelMenuItem(items, "Merge into current branch&#8230;").recentActionId).toBe(
+      "commit.merge"
+    );
+  });
+
+  it("assigns recentActionId only to Add Tag inside the More submenu (TC-040)", () => {
+    // Case: TC-040
+    // Given: a regular commit menu
+    const items = buildCommitContextMenuItems(REPO, HASH, PARENT_HASHES, [], {}, createMockElement());
+
+    // When: submenu actions are inspected
+    const addTagItem = findSubmenuItem(items, "Add Tag&#8230;");
+    const checkoutItem = findSubmenuItem(items, "Checkout&#8230;");
+    const revertItem = findSubmenuItem(items, "Revert&#8230;");
+    const resetItem = findSubmenuItem(items, "Reset current branch to this Commit&#8230;");
+
+    // Then: only Add Tag is recent-enabled
+    expect(addTagItem.recentActionId).toBe("commit.addTag");
+    expect(checkoutItem.recentActionId).toBeUndefined();
+    expect(revertItem.recentActionId).toBeUndefined();
+    expect(resetItem.recentActionId).toBeUndefined();
+  });
+
+  it("records the recent action before sending Create Branch on submit (TC-041)", () => {
+    // Case: TC-041
+    // Given: the Create Branch dialog has been opened
+    const item = getCreateBranchItem();
+    item.onClick();
+
+    // When: the dialog callback is submitted
+    const actioned = vi.mocked(showFormDialog).mock.calls[0][3];
+    actioned(["feature/recent", "checked"]);
+
+    // Then: recordRecentAction is called before sendMessage with the matching id
+    expect(recordRecentAction).toHaveBeenCalledWith(REPO, "commit.createBranch");
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "createBranch",
+      repo: REPO,
+      branchName: "feature/recent",
+      commitHash: HASH,
+      checkout: true
+    });
+    expect(vi.mocked(recordRecentAction).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(sendMessage).mock.invocationCallOrder[0]
+    );
+  });
+
+  it("does not record a recent action until the Add Tag dialog is submitted (TC-042)", () => {
+    // Case: TC-042
+    // Given: the Add Tag dialog is opened from the submenu
+    const items = buildCommitContextMenuItems(REPO, HASH, PARENT_HASHES, [], {}, createMockElement());
+    const addTagItem = findSubmenuItem(items, "Add Tag&#8230;");
+
+    // When: the menu item is clicked but the submit callback is not invoked
+    addTagItem.onClick();
+
+    // Then: the dialog opens without recording the action yet
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    expect(recordRecentAction).not.toHaveBeenCalled();
   });
 });

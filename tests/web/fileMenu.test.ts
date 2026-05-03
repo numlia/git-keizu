@@ -1,7 +1,12 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+vi.mock("../../web/contextMenu", () => ({
+  recordRecentAction: vi.fn()
+}));
+
 import { buildFileContextMenuItems, resolveFileRow, sendOpenFileAction } from "../../web/fileMenu";
+import { recordRecentAction } from "../../web/contextMenu";
 import { vscode } from "../../web/utils";
 
 /* ------------------------------------------------------------------ */
@@ -215,5 +220,62 @@ describe("buildFileContextMenuItems", () => {
       filePath: "src/file.ts",
       commitHash: COMMIT_HASH
     });
+  });
+});
+
+describe("buildFileContextMenuItems recent action metadata (S3)", () => {
+  beforeEach(() => {
+    vi.mocked(vscode.postMessage).mockClear();
+    vi.mocked(recordRecentAction).mockClear();
+  });
+
+  it("assigns recentActionId to the Open File item (TC-012)", () => {
+    // Case: TC-012
+    // Given: a valid file row with expanded commit
+    const row = makeFileRow({ newfilepath: "src%2Ffile.ts" });
+    const commit = makeExpandedCommit();
+
+    // When: buildFileContextMenuItems is called
+    const items = buildFileContextMenuItems(row, commit, TEST_REPO);
+
+    // Then: the Open File item is recent-enabled with file.openFile
+    expect(items).toHaveLength(1);
+    expect(items[0]!.recentActionId).toBe("file.openFile");
+  });
+
+  it("records the action before sending openFile when the menu item is clicked (TC-013)", () => {
+    // Case: TC-013
+    // Given: a valid Open File menu item
+    const row = makeFileRow({ newfilepath: "src%2Ffile.ts" });
+    const commit = makeExpandedCommit();
+    const items = buildFileContextMenuItems(row, commit, TEST_REPO);
+
+    // When: the menu item is clicked
+    items[0]!.onClick();
+
+    // Then: recordRecentAction runs before the openFile payload is posted
+    expect(recordRecentAction).toHaveBeenCalledWith(TEST_REPO, "file.openFile");
+    expect(vscode.postMessage).toHaveBeenCalledWith({
+      command: "openFile",
+      repo: TEST_REPO,
+      filePath: "src/file.ts",
+      commitHash: COMMIT_HASH
+    });
+    expect(vi.mocked(recordRecentAction).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(vscode.postMessage).mock.invocationCallOrder[0]
+    );
+  });
+
+  it("does not record a recent action when guard conditions prevent building the menu (TC-014)", () => {
+    // Case: TC-014
+    // Given: expandedCommit is null so no menu item can be created
+    const row = makeFileRow({ newfilepath: "src%2Ffile.ts" });
+
+    // When: buildFileContextMenuItems is called
+    const items = buildFileContextMenuItems(row, null, TEST_REPO);
+
+    // Then: no menu item exists and no recent action is recorded
+    expect(items).toEqual([]);
+    expect(recordRecentAction).not.toHaveBeenCalled();
   });
 });

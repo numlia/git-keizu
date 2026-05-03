@@ -9,6 +9,10 @@ vi.mock("../../web/dialogs", () => ({
   showActionRunningDialog: vi.fn()
 }));
 
+vi.mock("../../web/contextMenu", () => ({
+  recordRecentAction: vi.fn()
+}));
+
 vi.mock("../../web/utils", () => {
   const pathUnsafeChars = /[\\/:*?"<>| ]+/g;
   const pathUnsafeCharReplacement = "-";
@@ -34,6 +38,7 @@ import {
   showFormDialog,
   showRefInputDialog
 } from "../../web/dialogs";
+import { recordRecentAction } from "../../web/contextMenu";
 import { buildRefContextMenuItems, checkoutBranchAction, parseRemoteRef } from "../../web/refMenu";
 import { getRepoName, sanitizeBranchNameForPath, sendMessage } from "../../web/utils";
 
@@ -1473,5 +1478,150 @@ describe("Ref context menu structure (S13)", () => {
     expect(hasInvalidDividers(remoteMenu)).toBe(false);
     expect(hasInvalidDividers(headMenu)).toBe(false);
     expect(hasInvalidDividers(localMenu)).toBe(false);
+  });
+});
+
+describe("Ref recent action metadata (S14)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
+  });
+
+  it("assigns recentActionId to supported remote and HEAD actions only (TC-065)", () => {
+    // Case: TC-065
+    // Given: representative remote and HEAD branch menus
+    const remoteMenu = buildRefContextMenuItems(
+      REPO,
+      "origin/feature",
+      createMockElement(["remote"]),
+      false,
+      "main"
+    );
+    const headMenu = buildRefContextMenuItems(
+      REPO,
+      "main",
+      createMockElement(["head"]),
+      false,
+      "main",
+      undefined,
+      { path: "/tmp/main-worktree", isMainWorktree: true }
+    );
+
+    // When: supported items are inspected
+    const remoteCheckout = findMenuItem(remoteMenu, "Checkout Branch&#8230;");
+    const remoteMerge = findMenuItem(remoteMenu, "Merge into current branch&#8230;");
+    const deleteRemote = findMenuItem(remoteMenu, "Delete Remote Branch&#8230;");
+    const pullItem = findMenuItem(headMenu, "Pull");
+    const pushItem = findMenuItem(headMenu, "Push");
+    const openWindow = findMenuItem(headMenu, "Open in New Window");
+    const revealItem = findMenuItem(headMenu, "Reveal in File Manager");
+    const openTerminal = findMenuItem(headMenu, "Open Terminal Here");
+
+    // Then: supported actions expose ids and non-target actions stay undefined
+    expect(remoteCheckout?.recentActionId).toBe("ref.checkoutBranch");
+    expect(remoteMerge?.recentActionId).toBe("ref.mergeBranch");
+    expect(deleteRemote?.recentActionId).toBeUndefined();
+    expect(pullItem?.recentActionId).toBe("ref.pull");
+    expect(pushItem?.recentActionId).toBe("ref.push");
+    expect(openWindow?.recentActionId).toBe("ref.openWorktreeInNewWindow");
+    expect(revealItem?.recentActionId).toBe("ref.revealWorktreeInOS");
+    expect(openTerminal?.recentActionId).toBe("ref.openTerminal");
+  });
+
+  it("does not assign recentActionId to tag-only actions (TC-066)", () => {
+    // Case: TC-066
+    // Given: a tag menu
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "v1.0.0",
+      createMockElement(["tag"]),
+      false,
+      "main"
+    );
+
+    // When: tag items are inspected
+    const deleteTag = findMenuItem(menu, "Delete Tag&#8230;");
+    const pushTag = findMenuItem(menu, "Push Tag&#8230;");
+
+    // Then: tag-only actions are not recent-enabled
+    expect(deleteTag?.recentActionId).toBeUndefined();
+    expect(pushTag?.recentActionId).toBeUndefined();
+  });
+
+  it("records Checkout Branch only when the context-menu path opts in (TC-067)", () => {
+    // Case: TC-067
+    // Given: a local HEAD branch element
+    const sourceElem = createMockElement(["head"]);
+
+    // When: checkoutBranchAction is called directly without record opt-in
+    checkoutBranchAction(REPO, sourceElem, "feature/local");
+
+    // Then: sendMessage runs but no recent action is recorded
+    expect(recordRecentAction).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "checkoutBranch",
+      repo: REPO,
+      branchName: "feature/local",
+      remoteBranch: null
+    });
+  });
+
+  it("records Pull before sending the pull request on confirmation (TC-068)", () => {
+    // Case: TC-068
+    // Given: the current branch menu is built
+    const menu = buildRefContextMenuItems(REPO, "main", createMockElement(["head"]), false, "main");
+    const pullItem = findMenuItem(menu, "Pull");
+    expect(pullItem).toBeDefined();
+    pullItem!.onClick();
+
+    // When: the confirmation callback is accepted
+    const confirmed = vi.mocked(showConfirmationDialog).mock.calls[0][1];
+    confirmed();
+
+    // Then: recordRecentAction is called before sendMessage with ref.pull
+    expect(recordRecentAction).toHaveBeenCalledWith(REPO, "ref.pull");
+    expect(sendMessage).toHaveBeenCalledWith({ command: "pull", repo: REPO });
+    expect(vi.mocked(recordRecentAction).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(sendMessage).mock.invocationCallOrder[0]
+    );
+  });
+
+  it("records worktree actions before sending Open Terminal Here (TC-069)", () => {
+    // Case: TC-069
+    // Given: a branch menu with worktree actions
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      createMockElement(["head"]),
+      false,
+      "main",
+      undefined,
+      { path: "/tmp/feature-worktree", isMainWorktree: true }
+    );
+    const openTerminal = findMenuItem(menu, "Open Terminal Here");
+    expect(openTerminal).toBeDefined();
+
+    // When: Open Terminal Here is clicked
+    openTerminal!.onClick();
+
+    // Then: recordRecentAction is called before sending openTerminal
+    expect(recordRecentAction).toHaveBeenCalledWith(REPO, "ref.openTerminal");
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "openTerminal",
+      repo: REPO,
+      path: "/tmp/feature-worktree",
+      name: "Worktree: feature/x"
+    });
+    expect(vi.mocked(recordRecentAction).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(sendMessage).mock.invocationCallOrder[0]
+    );
   });
 });
