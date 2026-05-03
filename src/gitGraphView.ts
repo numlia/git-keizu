@@ -587,7 +587,8 @@ export class GitKeizuView {
         commitsNotAncestorsOfHead: config.muteCommitsNotAncestorsOfHead()
       },
       repos: this.repoManager.getRepos(),
-      showCurrentBranchByDefault: config.showCurrentBranchByDefault()
+      showCurrentBranchByDefault: config.showCurrentBranchByDefault(),
+      showRecentActions: config.showRecentActions()
     };
 
     let body,

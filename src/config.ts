@@ -172,6 +172,10 @@ class Config {
     return this.workspaceConfiguration.get("showCurrentBranchByDefault", false);
   }
 
+  public showRecentActions(): boolean {
+    return this.workspaceConfiguration.get("menu.showRecentActions", true);
+  }
+
   public showStatusBarItem() {
     return this.workspaceConfiguration.get("showStatusBarItem", true);
   }

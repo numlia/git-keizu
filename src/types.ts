@@ -60,11 +60,28 @@ export interface GitRefData {
   refs: GitRef[];
 }
 
+export type RecentActionId =
+  | "commit.addTag"
+  | "commit.cherryPick"
+  | "commit.createBranch"
+  | "commit.createWorktree"
+  | "commit.merge"
+  | "file.openFile"
+  | "ref.checkoutBranch"
+  | "ref.createWorktree"
+  | "ref.mergeBranch"
+  | "ref.openTerminal"
+  | "ref.openWorktreeInNewWindow"
+  | "ref.pull"
+  | "ref.push"
+  | "ref.revealWorktreeInOS";
+
 export type GitRepoSet = { [repo: string]: GitRepoState };
 export interface GitRepoState {
   columnWidths: number[] | null;
   commitOrdering?: RepoCommitOrdering;
   fileViewType?: "tree" | "list";
+  recentActions?: RecentActionId[];
 }
 
 export interface GitUnsavedChanges {
@@ -120,6 +137,7 @@ export interface GitKeizuViewState {
   mute: MuteCommitsConfig;
   repos: GitRepoSet;
   showCurrentBranchByDefault: boolean;
+  showRecentActions: boolean;
 }
 
 export interface GitFileChange {

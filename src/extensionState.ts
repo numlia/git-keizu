@@ -3,13 +3,14 @@ import * as path from "node:path";
 
 import { ExtensionContext, Memento } from "vscode";
 
-import { Avatar, AvatarCache, GitRepoSet } from "./types";
+import { Avatar, AvatarCache, GitRepoSet, GitRepoState, RecentActionId } from "./types";
 import { getPathFromStr } from "./utils";
 
 const AVATAR_STORAGE_FOLDER = "avatars";
 const AVATAR_CACHE = "avatarCache";
 const LAST_ACTIVE_REPO = "lastActiveRepo";
 const REPO_STATES = "repoStates";
+const MAX_RECENT_ACTIONS = 5;
 
 export class ExtensionState {
   private globalState: Memento;
@@ -45,7 +46,7 @@ export class ExtensionState {
     return this.workspaceState.get<GitRepoSet>(REPO_STATES, {});
   }
   public saveRepos(gitRepoSet: GitRepoSet) {
-    this.workspaceState.update(REPO_STATES, gitRepoSet);
+    this.workspaceState.update(REPO_STATES, this.normalizeRepoSet(gitRepoSet));
   }
 
   /* Last Active Repo */
@@ -85,5 +86,65 @@ export class ExtensionState {
     } catch {
       // Directory may not exist; nothing to clean up
     }
+  }
+
+  private normalizeRepoSet(gitRepoSet: GitRepoSet): GitRepoSet {
+    let normalizedRepoSet: GitRepoSet | null = null;
+
+    for (const [repo, state] of Object.entries(gitRepoSet)) {
+      const normalizedState = this.normalizeRepoState(state);
+      if (normalizedState === state) {
+        continue;
+      }
+
+      if (normalizedRepoSet === null) {
+        normalizedRepoSet = { ...gitRepoSet };
+      }
+      normalizedRepoSet[repo] = normalizedState;
+    }
+
+    return normalizedRepoSet ?? gitRepoSet;
+  }
+
+  private normalizeRepoState(state: GitRepoState): GitRepoState {
+    const recentActions = state.recentActions;
+    if (recentActions === undefined || recentActions.length <= 1) {
+      return state;
+    }
+
+    const normalizedRecentActions = this.normalizeRecentActions(recentActions);
+    if (normalizedRecentActions === recentActions) {
+      return state;
+    }
+
+    return {
+      ...state,
+      recentActions: normalizedRecentActions
+    };
+  }
+
+  private normalizeRecentActions(recentActions: RecentActionId[]): RecentActionId[] {
+    const seen = new Set<RecentActionId>();
+    const normalizedRecentActions: RecentActionId[] = [];
+
+    for (const actionId of recentActions) {
+      if (seen.has(actionId)) {
+        continue;
+      }
+      seen.add(actionId);
+      normalizedRecentActions.push(actionId);
+      if (normalizedRecentActions.length === MAX_RECENT_ACTIONS) {
+        break;
+      }
+    }
+
+    if (
+      normalizedRecentActions.length === recentActions.length &&
+      normalizedRecentActions.every((actionId, index) => actionId === recentActions[index])
+    ) {
+      return recentActions;
+    }
+
+    return normalizedRecentActions;
   }
 }
