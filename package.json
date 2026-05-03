@@ -262,6 +262,11 @@
           "default": true,
           "description": "When enabled, automatically loads more commits when scrolling to the bottom of the graph."
         },
+        "git-keizu.menu.showRecentActions": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a Recent section at the top of commit, branch, and file context menus when recent safe actions are available."
+        },
         "git-keizu.dialog.merge.noFastForward": {
           "type": "boolean",
           "default": true,
