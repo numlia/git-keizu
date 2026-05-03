@@ -52,6 +52,7 @@ An actively maintained fork of [Git Graph](https://github.com/mhutchie/vscode-gi
 - **Remote Branch Actions**: Right-click a remote branch label to delete it on the remote, merge it into the current branch, or check it out as a new local branch.
 - **Worktree Support**: Create, manage, and remove git worktrees directly from the graph. Branches with a linked worktree show a distinct icon; hover the label to see the worktree path. Right-click any local branch to create a worktree (default path `../repo-branchname`, with path-unsafe characters such as `/` normalized to `-` — e.g. `feature/x` → `../repo-feature-x`; consecutive unsafe characters collapse to a single `-`; an "Open Terminal" checkbox is included whose default state is configurable via `git-keizu.dialog.createWorktree.openTerminal`); right-click a worktree branch to open it in a new VS Code window, reveal it in the OS file manager, open a terminal there, copy its path, or remove it — the Remove Worktree dialog includes an "Also delete branch" checkbox (safe `git branch -d`) so you can clean up the branch in the same step (the main worktree cannot be removed). Right-click any commit to create a new branch + worktree at that point — the path field auto-fills as you type the branch name (applying the same path normalization), and the "Open Terminal" checkbox follows the same `git-keizu.dialog.createWorktree.openTerminal` setting.
 - **Tag Actions**: Add, delete, and push tags directly from the graph
+- **Recent actions in context menus**: Commit, branch, and file context menus show a "Recent" section at the top listing the actions you have performed most recently in that repository — your most common operations are always one click away. The list is kept per repository, deduplicates automatically, and is capped at 5 items. Only safe, frequently-used actions are tracked (destructive and low-frequency operations such as Reset, Revert, and Delete Branch are excluded). The section only appears when the current menu contains at least two trackable actions. Disable via `git-keizu.menu.showRecentActions` (default: on).
 - **Commit Actions**: Right-click any commit to checkout, cherry-pick, merge, create a branch, or create a worktree — the most common actions appear at the top of the menu. Less-used and destructive operations (Add Tag, Checkout to detached HEAD, Revert, Reset) are grouped under a "More…" submenu that expands on hover. The Cherry-pick dialog includes "Record Origin" and "No Commit" checkboxes; merge-commit cherry-picks also show a parent selector
 - **Stash Support**: Stash entries appear in the graph with a distinct visual style; right-click to apply or pop a stash (shown at the top for quick access), or open "More…" to create a branch from the stash or drop it
 - **Uncommitted Changes Actions**: Right-click the Uncommitted Changes row to stash, reset (Mixed/Hard), or clean untracked files
@@ -85,23 +86,24 @@ All settings are under the `git-keizu.*` namespace.
 
 ### General
 
-| Setting                                 | Default        | Description                                                                      |
-| --------------------------------------- | -------------- | -------------------------------------------------------------------------------- |
-| `dateFormat`                            | `Date & Time`  | Date format: `Date & Time`, `Date Only`, or `Relative`                           |
-| `dateType`                              | `Author Date`  | Date type: `Author Date` or `Commit Date`                                        |
-| `fetchAvatars`                          | `false`        | Fetch commit author avatars from GitHub, GitLab, or Gravatar                     |
-| `graphColours`                          | _(12 colours)_ | Colours used on the graph (HEX or RGB array)                                     |
-| `graphStyle`                            | `rounded`      | Graph line style: `rounded` or `angular`                                         |
-| `initialLoadCommits`                    | `300`          | Number of commits to initially load                                              |
-| `loadMoreCommits`                       | `100`          | Number of additional commits to load at a time                                   |
-| `loadMoreCommitsAutomatically`          | `true`         | Automatically load more commits when scrolling to the bottom                     |
-| `openNewTabEditorGroup`                 | `Active`       | Editor group for "Open File" in commit details: `Active`, `Beside`, `One`–`Nine` |
-| `maxDepthOfRepoSearch`                  | `0`            | Maximum depth of subfolders to search for repositories                           |
-| `showCurrentBranchByDefault`            | `false`        | Show only the current branch when the graph is opened                            |
-| `showStatusBarItem`                     | `true`         | Show a Status Bar item to open Git Keizu                                         |
-| `showUncommittedChanges`                | `true`         | Show uncommitted changes row in the graph                                        |
-| `tabIconColourTheme`                    | `colour`       | Tab icon theme: `colour` or `grey`                                               |
-| `sourceCodeProviderIntegrationLocation` | `Inline`       | SCM title bar button position: `Inline` or `More Actions`                        |
+| Setting                                 | Default        | Description                                                                           |
+| --------------------------------------- | -------------- | ------------------------------------------------------------------------------------- |
+| `dateFormat`                            | `Date & Time`  | Date format: `Date & Time`, `Date Only`, or `Relative`                                |
+| `dateType`                              | `Author Date`  | Date type: `Author Date` or `Commit Date`                                             |
+| `fetchAvatars`                          | `false`        | Fetch commit author avatars from GitHub, GitLab, or Gravatar                          |
+| `graphColours`                          | _(12 colours)_ | Colours used on the graph (HEX or RGB array)                                          |
+| `graphStyle`                            | `rounded`      | Graph line style: `rounded` or `angular`                                              |
+| `initialLoadCommits`                    | `300`          | Number of commits to initially load                                                   |
+| `loadMoreCommits`                       | `100`          | Number of additional commits to load at a time                                        |
+| `loadMoreCommitsAutomatically`          | `true`         | Automatically load more commits when scrolling to the bottom                          |
+| `openNewTabEditorGroup`                 | `Active`       | Editor group for "Open File" in commit details: `Active`, `Beside`, `One`–`Nine`      |
+| `maxDepthOfRepoSearch`                  | `0`            | Maximum depth of subfolders to search for repositories                                |
+| `showCurrentBranchByDefault`            | `false`        | Show only the current branch when the graph is opened                                 |
+| `showStatusBarItem`                     | `true`         | Show a Status Bar item to open Git Keizu                                              |
+| `menu.showRecentActions`                | `true`         | Show a "Recent" section at the top of context menus when recent actions are available |
+| `showUncommittedChanges`                | `true`         | Show uncommitted changes row in the graph                                             |
+| `tabIconColourTheme`                    | `colour`       | Tab icon theme: `colour` or `grey`                                                    |
+| `sourceCodeProviderIntegrationLocation` | `Inline`       | SCM title bar button position: `Inline` or `More Actions`                             |
 
 ### Keyboard Shortcuts (`keyboardShortcut*`)
 

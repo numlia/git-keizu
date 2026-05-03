@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-05-03
+
+### Added
+
+- **Recent actions in context menus**: Commit, branch, and file context menus now show a "Recent" section at the top listing the actions you have performed most recently in that repository — your most common operations are always one click away. The recent list is maintained per repository, deduplicates entries automatically, and is capped at 5 items. Only safe, frequently-used actions are tracked; destructive or low-frequency operations (Reset, Revert, Delete Branch, Rename Branch, and similar) are intentionally excluded. The section only appears when the current menu contains at least two trackable actions. Disable via `git-keizu.menu.showRecentActions` (default: on).
+
 ## [0.5.23] - 2026-05-02
 
 ### Changed
@@ -327,7 +333,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.5.23...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/numlia/git-keizu/compare/v0.5.23...v0.6.0
 [0.5.23]: https://github.com/numlia/git-keizu/compare/v0.5.22...v0.5.23
 [0.5.22]: https://github.com/numlia/git-keizu/compare/v0.5.21...v0.5.22
 [0.5.21]: https://github.com/numlia/git-keizu/compare/v0.5.20...v0.5.21
