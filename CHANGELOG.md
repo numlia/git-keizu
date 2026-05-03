@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-05-03
+
+### Added
+
+- **Japanese UI localization (i18n)**: When VS Code's display language is set to Japanese, the entire Git Keizu interface — commands, configuration descriptions, toolbar labels, context menus, dialogs, error messages, and date/time display — automatically switches to Japanese. The manifest layer uses VS Code's standard `%key%` NLS mechanism (`package.nls.json` / `package.nls.ja.json`); webview translations are delivered via a dictionary-injection system with a `t()` helper that falls back to English for any unsupported locale. Relative dates adapt to Japanese conventions (e.g. `5分前` instead of `5 minutes ago`); absolute dates use ISO-style format (`2026-05-03 12:34`). Git operation terms follow standard katakana conventions (チェリーピック, リベース, リセット, etc.). The underlying i18n infrastructure (`src/i18n.ts`, `web/i18n.ts`, `l10n/` dictionary files) is designed to support additional locales through dictionary additions alone, without code changes.
+
 ## [0.6.0] - 2026-05-03
 
 ### Added
@@ -333,7 +339,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/numlia/git-keizu/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/numlia/git-keizu/compare/v0.5.23...v0.6.0
 [0.5.23]: https://github.com/numlia/git-keizu/compare/v0.5.22...v0.5.23
 [0.5.22]: https://github.com/numlia/git-keizu/compare/v0.5.21...v0.5.22
