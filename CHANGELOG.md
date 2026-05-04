@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.3] - 2026-05-05
+
+### Fixed
+
+- **Context menu row height aligned with VS Code native menus**: Context menu items (including submenu entries) were taller than standard VS Code menus due to symmetric vertical padding. Item height is now set via `line-height: 28px` with no top/bottom padding, matching the compact, consistent look of VS Code's own context menus.
+
 ## [0.7.2] - 2026-05-04
 
 ### Changed
@@ -352,7 +358,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.7.2...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.7.3...HEAD
+[0.7.3]: https://github.com/numlia/git-keizu/compare/v0.7.2...v0.7.3
 [0.7.2]: https://github.com/numlia/git-keizu/compare/v0.7.1...v0.7.2
 [0.7.1]: https://github.com/numlia/git-keizu/compare/v0.7.0...v0.7.1
 [0.7.0]: https://github.com/numlia/git-keizu/compare/v0.6.0...v0.7.0
