@@ -70,6 +70,8 @@ export type RecentActionId =
   | "file.openFile"
   | "ref.checkoutBranch"
   | "ref.createWorktree"
+  | "ref.deleteBranch"
+  | "ref.deleteRemoteBranch"
   | "ref.mergeBranch"
   | "ref.openTerminal"
   | "ref.openWorktreeInNewWindow"

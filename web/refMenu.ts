@@ -137,6 +137,7 @@ function showDeleteBranchDialog(
       ],
       t("Delete Branch"),
       (values) => {
+        recordRecentAction(repo, "ref.deleteBranch");
         sendMessage({
           command: "deleteBranch",
           repo: repo,
@@ -154,6 +155,7 @@ function showDeleteBranchDialog(
       false,
       t("Delete Branch"),
       (forceDelete) => {
+        recordRecentAction(repo, "ref.deleteBranch");
         sendMessage({
           command: "deleteBranch",
           repo: repo,
@@ -213,6 +215,7 @@ export function buildRefContextMenuItems(
     const parsed = parseRemoteRef(refName);
     const deleteRemoteBranchItem: ContextMenuItem = {
       title: `${t("Delete Remote Branch")}${ELLIPSIS}`,
+      recentActionId: "ref.deleteRemoteBranch",
       onClick: () => {
         showConfirmationDialog(
           t(
@@ -220,6 +223,7 @@ export function buildRefContextMenuItems(
             `<b><i>${escapeHtml(refName)}</i></b>`
           ),
           () => {
+            recordRecentAction(repo, "ref.deleteRemoteBranch");
             sendMessage({
               command: "deleteRemoteBranch",
               repo: repo,
@@ -373,6 +377,7 @@ export function buildRefContextMenuItems(
     const resolvedRemotes = Array.isArray(remotes) && remotes.length > 0 ? remotes : [];
     const deleteBranchItem: ContextMenuItem = {
       title: `${t("Delete Branch")}${ELLIPSIS}`,
+      recentActionId: "ref.deleteBranch",
       onClick: () => showDeleteBranchDialog(repo, refName, resolvedRemotes, worktreeInfo)
     };
     const rebaseBranchItem: ContextMenuItem = {
