@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.6] - 2026-05-10
+
+### Changed
+
+- **`showRecentActions` setting applies without restart**: Changing `git-keizu.menu.showRecentActions` in VS Code settings now takes effect in the currently open Git Keizu graph immediately — no window reload or restart required. The graph state (selected repository, branch, scroll position, commit details, and find widget) is fully preserved; only the context menu's Recent section visibility updates on the next context menu open.
+
 ## [0.7.5] - 2026-05-09
 
 ### Changed
@@ -370,7 +376,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.7.5...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.7.6...HEAD
+[0.7.6]: https://github.com/numlia/git-keizu/compare/v0.7.5...v0.7.6
 [0.7.5]: https://github.com/numlia/git-keizu/compare/v0.7.4...v0.7.5
 [0.7.4]: https://github.com/numlia/git-keizu/compare/v0.7.3...v0.7.4
 [0.7.3]: https://github.com/numlia/git-keizu/compare/v0.7.2...v0.7.3
