@@ -317,3 +317,121 @@ describe("showFormDialog info tooltip rendering", () => {
     expect(infoSpan!.getAttribute("title")).toBe("Help text");
   });
 });
+
+describe("showFormDialog DialogInput plain text escaping (S4)", () => {
+  function realEscape(value: string): string {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;");
+  }
+
+  beforeEach(() => {
+    vi.mocked(escapeHtml).mockImplementation(realEscape);
+  });
+
+  afterEach(() => {
+    vi.mocked(escapeHtml).mockImplementation((s: string) => s);
+  });
+
+  // Case: TC-017
+  it("escapes input.name in multi form label cells (TC-017)", () => {
+    // Given: a multi form whose label contains an HTML injection payload
+    const hostile = "<img src=x onerror=alert(1)>";
+    const inputs: DialogInput[] = [
+      { type: "text", name: hostile, default: "", placeholder: null },
+      { type: "text", name: "other", default: "", placeholder: null }
+    ];
+
+    // When: showFormDialog renders the form
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+
+    // Then: no <img> element is inserted; label text equals the original string
+    expect(dialogEl.querySelector("img")).toBeNull();
+    const firstLabel = dialogEl.querySelectorAll("table.dialogForm td")[0];
+    expect(firstLabel.textContent).toBe(hostile);
+  });
+
+  // Case: TC-018
+  it("escapes text input default and placeholder so attributes are not broken (TC-018)", () => {
+    // Given: text input whose default and placeholder both contain attribute-breaking payloads
+    const hostileDefault = '" autofocus oninput="alert(1)';
+    const hostilePlaceholder = "</input><script>alert(2)</script>";
+    const inputs: DialogInput[] = [
+      { type: "text", name: "Name", default: hostileDefault, placeholder: hostilePlaceholder }
+    ];
+
+    // When: showFormDialog renders the form
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+
+    // Then: the input keeps the literal default and placeholder, with no extra script element
+    const inputEl = document.getElementById("dialogInput0") as HTMLInputElement;
+    expect(inputEl).not.toBeNull();
+    expect(inputEl.value).toBe(hostileDefault);
+    expect(inputEl.getAttribute("placeholder")).toBe(hostilePlaceholder);
+    expect(inputEl.hasAttribute("autofocus")).toBe(false);
+    expect(inputEl.hasAttribute("oninput")).toBe(false);
+    expect(dialogEl.querySelector("script")).toBeNull();
+  });
+
+  // Case: TC-019
+  it("escapes select option name and value (TC-019)", () => {
+    // Given: a select option whose value and display name both contain HTML special chars
+    const hostileValue = '1"';
+    const hostileName = "<b>boom</b>";
+    const inputs: DialogInput[] = [
+      {
+        type: "select",
+        name: "",
+        default: hostileValue,
+        options: [{ value: hostileValue, name: hostileName }]
+      }
+    ];
+
+    // When: showFormDialog renders the select
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+
+    // Then: exactly one option exists; no <b> element; round-trip value is unescaped
+    const selectEl = document.getElementById("dialogInput0") as HTMLSelectElement;
+    expect(selectEl.querySelectorAll("option")).toHaveLength(1);
+    expect(selectEl.querySelector("b")).toBeNull();
+    expect(selectEl.options[0].textContent).toBe(hostileName);
+    expect(selectEl.value).toBe(hostileValue);
+  });
+
+  // Case: TC-020
+  it("escapes input.name in multi form checkbox name cell (TC-020)", () => {
+    // Given: a multi form whose checkbox label tries to escape the cell
+    const hostile = "</td><script>alert(1)</script>";
+    const inputs: DialogInput[] = [
+      { type: "text", name: "Other", default: "", placeholder: null },
+      { type: "checkbox", name: hostile, value: false }
+    ];
+
+    // When: showFormDialog renders the form
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+
+    // Then: no script element was injected; the cell text matches the literal label
+    expect(dialogEl.querySelector("script")).toBeNull();
+    const rows = dialogEl.querySelectorAll("tr");
+    const checkboxRow = rows[1];
+    const cells = checkboxRow.querySelectorAll("td");
+    const nameCell = cells[cells.length - 1];
+    expect(nameCell.textContent).toBe(hostile);
+  });
+
+  // Case: TC-021
+  it("preserves HTML in the message argument (TC-021)", () => {
+    // Given: a form whose message uses limited HTML for emphasis
+    const inputs: DialogInput[] = [{ type: "text", name: "x", default: "", placeholder: null }];
+
+    // When: showFormDialog renders the dialog
+    showFormDialog("<b>hi</b>", inputs, "OK", vi.fn(), null);
+
+    // Then: the <b> element is preserved (message is documented HTML contract)
+    expect(dialogEl.querySelector("b")).not.toBeNull();
+    expect(dialogEl.querySelector("b")!.textContent).toBe("hi");
+  });
+});

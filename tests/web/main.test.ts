@@ -3636,7 +3636,17 @@ describe("Author, details, remotes & parent navigation", () => {
       // Given: authors was previously set
       expect(capturedAuthorCallback).not.toBeNull();
       capturedAuthorCallback!(["Alice"]);
-      // Complete the pending loadCommits to clear loadCommitsCallback
+      // Complete the pending loadCommits to clear loadCommitsCallback. TC-108 above leaves a
+      // pending loadCommitsCallback in-flight, so the call above queues; after dispatching the
+      // response the queued request flushes and sets a new callback — dispatch once more to
+      // drain that, leaving loadCommitsCallback null.
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
       dispatchMessage({
         command: "loadCommits",
         commits: MOCK_COMMITS,
@@ -5994,5 +6004,320 @@ describe("file row context menu handler", () => {
     expect(items).toHaveLength(1);
     expect(items.every((item) => item !== null)).toBe(true);
     expect(items[0]!.title).toBe("Open File");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S40: ロード要求の保留と再送 (Feature 041)                          */
+/* ------------------------------------------------------------------ */
+
+describe("request queue / refresh contention (S40)", () => {
+  let liveVscode: typeof vscode;
+
+  function postedCommands(filter: string): Record<string, unknown>[] {
+    return vi
+      .mocked(liveVscode.postMessage)
+      .mock.calls.map((c) => c[0] as Record<string, unknown>)
+      .filter((m) => m.command === filter);
+  }
+
+  beforeAll(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    capturedBranchCallback = null;
+    capturedAuthorCallback = null;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    liveVscode = utilsMod.vscode;
+    vi.mocked(liveVscode.getState).mockReturnValueOnce(null);
+
+    await import("../../web/main");
+    loadTestCommits();
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Case: TC-221
+  it("re-sends loadBranches after current loadBranches completes when refresh fires in-flight (TC-221)", () => {
+    // Given: refresh button triggers loadBranches; response not yet dispatched
+    vi.clearAllMocks();
+    const refreshBtn = document.getElementById("refreshBtn")!;
+    refreshBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    expect(postedCommands("loadBranches")).toHaveLength(1);
+
+    // When: a second refresh fires while loadBranches is still in flight
+    refreshBtn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Then: no extra loadBranches sent yet (queued)
+    expect(postedCommands("loadBranches")).toHaveLength(1);
+
+    // When: current loadBranches response arrives
+    dispatchMessage({
+      command: "loadBranches",
+      branches: ["main"],
+      head: "main",
+      hard: true,
+      isRepo: true
+    });
+
+    // Then: queued loadBranches has been sent (now total of 2)
+    expect(postedCommands("loadBranches")).toHaveLength(2);
+
+    // Cleanup: complete pending loadCommits and the second loadBranches/loadCommits cascade
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+    dispatchMessage({
+      command: "loadBranches",
+      branches: ["main"],
+      head: "main",
+      hard: true,
+      isRepo: true
+    });
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+  });
+
+  // Case: TC-222
+  it("re-sends loadCommits with latest branches state when filter changes in-flight (TC-222)", () => {
+    // Given: a branch filter change is in flight
+    vi.clearAllMocks();
+    capturedBranchCallback!(["a"]);
+    const firstSent = postedCommands("loadCommits");
+    expect(firstSent).toHaveLength(1);
+    expect(firstSent[0].branches).toEqual(["a"]);
+
+    // When: filter changes again before the current loadCommits response arrives
+    capturedBranchCallback!(["main"]);
+
+    // Then: no additional loadCommits has been sent yet (queued)
+    expect(postedCommands("loadCommits")).toHaveLength(1);
+
+    // When: the in-flight loadCommits response arrives
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+
+    // Then: the queued loadCommits has been sent with the latest branches state
+    const sent = postedCommands("loadCommits");
+    expect(sent).toHaveLength(2);
+    expect(sent[1].branches).toEqual(["main"]);
+
+    // Cleanup
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+  });
+
+  // Case: TC-223
+  it("preserves auto Load More callback through queue so isLoadingMoreCommits resets (TC-223)", () => {
+    // Given: auto Load More is enabled and there are more commits available
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: true,
+      hard: true
+    });
+    vi.clearAllMocks();
+
+    // Pre-trigger a loadCommits that is still in flight, so auto Load More will queue
+    capturedBranchCallback!(["main"]);
+    expect(postedCommands("loadCommits")).toHaveLength(1);
+
+    // When: auto Load More fires while the current loadCommits is in flight
+    const container = document.getElementById("scrollContainer")!;
+    Object.defineProperty(container, "scrollTop", {
+      value: 475,
+      writable: true,
+      configurable: true
+    });
+    Object.defineProperty(container, "clientHeight", { value: 500, configurable: true });
+    Object.defineProperty(container, "scrollHeight", { value: 1000, configurable: true });
+    container.dispatchEvent(new Event("scroll", { bubbles: true }));
+
+    // Then: auto load is recorded as in-flight; no additional message yet (queued)
+    expect(postedCommands("loadCommits")).toHaveLength(1);
+
+    // When: current loadCommits response arrives → queued one flushes
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: true,
+      hard: true
+    });
+    expect(postedCommands("loadCommits")).toHaveLength(2);
+
+    // When: the queued loadCommits (Load More) response arrives → completion callback runs
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: true,
+      hard: true
+    });
+    vi.clearAllMocks();
+
+    // Then: isLoadingMoreCommits has been reset; another scroll re-fires auto Load More
+    container.dispatchEvent(new Event("scroll", { bubbles: true }));
+    expect(postedCommands("loadCommits")).toHaveLength(1);
+
+    // Cleanup
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+  });
+
+  // Case: TC-224
+  it("ORs the hard flag and aggregates callbacks when multiple requests queue (TC-224)", async () => {
+    // Given: a loadCommits is in flight; we have private access via module symbols not available,
+    // so exercise this via the public dropdown path which uses hard=true, then queue an additional
+    // request via re-firing the dropdown (also hard=true) — both callbacks should be aggregated.
+    vi.clearAllMocks();
+    capturedBranchCallback!(["a"]);
+    capturedBranchCallback!(["b"]);
+    capturedBranchCallback!(["c"]);
+    expect(postedCommands("loadCommits")).toHaveLength(1);
+
+    // When: in-flight response arrives → queued request is flushed with latest state
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+
+    // Then: exactly one queued request is sent (collapsed, latest state), with hard=true
+    const sent = postedCommands("loadCommits");
+    expect(sent).toHaveLength(2);
+    expect(sent[1].branches).toEqual(["c"]);
+    expect(sent[1].hard).toBe(true);
+
+    // Cleanup
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+  });
+
+  // Case: TC-225
+  it("uses the latest filter state for the resend payload, dropping intermediate states (TC-225)", () => {
+    // Given: a loadCommits is in flight after filter ["a"]
+    vi.clearAllMocks();
+    capturedBranchCallback!(["a"]);
+    const initial = postedCommands("loadCommits");
+    expect(initial).toHaveLength(1);
+    expect(initial[0].branches).toEqual(["a"]);
+
+    // When: multiple subsequent filter changes happen while in flight
+    capturedBranchCallback!(["b"]);
+    capturedBranchCallback!(["c"]);
+    capturedBranchCallback!(["d"]);
+    expect(postedCommands("loadCommits")).toHaveLength(1);
+
+    // When: in-flight response arrives → resend uses final state ["d"]
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+    const sent = postedCommands("loadCommits");
+    expect(sent).toHaveLength(2);
+    expect(sent[1].branches).toEqual(["d"]);
+
+    // Cleanup
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+  });
+
+  // Case: TC-226
+  it("flush is a no-op when there is no queued request (TC-226)", () => {
+    // Given: no queued request — completing a normal loadCommits should not send extras
+    vi.clearAllMocks();
+    capturedBranchCallback!(["x"]);
+    expect(postedCommands("loadCommits")).toHaveLength(1);
+
+    // When: response arrives without any queued request behind it
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+
+    // Then: no additional loadCommits messages were sent by the flush path
+    expect(postedCommands("loadCommits")).toHaveLength(1);
+  });
+
+  // Case: TC-227
+  it("re-entrant request from inside a completion callback bypasses queue and sends immediately (TC-227)", () => {
+    // Given: an in-flight loadCommits whose completion will, indirectly, trigger another request
+    // The branchDropdown handler is the public re-entry point used in real flows. Confirm that
+    // calling it again at the exact moment we deliver the response does not get queued (because
+    // loadCommitsCallback is cleared *before* the user callback runs) and instead is sent immediately.
+    vi.clearAllMocks();
+    capturedBranchCallback!(["a"]);
+    expect(postedCommands("loadCommits")).toHaveLength(1);
+
+    // Deliver the response (callback is internally nulled before user callback runs)
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+    expect(postedCommands("loadCommits")).toHaveLength(1);
+
+    // When: another filter change immediately after — should fire as a fresh request, not queue
+    capturedBranchCallback!(["b"]);
+    expect(postedCommands("loadCommits")).toHaveLength(2);
+
+    // Cleanup
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
   });
 });

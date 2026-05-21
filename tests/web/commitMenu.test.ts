@@ -1101,3 +1101,151 @@ describe("Commit recent action metadata (S8)", () => {
     expect(recordRecentAction).not.toHaveBeenCalled();
   });
 });
+
+// --- S10: merge parent option plain text 生成 (Feature 041) ---
+
+describe("merge parent option plain text generation (S10)", () => {
+  const MERGE_PARENT_HASHES = ["parent1234567890", "parent2234567890"];
+
+  function setupViewState() {
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
+  }
+
+  function getCherryPickItem(
+    parentHashes: string[],
+    commits: import("../../src/types").GitCommitNode[],
+    lookup: { [hash: string]: number }
+  ): ContextMenuItem {
+    const items = buildCommitContextMenuItems(
+      REPO,
+      HASH,
+      parentHashes,
+      commits,
+      lookup,
+      createMockElement()
+    );
+    return findTopLevelMenuItem(items, "Cherry Pick&#8230;");
+  }
+
+  function getRevertItem(
+    parentHashes: string[],
+    commits: import("../../src/types").GitCommitNode[],
+    lookup: { [hash: string]: number }
+  ): ContextMenuItem {
+    const items = buildCommitContextMenuItems(
+      REPO,
+      HASH,
+      parentHashes,
+      commits,
+      lookup,
+      createMockElement()
+    );
+    return findSubmenuItem(items, "Revert&#8230;");
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupViewState();
+  });
+
+  // Case: TC-044
+  it("emits `<hash>: <message>` for parents present in commitLookup (TC-044)", () => {
+    // Given: both parents are present in commitLookup with messages
+    const commits = [
+      { message: "first commit" },
+      { message: "second commit" }
+    ] as unknown as import("../../src/types").GitCommitNode[];
+    const lookup = { parent1234567890: 0, parent2234567890: 1 };
+
+    // When: Cherry Pick is clicked on the merge commit
+    getCherryPickItem(MERGE_PARENT_HASHES, commits, lookup).onClick();
+
+    // Then: the select options contain the abbreviated hash and message
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const selectInput = inputs[0] as DialogSelectInput;
+    expect(selectInput.options).toEqual([
+      { name: "parent12: first commit", value: "1" },
+      { name: "parent22: second commit", value: "2" }
+    ]);
+  });
+
+  // Case: TC-045
+  it("falls back to abbreviated hash only when commitLookup is missing the parent (TC-045)", () => {
+    // Given: only one of the parents has an entry in commitLookup
+    const commits = [
+      { message: "first commit" }
+    ] as unknown as import("../../src/types").GitCommitNode[];
+    const lookup = { parent1234567890: 0 };
+
+    // When: Cherry Pick is clicked on the merge commit
+    getCherryPickItem(MERGE_PARENT_HASHES, commits, lookup).onClick();
+
+    // Then: the missing parent's option has no `: <message>` suffix
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const selectInput = inputs[0] as DialogSelectInput;
+    expect(selectInput.options).toEqual([
+      { name: "parent12: first commit", value: "1" },
+      { name: "parent22", value: "2" }
+    ]);
+  });
+
+  // Case: TC-046
+  it("passes hostile parent messages through as plain text without escaping (TC-046)", () => {
+    // Given: parent messages contain HTML injection payloads
+    const hostile1 = "<img src=x onerror=alert(1)>";
+    const hostile2 = "</option><script>alert(2)</script>";
+    const commits = [
+      { message: hostile1 },
+      { message: hostile2 }
+    ] as unknown as import("../../src/types").GitCommitNode[];
+    const lookup = { parent1234567890: 0, parent2234567890: 1 };
+
+    // When: Cherry Pick is invoked
+    getCherryPickItem(MERGE_PARENT_HASHES, commits, lookup).onClick();
+    const cherryInputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const cherrySelect = cherryInputs[0] as DialogSelectInput;
+
+    // Then: the options carry the message as plain text (no HTML escaping by the helper)
+    expect(cherrySelect.options[0].name).toBe(`parent12: ${hostile1}`);
+    expect(cherrySelect.options[1].name).toBe(`parent22: ${hostile2}`);
+
+    // When: Revert is invoked for the same merge commit
+    vi.clearAllMocks();
+    getRevertItem(MERGE_PARENT_HASHES, commits, lookup).onClick();
+
+    // Then: showSelectDialog receives the same plain text option array
+    const revertOptions = vi.mocked(showSelectDialog).mock.calls[0][2];
+    expect(revertOptions[0].name).toBe(`parent12: ${hostile1}`);
+    expect(revertOptions[1].name).toBe(`parent22: ${hostile2}`);
+  });
+
+  // Case: TC-047
+  it("cherry-pick and revert share the same parent option generator output (TC-047)", () => {
+    // Given: identical inputs for both flows
+    const commits = [
+      { message: "msg-a" },
+      { message: "msg-b" }
+    ] as unknown as import("../../src/types").GitCommitNode[];
+    const lookup = { parent1234567890: 0, parent2234567890: 1 };
+
+    // When: cherry-pick and revert are invoked for the same merge commit
+    getCherryPickItem(MERGE_PARENT_HASHES, commits, lookup).onClick();
+    const cherryInputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const cherrySelect = cherryInputs[0] as DialogSelectInput;
+
+    vi.clearAllMocks();
+    getRevertItem(MERGE_PARENT_HASHES, commits, lookup).onClick();
+    const revertOptions = vi.mocked(showSelectDialog).mock.calls[0][2];
+
+    // Then: both option arrays are deep-equal (helper reuse)
+    expect(revertOptions).toEqual(cherrySelect.options);
+  });
+});
