@@ -113,9 +113,10 @@ export class AvatarManager {
   }
 
   private async getRemoteSource(avatarRequest: AvatarRequestItem) {
-    if (typeof this.remoteSourceCache[avatarRequest.repo] === "string") {
+    const cachedRemoteSource = this.remoteSourceCache[avatarRequest.repo];
+    if (cachedRemoteSource !== undefined) {
       // If the repo exists in the cache of remote sources
-      return this.remoteSourceCache[avatarRequest.repo];
+      return cachedRemoteSource;
     } else {
       // Fetch the remote repo source
       let remoteUrl = await this.dataSource.getRemoteUrl(avatarRequest.repo),
@@ -177,7 +178,13 @@ export class AvatarManager {
 
             if (res.statusCode === 200) {
               // Sucess
-              let commit = JSON.parse(respBody) as { author?: { avatar_url?: string } };
+              let commit: { author?: { avatar_url?: string } };
+              try {
+                commit = JSON.parse(respBody) as { author?: { avatar_url?: string } };
+              } catch {
+                this.fetchFromGravatar(avatarRequest);
+                return;
+              }
               if (commit.author && commit.author.avatar_url) {
                 // Avatar url found
                 let img = await this.downloadAvatarImage(
@@ -247,7 +254,13 @@ export class AvatarManager {
 
             if (res.statusCode === 200) {
               // Sucess
-              let users = JSON.parse(respBody) as { avatar_url?: string }[];
+              let users: { avatar_url?: string }[];
+              try {
+                users = JSON.parse(respBody) as { avatar_url?: string }[];
+              } catch {
+                this.fetchFromGravatar(avatarRequest);
+                return;
+              }
               if (users.length > 0 && users[0].avatar_url) {
                 // Avatar url found
                 let img = await this.downloadAvatarImage(avatarRequest.email, users[0].avatar_url);
