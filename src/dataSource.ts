@@ -578,21 +578,29 @@ export class DataSource {
     return this.spawnGit<string | null>(
       [
         "diff",
+        NAME_STATUS_OPTION,
         DIFF_FILTER_R_OPTION,
         DIFF_FIND_RENAMES_OPTION,
         NULL_BYTE_OPTION,
         commitHash,
-        "HEAD",
-        "--",
-        oldFilePath
+        "HEAD"
       ],
       repo,
       (stdout) => {
-        const fields = stdout.split(NULL_BYTE_SEPARATOR);
         // Format: status\0oldPath\0newPath\0...
-        for (let i = 0; i < fields.length; i++) {
-          if ((fields[i] ?? "")[0] === "R" && i + 2 < fields.length) {
-            return getPathFromStr(fields[i + 2] ?? "");
+        const fields = stdout.split(NULL_BYTE_SEPARATOR);
+        let cursor = 0;
+        while (cursor < fields.length && fields[cursor] !== "") {
+          const statusChar = (fields[cursor] ?? "")[0] ?? "";
+          if (!VALID_FILE_CHANGE_TYPES.has(statusChar)) break;
+          if (statusChar === "R") {
+            const oldPath = getPathFromStr(fields[cursor + 1] ?? "");
+            if (oldPath === oldFilePath) {
+              return getPathFromStr(fields[cursor + 2] ?? "");
+            }
+            cursor += 3;
+          } else {
+            cursor += 2;
           }
         }
         return null;
