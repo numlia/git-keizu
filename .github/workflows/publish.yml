@@ -57,6 +57,9 @@ jobs:
           name: vsix
 
       - name: Publish to ${{ matrix.name }}
+        # TODO: bump when HaaLeo/publish-vscode-extension ships a Node 24 build (still node20 on v2/master).
+        # Upstream issue: https://github.com/HaaLeo/publish-vscode-extension/issues/76
+        # Non-blocking for now: GitHub Actions force-runs node20 actions on node24 during the deprecation window.
         uses: HaaLeo/publish-vscode-extension@v2
         with:
           pat: ${{ secrets[matrix.pat] }}
