@@ -2,7 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { GitFileChange } from "../../src/types";
-import { generateGitFileListHtml } from "../../web/fileTree";
+import { generateGitFileListHtml, generateGitFileTreeHtml } from "../../web/fileTree";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
@@ -321,5 +321,153 @@ describe("generateGitFileListHtml", () => {
     // Then: exactly 3 action icons (A, M, R — not D)
     const actionIcons = fragment.querySelectorAll(".gitFileAction.openFile");
     expect(actionIcons).toHaveLength(3);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S3: generateGitFileTreeHtml HTML escaping (fileTree-test.md)        */
+/* ------------------------------------------------------------------ */
+
+function makeFolder(name: string, contents: GitFolderContents = {}): GitFolder {
+  return {
+    type: "folder",
+    name,
+    folderPath: "folder",
+    contents,
+    open: true
+  };
+}
+
+describe("generateGitFileTreeHtml", () => {
+  it("escapes angle brackets and slashes in a folder name (TC-017)", () => {
+    // Case: TC-017
+    // Given: an opened folder whose name is a script-injection payload
+    const folder = makeFolder("<script>alert(1)</script>");
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: the folder name is HTML-escaped and no raw <script> tag is emitted
+    expect(html).toContain(
+      '<span class="gitFolderName">&lt;script&gt;alert(1)&lt;&#x2F;script&gt;</span>'
+    );
+    expect(html).not.toContain("<script>");
+  });
+
+  it("escapes an ampersand in a folder name (TC-018)", () => {
+    // Case: TC-018
+    // Given: a folder name containing a raw ampersand
+    const folder = makeFolder("a&b");
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: the ampersand is escaped and the raw "a&b" is not present
+    expect(html).toContain('<span class="gitFolderName">a&amp;b</span>');
+    expect(html).not.toContain("a&b");
+  });
+
+  it("escapes double and single quotes in a folder name (TC-019)", () => {
+    // Case: TC-019
+    // Given: a folder name containing double and single quotes
+    const folder = makeFolder('say"hi" it\'s');
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: quotes are escaped and the raw quoted substrings are absent
+    expect(html).toContain('<span class="gitFolderName">say&quot;hi&quot; it&#x27;s</span>');
+    expect(html).not.toContain('say"hi"');
+    expect(html).not.toContain("it's");
+  });
+
+  it("escapes a forward slash in a folder name (TC-020)", () => {
+    // Case: TC-020
+    // Given: a folder name that contains a forward slash
+    const folder = makeFolder("a/b");
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: the slash is escaped to &#x2F; and the raw "a/b" is not present
+    expect(html).toContain('<span class="gitFolderName">a&#x2F;b</span>');
+    expect(html).not.toContain("a/b");
+  });
+
+  it("leaves a plain folder name unchanged (TC-021)", () => {
+    // Case: TC-021
+    // Given: a folder name with no special characters
+    const folder = makeFolder("src");
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: the name is rendered as-is with no HTML entities
+    expect(html).toContain('<span class="gitFolderName">src</span>');
+    expect(html).not.toContain("&amp;");
+    expect(html).not.toContain("&lt;");
+  });
+
+  it("renders no folder name span for the empty root folder (TC-022)", () => {
+    // Case: TC-022
+    // Given: the root folder with an empty name and no children
+    const folder = makeFolder("");
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: neither the gitFolder wrapper nor the gitFolderName span is rendered
+    expect(html).not.toContain('class="gitFolder"');
+    expect(html).not.toContain("gitFolderName");
+  });
+
+  it("escapes an XSS payload in a file basename (TC-023)", () => {
+    // Case: TC-023
+    // Given: a root folder containing a file whose basename is an <img> payload
+    const maliciousName = "<img src=x onerror=y>.ts";
+    const folder = makeFolder("", {
+      f: { type: "file", name: maliciousName, index: 0 }
+    });
+    const gitFiles = [
+      makeFile({ oldFilePath: maliciousName, newFilePath: maliciousName, type: "M" })
+    ];
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, gitFiles);
+
+    // Then: the display name is escaped and no raw <img tag is emitted
+    expect(html).toContain("&lt;img src=x onerror=y&gt;.ts");
+    expect(html).not.toContain("<img");
+  });
+
+  it("leaves a plain file basename unchanged (TC-024)", () => {
+    // Case: TC-024
+    // Given: a root folder containing a file with a plain basename
+    const folder = makeFolder("", {
+      f: { type: "file", name: "main.ts", index: 0 }
+    });
+    const gitFiles = [makeFile({ oldFilePath: "main.ts", newFilePath: "main.ts", type: "M" })];
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, gitFiles);
+
+    // Then: the basename is rendered as-is with no HTML entities
+    expect(html).toContain("main.ts");
+    expect(html).not.toContain("&lt;");
+    expect(html).not.toContain("&amp;");
+  });
+
+  it("escapes a nested child folder name through recursion (TC-025)", () => {
+    // Case: TC-025
+    // Given: a parent folder containing a child folder with a special-character name
+    const child = makeFolder("<b>&");
+    const folder = makeFolder("parent", { child });
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: the recursively rendered child folder name is escaped
+    expect(html).toContain('<span class="gitFolderName">&lt;b&gt;&amp;</span>');
+    expect(html).not.toContain("<b>&");
   });
 });

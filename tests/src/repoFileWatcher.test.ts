@@ -7,7 +7,8 @@ vi.mock("vscode", () => ({
 }));
 
 vi.mock("../../src/utils", () => ({
-  getPathFromUri: vi.fn((uri: { fsPath: string }) => uri.fsPath)
+  getPathFromUri: vi.fn((uri: { fsPath: string }) => uri.fsPath),
+  getPathFromStr: vi.fn((str: string) => str.replace(/\\/g, "/"))
 }));
 
 import * as vscode from "vscode";
@@ -310,5 +311,93 @@ describe("RepoFileWatcher repository-state watching", () => {
 
     // Then: repoChangeCallback is not called because the path is outside the configured root
     expect(callback).not.toHaveBeenCalled();
+  });
+});
+
+describe("RepoFileWatcher start() glob separator normalization (S10)", () => {
+  function startWithRoots(watchRoots: string[]): { globArgs: string[] } {
+    const callback = vi.fn();
+    const mockWatchers = watchRoots.map(() => createMockWatcher());
+    let watcherIndex = 0;
+    mockedCreateFSWatcher.mockImplementation(() => mockWatchers[watcherIndex++]);
+    const rfWatcher = new RepoFileWatcher(callback);
+    rfWatcher.start(watchRoots);
+
+    return {
+      globArgs: mockedCreateFSWatcher.mock.calls.map((call) => call[0] as string)
+    };
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("converts Windows backslash separators to forward slashes in the glob (TC-046)", () => {
+    // Case: TC-046
+    // Given: A watch root using Windows backslash separators
+    // When: start() builds the file system watcher glob
+    const { globArgs } = startWithRoots(["C:\\repo\\.git"]);
+
+    // Then: createFileSystemWatcher is called once with a forward-slash glob and no backslash
+    expect(mockedCreateFSWatcher).toHaveBeenCalledTimes(1);
+    expect(mockedCreateFSWatcher).toHaveBeenCalledWith("C:/repo/.git/**");
+    expect(globArgs[0]).not.toContain("\\");
+  });
+
+  it("leaves an already-forward-slash POSIX path unchanged (TC-047)", () => {
+    // Case: TC-047
+    // Given: A watch root already using forward-slash separators
+    // When: start() builds the glob
+    startWithRoots(["/path/to/repo/.git"]);
+
+    // Then: The glob separators are unchanged
+    expect(mockedCreateFSWatcher).toHaveBeenCalledTimes(1);
+    expect(mockedCreateFSWatcher).toHaveBeenCalledWith("/path/to/repo/.git/**");
+  });
+
+  it("collapses a redundant ./ segment via path.normalize (TC-048)", () => {
+    // Case: TC-048
+    // Given: A watch root containing a redundant "./" segment
+    // When: start() normalizes the path
+    startWithRoots(["/path/to/repo/./.git"]);
+
+    // Then: The "/./" segment is collapsed in the glob
+    expect(mockedCreateFSWatcher).toHaveBeenCalledTimes(1);
+    expect(mockedCreateFSWatcher).toHaveBeenCalledWith("/path/to/repo/.git/**");
+  });
+
+  it("creates no watcher for an empty roots array (TC-049)", () => {
+    // Case: TC-049
+    // Given: An empty watch roots array
+    // When: start() is called with no roots
+    startWithRoots([]);
+
+    // Then: createFileSystemWatcher is never called
+    expect(mockedCreateFSWatcher).toHaveBeenCalledTimes(0);
+  });
+
+  it("normalizes an empty-string root to './**' (TC-050)", () => {
+    // Case: TC-050
+    // Given: A single empty-string watch root
+    // When: start() normalizes the empty root
+    startWithRoots([""]);
+
+    // Then: path.normalize("") yields "." and the glob becomes "./**"
+    expect(mockedCreateFSWatcher).toHaveBeenCalledTimes(1);
+    expect(mockedCreateFSWatcher).toHaveBeenCalledWith("./**");
+  });
+
+  it("normalizes each root independently for mixed-separator multi-roots (TC-052)", () => {
+    // Case: TC-052
+    // Given: Two watch roots with mixed backslash and forward-slash separators
+    // When: start() builds a glob per root
+    const { globArgs } = startWithRoots(["C:\\a\\.git", "/b/.git"]);
+
+    // Then: Each glob is normalized to forward slashes with no backslash
+    expect(mockedCreateFSWatcher).toHaveBeenCalledTimes(2);
+    expect(mockedCreateFSWatcher).toHaveBeenNthCalledWith(1, "C:/a/.git/**");
+    expect(mockedCreateFSWatcher).toHaveBeenNthCalledWith(2, "/b/.git/**");
+    expect(globArgs[0]).not.toContain("\\");
+    expect(globArgs[1]).not.toContain("\\");
   });
 });

@@ -3450,8 +3450,8 @@ describe("removeWorktree", () => {
   });
 });
 
-// S25: getNewPathOfRenamedFile() リネーム追跡
-describe("getNewPathOfRenamedFile", () => {
+// S27: getNewPathOfRenamedFile() リネーム追跡（pathspec 除去 + name-status カーソルパース）
+describe("getNewPathOfRenamedFile (S27)", () => {
   let ds: DataSource;
   const spawnMock = vi.mocked(cp.spawn);
   const VALID_HASH = "abc123def456";
@@ -3465,106 +3465,281 @@ describe("getNewPathOfRenamedFile", () => {
     vi.restoreAllMocks();
   });
 
-  // TC-142: リネームされたファイルの新パスを返す
-  it("returns new path when file was renamed (TC-142)", async () => {
-    // Given: git diff output indicating old.ts was renamed to new.ts (null-byte separated)
-    const diffOutput = `R100\0old.ts\0new.ts\0`;
-    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: diffOutput }));
+  it("returns the new path for a single matching rename record (TC-156)", async () => {
+    // Case: TC-156
+    // Given: name-status output with one R record whose old path matches
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({ stdout: "R100\0old.ts\0new.ts\0" })
+    );
 
-    // When: getNewPathOfRenamedFile is called with the old file path
+    // When: getNewPathOfRenamedFile is called for old.ts
     const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
 
-    // Then: the new file path is returned
+    // Then: the new path from fields[2] is returned
     expect(result).toBe("new.ts");
   });
 
-  // TC-143: リネームされていないファイルは null を返す
-  it("returns null when file was not renamed (TC-143)", async () => {
-    // Given: git diff output is empty (no renames detected)
+  it("invokes git diff with --name-status and no pathspec (TC-157)", async () => {
+    // Case: TC-157
+    // Given: valid inputs and empty git diff output
     spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "" }));
 
-    // When: getNewPathOfRenamedFile is called for an unchanged file
-    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "unchanged.ts");
+    // When: getNewPathOfRenamedFile is called
+    await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
+
+    // Then: spawn is called with name-status args and no trailing "--"/oldFilePath pathspec
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["diff", "--name-status", "--diff-filter=R", "--find-renames", "-z", VALID_HASH, "HEAD"],
+      { cwd: REPO }
+    );
+    const passedArgs = spawnMock.mock.calls[0][1] as string[];
+    expect(passedArgs).not.toContain("--");
+    expect(passedArgs).not.toContain("old.ts");
+  });
+
+  it("advances the cursor past non-matching records to find a later match (TC-158)", async () => {
+    // Case: TC-158
+    // Given: two R records where only the second one matches oldFilePath
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({ stdout: "R100\0a.ts\0b.ts\0R100\0old.ts\0new.ts\0" })
+    );
+
+    // When: getNewPathOfRenamedFile is called for old.ts
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
+
+    // Then: the cursor advances past a.ts and returns the second record's new path
+    expect(result).toBe("new.ts");
+  });
+
+  it("returns null when no record's old path matches (TC-159)", async () => {
+    // Case: TC-159
+    // Given: an R record whose old path does not match oldFilePath
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({ stdout: "R100\0other.ts\0renamed.ts\0" })
+    );
+
+    // When: getNewPathOfRenamedFile is called for old.ts
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
+
+    // Then: the cursor reaches the end with no match and null is returned
+    expect(result).toBeNull();
+  });
+
+  it("returns null for empty git diff output (TC-160)", async () => {
+    // Case: TC-160
+    // Given: empty stdout so fields is [""] and the while condition is false
+    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "" }));
+
+    // When: getNewPathOfRenamedFile is called
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
 
     // Then: null is returned
     expect(result).toBeNull();
   });
 
-  // TC-144: 無効なコミットハッシュで null を返し、spawn は呼ばれない
-  it("returns null for invalid commit hash without spawning git (TC-144)", async () => {
-    // Given: an invalid commit hash (contains non-hex characters)
-    const invalidHash = "not-a-valid-hash!@#";
+  it("breaks and returns null on an unexpected status char (TC-161)", async () => {
+    // Case: TC-161
+    // Given: a status char "X" that is not in VALID_FILE_CHANGE_TYPES
+    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "X\0a.ts\0b.ts\0" }));
 
+    // When: getNewPathOfRenamedFile is called for a.ts
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "a.ts");
+
+    // Then: the loop breaks defensively and null is returned
+    expect(result).toBeNull();
+  });
+
+  it("returns null for an invalid commit hash without spawning git (TC-162)", async () => {
+    // Case: TC-162
+    // Given: a commit hash containing non-hex characters
     // When: getNewPathOfRenamedFile is called with the invalid hash
-    const result = await ds.getNewPathOfRenamedFile(REPO, invalidHash, "file.ts");
+    const result = await ds.getNewPathOfRenamedFile(REPO, "not-a-hex-hash", "old.ts");
 
-    // Then: null is returned and git is not invoked
+    // Then: null is returned and git is never invoked
     expect(result).toBeNull();
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  // TC-145: ".." を含むパスは null を返し、spawn は呼ばれない
-  it("returns null for path traversal attempt without spawning git (TC-145)", async () => {
-    // Given: a file path containing ".." (path traversal)
-    const traversalPath = "../etc/passwd";
-
+  it("returns null for a path-traversal old path without spawning git (TC-163)", async () => {
+    // Case: TC-163
+    // Given: an old file path containing a ".." segment
     // When: getNewPathOfRenamedFile is called with the traversal path
-    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, traversalPath);
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "../secret.ts");
 
-    // Then: null is returned and git is not invoked
+    // Then: null is returned and git is never invoked
     expect(result).toBeNull();
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  // TC-146: git diff が非0 exit code で null を返す
-  it("returns null when git diff exits with non-zero code (TC-146)", async () => {
-    // Given: git diff command fails with exit code 128
+  it("returns null via error fallback when git diff exits non-zero (TC-164)", async () => {
+    // Case: TC-164
+    // Given: git diff exits with a non-zero code
     spawnMock.mockImplementation(() => createCommandMockProcess({ exitCode: 128 }));
 
     // When: getNewPathOfRenamedFile is called
-    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "file.ts");
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
 
-    // Then: null is returned (error fallback)
+    // Then: the spawnGit errorValue (null) is returned
     expect(result).toBeNull();
   });
 
-  // TC-147: spawn が error イベントを emit すると null を返す
-  it("returns null when spawn emits an error event (TC-147)", async () => {
-    // Given: spawn emits an error event
-    spawnMock.mockImplementation(() => createCommandMockProcess({ emitError: true }));
+  it("returns an empty string when the new path field is missing (TC-165)", async () => {
+    // Case: TC-165
+    // Given: a truncated R record missing the new-path field
+    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "R100\0old.ts\0" }));
 
-    // When: getNewPathOfRenamedFile is called
-    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "file.ts");
+    // When: getNewPathOfRenamedFile is called for the matching old path
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
 
-    // Then: null is returned (error fallback)
-    expect(result).toBeNull();
+    // Then: the missing field falls back to "" via getPathFromStr("" ?? "")
+    expect(result).toBe("");
+  });
+});
+
+function createChunkedMockProcess(
+  options: {
+    stdoutChunks?: (Buffer | string)[];
+    stderrChunks?: (Buffer | string)[];
+    exitCode?: number;
+    emitError?: boolean;
+  } = {}
+) {
+  const { stdoutChunks = [], stderrChunks = [], exitCode = 0, emitError = false } = options;
+  const stdoutEmitter = new EventEmitter();
+  const stderrEmitter = new EventEmitter();
+  const proc = new EventEmitter();
+  Object.assign(proc, { stdout: stdoutEmitter, stderr: stderrEmitter });
+
+  queueMicrotask(() => {
+    if (emitError) {
+      proc.emit("error", new Error("spawn error"));
+      return;
+    }
+    for (const chunk of stdoutChunks) {
+      stdoutEmitter.emit("data", chunk);
+    }
+    for (const chunk of stderrChunks) {
+      stderrEmitter.emit("data", chunk);
+    }
+    proc.emit("close", exitCode);
   });
 
-  // TC-148: git diff の stdout が空なら null を返す
-  it("returns null when git diff stdout is empty (TC-148)", async () => {
-    // Given: git diff returns empty stdout (no rename data)
-    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "" }));
+  return proc as unknown as cp.ChildProcess;
+}
 
-    // When: getNewPathOfRenamedFile is called
-    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "file.ts");
+// S28: runGitCommandSpawn() / spawnGit() 出力バッファの結合デコード
+describe("spawn output buffer concat decoding (S28)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+  const VALID_HASH = "abc123def456";
+  const REPLACEMENT_CHAR = "�";
 
-    // Then: null is returned
-    expect(result).toBeNull();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
   });
 
-  // TC-149: 正しい git 引数で spawn が呼ばれることを検証
-  it("passes correct arguments to git diff (TC-149)", async () => {
-    // Given: valid inputs and a successful git diff
-    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "" }));
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-    // When: getNewPathOfRenamedFile is called
-    await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "file.ts");
-
-    // Then: spawn is called with the correct diff arguments
-    expect(spawnMock).toHaveBeenCalledWith(
-      "git",
-      ["diff", "--diff-filter=R", "--find-renames", "-z", VALID_HASH, "HEAD", "--", "file.ts"],
-      { cwd: REPO }
+  it("restores a multibyte char split across chunk boundaries in spawnGit (TC-166)", async () => {
+    // Case: TC-166
+    // Given: the UTF-8 bytes of "あ" (E3 81 82) emitted as [E3,81] then [82]
+    spawnMock.mockImplementation(() =>
+      createChunkedMockProcess({
+        stdoutChunks: [Buffer.from([0xe3, 0x81]), Buffer.from([0x82])]
+      })
     );
+
+    // When: getCommitFile drives spawnGit with an identity successValue
+    const result = await ds.getCommitFile(REPO, VALID_HASH, "file.ts");
+
+    // Then: Buffer.concat restores "あ" with no U+FFFD replacement char
+    expect(result).toBe("あ");
+    expect(result).not.toContain(REPLACEMENT_CHAR);
+  });
+
+  it("decodes a single ASCII chunk in spawnGit (TC-167)", async () => {
+    // Case: TC-167
+    // Given: ASCII "abc" emitted in a single data event
+    spawnMock.mockImplementation(() => createChunkedMockProcess({ stdoutChunks: ["abc"] }));
+
+    // When: getCommitFile drives spawnGit
+    const result = await ds.getCommitFile(REPO, VALID_HASH, "file.ts");
+
+    // Then: the identity successValue receives "abc"
+    expect(result).toBe("abc");
+  });
+
+  it("yields an empty string in spawnGit when no data events fire (TC-168)", async () => {
+    // Case: TC-168
+    // Given: exit 0 with no stdout data events
+    spawnMock.mockImplementation(() => createChunkedMockProcess({ stdoutChunks: [] }));
+
+    // When: getCommitFile drives spawnGit
+    const result = await ds.getCommitFile(REPO, VALID_HASH, "file.ts");
+
+    // Then: Buffer.concat([]) decodes to "" and successValue receives ""
+    expect(result).toBe("");
+  });
+
+  it("resolves errorValue and skips successValue on non-zero exit in spawnGit (TC-169)", async () => {
+    // Case: TC-169
+    // Given: stdout "abc" is emitted but the process exits with code 1
+    spawnMock.mockImplementation(() =>
+      createChunkedMockProcess({ stdoutChunks: ["abc"], exitCode: 1 })
+    );
+
+    // When: getCommitFile drives spawnGit
+    const result = await ds.getCommitFile(REPO, VALID_HASH, "file.ts");
+
+    // Then: the errorValue "" is returned, proving successValue was not applied to "abc"
+    expect(result).toBe("");
+  });
+
+  it("restores multibyte stdout across chunks in runGitCommandSpawn error path (TC-170)", async () => {
+    // Case: TC-170
+    // Given: non-zero exit with "あ\n" (E3 81 82 0A) split as [E3,81] then [82,0A]
+    spawnMock.mockImplementation(() =>
+      createChunkedMockProcess({
+        stdoutChunks: [Buffer.from([0xe3, 0x81]), Buffer.from([0x82, 0x0a])],
+        exitCode: 1
+      })
+    );
+
+    // When: fetch drives runGitCommandSpawn
+    const result = await ds.fetch(REPO);
+
+    // Then: the concat-decoded stdout minus the trailing line resolves as "あ" without U+FFFD
+    expect(result).toBe("あ");
+    expect(result).not.toContain(REPLACEMENT_CHAR);
+  });
+
+  it("falls back to concat-decoded stderr when stdout is empty in runGitCommandSpawn (TC-171)", async () => {
+    // Case: TC-171
+    // Given: non-zero exit, empty stdout, and stderr "err\n" split across two chunks
+    spawnMock.mockImplementation(() =>
+      createChunkedMockProcess({ stderrChunks: ["er", "r\n"], exitCode: 1 })
+    );
+
+    // When: fetch drives runGitCommandSpawn
+    const result = await ds.fetch(REPO);
+
+    // Then: the stderr-derived "err" is resolved because stdout is empty
+    expect(result).toBe("err");
+  });
+
+  it("resolves null on a successful exit in runGitCommandSpawn (TC-172)", async () => {
+    // Case: TC-172
+    // Given: the process exits with code 0
+    spawnMock.mockImplementation(() => createChunkedMockProcess({ exitCode: 0 }));
+
+    // When: fetch drives runGitCommandSpawn
+    const result = await ds.fetch(REPO);
+
+    // Then: null is resolved (success)
+    expect(result).toBeNull();
   });
 });
