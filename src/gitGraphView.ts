@@ -52,6 +52,9 @@ export class GitKeizuView {
       : undefined;
 
     if (GitKeizuView.currentPanel) {
+      if (rootUri !== undefined) {
+        extensionState.setLastActiveRepo(getPathFromUri(rootUri));
+      }
       GitKeizuView.currentPanel.panel.reveal(column);
       if (rootUri !== undefined) {
         GitKeizuView.currentPanel.selectRepoFromUri(rootUri, repoManager);
