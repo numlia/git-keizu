@@ -169,3 +169,24 @@ fileChangeRegex は3パターンのOR:
 | TC-043  | watchRoots=[linked git-dir, common-dir], common-dir で `refs/heads/main` が変化   | Normal - second watch root                                                 | 共通 root 側イベントでも 750ms 後に `repoChangeCallback` が1回呼ばれる                                               | shared refs                       |
 | TC-044  | 複数 root から 750ms 以内に `HEAD` と `refs/remotes/origin/main` の変更が連続到達 | Normal - cross-root debounce                                               | `clearTimeout` が1回呼ばれ、750ms 後の `repoChangeCallback` は合計1回だけ実行される                                  | デバウンス維持                    |
 | TC-045  | watchRoots=[linked git-dir], common-dir 配下の `refs/heads/main` を誤って渡す     | Validation - outside configured roots                                      | `repoChangeCallback` が呼ばれない                                                                                    | root 外イベントを拒否             |
+
+## S10: start() glob 構築時の区切り正規化（Windows バックスラッシュ対策）
+
+> Origin: フェーズ1 修正 M4 (watcher-glob-separator-normalize)
+> Added: 2026-07-04T01:35:00Z
+> Status: active
+> Supersedes: -
+> Signature: `public start(watchRoots: string[]): void`
+> Target Path: `src/repoFileWatcher.ts:41-49`
+
+各 watchRoot を `getPathFromStr(path.normalize(watchRoot))` で正規化してから `` `${watchRoot}/**` `` を連結する修正。`getPathFromStr` はバックスラッシュ `\` を `/` へ置換するため、Windows 形式パスでも glob 区切りがフォワードスラッシュに統一される（POSIX 実行時 `path.normalize` は `\` を区切りとして扱わず、`getPathFromStr` が変換を担う）。
+
+| Case ID | Input / Precondition                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                              | Notes                              |
+| ------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| TC-046  | watchRoots=[`C:\\repo\\.git`]（バックスラッシュ区切り）        | Normal - backslash normalized                                              | `createFileSystemWatcher` が `C:/repo/.git/**` で1回呼ばれる。glob 引数にバックスラッシュ `\` を含まない                     | getPathFromStr による `\`→`/` 変換 |
+| TC-047  | watchRoots=[`/path/to/repo/.git`]（既にフォワードスラッシュ）  | Normal - posix path unchanged                                              | `createFileSystemWatcher` が `/path/to/repo/.git/**` で1回呼ばれる。区切りは変化しない                                       | 変換対象なし                       |
+| TC-048  | watchRoots=[`/path/to/repo/./.git`]（冗長な `./` セグメント）  | Normal - redundant segment collapsed                                       | `path.normalize` により `/./` が畳まれ、`createFileSystemWatcher` が `/path/to/repo/.git/**` で呼ばれる                      | normalize の正規化検証             |
+| TC-049  | watchRoots=[]（空配列）                                        | Boundary - empty roots array                                               | `createFileSystemWatcher` が呼ばれない（0回）。`fsWatchers.length === 0`                                                     | map が空配列を返す                 |
+| TC-050  | watchRoots=[`""`]（空文字列）                                  | Boundary - empty string root                                               | `path.normalize("")` が `"."` を返し、`createFileSystemWatcher` が `./**` で1回呼ばれる                                      | 空文字 root の境界                 |
+| TC-051  | watchRoots=[`C:\\repo\\.git\\`]（末尾バックスラッシュ）        | Boundary - trailing separator                                              | `path.normalize` が末尾区切りを除去し、`createFileSystemWatcher` が `C:/repo/.git/**` で呼ばれる。`\**` や `//**` を含まない | 末尾区切り + `\`→`/`               |
+| TC-052  | watchRoots=[`C:\\a\\.git`, `/b/.git`]（混在区切りの複数 root） | Boundary - mixed separators multi-root                                     | `createFileSystemWatcher` が2回呼ばれ、glob は各々 `C:/a/.git/**` と `/b/.git/**`。いずれもバックスラッシュを含まない        | 複数 root ごとに正規化される       |

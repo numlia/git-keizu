@@ -1,10 +1,10 @@
 # テスト観点表インデックス
 
-> Auto-generated: 2026-05-28T13:20:38Z
+> Auto-generated: 2026-07-04T01:35:00Z
 > Total sources: 33
 > Total physical files: 46
-> Total sections: 295
-> Total cases: 1395
+> Total sections: 298
+> Total cases: 1420
 
 ## ソースファイル → 観点表（正引き）
 
@@ -12,13 +12,13 @@
 | ------------------------- | ------------ | --------------------------------- | ------ | -------- | ----- | ------------ |
 | src/avatarManager.ts      | single-file  | src/avatarManager-test.md         | 1      | 22       | 85    | 2026-05-28   |
 | src/config.ts             | sharded      | src/config-test/INDEX.md          | 3      | 17       | 96    | 2026-05-17   |
-| src/dataSource.ts         | sharded      | src/dataSource-test/INDEX.md      | 3      | 26       | 155   | 2026-05-02   |
+| src/dataSource.ts         | sharded      | src/dataSource-test/INDEX.md      | 3      | 27       | 164   | 2026-07-04   |
 | src/diffDocProvider.ts    | single-file  | src/diffDocProvider-test.md       | 1      | 6        | 30    | 2026-03-21   |
 | src/extension.ts          | single-file  | src/extension-test.md             | 1      | 6        | 23    | 2026-05-10   |
 | src/extensionState.ts     | single-file  | src/extensionState-test.md        | 1      | 13       | 37    | 2026-05-02   |
 | src/gitGraphView.ts       | sharded      | src/gitGraphView-test/INDEX.md    | 4      | 23       | 75    | 2026-05-17   |
 | src/i18n.ts               | single-file  | src/i18n-test.md                  | 1      | 1        | 6     | 2026-05-03   |
-| src/repoFileWatcher.ts    | single-file  | src/repoFileWatcher-test.md       | 1      | 9        | 45    | 2026-05-02   |
+| src/repoFileWatcher.ts    | single-file  | src/repoFileWatcher-test.md       | 1      | 10       | 52    | 2026-07-04   |
 | src/repoManager.ts        | single-file  | src/repoManager-test.md           | 1      | 18       | 104   | 2026-03-22   |
 | src/statusBarItem.ts      | single-file  | src/statusBarItem-test.md         | 1      | 3        | 13    | 2026-03-22   |
 | src/types.ts              | single-file  | src/types-test.md                 | 1      | 1        | 7     | 2026-02-25   |
@@ -31,7 +31,7 @@
 | web/dialogs.ts            | single-file  | web/dialogs-test.md               | 1      | 4        | 21    | 2026-05-22   |
 | web/dropdown.ts           | single-file  | web/dropdown-test.md              | 1      | 10       | 38    | 2026-03-07   |
 | web/fileMenu.ts           | single-file  | web/fileMenu-test.md              | 1      | 3        | 14    | 2026-05-02   |
-| web/fileTree.ts           | single-file  | web/fileTree-test.md              | 1      | 2        | 16    | 2026-04-04   |
+| web/fileTree.ts           | single-file  | web/fileTree-test.md              | 1      | 3        | 25    | 2026-07-04   |
 | web/findWidget.ts         | single-file  | web/findWidget-test.md            | 1      | 7        | 32    | 2026-02-25   |
 | web/graph.ts              | single-file  | web/graph-test.md                 | 1      | 17       | 59    | 2026-03-08   |
 | web/i18n.ts               | single-file  | web/i18n-test.md                  | 1      | 1        | 5     | 2026-05-03   |
@@ -82,7 +82,7 @@
 | Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test) | src/config-test/INDEX.md                                                                                                                                                                                       |
 | Feature 023 (worktree-dialog-defaults) (aidd-spec-tasks-test)         | web/commitMenu-test.md                                                                                                                                                                                         |
 | Feature 024 (worktree-path-normalize) (aidd-spec-tasks-test)          | web/commitMenu-test.md, web/utils-test.md                                                                                                                                                                      |
-| Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)          | src/config-test/INDEX.md, src/dataSource-test/INDEX.md, src/utils-test.md, web/fileTree-test.md, web/main-test/INDEX.md, web/messageHandler-test.md                                                            |
+| Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)          | src/config-test/INDEX.md, src/utils-test.md, web/fileTree-test.md, web/main-test/INDEX.md, web/messageHandler-test.md                                                                                          |
 | Feature 027 (commit-file-context-menu) (aidd-spec-tasks-test)         | web/fileMenu-test.md, web/main-test/INDEX.md                                                                                                                                                                   |
 | Feature 032 (context-menu-reorg) Task 7                               | web/commitMenu-test.md, web/contextMenu-test.md, web/refMenu-test.md, web/stashMenu-test.md                                                                                                                    |
 | Feature 033 (watch-refresh-scope) Task 1                              | src/dataSource-test/INDEX.md                                                                                                                                                                                   |
@@ -99,3 +99,7 @@
 | test-plan (既存コード分析)                                            | src/avatarManager-test.md, src/diffDocProvider-test.md, src/extension-test.md, src/extensionState-test.md, src/repoFileWatcher-test.md, src/statusBarItem-test.md, web/branchLabels-test.md, web/dates-test.md |
 | test-plan (既存コード網羅)                                            | src/config-test/INDEX.md, src/gitGraphView-test/INDEX.md, src/repoManager-test.md, web/main-test/INDEX.md                                                                                                      |
 | test-plan (既存テスト)                                                | src/dataSource-test/INDEX.md                                                                                                                                                                                   |
+| フェーズ1 修正 H1 (commit-details-tree-escape)                        | web/fileTree-test.md                                                                                                                                                                                           |
+| フェーズ1 修正 H2 (rename-tracking-repair)                            | src/dataSource-test/INDEX.md                                                                                                                                                                                   |
+| フェーズ1 修正 M2 (spawn-buffer-concat)                               | src/dataSource-test/INDEX.md                                                                                                                                                                                   |
+| フェーズ1 修正 M4 (watcher-glob-separator-normalize)                  | src/repoFileWatcher-test.md                                                                                                                                                                                    |

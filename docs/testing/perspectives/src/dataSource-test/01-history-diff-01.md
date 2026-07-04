@@ -172,3 +172,24 @@
 | TC-065  | ls-files出力に空行が混在                    | Boundary - empty line                                                      | 空行はスキップされ、有効なファイルパスのみ追加される | filePath === "" ガード                     |
 | TC-066  | git diff または ls-files が例外をスロー     | Exception - handled error                                                  | null を返す                                          | catch ブロックでnull返却                   |
 | TC-067  | 正常なdiff出力（リネーム含む）              | Normal - standard                                                          | GitCommitDetails を返す。正しいtype/pathが設定される | nameStatus パースの基本検証                |
+
+## S28: runGitCommandSpawn() / spawnGit() 出力バッファの結合デコード
+
+> Origin: フェーズ1 修正 M2 (spawn-buffer-concat)
+> Added: 2026-07-04T01:35:00Z
+> Status: active
+> Supersedes: -
+> Signature: `private runGitCommandSpawn(args: string[], repo: string): Promise<GitCommandStatus>` / `private spawnGit<T>(args, repo, successValue, errorValue): Promise<T>`
+> Target Path: `src/dataSource.ts:1100-1153`
+
+stdout/stderr を文字列連結（`stdout += d`）で蓄積していた実装を Buffer 配列（`stdoutChunks.push(Buffer.from(d))`）+ `Buffer.concat(chunks).toString()` の一括デコード方式へ変更。マルチバイト文字がチャンク境界で分割されても文字化け（U+FFFD 置換文字）せずに復元されることを保証する追加観点。
+
+| Case ID | Input / Precondition                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                             | Notes                                     |
+| ------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| TC-166  | spawnGit, exit 0。UTF-8 3バイト文字 "あ"(E3 81 82) を data イベント2回 `[E3,81]` と `[82]` に分割して emit | Normal - multibyte chunk boundary restore                                  | successValue が結合デコード後の `"あ"` で1回呼ばれる。U+FFFD(`�`) を含まない                | Buffer.concat による境界復元              |
+| TC-167  | spawnGit, exit 0。ASCII `"abc"` を単一 data イベントで emit                                                | Normal - single chunk decode                                               | successValue が `"abc"` で1回呼ばれる                                                       | 単一チャンクの通常経路                    |
+| TC-168  | spawnGit, exit 0。data イベントを一度も emit しない                                                        | Boundary - no data events                                                  | `Buffer.concat([])` が空文字となり、successValue が `""` で1回呼ばれる                      | 出力なし境界                              |
+| TC-169  | spawnGit, exit code 非0（close code=1）                                                                    | Exception - error value fallback                                           | errorValue がそのまま解決される。successValue は呼ばれない（0回）                           | 非正常終了時フォールバック                |
+| TC-170  | runGitCommandSpawn, exit code 非0。stdout にマルチバイト文字を2チャンク分割で emit                         | Exception - error stdout multibyte restore                                 | 結合デコードされた stdout を eol 分割し末尾行を除いた文字列が解決される。文字化けを含まない | close code≠0 の stdout 経路（L1121-1124） |
+| TC-171  | runGitCommandSpawn, exit code 非0。stdout は空、stderr に2チャンク emit                                    | Exception - stderr concat fallback                                         | stdout が空のため結合デコードされた stderr 由来の文字列が解決される                         | stdout 空時の stderr フォールバック       |
+| TC-172  | runGitCommandSpawn, exit code 0                                                                            | Normal - success null                                                      | `null` が解決される（成功）                                                                 | 正常終了時                                |
