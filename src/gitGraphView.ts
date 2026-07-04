@@ -154,380 +154,408 @@ export class GitKeizuView {
           return;
         }
         this.repoFileWatcher.mute();
-        switch (msg.command) {
-          case "addTag":
-            this.sendMessage({
-              command: "addTag",
-              status: await this.dataSource.addTag(
-                msg.repo,
-                msg.tagName,
-                msg.commitHash,
-                msg.lightweight,
-                msg.message
-              )
-            });
-            break;
-          case "fetchAvatar":
-            this.avatarManager.fetchAvatarImage(msg.email, msg.repo, msg.commits);
-            break;
-          case "checkoutBranch":
-            this.sendMessage({
-              command: "checkoutBranch",
-              status: await this.dataSource.checkoutBranch(
-                msg.repo,
-                msg.branchName,
-                msg.remoteBranch
-              )
-            });
-            break;
-          case "checkoutCommit":
-            this.sendMessage({
-              command: "checkoutCommit",
-              status: await this.dataSource.checkoutCommit(msg.repo, msg.commitHash)
-            });
-            break;
-          case "cherrypickCommit":
-            this.sendMessage({
-              command: "cherrypickCommit",
-              status: await this.dataSource.cherrypickCommit(
-                msg.repo,
-                msg.commitHash,
-                msg.parentIndex,
-                msg.recordOrigin,
-                msg.noCommit
-              )
-            });
-            break;
-          case "commitDetails":
-            this.sendMessage({
-              command: "commitDetails",
-              commitDetails:
-                msg.commitHash === UNCOMMITTED_CHANGES_HASH
-                  ? await this.dataSource.getUncommittedDetails(msg.repo)
-                  : await this.dataSource.commitDetails(
-                      msg.repo,
-                      msg.commitHash,
-                      msg.hasParents,
-                      msg.isStash
-                    )
-            });
-            break;
-          case "compareCommits":
-            this.sendMessage({
-              command: "compareCommits",
-              fileChanges: await this.dataSource.getCommitComparison(
-                msg.repo,
-                msg.fromHash,
-                msg.toHash
-              ),
-              fromHash: msg.fromHash,
-              toHash: msg.toHash
-            });
-            break;
-          case "copyToClipboard":
-            this.sendMessage({
-              command: "copyToClipboard",
-              type: msg.type,
-              success: await copyToClipboard(msg.data)
-            });
-            break;
-          case "createBranch": {
-            const createStatus = await this.dataSource.createBranch(
-              msg.repo,
-              msg.branchName,
-              msg.commitHash
-            );
-            let status: GitCommandStatus = createStatus;
-            if (createStatus === null && msg.checkout) {
-              const checkoutStatus = await this.dataSource.checkoutBranch(
+        try {
+          switch (msg.command) {
+            case "addTag":
+              this.sendMessage({
+                command: "addTag",
+                status: await this.dataSource.addTag(
+                  msg.repo,
+                  msg.tagName,
+                  msg.commitHash,
+                  msg.lightweight,
+                  msg.message
+                )
+              });
+              break;
+            case "fetchAvatar":
+              this.avatarManager.fetchAvatarImage(msg.email, msg.repo, msg.commits);
+              break;
+            case "checkoutBranch":
+              this.sendMessage({
+                command: "checkoutBranch",
+                status: await this.dataSource.checkoutBranch(
+                  msg.repo,
+                  msg.branchName,
+                  msg.remoteBranch
+                )
+              });
+              break;
+            case "checkoutCommit":
+              this.sendMessage({
+                command: "checkoutCommit",
+                status: await this.dataSource.checkoutCommit(msg.repo, msg.commitHash)
+              });
+              break;
+            case "cherrypickCommit":
+              this.sendMessage({
+                command: "cherrypickCommit",
+                status: await this.dataSource.cherrypickCommit(
+                  msg.repo,
+                  msg.commitHash,
+                  msg.parentIndex,
+                  msg.recordOrigin,
+                  msg.noCommit
+                )
+              });
+              break;
+            case "commitDetails":
+              this.sendMessage({
+                command: "commitDetails",
+                commitDetails:
+                  msg.commitHash === UNCOMMITTED_CHANGES_HASH
+                    ? await this.dataSource.getUncommittedDetails(msg.repo)
+                    : await this.dataSource.commitDetails(
+                        msg.repo,
+                        msg.commitHash,
+                        msg.hasParents,
+                        msg.isStash
+                      )
+              });
+              break;
+            case "compareCommits":
+              this.sendMessage({
+                command: "compareCommits",
+                fileChanges: await this.dataSource.getCommitComparison(
+                  msg.repo,
+                  msg.fromHash,
+                  msg.toHash
+                ),
+                fromHash: msg.fromHash,
+                toHash: msg.toHash
+              });
+              break;
+            case "copyToClipboard":
+              this.sendMessage({
+                command: "copyToClipboard",
+                type: msg.type,
+                success: await copyToClipboard(msg.data)
+              });
+              break;
+            case "createBranch": {
+              const createStatus = await this.dataSource.createBranch(
                 msg.repo,
                 msg.branchName,
-                null
+                msg.commitHash
               );
-              if (checkoutStatus !== null) {
-                status = `Branch '${msg.branchName}' was created, but checkout failed: ${checkoutStatus}`;
+              let status: GitCommandStatus = createStatus;
+              if (createStatus === null && msg.checkout) {
+                const checkoutStatus = await this.dataSource.checkoutBranch(
+                  msg.repo,
+                  msg.branchName,
+                  null
+                );
+                if (checkoutStatus !== null) {
+                  status = `Branch '${msg.branchName}' was created, but checkout failed: ${checkoutStatus}`;
+                }
               }
+              this.sendMessage({ command: "createBranch", status });
+              break;
             }
-            this.sendMessage({ command: "createBranch", status });
-            break;
-          }
-          case "deleteBranch": {
-            const localStatus = await this.dataSource.deleteBranch(
-              msg.repo,
-              msg.branchName,
-              msg.forceDelete
-            );
-            this.sendMessage({
-              command: "deleteBranch",
-              status: localStatus
-            });
-            if (localStatus === null && msg.deleteOnRemotes.length > 0) {
-              await this.deleteRemoteBranches(msg.repo, msg.branchName, msg.deleteOnRemotes);
-            }
-            break;
-          }
-          case "deleteRemoteBranch":
-            this.sendMessage({
-              command: "deleteRemoteBranch",
-              status: await this.dataSource.deleteRemoteBranch(
-                msg.repo,
-                msg.remoteName,
-                msg.branchName
-              )
-            });
-            break;
-          case "deleteTag":
-            this.sendMessage({
-              command: "deleteTag",
-              status: await this.dataSource.deleteTag(msg.repo, msg.tagName)
-            });
-            break;
-          case "loadBranches": {
-            const branchData = await this.dataSource.getBranches(msg.repo, msg.showRemoteBranches);
-            const isRepo = branchData.error
-              ? await this.dataSource.isGitRepository(msg.repo)
-              : true;
-            this.sendMessage({
-              command: "loadBranches",
-              branches: branchData.branches,
-              head: branchData.head,
-              hard: msg.hard,
-              isRepo: isRepo
-            });
-            if (msg.repo !== this.currentRepo) {
-              this.currentRepo = msg.repo;
-              this.extensionState.setLastActiveRepo(msg.repo);
-              const watchRoots = await this.dataSource.getRepositoryStateWatchPaths(msg.repo);
-              this.repoFileWatcher.start(watchRoots);
-            }
-            break;
-          }
-          case "loadCommits":
-            this.sendMessage({
-              command: "loadCommits",
-              ...(await this.dataSource.getCommits(
-                msg.repo,
-                msg.branches,
-                normalizeCommitLoadCount(msg.maxCommits, MIN_COMMIT_LOAD_COUNT),
-                msg.showRemoteBranches,
-                msg.authors,
-                msg.commitOrdering
-              )),
-              hard: msg.hard
-            });
-            break;
-          case "loadRepos":
-            if (!msg.check || !(await this.repoManager.checkReposExist())) {
-              // If not required to check repos, or no changes were found when checking, respond with repos
-              this.respondLoadRepos(this.repoManager.getRepos());
-            }
-            break;
-          case "mergeBranch":
-            this.sendMessage({
-              command: "mergeBranch",
-              status: await this.dataSource.mergeBranch(
+            case "deleteBranch": {
+              const localStatus = await this.dataSource.deleteBranch(
                 msg.repo,
                 msg.branchName,
-                msg.createNewCommit,
-                msg.squash,
-                msg.noCommit
-              )
-            });
-            break;
-          case "mergeCommit":
-            this.sendMessage({
-              command: "mergeCommit",
-              status: await this.dataSource.mergeCommit(
+                msg.forceDelete
+              );
+              this.sendMessage({
+                command: "deleteBranch",
+                status: localStatus
+              });
+              if (localStatus === null && msg.deleteOnRemotes.length > 0) {
+                await this.deleteRemoteBranches(msg.repo, msg.branchName, msg.deleteOnRemotes);
+              }
+              break;
+            }
+            case "deleteRemoteBranch":
+              this.sendMessage({
+                command: "deleteRemoteBranch",
+                status: await this.dataSource.deleteRemoteBranch(
+                  msg.repo,
+                  msg.remoteName,
+                  msg.branchName
+                )
+              });
+              break;
+            case "deleteTag":
+              this.sendMessage({
+                command: "deleteTag",
+                status: await this.dataSource.deleteTag(msg.repo, msg.tagName)
+              });
+              break;
+            case "loadBranches": {
+              const branchData = await this.dataSource.getBranches(
                 msg.repo,
-                msg.commitHash,
-                msg.createNewCommit,
-                msg.squash,
-                msg.noCommit
-              )
-            });
-            break;
-          case "rebaseBranch":
-            this.sendMessage({
-              command: "rebaseBranch",
-              status: await this.dataSource.rebaseBranch(msg.repo, msg.branchName)
-            });
-            break;
-          case "pull":
-            this.sendMessage({
-              command: "pull",
-              status: await this.dataSource.pull(msg.repo)
-            });
-            break;
-          case "push":
-            this.sendMessage({
-              command: "push",
-              status: await this.dataSource.push(msg.repo)
-            });
-            break;
-          case "pushTag":
-            this.sendMessage({
-              command: "pushTag",
-              status: await this.dataSource.pushTag(msg.repo, msg.tagName)
-            });
-            break;
-          case "renameBranch":
-            this.sendMessage({
-              command: "renameBranch",
-              status: await this.dataSource.renameBranch(
+                msg.showRemoteBranches
+              );
+              const isRepo = branchData.error
+                ? await this.dataSource.isGitRepository(msg.repo)
+                : true;
+              this.sendMessage({
+                command: "loadBranches",
+                branches: branchData.branches,
+                head: branchData.head,
+                hard: msg.hard,
+                isRepo: isRepo
+              });
+              if (msg.repo !== this.currentRepo) {
+                this.currentRepo = msg.repo;
+                this.extensionState.setLastActiveRepo(msg.repo);
+                const watchRoots = await this.dataSource.getRepositoryStateWatchPaths(msg.repo);
+                this.repoFileWatcher.start(watchRoots);
+              }
+              break;
+            }
+            case "loadCommits":
+              this.sendMessage({
+                command: "loadCommits",
+                ...(await this.dataSource.getCommits(
+                  msg.repo,
+                  msg.branches,
+                  normalizeCommitLoadCount(msg.maxCommits, MIN_COMMIT_LOAD_COUNT),
+                  msg.showRemoteBranches,
+                  msg.authors,
+                  msg.commitOrdering
+                )),
+                hard: msg.hard
+              });
+              break;
+            case "loadRepos":
+              if (!msg.check || !(await this.repoManager.checkReposExist())) {
+                // If not required to check repos, or no changes were found when checking, respond with repos
+                this.respondLoadRepos(this.repoManager.getRepos());
+              }
+              break;
+            case "mergeBranch":
+              this.sendMessage({
+                command: "mergeBranch",
+                status: await this.dataSource.mergeBranch(
+                  msg.repo,
+                  msg.branchName,
+                  msg.createNewCommit,
+                  msg.squash,
+                  msg.noCommit
+                )
+              });
+              break;
+            case "mergeCommit":
+              this.sendMessage({
+                command: "mergeCommit",
+                status: await this.dataSource.mergeCommit(
+                  msg.repo,
+                  msg.commitHash,
+                  msg.createNewCommit,
+                  msg.squash,
+                  msg.noCommit
+                )
+              });
+              break;
+            case "rebaseBranch":
+              this.sendMessage({
+                command: "rebaseBranch",
+                status: await this.dataSource.rebaseBranch(msg.repo, msg.branchName)
+              });
+              break;
+            case "pull":
+              this.sendMessage({
+                command: "pull",
+                status: await this.dataSource.pull(msg.repo)
+              });
+              break;
+            case "push":
+              this.sendMessage({
+                command: "push",
+                status: await this.dataSource.push(msg.repo)
+              });
+              break;
+            case "pushTag":
+              this.sendMessage({
+                command: "pushTag",
+                status: await this.dataSource.pushTag(msg.repo, msg.tagName)
+              });
+              break;
+            case "renameBranch":
+              this.sendMessage({
+                command: "renameBranch",
+                status: await this.dataSource.renameBranch(
+                  msg.repo,
+                  msg.oldName,
+                  msg.newName,
+                  msg.updateUpstream
+                )
+              });
+              break;
+            case "resetToCommit":
+              this.sendMessage({
+                command: "resetToCommit",
+                status: await this.dataSource.resetToCommit(msg.repo, msg.commitHash, msg.resetMode)
+              });
+              break;
+            case "revertCommit":
+              this.sendMessage({
+                command: "revertCommit",
+                status: await this.dataSource.revertCommit(
+                  msg.repo,
+                  msg.commitHash,
+                  msg.parentIndex
+                )
+              });
+              break;
+            case "applyStash":
+              this.sendMessage({
+                command: "applyStash",
+                status: await this.dataSource.applyStash(msg.repo, msg.selector, msg.reinstateIndex)
+              });
+              break;
+            case "popStash":
+              this.sendMessage({
+                command: "popStash",
+                status: await this.dataSource.popStash(msg.repo, msg.selector, msg.reinstateIndex)
+              });
+              break;
+            case "dropStash":
+              this.sendMessage({
+                command: "dropStash",
+                status: await this.dataSource.dropStash(msg.repo, msg.selector)
+              });
+              break;
+            case "branchFromStash":
+              this.sendMessage({
+                command: "branchFromStash",
+                status: await this.dataSource.branchFromStash(
+                  msg.repo,
+                  msg.branchName,
+                  msg.selector
+                )
+              });
+              break;
+            case "pushStash":
+              this.sendMessage({
+                command: "pushStash",
+                status: await this.dataSource.pushStash(msg.repo, msg.message, msg.includeUntracked)
+              });
+              break;
+            case "resetUncommitted":
+              this.sendMessage({
+                command: "resetUncommitted",
+                status: await this.dataSource.resetUncommitted(msg.repo, msg.mode)
+              });
+              break;
+            case "cleanUntrackedFiles":
+              this.sendMessage({
+                command: "cleanUntrackedFiles",
+                status: await this.dataSource.cleanUntrackedFiles(msg.repo, msg.directories)
+              });
+              break;
+            case "createWorktree": {
+              const wtStatus = await this.dataSource.addWorktree(
                 msg.repo,
-                msg.oldName,
-                msg.newName,
-                msg.updateUpstream
-              )
-            });
-            break;
-          case "resetToCommit":
-            this.sendMessage({
-              command: "resetToCommit",
-              status: await this.dataSource.resetToCommit(msg.repo, msg.commitHash, msg.resetMode)
-            });
-            break;
-          case "revertCommit":
-            this.sendMessage({
-              command: "revertCommit",
-              status: await this.dataSource.revertCommit(msg.repo, msg.commitHash, msg.parentIndex)
-            });
-            break;
-          case "applyStash":
-            this.sendMessage({
-              command: "applyStash",
-              status: await this.dataSource.applyStash(msg.repo, msg.selector, msg.reinstateIndex)
-            });
-            break;
-          case "popStash":
-            this.sendMessage({
-              command: "popStash",
-              status: await this.dataSource.popStash(msg.repo, msg.selector, msg.reinstateIndex)
-            });
-            break;
-          case "dropStash":
-            this.sendMessage({
-              command: "dropStash",
-              status: await this.dataSource.dropStash(msg.repo, msg.selector)
-            });
-            break;
-          case "branchFromStash":
-            this.sendMessage({
-              command: "branchFromStash",
-              status: await this.dataSource.branchFromStash(msg.repo, msg.branchName, msg.selector)
-            });
-            break;
-          case "pushStash":
-            this.sendMessage({
-              command: "pushStash",
-              status: await this.dataSource.pushStash(msg.repo, msg.message, msg.includeUntracked)
-            });
-            break;
-          case "resetUncommitted":
-            this.sendMessage({
-              command: "resetUncommitted",
-              status: await this.dataSource.resetUncommitted(msg.repo, msg.mode)
-            });
-            break;
-          case "cleanUntrackedFiles":
-            this.sendMessage({
-              command: "cleanUntrackedFiles",
-              status: await this.dataSource.cleanUntrackedFiles(msg.repo, msg.directories)
-            });
-            break;
-          case "createWorktree": {
-            const wtStatus = await this.dataSource.addWorktree(
-              msg.repo,
-              msg.path,
-              msg.branchName,
-              msg.commitHash
-            );
-            if (wtStatus === null && msg.openTerminal) {
+                msg.path,
+                msg.branchName,
+                msg.commitHash
+              );
+              if (wtStatus === null && msg.openTerminal) {
+                const terminal = vscode.window.createTerminal({
+                  name: `Worktree: ${msg.branchName}`,
+                  cwd: path.resolve(msg.repo, msg.path)
+                });
+                terminal.show();
+              }
+              this.sendMessage({ command: "createWorktree", status: wtStatus });
+              break;
+            }
+            case "removeWorktree": {
+              const wtStatus = await this.dataSource.removeWorktree(msg.repo, msg.worktreePath);
+              if (wtStatus !== null) {
+                this.sendMessage({ command: "removeWorktree", status: wtStatus });
+              } else if (msg.deleteBranch === true) {
+                const branchStatus = await this.dataSource.deleteBranch(
+                  msg.repo,
+                  msg.branchName,
+                  false
+                );
+                this.sendMessage({ command: "removeWorktree", status: null, branchStatus });
+              } else {
+                this.sendMessage({ command: "removeWorktree", status: null });
+              }
+              break;
+            }
+            case "openTerminal": {
               const terminal = vscode.window.createTerminal({
-                name: `Worktree: ${msg.branchName}`,
+                name: msg.name,
                 cwd: path.resolve(msg.repo, msg.path)
               });
               terminal.show();
+              this.sendMessage({ command: "openTerminal" });
+              break;
             }
-            this.sendMessage({ command: "createWorktree", status: wtStatus });
-            break;
-          }
-          case "removeWorktree": {
-            const wtStatus = await this.dataSource.removeWorktree(msg.repo, msg.worktreePath);
-            if (wtStatus !== null) {
-              this.sendMessage({ command: "removeWorktree", status: wtStatus });
-            } else if (msg.deleteBranch === true) {
-              const branchStatus = await this.dataSource.deleteBranch(
+            case "openWorktreeInNewWindow":
+              try {
+                await vscode.commands.executeCommand(
+                  "vscode.openFolder",
+                  vscode.Uri.file(path.resolve(msg.repo, msg.path)),
+                  { forceNewWindow: true }
+                );
+                this.sendMessage({ command: "openWorktreeInNewWindow" });
+              } catch (error) {
+                this.sendMessage({
+                  command: "openWorktreeInNewWindow",
+                  status: error instanceof Error ? error.message : String(error)
+                });
+              }
+              break;
+            case "revealWorktreeInOS":
+              try {
+                await vscode.commands.executeCommand(
+                  "revealFileInOS",
+                  vscode.Uri.file(path.resolve(msg.repo, msg.path))
+                );
+                this.sendMessage({ command: "revealWorktreeInOS" });
+              } catch (error) {
+                this.sendMessage({
+                  command: "revealWorktreeInOS",
+                  status: error instanceof Error ? error.message : String(error)
+                });
+              }
+              break;
+            case "fetch":
+              this.sendMessage({
+                command: "fetch",
+                status: await this.dataSource.fetch(msg.repo)
+              });
+              break;
+            case "saveRepoState":
+              this.repoManager.setRepoState(msg.repo, msg.state);
+              break;
+            case "viewDiff":
+              this.sendMessage({
+                command: "viewDiff",
+                success: await this.viewDiff(
+                  msg.repo,
+                  msg.commitHash,
+                  msg.oldFilePath,
+                  msg.newFilePath,
+                  msg.type,
+                  msg.compareWithHash
+                )
+              });
+              break;
+            case "openFile": {
+              const viewColumn = getConfig().openNewTabEditorGroup();
+              const status = await openFile(
                 msg.repo,
-                msg.branchName,
-                false
-              );
-              this.sendMessage({ command: "removeWorktree", status: null, branchStatus });
-            } else {
-              this.sendMessage({ command: "removeWorktree", status: null });
-            }
-            break;
-          }
-          case "openTerminal": {
-            const terminal = vscode.window.createTerminal({
-              name: msg.name,
-              cwd: path.resolve(msg.repo, msg.path)
-            });
-            terminal.show();
-            this.sendMessage({ command: "openTerminal" });
-            break;
-          }
-          case "openWorktreeInNewWindow":
-            await vscode.commands.executeCommand(
-              "vscode.openFolder",
-              vscode.Uri.file(path.resolve(msg.repo, msg.path)),
-              { forceNewWindow: true }
-            );
-            this.sendMessage({ command: "openWorktreeInNewWindow" });
-            break;
-          case "revealWorktreeInOS":
-            await vscode.commands.executeCommand(
-              "revealFileInOS",
-              vscode.Uri.file(path.resolve(msg.repo, msg.path))
-            );
-            this.sendMessage({ command: "revealWorktreeInOS" });
-            break;
-          case "fetch":
-            this.sendMessage({
-              command: "fetch",
-              status: await this.dataSource.fetch(msg.repo)
-            });
-            break;
-          case "saveRepoState":
-            this.repoManager.setRepoState(msg.repo, msg.state);
-            break;
-          case "viewDiff":
-            this.sendMessage({
-              command: "viewDiff",
-              success: await this.viewDiff(
-                msg.repo,
+                msg.filePath,
                 msg.commitHash,
-                msg.oldFilePath,
-                msg.newFilePath,
-                msg.type,
-                msg.compareWithHash
-              )
-            });
-            break;
-          case "openFile": {
-            const viewColumn = getConfig().openNewTabEditorGroup();
-            const status = await openFile(
-              msg.repo,
-              msg.filePath,
-              msg.commitHash,
-              this.dataSource,
-              viewColumn
-            );
-            this.sendMessage({ command: "openFile", status });
-            break;
+                this.dataSource,
+                viewColumn
+              );
+              this.sendMessage({ command: "openFile", status });
+              break;
+            }
           }
+        } finally {
+          this.repoFileWatcher.unmute();
         }
-        this.repoFileWatcher.unmute();
       },
       null,
       this.disposables
