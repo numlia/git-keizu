@@ -59,8 +59,9 @@
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S42
 
 **テスト対象パス**: `web/main.ts`
 
@@ -76,8 +77,9 @@
 
 > Origin: Feature 011 (author-filter-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-05
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S42
 
 **シグネチャ**: `public loadCommits(commits, commitHead, moreAvailable, hard, authors?)`
 **テスト対象パス**: `web/main.ts`
@@ -111,8 +113,9 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S42
 
 **テスト対象パス**: `web/main.ts`
 

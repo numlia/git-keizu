@@ -8,6 +8,16 @@ const SECONDS_IN_WEEK = 604800;
 const SECONDS_IN_MONTH = 2629800;
 const SECONDS_IN_YEAR = 31557600;
 
+const RELATIVE_UNITS: { unit: string; seconds: number; max: number }[] = [
+  { unit: "second", seconds: 1, max: SECONDS_IN_MINUTE },
+  { unit: "minute", seconds: SECONDS_IN_MINUTE, max: SECONDS_IN_HOUR },
+  { unit: "hour", seconds: SECONDS_IN_HOUR, max: SECONDS_IN_DAY },
+  { unit: "day", seconds: SECONDS_IN_DAY, max: SECONDS_IN_WEEK },
+  { unit: "week", seconds: SECONDS_IN_WEEK, max: SECONDS_IN_MONTH },
+  { unit: "month", seconds: SECONDS_IN_MONTH, max: SECONDS_IN_YEAR },
+  { unit: "year", seconds: SECONDS_IN_YEAR, max: Number.POSITIVE_INFINITY }
+];
+
 export function getCommitDate(dateVal: number) {
   let date = new Date(dateVal * 1000),
     value;
@@ -22,31 +32,17 @@ export function getCommitDate(dateVal: number) {
       value = dateStr;
       break;
     case "Relative":
-      let diff = Math.round(new Date().getTime() / 1000) - dateVal,
-        unit;
-      if (diff < SECONDS_IN_MINUTE) {
-        unit = "second";
-      } else if (diff < SECONDS_IN_HOUR) {
-        unit = "minute";
-        diff /= SECONDS_IN_MINUTE;
-      } else if (diff < SECONDS_IN_DAY) {
-        unit = "hour";
-        diff /= SECONDS_IN_HOUR;
-      } else if (diff < SECONDS_IN_WEEK) {
-        unit = "day";
-        diff /= SECONDS_IN_DAY;
-      } else if (diff < SECONDS_IN_MONTH) {
-        unit = "week";
-        diff /= SECONDS_IN_WEEK;
-      } else if (diff < SECONDS_IN_YEAR) {
-        unit = "month";
-        diff /= SECONDS_IN_MONTH;
-      } else {
-        unit = "year";
-        diff /= SECONDS_IN_YEAR;
+      let diff = Math.round(new Date().getTime() / 1000) - dateVal;
+      let unitIndex = RELATIVE_UNITS.findIndex((u) => diff < u.max);
+      if (unitIndex === -1) unitIndex = RELATIVE_UNITS.length - 1;
+      let selectedUnit = RELATIVE_UNITS[unitIndex];
+      let count = Math.round(diff / selectedUnit.seconds);
+      let nextUnit = RELATIVE_UNITS[unitIndex + 1];
+      if (nextUnit !== undefined && count * selectedUnit.seconds >= nextUnit.seconds) {
+        selectedUnit = nextUnit;
+        count = 1;
       }
-      diff = Math.round(diff);
-      value = t(`date.relative.${unit}.${diff === 1 ? "one" : "other"}`, diff);
+      value = t(`date.relative.${selectedUnit.unit}.${count === 1 ? "one" : "other"}`, count);
       break;
     default:
       value = `${dateStr} ${timeStr}`;

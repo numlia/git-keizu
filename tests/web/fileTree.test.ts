@@ -2,7 +2,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { GitFileChange } from "../../src/types";
-import { generateGitFileListHtml } from "../../web/fileTree";
+import {
+  generateGitFileListHtml,
+  generateGitFileTree,
+  generateGitFileTreeHtml
+} from "../../web/fileTree";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
@@ -321,5 +325,245 @@ describe("generateGitFileListHtml", () => {
     // Then: exactly 3 action icons (A, M, R — not D)
     const actionIcons = fragment.querySelectorAll(".gitFileAction.openFile");
     expect(actionIcons).toHaveLength(3);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S3: generateGitFileTreeHtml HTML escaping (fileTree-test.md)        */
+/* ------------------------------------------------------------------ */
+
+function makeFolder(name: string, contents: GitFolderContents = {}): GitFolder {
+  return {
+    type: "folder",
+    name,
+    folderPath: "folder",
+    contents,
+    open: true
+  };
+}
+
+describe("generateGitFileTreeHtml", () => {
+  it("escapes angle brackets and slashes in a folder name (TC-017)", () => {
+    // Case: TC-017
+    // Given: an opened folder whose name is a script-injection payload
+    const folder = makeFolder("<script>alert(1)</script>");
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: the folder name is HTML-escaped and no raw <script> tag is emitted
+    expect(html).toContain(
+      '<span class="gitFolderName">&lt;script&gt;alert(1)&lt;&#x2F;script&gt;</span>'
+    );
+    expect(html).not.toContain("<script>");
+  });
+
+  it("escapes an ampersand in a folder name (TC-018)", () => {
+    // Case: TC-018
+    // Given: a folder name containing a raw ampersand
+    const folder = makeFolder("a&b");
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: the ampersand is escaped and the raw "a&b" is not present
+    expect(html).toContain('<span class="gitFolderName">a&amp;b</span>');
+    expect(html).not.toContain("a&b");
+  });
+
+  it("escapes double and single quotes in a folder name (TC-019)", () => {
+    // Case: TC-019
+    // Given: a folder name containing double and single quotes
+    const folder = makeFolder('say"hi" it\'s');
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: quotes are escaped and the raw quoted substrings are absent
+    expect(html).toContain('<span class="gitFolderName">say&quot;hi&quot; it&#x27;s</span>');
+    expect(html).not.toContain('say"hi"');
+    expect(html).not.toContain("it's");
+  });
+
+  it("escapes a forward slash in a folder name (TC-020)", () => {
+    // Case: TC-020
+    // Given: a folder name that contains a forward slash
+    const folder = makeFolder("a/b");
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: the slash is escaped to &#x2F; and the raw "a/b" is not present
+    expect(html).toContain('<span class="gitFolderName">a&#x2F;b</span>');
+    expect(html).not.toContain("a/b");
+  });
+
+  it("leaves a plain folder name unchanged (TC-021)", () => {
+    // Case: TC-021
+    // Given: a folder name with no special characters
+    const folder = makeFolder("src");
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: the name is rendered as-is with no HTML entities
+    expect(html).toContain('<span class="gitFolderName">src</span>');
+    expect(html).not.toContain("&amp;");
+    expect(html).not.toContain("&lt;");
+  });
+
+  it("renders no folder name span for the empty root folder (TC-022)", () => {
+    // Case: TC-022
+    // Given: the root folder with an empty name and no children
+    const folder = makeFolder("");
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: neither the gitFolder wrapper nor the gitFolderName span is rendered
+    expect(html).not.toContain('class="gitFolder"');
+    expect(html).not.toContain("gitFolderName");
+  });
+
+  it("escapes an XSS payload in a file basename (TC-023)", () => {
+    // Case: TC-023
+    // Given: a root folder containing a file whose basename is an <img> payload
+    const maliciousName = "<img src=x onerror=y>.ts";
+    const folder = makeFolder("", {
+      f: { type: "file", name: maliciousName, index: 0 }
+    });
+    const gitFiles = [
+      makeFile({ oldFilePath: maliciousName, newFilePath: maliciousName, type: "M" })
+    ];
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, gitFiles);
+
+    // Then: the display name is escaped and no raw <img tag is emitted
+    expect(html).toContain("&lt;img src=x onerror=y&gt;.ts");
+    expect(html).not.toContain("<img");
+  });
+
+  it("leaves a plain file basename unchanged (TC-024)", () => {
+    // Case: TC-024
+    // Given: a root folder containing a file with a plain basename
+    const folder = makeFolder("", {
+      f: { type: "file", name: "main.ts", index: 0 }
+    });
+    const gitFiles = [makeFile({ oldFilePath: "main.ts", newFilePath: "main.ts", type: "M" })];
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, gitFiles);
+
+    // Then: the basename is rendered as-is with no HTML entities
+    expect(html).toContain("main.ts");
+    expect(html).not.toContain("&lt;");
+    expect(html).not.toContain("&amp;");
+  });
+
+  it("escapes a nested child folder name through recursion (TC-025)", () => {
+    // Case: TC-025
+    // Given: a parent folder containing a child folder with a special-character name
+    const child = makeFolder("<b>&");
+    const folder = makeFolder("parent", { child });
+
+    // When: the tree HTML is generated
+    const html = generateGitFileTreeHtml(folder, []);
+
+    // Then: the recursively rendered child folder name is escaped
+    expect(html).toContain('<span class="gitFolderName">&lt;b&gt;&amp;</span>');
+    expect(html).not.toContain("<b>&");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S4: generateGitFileTree file→folder replacement (fileTree-test.md)  */
+/* ------------------------------------------------------------------ */
+
+function asFolder(node: GitFolderOrFile): GitFolder {
+  if (node.type !== "folder") {
+    throw new Error(`expected folder, got ${node.type}`);
+  }
+  return node;
+}
+
+describe("generateGitFileTree", () => {
+  it("creates a new folder node for an undefined intermediate segment (TC-026)", () => {
+    // Case: TC-026
+    // Given: a single file under a not-yet-seen folder
+    const files = [makeFile({ newFilePath: "a/b", oldFilePath: "a/b" })];
+
+    // When: the tree is generated
+    const tree = generateGitFileTree(files);
+
+    // Then: segment "a" is a new folder that the walk descends into
+    const a = asFolder(tree.contents["a"]);
+    expect(a.type).toBe("folder");
+    expect(a.contents["b"].type).toBe("file");
+  });
+
+  it("reuses an existing folder node for a shared segment (TC-027)", () => {
+    // Case: TC-027
+    // Given: two files sharing the intermediate folder "a"
+    const files = [
+      makeFile({ newFilePath: "a/b", oldFilePath: "a/b" }),
+      makeFile({ newFilePath: "a/c", oldFilePath: "a/c" })
+    ];
+
+    // When: the tree is generated
+    const tree = generateGitFileTree(files);
+
+    // Then: the existing folder is reused and both leaves are preserved
+    const a = asFolder(tree.contents["a"]);
+    expect(a.contents["b"].type).toBe("file");
+    expect(a.contents["c"].type).toBe("file");
+  });
+
+  it("replaces a same-named file node with a folder node (TC-028)", () => {
+    // Case: TC-028
+    // Given: first a file "foo", then a file "foo/bar" needing foo as a directory
+    const files = [
+      makeFile({ newFilePath: "foo", oldFilePath: "foo" }),
+      makeFile({ newFilePath: "foo/bar", oldFilePath: "foo/bar" })
+    ];
+
+    // When: the tree is generated
+    const tree = generateGitFileTree(files);
+
+    // Then: the "foo" file node is replaced by a folder node
+    expect(tree.contents["foo"].type).toBe("folder");
+  });
+
+  it("adds the leaf under the replaced folder (TC-029)", () => {
+    // Case: TC-029
+    // Given: the file→folder replacement scenario
+    const files = [
+      makeFile({ newFilePath: "foo", oldFilePath: "foo" }),
+      makeFile({ newFilePath: "foo/bar", oldFilePath: "foo/bar" })
+    ];
+
+    // When: the tree is generated
+    const tree = generateGitFileTree(files);
+
+    // Then: the leaf "bar" is registered under the replaced folder
+    const foo = asFolder(tree.contents["foo"]);
+    expect(foo.contents["bar"].type).toBe("file");
+  });
+
+  it("handles a name collision without throwing (TC-030)", () => {
+    // Case: TC-030
+    // Given: colliding entries foo (file) and foo/bar (file)
+    const files = [
+      makeFile({ newFilePath: "foo", oldFilePath: "foo" }),
+      makeFile({ newFilePath: "foo/bar", oldFilePath: "foo/bar" })
+    ];
+
+    // When / Then: generation completes without throwing
+    expect(() => generateGitFileTree(files)).not.toThrow();
+
+    // Then: foo is a folder that contains bar
+    const tree = generateGitFileTree(files);
+    const foo = asFolder(tree.contents["foo"]);
+    expect(foo.contents["bar"].type).toBe("file");
   });
 });

@@ -60,7 +60,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
-> Status: active
+> Status: superseded
+> Superseded By: S7
 > Supersedes: -
 
 **シグネチャ**: `(e: vscode.ConfigurationChangeEvent) => void`
@@ -105,3 +106,25 @@
 | Case ID | Input / Precondition                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                    | Notes |
 | ------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----- |
 | TC-020  | `activate` 実行前後のどちらでも `deactivate()` を 1 回以上呼ぶ | Normal - standard                                                          | `deactivate()` は `undefined` を返し、VS Code API や import 済み依存に対する追加呼び出しを行わない。複数回呼んでも例外は発生しない | L66   |
+
+## S7: activate 設定変更イベントのルーティング（独立 if 分解）
+
+> Origin: フェーズ3 修正 L6 (config-change-independent-if)
+> Added: 2026-07-04T04:29:24Z
+> Status: active
+> Supersedes: S4
+> Signature: `(e: vscode.ConfigurationChangeEvent) => void`
+> Target Path: `src/extension.ts:49-59`
+
+`showStatusBarItem` / `dateType` / `maxDepthOfRepoSearch` / `git.path` の設定変更ハンドラを `else if` 連鎖から独立した `if` 文の並びへ分解する修正。複数の設定キーが同一の変更イベントで同時に `affectsConfiguration` を満たす場合に、旧 `else if` 連鎖では先頭一致のハンドラのみ実行されていたが、独立 `if` により該当する全ハンドラが実行される。S4 の `else if` 排他前提（TC-018）を置き換える。
+
+| Case ID | Input / Precondition                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                    | Notes                 |
+| ------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| TC-024  | `e.affectsConfiguration("git-keizu.showStatusBarItem")` のみ `true`                          | Normal - single key statusBar                                              | `statusBarItem.refresh()` が1回呼ばれ、他3ハンドラは呼ばれない                                                                                     | L50-51                |
+| TC-025  | `e.affectsConfiguration("git-keizu.dateType")` のみ `true`                                   | Normal - single key dateType                                               | `dataSource.generateGitCommandFormats()` が1回呼ばれ、他3ハンドラは呼ばれない                                                                      | L52-53                |
+| TC-026  | `e.affectsConfiguration("git-keizu.maxDepthOfRepoSearch")` のみ `true`                       | Normal - single key maxDepth                                               | `repoManager.maxDepthOfRepoSearchChanged()` が1回呼ばれ、他3ハンドラは呼ばれない                                                                   | L54-55                |
+| TC-027  | `e.affectsConfiguration("git.path")` のみ `true`                                             | Normal - single key gitPath                                                | `dataSource.registerGitPath()` が1回呼ばれ、他3ハンドラは呼ばれない                                                                                | L56-57                |
+| TC-028  | 監視対象4キーすべてに対し `affectsConfiguration` が `false`                                  | Boundary - no matching key                                                 | 4ハンドラいずれも呼ばれず、副作用なしで終了する                                                                                                    | L50-57                |
+| TC-029  | `showStatusBarItem` と `dateType` の両方が `true`                                            | Boundary - overlapping configuration matches                               | 独立 `if` により `statusBarItem.refresh()` と `dataSource.generateGitCommandFormats()` が**両方**1回ずつ呼ばれる（旧 `else if` では refresh のみ） | L50-53。L6 の中核挙動 |
+| TC-030  | 監視対象4キーすべてが `true`                                                                 | Boundary - all keys match                                                  | `refresh()` / `generateGitCommandFormats()` / `maxDepthOfRepoSearchChanged()` / `registerGitPath()` の4ハンドラすべてが1回ずつ呼ばれる             | L50-57                |
+| TC-031  | `showStatusBarItem` が `true` で `statusBarItem.refresh` が `Error("refresh failed")` を送出 | Exception - handler failure propagates                                     | リスナが同じ `Error("refresh failed")` を送出し、後続の独立 `if`（`dateType` 等）は例外伝播により評価されない                                      | L50-51                |

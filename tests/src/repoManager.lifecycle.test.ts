@@ -391,3 +391,118 @@ describe("RepoManager lifecycle and public state flows", () => {
     });
   });
 });
+
+describe("RepoManager dispose clears pending event timers (S19)", () => {
+  beforeEach(() => {
+    resetRepoManagerTestEnvironment();
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  it("TC-105: clears a pending processCreateEventsTimeout on dispose", () => {
+    // Case: TC-105
+    const { manager } = createManager();
+    const internal = manager as RepoManagerWithPrivate;
+    const timerCallback = vi.fn();
+
+    // Given: a create-events debounce timer is pending
+    const timer = setTimeout(timerCallback, 10_000);
+    internal.processCreateEventsTimeout = timer;
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    // When: dispose is called
+    manager.dispose();
+
+    // Then: the pending timer is cleared, the field is nulled, and it never fires
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(timer);
+    expect(internal.processCreateEventsTimeout).toBeNull();
+    vi.advanceTimersByTime(10_000);
+    expect(timerCallback).not.toHaveBeenCalled();
+  });
+
+  it("TC-106: does not clear a create timer when none is pending", () => {
+    // Case: TC-106
+    const { manager } = createManager();
+    const internal = manager as RepoManagerWithPrivate;
+
+    // Given: both event timers are null
+    internal.processCreateEventsTimeout = null;
+    internal.processChangeEventsTimeout = null;
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    // When: dispose is called
+    expect(() => manager.dispose()).not.toThrow();
+
+    // Then: clearTimeout is not called for the event timers
+    expect(clearTimeoutSpy).not.toHaveBeenCalled();
+  });
+
+  it("TC-107: clears a pending processChangeEventsTimeout on dispose", () => {
+    // Case: TC-107
+    const { manager } = createManager();
+    const internal = manager as RepoManagerWithPrivate;
+    const timerCallback = vi.fn();
+
+    // Given: a change-events debounce timer is pending
+    const timer = setTimeout(timerCallback, 10_000);
+    internal.processChangeEventsTimeout = timer;
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    // When: dispose is called
+    manager.dispose();
+
+    // Then: the pending timer is cleared, the field is nulled, and it never fires
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(timer);
+    expect(internal.processChangeEventsTimeout).toBeNull();
+    vi.advanceTimersByTime(10_000);
+    expect(timerCallback).not.toHaveBeenCalled();
+  });
+
+  it("TC-108: does not clear a change timer when none is pending", () => {
+    // Case: TC-108
+    const { manager } = createManager();
+    const internal = manager as RepoManagerWithPrivate;
+
+    // Given: both event timers are null
+    internal.processCreateEventsTimeout = null;
+    internal.processChangeEventsTimeout = null;
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    // When: dispose is called
+    expect(() => manager.dispose()).not.toThrow();
+
+    // Then: clearTimeout is not called for the event timers
+    expect(clearTimeoutSpy).not.toHaveBeenCalled();
+  });
+
+  it("TC-109: clears both pending timers and neither fires after dispose", () => {
+    // Case: TC-109
+    const { manager } = createManager();
+    const internal = manager as RepoManagerWithPrivate;
+    const createCallback = vi.fn();
+    const changeCallback = vi.fn();
+
+    // Given: both create and change debounce timers are pending
+    const createTimer = setTimeout(createCallback, 10_000);
+    const changeTimer = setTimeout(changeCallback, 10_000);
+    internal.processCreateEventsTimeout = createTimer;
+    internal.processChangeEventsTimeout = changeTimer;
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    // When: dispose is called
+    manager.dispose();
+
+    // Then: both timers are cleared, nulled, and never fire
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(createTimer);
+    expect(clearTimeoutSpy).toHaveBeenCalledWith(changeTimer);
+    expect(internal.processCreateEventsTimeout).toBeNull();
+    expect(internal.processChangeEventsTimeout).toBeNull();
+    vi.advanceTimersByTime(10_000);
+    expect(createCallback).not.toHaveBeenCalled();
+    expect(changeCallback).not.toHaveBeenCalled();
+  });
+});

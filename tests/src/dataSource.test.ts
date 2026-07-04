@@ -28,6 +28,7 @@ import { type CommitOrdering, type GitStash, UNCOMMITTED_CHANGES_HASH } from "..
 
 const SEP = "XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb";
 const REPO = "/test/repo";
+const SPAWN_OPTS = { cwd: REPO, env: { ...process.env, LC_ALL: "C" } };
 
 type DataSourceWithPrivate = DataSource & {
   getStashes: (repo: string) => Promise<GitStash[]>;
@@ -646,9 +647,7 @@ describe("getCommitFile", () => {
 
     // Then: returns the file content and passes correct args to git
     expect(result).toBe(fileContent);
-    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "abc123def456:src/file.ts"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "abc123def456:src/file.ts"], SPAWN_OPTS);
   });
 
   it("returns file content for commit hash with ^ suffix (TC-014)", async () => {
@@ -661,9 +660,11 @@ describe("getCommitFile", () => {
 
     // Then: passes the ^ suffix through to git show
     expect(result).toBe(fileContent);
-    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "abc123def456^:src/file.ts"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["show", "abc123def456^:src/file.ts"],
+      SPAWN_OPTS
+    );
   });
 
   it("returns empty string for invalid commit hash (TC-015)", async () => {
@@ -717,9 +718,7 @@ describe("getCommitFile", () => {
 
     // Then: returns the file content and passes correct args to git
     expect(result).toBe(fileContent);
-    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "HEAD:src/file.ts"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "HEAD:src/file.ts"], SPAWN_OPTS);
   });
 
   it("returns file content for HEAD^ ref (TC-020)", async () => {
@@ -732,9 +731,7 @@ describe("getCommitFile", () => {
 
     // Then: returns the file content with HEAD^ passed through to git
     expect(result).toBe(fileContent);
-    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "HEAD^:src/file.ts"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "HEAD^:src/file.ts"], SPAWN_OPTS);
   });
 });
 
@@ -787,7 +784,7 @@ describe("stash commands", () => {
 
     // Then: spawn is called with ["stash", "apply", "stash@{0}"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "apply", "stash@{0}"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "apply", "stash@{0}"], SPAWN_OPTS);
   });
 
   it("applyStash passes --index flag when reinstateIndex is true (TC-022)", async () => {
@@ -799,9 +796,11 @@ describe("stash commands", () => {
 
     // Then: spawn is called with --index flag
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "apply", "--index", "stash@{0}"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["stash", "apply", "--index", "stash@{0}"],
+      SPAWN_OPTS
+    );
   });
 
   it("popStash passes correct args without --index (TC-023)", async () => {
@@ -813,7 +812,7 @@ describe("stash commands", () => {
 
     // Then: spawn is called with ["stash", "pop", "stash@{1}"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "pop", "stash@{1}"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "pop", "stash@{1}"], SPAWN_OPTS);
   });
 
   it("popStash passes --index flag when reinstateIndex is true (TC-024)", async () => {
@@ -825,9 +824,11 @@ describe("stash commands", () => {
 
     // Then: spawn is called with --index flag
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "pop", "--index", "stash@{1}"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["stash", "pop", "--index", "stash@{1}"],
+      SPAWN_OPTS
+    );
   });
 
   it("dropStash passes correct args (TC-025)", async () => {
@@ -839,7 +840,7 @@ describe("stash commands", () => {
 
     // Then: spawn is called with ["stash", "drop", "stash@{2}"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "drop", "stash@{2}"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "drop", "stash@{2}"], SPAWN_OPTS);
   });
 
   it("branchFromStash passes correct args (TC-026)", async () => {
@@ -851,9 +852,11 @@ describe("stash commands", () => {
 
     // Then: spawn is called with ["stash", "branch", "my-branch", "stash@{0}"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "branch", "my-branch", "stash@{0}"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["stash", "branch", "my-branch", "stash@{0}"],
+      SPAWN_OPTS
+    );
   });
 
   it("returns error message when applyStash encounters a conflict (TC-027)", async () => {
@@ -918,7 +921,7 @@ describe("uncommitted commands", () => {
     expect(spawnMock).toHaveBeenCalledWith(
       "git",
       ["stash", "push", "--message", "WIP message", "--include-untracked"],
-      { cwd: REPO }
+      SPAWN_OPTS
     );
   });
 
@@ -931,9 +934,11 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["stash", "push", "--message", "WIP message"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "push", "--message", "WIP message"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["stash", "push", "--message", "WIP message"],
+      SPAWN_OPTS
+    );
   });
 
   it("pushStash passes --include-untracked only when message is empty (TC-031)", async () => {
@@ -945,9 +950,11 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["stash", "push", "--include-untracked"] (no --message flag)
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "push", "--include-untracked"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["stash", "push", "--include-untracked"],
+      SPAWN_OPTS
+    );
   });
 
   it("pushStash passes minimal args when message is empty and includeUntracked is false (TC-032)", async () => {
@@ -959,7 +966,7 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["stash", "push"] only
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "push"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "push"], SPAWN_OPTS);
   });
 
   // --- resetUncommitted ---
@@ -973,7 +980,7 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["reset", "--mixed", "HEAD"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["reset", "--mixed", "HEAD"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["reset", "--mixed", "HEAD"], SPAWN_OPTS);
   });
 
   it("resetUncommitted passes correct args for hard mode (TC-034)", async () => {
@@ -985,7 +992,7 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["reset", "--hard", "HEAD"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["reset", "--hard", "HEAD"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["reset", "--hard", "HEAD"], SPAWN_OPTS);
   });
 
   it("resetUncommitted rejects soft mode (TC-035)", async () => {
@@ -1035,7 +1042,7 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["clean", "-f"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["clean", "-f"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["clean", "-f"], SPAWN_OPTS);
   });
 
   it("cleanUntrackedFiles passes -f -d when directories is true (TC-039)", async () => {
@@ -1047,7 +1054,7 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["clean", "-f", "-d"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["clean", "-f", "-d"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["clean", "-f", "-d"], SPAWN_OPTS);
   });
 
   // --- Error handling ---
@@ -1109,7 +1116,7 @@ describe("fetch command", () => {
 
     // Then: spawn is called with ["fetch", "--all", "--prune"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["fetch", "--all", "--prune"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["fetch", "--all", "--prune"], SPAWN_OPTS);
   });
 
   it("fetch returns null on success (TC-043)", async () => {
@@ -1178,163 +1185,140 @@ describe("getCommitComparison", () => {
     });
   }
 
-  it("returns file changes for two valid commit hashes (TC-046)", async () => {
-    // Given: Two valid commit hashes with modified and added files in diff output
-    const nameStatus = "M\tsrc/modified.ts\nA\tsrc/added.ts\n";
-    const numStat = "10\t5\tsrc/modified.ts\n20\t0\tsrc/added.ts\n";
+  // Case: TC-201
+  it("parses a single modified file from NUL-delimited diff output (TC-201)", async () => {
+    // Given: NUL-delimited name-status and numstat for one modified file
+    const nameStatus = "M\0src/a.ts\0";
+    const numStat = "3\t1\tsrc/a.ts\0";
     setupSpawnForComparison(nameStatus, numStat);
 
     // When: getCommitComparison is called with two valid hashes
     const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
 
-    // Then: Returns GitFileChange[] with correct oldFilePath, newFilePath, type, additions, deletions
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(2);
-    expect(result![0]).toEqual({
-      oldFilePath: "src/modified.ts",
-      newFilePath: "src/modified.ts",
-      type: "M",
-      additions: 10,
-      deletions: 5
-    });
-    expect(result![1]).toEqual({
-      oldFilePath: "src/added.ts",
-      newFilePath: "src/added.ts",
-      type: "A",
-      additions: 20,
-      deletions: 0
-    });
-    // Verify nameStatus and numStat are executed in parallel (2 spawn calls)
-    expect(spawnMock).toHaveBeenCalledTimes(2);
-  });
-
-  it("returns different oldFilePath and newFilePath for renamed files (TC-047)", async () => {
-    // Given: Diff contains a renamed file (R100 status with old and new paths)
-    const nameStatus = "R100\tsrc/old-name.ts\tsrc/new-name.ts\n";
-    const numStat = "8\t3\tsrc/{old-name.ts => new-name.ts}\n";
-    setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called
-    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
-
-    // Then: oldFilePath and newFilePath differ, type is "R", additions/deletions are parsed
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(1);
-    expect(result![0].oldFilePath).toBe("src/old-name.ts");
-    expect(result![0].newFilePath).toBe("src/new-name.ts");
-    expect(result![0].type).toBe("R");
-    expect(result![0].additions).toBe(8);
-    expect(result![0].deletions).toBe(3);
-  });
-
-  it("correctly classifies all change types A/M/D/R (TC-048)", async () => {
-    // Given: Diff contains all 4 change types (Added, Modified, Deleted, Renamed)
-    const nameStatus = [
-      "A\tsrc/added.ts",
-      "M\tsrc/modified.ts",
-      "D\tsrc/deleted.ts",
-      "R100\tsrc/old.ts\tsrc/renamed.ts",
-      ""
-    ].join("\n");
-    const numStat = [
-      "10\t0\tsrc/added.ts",
-      "5\t3\tsrc/modified.ts",
-      "0\t15\tsrc/deleted.ts",
-      "2\t1\tsrc/{old.ts => renamed.ts}",
-      ""
-    ].join("\n");
-    setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called
-    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
-
-    // Then: Each change type is correctly identified
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(4);
-    expect(result![0].type).toBe("A");
-    expect(result![1].type).toBe("M");
-    expect(result![2].type).toBe("D");
-    expect(result![3].type).toBe("R");
-  });
-
-  it("parses numStat additions and deletions as numbers (TC-049)", async () => {
-    // Given: numStat output with specific addition/deletion counts
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "42\t17\tsrc/file.ts\n";
-    setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called
-    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
-
-    // Then: additions and deletions are parsed as numbers (not strings)
-    expect(result).not.toBeNull();
-    expect(result![0].additions).toBe(42);
-    expect(result![0].deletions).toBe(17);
-  });
-
-  it("omits toHash from git args when toHash is empty string (TC-050)", async () => {
-    // Given: toHash is empty string (working tree comparison)
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "5\t2\tsrc/file.ts\n";
-    setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called with empty toHash
-    const result = await ds.getCommitComparison(REPO, "abc123def456", "");
-
-    // Then: git diff args end with fromHash only (toHash not appended)
-    expect(result).not.toBeNull();
+    // Then: the -z option is present and the file change is parsed via +2 / +1 cursors
+    expect(result).toEqual([
+      {
+        oldFilePath: "src/a.ts",
+        newFilePath: "src/a.ts",
+        type: "M",
+        additions: 3,
+        deletions: 1
+      }
+    ]);
     const nameStatusCall = spawnMock.mock.calls.find((call) =>
       (call[1] as string[]).includes("--name-status")
     );
-    expect(nameStatusCall).toBeDefined();
-    const args = nameStatusCall![1] as string[];
-    expect(args).toEqual([
-      "-c",
-      "core.quotePath=false",
-      "diff",
-      "--name-status",
-      "--find-renames",
-      "--diff-filter=AMDR",
-      "abc123def456"
+    expect((nameStatusCall![1] as string[]).includes("-z")).toBe(true);
+  });
+
+  // Case: TC-202
+  it("parses a rename as a NUL triple-token in name-status and numstat (TC-202)", async () => {
+    // Given: rename tokens R\0old\0new and numstat with an empty path field then old/new tokens
+    const nameStatus = "R\0old.ts\0new.ts\0";
+    const numStat = "2\t2\t\0old.ts\0new.ts\0";
+    setupSpawnForComparison(nameStatus, numStat);
+
+    // When: getCommitComparison is called
+    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
+
+    // Then: name-status advances +3 and numstat reads old/new via +3
+    expect(result).toEqual([
+      {
+        oldFilePath: "old.ts",
+        newFilePath: "new.ts",
+        type: "R",
+        additions: 2,
+        deletions: 2
+      }
     ]);
   });
 
-  it("uses toHash as diff base when fromHash is UNCOMMITTED_CHANGES_HASH (TC-051)", async () => {
-    // Given: fromHash is UNCOMMITTED_CHANGES_HASH ("*")
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "3\t1\tsrc/file.ts\n";
+  // Case: TC-203
+  it("classifies all change types A/M/D/R from NUL tokens (TC-203)", async () => {
+    // Given: one entry of each change type with matching numstat tokens
+    const nameStatus = "A\0a.ts\0M\0m.ts\0D\0d.ts\0R\0o.ts\0r.ts\0";
+    const numStat = "1\t0\ta.ts\0" + "2\t3\tm.ts\0" + "0\t5\td.ts\0" + "4\t4\t\0o.ts\0r.ts\0";
     setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called with UNCOMMITTED_CHANGES_HASH as fromHash
-    const result = await ds.getCommitComparison(REPO, UNCOMMITTED_CHANGES_HASH, "abc123def456");
-
-    // Then: toHash is used as the single diff base (comparing toHash against working tree)
-    expect(result).not.toBeNull();
-    const nameStatusCall = spawnMock.mock.calls.find((call) =>
-      (call[1] as string[]).includes("--name-status")
-    );
-    const args = nameStatusCall![1] as string[];
-    expect(args).toContain("abc123def456");
-    expect(args).not.toContain(UNCOMMITTED_CHANGES_HASH);
-    // toHash should be the only commit arg (no second commit = working tree comparison)
-    const diffIndex = args.indexOf("diff");
-    const commitArgs = args.slice(diffIndex + 1).filter((a) => !a.startsWith("-"));
-    expect(commitArgs).toEqual(["abc123def456"]);
-  });
-
-  it("returns empty array when no changes exist (TC-052)", async () => {
-    // Given: git diff returns empty output (identical commits or no changes)
-    setupSpawnForComparison("", "");
 
     // When: getCommitComparison is called
     const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
 
-    // Then: Returns empty array (not null)
-    expect(result).toEqual([]);
-    expect(result).not.toBeNull();
+    // Then: each type is classified and counts come from numstat
+    expect(result).toEqual([
+      { oldFilePath: "a.ts", newFilePath: "a.ts", type: "A", additions: 1, deletions: 0 },
+      { oldFilePath: "m.ts", newFilePath: "m.ts", type: "M", additions: 2, deletions: 3 },
+      { oldFilePath: "d.ts", newFilePath: "d.ts", type: "D", additions: 0, deletions: 5 },
+      { oldFilePath: "o.ts", newFilePath: "r.ts", type: "R", additions: 4, deletions: 4 }
+    ]);
   });
 
-  it("returns null when git spawn throws an exception (TC-053)", async () => {
+  // Case: TC-204
+  it("sets additions/deletions null for a non-numeric (binary) numstat row (TC-204)", async () => {
+    // Given: a binary file whose numstat counts are "-" (non-numeric)
+    const nameStatus = "M\0binary.png\0";
+    const numStat = "-\t-\tbinary.png\0";
+    setupSpawnForComparison(nameStatus, numStat);
+
+    // When: getCommitComparison is called
+    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
+
+    // Then: parseInt("-") is NaN so additions/deletions become null
+    expect(result).toEqual([
+      {
+        oldFilePath: "binary.png",
+        newFilePath: "binary.png",
+        type: "M",
+        additions: null,
+        deletions: null
+      }
+    ]);
+  });
+
+  // Case: TC-206
+  it("breaks the parse loop on an invalid name-status status char (TC-206)", async () => {
+    // Given: the first name-status token has a status char outside VALID_FILE_CHANGE_TYPES
+    const nameStatus = "X\0src/x.ts\0M\0src/after.ts\0";
+    const numStat = "";
+    setupSpawnForComparison(nameStatus, numStat);
+
+    // When: getCommitComparison is called
+    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
+
+    // Then: the cursor loop breaks immediately and no later entries are parsed
+    expect(result).toEqual([]);
+  });
+
+  // Case: TC-207
+  it("leaves additions/deletions null when numstat has no matching path (TC-207)", async () => {
+    // Given: two name-status entries but numstat references an unrelated file
+    const nameStatus = "M\0src/file1.ts\0A\0src/file2.ts\0";
+    const numStat = "10\t5\tsrc/unrelated.ts\0";
+    setupSpawnForComparison(nameStatus, numStat);
+
+    // When: getCommitComparison is called
+    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
+
+    // Then: entries come from name-status with null counts (numstat orphan is ignored)
+    expect(result).toEqual([
+      {
+        oldFilePath: "src/file1.ts",
+        newFilePath: "src/file1.ts",
+        type: "M",
+        additions: null,
+        deletions: null
+      },
+      {
+        oldFilePath: "src/file2.ts",
+        newFilePath: "src/file2.ts",
+        type: "A",
+        additions: null,
+        deletions: null
+      }
+    ]);
+  });
+
+  // Case: TC-209
+  it("returns null when git spawn throws an exception (TC-209)", async () => {
     // Given: cp.spawn throws synchronously (e.g., binary not found)
     spawnMock.mockImplementation(() => {
       throw new Error("spawn ENOENT");
@@ -1343,26 +1327,8 @@ describe("getCommitComparison", () => {
     // When: getCommitComparison is called
     const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
 
-    // Then: Returns null (caught by try-catch block)
+    // Then: null is returned (caught by the try-catch block)
     expect(result).toBeNull();
-  });
-
-  it("returns file changes with null additions/deletions when numStat has no matching entry (TC-054)", async () => {
-    // Given: nameStatus has 2 entries but numStat output references a different file
-    const nameStatus = "M\tsrc/file1.ts\nA\tsrc/file2.ts\n";
-    const numStat = "10\t5\tsrc/unrelated.ts\n";
-    setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called
-    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
-
-    // Then: File changes are returned but additions/deletions remain null (no numStat match)
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(2);
-    expect(result![0].additions).toBeNull();
-    expect(result![0].deletions).toBeNull();
-    expect(result![1].additions).toBeNull();
-    expect(result![1].deletions).toBeNull();
   });
 
   it("returns null for invalid fromHash (non-hex characters)", async () => {
@@ -1409,122 +1375,51 @@ describe("getCommitComparison", () => {
     });
   }
 
-  it("includes untracked files when fromHash is UNCOMMITTED_CHANGES_HASH (TC-055)", async () => {
-    // Given: fromHash is UNCOMMITTED_CHANGES_HASH, diff has 1 modified file, ls-files has 1 untracked file
-    const nameStatus = "M\tsrc/existing.ts\n";
-    const numStat = "5\t2\tsrc/existing.ts\n";
-    const untracked = "src/newfile.ts\n";
+  // Case: TC-205
+  it("runs ls-files and includes untracked files for a working-tree comparison (TC-205)", async () => {
+    // Given: toHash is empty (working tree) with one modified file and one untracked file
+    const nameStatus = "M\0src/a.ts\0";
+    const numStat = "3\t1\tsrc/a.ts\0";
+    const untracked = "src/new.ts\n";
     setupSpawnForComparisonWithUntracked(nameStatus, numStat, untracked);
 
-    // When: getCommitComparison is called with UNCOMMITTED_CHANGES_HASH
-    const result = await ds.getCommitComparison(REPO, UNCOMMITTED_CHANGES_HASH, "abc123def456");
-
-    // Then: result includes both the diff file and the untracked file
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(2);
-    expect(result![0]).toEqual({
-      oldFilePath: "src/existing.ts",
-      newFilePath: "src/existing.ts",
-      type: "M",
-      additions: 5,
-      deletions: 2
-    });
-    expect(result![1]).toEqual({
-      oldFilePath: "src/newfile.ts",
-      newFilePath: "src/newfile.ts",
-      type: "A",
-      additions: null,
-      deletions: null
-    });
-  });
-
-  it("includes untracked files when toHash is empty string (TC-056)", async () => {
-    // Given: toHash is empty string (working tree comparison), ls-files has untracked files
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "3\t1\tsrc/file.ts\n";
-    const untracked = "src/untracked.ts\n";
-    setupSpawnForComparisonWithUntracked(nameStatus, numStat, untracked);
-
-    // When: getCommitComparison is called with empty toHash
+    // When: getCommitComparison is called with an empty toHash
     const result = await ds.getCommitComparison(REPO, "abc123def456", "");
 
-    // Then: result includes both the diff file and the untracked file
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(2);
-    expect(result![1]).toEqual({
-      oldFilePath: "src/untracked.ts",
-      newFilePath: "src/untracked.ts",
-      type: "A",
-      additions: null,
-      deletions: null
-    });
+    // Then: 3 spawns run and the result includes the diff file plus the untracked file
+    expect(result).toEqual([
+      {
+        oldFilePath: "src/a.ts",
+        newFilePath: "src/a.ts",
+        type: "M",
+        additions: 3,
+        deletions: 1
+      },
+      {
+        oldFilePath: "src/new.ts",
+        newFilePath: "src/new.ts",
+        type: "A",
+        additions: null,
+        deletions: null
+      }
+    ]);
+    expect(spawnMock).toHaveBeenCalledTimes(3);
   });
 
-  it("does not run ls-files for two-commit comparison (TC-057)", async () => {
-    // Given: both fromHash and toHash are valid commit hashes
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "3\t1\tsrc/file.ts\n";
-    setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called with two valid hashes
-    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
-
-    // Then: only 2 spawn calls (nameStatus + numStat), no ls-files
-    expect(result).not.toBeNull();
-    expect(spawnMock).toHaveBeenCalledTimes(2);
-    const lsFilesCall = spawnMock.mock.calls.find((call) =>
-      (call[1] as string[]).includes("ls-files")
-    );
-    expect(lsFilesCall).toBeUndefined();
-  });
-
-  it("deduplicates untracked files already present in diff output (TC-058)", async () => {
-    // Given: working tree comparison, untracked file has same name as a file in diff output
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "3\t1\tsrc/file.ts\n";
+  // Case: TC-208
+  it("deduplicates an untracked file already present in the diff output (TC-208)", async () => {
+    // Given: working-tree comparison where an untracked file matches a diff newFilePath
+    const nameStatus = "M\0src/file.ts\0";
+    const numStat = "3\t1\tsrc/file.ts\0";
     const untracked = "src/file.ts\n";
     setupSpawnForComparisonWithUntracked(nameStatus, numStat, untracked);
 
     // When: getCommitComparison is called with UNCOMMITTED_CHANGES_HASH
     const result = await ds.getCommitComparison(REPO, UNCOMMITTED_CHANGES_HASH, "abc123def456");
 
-    // Then: file appears only once (fileLookup skips duplicate)
-    expect(result).not.toBeNull();
+    // Then: the file appears only once (fileLookup skips the duplicate)
     expect(result).toHaveLength(1);
     expect(result![0].type).toBe("M");
-  });
-
-  it("returns diff-only results when ls-files output is empty (TC-059)", async () => {
-    // Given: working tree comparison, ls-files returns empty output
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "3\t1\tsrc/file.ts\n";
-    const untracked = "";
-    setupSpawnForComparisonWithUntracked(nameStatus, numStat, untracked);
-
-    // When: getCommitComparison is called with UNCOMMITTED_CHANGES_HASH
-    const result = await ds.getCommitComparison(REPO, UNCOMMITTED_CHANGES_HASH, "abc123def456");
-
-    // Then: only diff result is returned, no extra entries
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(1);
-    expect(result![0].type).toBe("M");
-  });
-
-  it("skips empty lines in ls-files output (TC-060)", async () => {
-    // Given: working tree comparison, ls-files output has empty lines mixed in
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "3\t1\tsrc/file.ts\n";
-    const untracked = "src/new1.ts\n\nsrc/new2.ts\n";
-    setupSpawnForComparisonWithUntracked(nameStatus, numStat, untracked);
-
-    // When: getCommitComparison is called with UNCOMMITTED_CHANGES_HASH
-    const result = await ds.getCommitComparison(REPO, UNCOMMITTED_CHANGES_HASH, "abc123def456");
-
-    // Then: empty lines are skipped, only valid file paths are added
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(3);
-    expect(result![1].newFilePath).toBe("src/new1.ts");
-    expect(result![2].newFilePath).toBe("src/new2.ts");
   });
 });
 
@@ -1565,40 +1460,68 @@ describe("getUncommittedDetails", () => {
     });
   }
 
-  it("returns diff changes plus untracked files (TC-061)", async () => {
-    // Given: diff has 1 modified file, ls-files has 1 untracked file
-    const nameStatus = "M\tsrc/modified.ts\n";
-    const numStat = "10\t3\tsrc/modified.ts\n";
+  // Case: TC-210
+  it("parses NUL-delimited diff plus untracked files with 3 parallel spawns (TC-210)", async () => {
+    // Given: staged/unstaged change and an untracked file (name-status/numstat are NUL-delimited)
+    const nameStatus = "M\0src/modified.ts\0";
+    const numStat = "10\t3\tsrc/modified.ts\0";
     const untracked = "src/newfile.ts\n";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
     // When: getUncommittedDetails is called
     const result = await ds.getUncommittedDetails(REPO);
 
-    // Then: fileChanges contains both the diff file and untracked file
+    // Then: fileChanges holds the parsed diff file and the untracked file; 3 spawns ran
     expect(result).not.toBeNull();
     expect(result!.hash).toBe(UNCOMMITTED_CHANGES_HASH);
-    expect(result!.fileChanges).toHaveLength(2);
-    expect(result!.fileChanges[0]).toEqual({
-      oldFilePath: "src/modified.ts",
-      newFilePath: "src/modified.ts",
-      type: "M",
-      additions: 10,
-      deletions: 3
-    });
-    expect(result!.fileChanges[1]).toEqual({
-      oldFilePath: "src/newfile.ts",
-      newFilePath: "src/newfile.ts",
-      type: "A",
-      additions: null,
-      deletions: null
-    });
+    expect(result!.fileChanges).toEqual([
+      {
+        oldFilePath: "src/modified.ts",
+        newFilePath: "src/modified.ts",
+        type: "M",
+        additions: 10,
+        deletions: 3
+      },
+      {
+        oldFilePath: "src/newfile.ts",
+        newFilePath: "src/newfile.ts",
+        type: "A",
+        additions: null,
+        deletions: null
+      }
+    ]);
+    expect(spawnMock).toHaveBeenCalledTimes(3);
   });
 
-  it("returns diff changes only when no untracked files exist (TC-062)", async () => {
-    // Given: diff has changes but ls-files returns empty output
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "5\t2\tsrc/file.ts\n";
+  // Case: TC-211
+  it("parses a rename as a NUL triple-token in both name-status and numstat (TC-211)", async () => {
+    // Given: a renamed file, numstat rename form has an empty path field then old/new tokens
+    const nameStatus = "R\0a/old\0a/new\0";
+    const numStat = "5\t0\t\0a/old\0a/new\0";
+    const untracked = "";
+    setupSpawnForUncommitted(nameStatus, numStat, untracked);
+
+    // When: getUncommittedDetails is called
+    const result = await ds.getUncommittedDetails(REPO);
+
+    // Then: the rename entry carries distinct old/new paths and numstat counts
+    expect(result).not.toBeNull();
+    expect(result!.fileChanges).toEqual([
+      {
+        oldFilePath: "a/old",
+        newFilePath: "a/new",
+        type: "R",
+        additions: 5,
+        deletions: 0
+      }
+    ]);
+  });
+
+  // Case: TC-212
+  it("returns diff changes only when there are no untracked files (TC-212)", async () => {
+    // Given: NUL-delimited diff with no untracked files
+    const nameStatus = "M\0src/file.ts\0";
+    const numStat = "5\t2\tsrc/file.ts\0";
     const untracked = "";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
@@ -1607,74 +1530,95 @@ describe("getUncommittedDetails", () => {
 
     // Then: fileChanges contains only the diff file
     expect(result).not.toBeNull();
-    expect(result!.fileChanges).toHaveLength(1);
-    expect(result!.fileChanges[0].type).toBe("M");
+    expect(result!.fileChanges).toEqual([
+      {
+        oldFilePath: "src/file.ts",
+        newFilePath: "src/file.ts",
+        type: "M",
+        additions: 5,
+        deletions: 2
+      }
+    ]);
   });
 
-  it("returns only untracked files when diff output is empty (TC-063)", async () => {
-    // Given: no diff output, ls-files has 2 untracked files
-    const nameStatus = "";
-    const numStat = "";
-    const untracked = "src/new1.ts\nsrc/new2.ts\n";
+  // Case: TC-213
+  it("sets additions/deletions null for a binary rename with non-numeric numstat (TC-213)", async () => {
+    // Given: a binary rename whose numstat counts are "-" (non-numeric)
+    const nameStatus = "R\0old\0new\0";
+    const numStat = "-\t-\t\0old\0new\0";
+    const untracked = "";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
     // When: getUncommittedDetails is called
     const result = await ds.getUncommittedDetails(REPO);
 
-    // Then: fileChanges contains only untracked files with type "A" and null additions/deletions
+    // Then: the rename is read via +3 and additions/deletions are null (NaN -> null)
     expect(result).not.toBeNull();
-    expect(result!.fileChanges).toHaveLength(2);
-    expect(result!.fileChanges[0]).toEqual({
-      oldFilePath: "src/new1.ts",
-      newFilePath: "src/new1.ts",
-      type: "A",
-      additions: null,
-      deletions: null
-    });
-    expect(result!.fileChanges[1]).toEqual({
-      oldFilePath: "src/new2.ts",
-      newFilePath: "src/new2.ts",
-      type: "A",
-      additions: null,
-      deletions: null
-    });
+    expect(result!.fileChanges).toEqual([
+      {
+        oldFilePath: "old",
+        newFilePath: "new",
+        type: "R",
+        additions: null,
+        deletions: null
+      }
+    ]);
   });
 
-  it("deduplicates untracked files already present in diff output (TC-064)", async () => {
+  // Case: TC-214
+  it("deduplicates an untracked file already present in the diff output (TC-214)", async () => {
     // Given: diff has a file, ls-files also lists the same file
-    const nameStatus = "A\tsrc/file.ts\n";
-    const numStat = "10\t0\tsrc/file.ts\n";
+    const nameStatus = "A\0src/file.ts\0";
+    const numStat = "10\t0\tsrc/file.ts\0";
     const untracked = "src/file.ts\n";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
     // When: getUncommittedDetails is called
     const result = await ds.getUncommittedDetails(REPO);
 
-    // Then: file appears only once (fileLookup prevents duplicate)
+    // Then: the file appears only once (fileLookup prevents the duplicate)
     expect(result).not.toBeNull();
     expect(result!.fileChanges).toHaveLength(1);
     expect(result!.fileChanges[0].type).toBe("A");
     expect(result!.fileChanges[0].additions).toBe(10);
   });
 
-  it("skips empty lines in ls-files output (TC-065)", async () => {
-    // Given: ls-files output has empty lines mixed in
-    const nameStatus = "";
+  // Case: TC-215
+  it("breaks the parse loop on an invalid name-status status char (TC-215)", async () => {
+    // Given: the first name-status token has a status char outside VALID_FILE_CHANGE_TYPES
+    const nameStatus = "X\0foo\0";
     const numStat = "";
-    const untracked = "src/a.ts\n\nsrc/b.ts\n";
+    const untracked = "";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
     // When: getUncommittedDetails is called
     const result = await ds.getUncommittedDetails(REPO);
 
-    // Then: empty lines are skipped, only valid paths are added
+    // Then: the cursor loop breaks and no file changes are parsed
     expect(result).not.toBeNull();
-    expect(result!.fileChanges).toHaveLength(2);
-    expect(result!.fileChanges[0].newFilePath).toBe("src/a.ts");
-    expect(result!.fileChanges[1].newFilePath).toBe("src/b.ts");
+    expect(result!.fileChanges).toEqual([]);
   });
 
-  it("returns null when spawn throws an exception (TC-066)", async () => {
+  // Case: TC-216
+  it("skips empty tokens in ls-files output (TC-216)", async () => {
+    // Given: ls-files output contains an empty token between valid paths
+    const nameStatus = "M\0src/a.ts\0";
+    const numStat = "1\t0\tsrc/a.ts\0";
+    const untracked = "src/new1.ts\n\nsrc/new2.ts\n";
+    setupSpawnForUncommitted(nameStatus, numStat, untracked);
+
+    // When: getUncommittedDetails is called
+    const result = await ds.getUncommittedDetails(REPO);
+
+    // Then: the empty path is skipped, only valid untracked files are added
+    expect(result).not.toBeNull();
+    expect(result!.fileChanges).toHaveLength(3);
+    expect(result!.fileChanges[1].newFilePath).toBe("src/new1.ts");
+    expect(result!.fileChanges[2].newFilePath).toBe("src/new2.ts");
+  });
+
+  // Case: TC-217
+  it("returns null when spawn throws an exception (TC-217)", async () => {
     // Given: cp.spawn throws synchronously
     spawnMock.mockImplementation(() => {
       throw new Error("spawn ENOENT");
@@ -1683,29 +1627,8 @@ describe("getUncommittedDetails", () => {
     // When: getUncommittedDetails is called
     const result = await ds.getUncommittedDetails(REPO);
 
-    // Then: Returns null (caught by try-catch block)
+    // Then: null is returned (caught by the try-catch block)
     expect(result).toBeNull();
-  });
-
-  it("parses renamed files correctly in diff output (TC-067)", async () => {
-    // Given: diff has a renamed file with R status
-    const nameStatus = "R100\tsrc/old.ts\tsrc/new.ts\n";
-    const numStat = "2\t1\tsrc/{old.ts => new.ts}\n";
-    const untracked = "";
-    setupSpawnForUncommitted(nameStatus, numStat, untracked);
-
-    // When: getUncommittedDetails is called
-    const result = await ds.getUncommittedDetails(REPO);
-
-    // Then: GitCommitDetails is returned with correct hash and file change data
-    expect(result).not.toBeNull();
-    expect(result!.hash).toBe(UNCOMMITTED_CHANGES_HASH);
-    expect(result!.fileChanges).toHaveLength(1);
-    expect(result!.fileChanges[0].oldFilePath).toBe("src/old.ts");
-    expect(result!.fileChanges[0].newFilePath).toBe("src/new.ts");
-    expect(result!.fileChanges[0].type).toBe("R");
-    expect(result!.fileChanges[0].additions).toBe(2);
-    expect(result!.fileChanges[0].deletions).toBe(1);
   });
 });
 
@@ -1796,7 +1719,7 @@ describe("pull command", () => {
     const result = await ds.pull(REPO);
 
     // Then: spawn is called with ["pull"] and correct cwd
-    expect(spawnMock).toHaveBeenCalledWith("git", ["pull"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["pull"], SPAWN_OPTS);
     expect(result).toBeNull();
   });
 
@@ -1852,9 +1775,11 @@ describe("push command", () => {
     const result = await ds.push(REPO);
 
     // Then: spawn is called with --set-upstream args and correct cwd
-    expect(spawnMock).toHaveBeenCalledWith("git", ["push", "--set-upstream", "origin", "HEAD"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["push", "--set-upstream", "origin", "HEAD"],
+      SPAWN_OPTS
+    );
     expect(result).toBeNull();
   });
 
@@ -1928,9 +1853,11 @@ describe("deleteRemoteBranch", () => {
 
     // Then: spawn is called with correct args and returns null (success)
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["push", "origin", "--delete", "feature/x"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["push", "origin", "--delete", "feature/x"],
+      SPAWN_OPTS
+    );
   });
 
   it("returns error message when git push --delete fails (TC-079)", async () => {
@@ -1959,9 +1886,11 @@ describe("deleteRemoteBranch", () => {
 
     // Then: spawn is called with upstream as remote name and returns null
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["push", "upstream", "--delete", "fix/bug-123"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["push", "upstream", "--delete", "fix/bug-123"],
+      SPAWN_OPTS
+    );
   });
 });
 
@@ -1987,7 +1916,7 @@ describe("rebaseBranch", () => {
 
     // Then: spawn is called with correct args and returns null (success)
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["rebase", "main"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["rebase", "main"], SPAWN_OPTS);
   });
 
   it("returns error message with abort hint on conflict (TC-082)", async () => {
@@ -2489,7 +2418,7 @@ describe("getAuthors", () => {
     await ds.getAuthors(REPO);
 
     // Then: spawn is called with ["shortlog", "-s", "HEAD"] and correct cwd
-    expect(spawnMock).toHaveBeenCalledWith("git", ["shortlog", "-s", "HEAD"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["shortlog", "-s", "HEAD"], SPAWN_OPTS);
   });
 });
 
@@ -2770,7 +2699,7 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --no-ff <branch>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-ff"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-ff"], SPAWN_OPTS);
   });
 
   it("mergeBranch: createNewCommit=false, squash=false, noCommit=false → no flags (TC-111)", async () => {
@@ -2782,7 +2711,7 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge <branch> (no flags)
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH], SPAWN_OPTS);
   });
 
   it("mergeBranch: createNewCommit=true, squash=true → --squash overrides --no-ff (TC-112)", async () => {
@@ -2794,7 +2723,7 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --squash <branch> (no --no-ff)
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash"], SPAWN_OPTS);
   });
 
   it("mergeBranch: createNewCommit=false, squash=true → --squash only (TC-113)", async () => {
@@ -2806,7 +2735,7 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --squash <branch>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash"], SPAWN_OPTS);
   });
 
   it("mergeBranch: createNewCommit=true, noCommit=true → --no-ff --no-commit (TC-114)", async () => {
@@ -2818,9 +2747,11 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --no-ff --no-commit <branch>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-ff", "--no-commit"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["merge", BRANCH, "--no-ff", "--no-commit"],
+      SPAWN_OPTS
+    );
   });
 
   it("mergeBranch: createNewCommit=false, noCommit=true → --no-commit only (TC-115)", async () => {
@@ -2832,7 +2763,7 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --no-commit <branch>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-commit"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-commit"], SPAWN_OPTS);
   });
 
   it("mergeBranch: createNewCommit=true, squash=true, noCommit=true → --squash --no-commit (TC-116)", async () => {
@@ -2844,9 +2775,11 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --squash --no-commit <branch> (no --no-ff)
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash", "--no-commit"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["merge", BRANCH, "--squash", "--no-commit"],
+      SPAWN_OPTS
+    );
   });
 
   it("mergeBranch: squash=true, noCommit=true, createNewCommit=false → --squash --no-commit (TC-117)", async () => {
@@ -2858,9 +2791,11 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --squash --no-commit <branch>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash", "--no-commit"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["merge", BRANCH, "--squash", "--no-commit"],
+      SPAWN_OPTS
+    );
   });
 
   it("mergeCommit: invalid commit hash with squash=true returns error (TC-118)", async () => {
@@ -2899,7 +2834,7 @@ describe("cherrypickCommit recordOrigin/noCommit", () => {
 
     // Then: git cherry-pick <hash>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT], SPAWN_OPTS);
   });
 
   it("parentIndex=0, recordOrigin=true → -x flag (TC-120)", async () => {
@@ -2911,7 +2846,7 @@ describe("cherrypickCommit recordOrigin/noCommit", () => {
 
     // Then: git cherry-pick -x <hash>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT, "-x"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT, "-x"], SPAWN_OPTS);
   });
 
   it("parentIndex=0, noCommit=true → --no-commit flag (TC-121)", async () => {
@@ -2923,9 +2858,11 @@ describe("cherrypickCommit recordOrigin/noCommit", () => {
 
     // Then: git cherry-pick --no-commit <hash>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT, "--no-commit"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["cherry-pick", COMMIT, "--no-commit"],
+      SPAWN_OPTS
+    );
   });
 
   it("parentIndex=0, recordOrigin=true, noCommit=true → both flags (TC-122)", async () => {
@@ -2937,9 +2874,11 @@ describe("cherrypickCommit recordOrigin/noCommit", () => {
 
     // Then: git cherry-pick -x --no-commit <hash>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT, "-x", "--no-commit"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["cherry-pick", COMMIT, "-x", "--no-commit"],
+      SPAWN_OPTS
+    );
   });
 
   it("parentIndex=2, recordOrigin=true, noCommit=true → merge commit full flags (TC-123)", async () => {
@@ -2954,7 +2893,7 @@ describe("cherrypickCommit recordOrigin/noCommit", () => {
     expect(spawnMock).toHaveBeenCalledWith(
       "git",
       ["cherry-pick", COMMIT, "-m", "2", "-x", "--no-commit"],
-      { cwd: REPO }
+      SPAWN_OPTS
     );
   });
 
@@ -3147,9 +3086,7 @@ describe("getWorktrees", () => {
       main: { path: "/home/user/project", isMain: true },
       "feature/x": { path: "/home/user/project-feature", isMain: false }
     });
-    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "list", "--porcelain"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "list", "--porcelain"], SPAWN_OPTS);
   });
 
   it("returns empty map when spawnGit fails (TC-133)", async () => {
@@ -3234,10 +3171,13 @@ describe("getRepositoryStateWatchPaths", () => {
     // Then: One deduplicated absolute watch path is returned and both rev-parse commands are executed once
     expect(result).toEqual([`${REPO}/.git`]);
     expect(spawnMock).toHaveBeenCalledTimes(2);
-    expect(spawnMock).toHaveBeenNthCalledWith(1, "git", ["rev-parse", "--git-dir"], { cwd: REPO });
-    expect(spawnMock).toHaveBeenNthCalledWith(2, "git", ["rev-parse", "--git-common-dir"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenNthCalledWith(1, "git", ["rev-parse", "--git-dir"], SPAWN_OPTS);
+    expect(spawnMock).toHaveBeenNthCalledWith(
+      2,
+      "git",
+      ["rev-parse", "--git-common-dir"],
+      SPAWN_OPTS
+    );
   });
 
   it("returns both linked worktree git-dir and shared common-dir in call order (TC-151)", async () => {
@@ -3338,9 +3278,11 @@ describe("addWorktree", () => {
 
     // Then: spawn is called with correct args for existing branch
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "add", "/tmp/wt", "feature/x"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["worktree", "add", "/tmp/wt", "feature/x"],
+      SPAWN_OPTS
+    );
   });
 
   it('passes ["worktree", "add", "-b", branchName, path, commitHash] when commitHash is provided (TC-136)', async () => {
@@ -3355,7 +3297,7 @@ describe("addWorktree", () => {
     expect(spawnMock).toHaveBeenCalledWith(
       "git",
       ["worktree", "add", "-b", "new-branch", "/tmp/wt", "abc1234"],
-      { cwd: REPO }
+      SPAWN_OPTS
     );
   });
 
@@ -3429,7 +3371,7 @@ describe("removeWorktree", () => {
 
     // Then: spawn is called with correct args and null is returned
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "remove", "/tmp/wt"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "remove", "/tmp/wt"], SPAWN_OPTS);
   });
 
   it("returns error message when worktree has uncommitted changes (TC-141)", async () => {
@@ -3450,8 +3392,8 @@ describe("removeWorktree", () => {
   });
 });
 
-// S25: getNewPathOfRenamedFile() リネーム追跡
-describe("getNewPathOfRenamedFile", () => {
+// S27: getNewPathOfRenamedFile() リネーム追跡（pathspec 除去 + name-status カーソルパース）
+describe("getNewPathOfRenamedFile (S27)", () => {
   let ds: DataSource;
   const spawnMock = vi.mocked(cp.spawn);
   const VALID_HASH = "abc123def456";
@@ -3465,106 +3407,796 @@ describe("getNewPathOfRenamedFile", () => {
     vi.restoreAllMocks();
   });
 
-  // TC-142: リネームされたファイルの新パスを返す
-  it("returns new path when file was renamed (TC-142)", async () => {
-    // Given: git diff output indicating old.ts was renamed to new.ts (null-byte separated)
-    const diffOutput = `R100\0old.ts\0new.ts\0`;
-    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: diffOutput }));
+  it("returns the new path for a single matching rename record (TC-156)", async () => {
+    // Case: TC-156
+    // Given: name-status output with one R record whose old path matches
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({ stdout: "R100\0old.ts\0new.ts\0" })
+    );
 
-    // When: getNewPathOfRenamedFile is called with the old file path
+    // When: getNewPathOfRenamedFile is called for old.ts
     const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
 
-    // Then: the new file path is returned
+    // Then: the new path from fields[2] is returned
     expect(result).toBe("new.ts");
   });
 
-  // TC-143: リネームされていないファイルは null を返す
-  it("returns null when file was not renamed (TC-143)", async () => {
-    // Given: git diff output is empty (no renames detected)
+  it("invokes git diff with --name-status and no pathspec (TC-157)", async () => {
+    // Case: TC-157
+    // Given: valid inputs and empty git diff output
     spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "" }));
 
-    // When: getNewPathOfRenamedFile is called for an unchanged file
-    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "unchanged.ts");
+    // When: getNewPathOfRenamedFile is called
+    await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
+
+    // Then: spawn is called with name-status args and no trailing "--"/oldFilePath pathspec
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["diff", "--name-status", "--diff-filter=R", "--find-renames", "-z", VALID_HASH, "HEAD"],
+      SPAWN_OPTS
+    );
+    const passedArgs = spawnMock.mock.calls[0][1] as string[];
+    expect(passedArgs).not.toContain("--");
+    expect(passedArgs).not.toContain("old.ts");
+  });
+
+  it("advances the cursor past non-matching records to find a later match (TC-158)", async () => {
+    // Case: TC-158
+    // Given: two R records where only the second one matches oldFilePath
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({ stdout: "R100\0a.ts\0b.ts\0R100\0old.ts\0new.ts\0" })
+    );
+
+    // When: getNewPathOfRenamedFile is called for old.ts
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
+
+    // Then: the cursor advances past a.ts and returns the second record's new path
+    expect(result).toBe("new.ts");
+  });
+
+  it("returns null when no record's old path matches (TC-159)", async () => {
+    // Case: TC-159
+    // Given: an R record whose old path does not match oldFilePath
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({ stdout: "R100\0other.ts\0renamed.ts\0" })
+    );
+
+    // When: getNewPathOfRenamedFile is called for old.ts
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
+
+    // Then: the cursor reaches the end with no match and null is returned
+    expect(result).toBeNull();
+  });
+
+  it("returns null for empty git diff output (TC-160)", async () => {
+    // Case: TC-160
+    // Given: empty stdout so fields is [""] and the while condition is false
+    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "" }));
+
+    // When: getNewPathOfRenamedFile is called
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
 
     // Then: null is returned
     expect(result).toBeNull();
   });
 
-  // TC-144: 無効なコミットハッシュで null を返し、spawn は呼ばれない
-  it("returns null for invalid commit hash without spawning git (TC-144)", async () => {
-    // Given: an invalid commit hash (contains non-hex characters)
-    const invalidHash = "not-a-valid-hash!@#";
+  it("breaks and returns null on an unexpected status char (TC-161)", async () => {
+    // Case: TC-161
+    // Given: a status char "X" that is not in VALID_FILE_CHANGE_TYPES
+    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "X\0a.ts\0b.ts\0" }));
 
+    // When: getNewPathOfRenamedFile is called for a.ts
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "a.ts");
+
+    // Then: the loop breaks defensively and null is returned
+    expect(result).toBeNull();
+  });
+
+  it("returns null for an invalid commit hash without spawning git (TC-162)", async () => {
+    // Case: TC-162
+    // Given: a commit hash containing non-hex characters
     // When: getNewPathOfRenamedFile is called with the invalid hash
-    const result = await ds.getNewPathOfRenamedFile(REPO, invalidHash, "file.ts");
+    const result = await ds.getNewPathOfRenamedFile(REPO, "not-a-hex-hash", "old.ts");
 
-    // Then: null is returned and git is not invoked
+    // Then: null is returned and git is never invoked
     expect(result).toBeNull();
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  // TC-145: ".." を含むパスは null を返し、spawn は呼ばれない
-  it("returns null for path traversal attempt without spawning git (TC-145)", async () => {
-    // Given: a file path containing ".." (path traversal)
-    const traversalPath = "../etc/passwd";
-
+  it("returns null for a path-traversal old path without spawning git (TC-163)", async () => {
+    // Case: TC-163
+    // Given: an old file path containing a ".." segment
     // When: getNewPathOfRenamedFile is called with the traversal path
-    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, traversalPath);
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "../secret.ts");
 
-    // Then: null is returned and git is not invoked
+    // Then: null is returned and git is never invoked
     expect(result).toBeNull();
     expect(spawnMock).not.toHaveBeenCalled();
   });
 
-  // TC-146: git diff が非0 exit code で null を返す
-  it("returns null when git diff exits with non-zero code (TC-146)", async () => {
-    // Given: git diff command fails with exit code 128
+  it("returns null via error fallback when git diff exits non-zero (TC-164)", async () => {
+    // Case: TC-164
+    // Given: git diff exits with a non-zero code
     spawnMock.mockImplementation(() => createCommandMockProcess({ exitCode: 128 }));
 
     // When: getNewPathOfRenamedFile is called
-    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "file.ts");
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
 
-    // Then: null is returned (error fallback)
+    // Then: the spawnGit errorValue (null) is returned
     expect(result).toBeNull();
   });
 
-  // TC-147: spawn が error イベントを emit すると null を返す
-  it("returns null when spawn emits an error event (TC-147)", async () => {
-    // Given: spawn emits an error event
-    spawnMock.mockImplementation(() => createCommandMockProcess({ emitError: true }));
+  it("returns an empty string when the new path field is missing (TC-165)", async () => {
+    // Case: TC-165
+    // Given: a truncated R record missing the new-path field
+    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "R100\0old.ts\0" }));
 
-    // When: getNewPathOfRenamedFile is called
-    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "file.ts");
+    // When: getNewPathOfRenamedFile is called for the matching old path
+    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "old.ts");
 
-    // Then: null is returned (error fallback)
-    expect(result).toBeNull();
+    // Then: the missing field falls back to "" via getPathFromStr("" ?? "")
+    expect(result).toBe("");
+  });
+});
+
+function createChunkedMockProcess(
+  options: {
+    stdoutChunks?: (Buffer | string)[];
+    stderrChunks?: (Buffer | string)[];
+    exitCode?: number;
+    emitError?: boolean;
+  } = {}
+) {
+  const { stdoutChunks = [], stderrChunks = [], exitCode = 0, emitError = false } = options;
+  const stdoutEmitter = new EventEmitter();
+  const stderrEmitter = new EventEmitter();
+  const proc = new EventEmitter();
+  Object.assign(proc, { stdout: stdoutEmitter, stderr: stderrEmitter });
+
+  queueMicrotask(() => {
+    if (emitError) {
+      proc.emit("error", new Error("spawn error"));
+      return;
+    }
+    for (const chunk of stdoutChunks) {
+      stdoutEmitter.emit("data", chunk);
+    }
+    for (const chunk of stderrChunks) {
+      stderrEmitter.emit("data", chunk);
+    }
+    proc.emit("close", exitCode);
   });
 
-  // TC-148: git diff の stdout が空なら null を返す
-  it("returns null when git diff stdout is empty (TC-148)", async () => {
-    // Given: git diff returns empty stdout (no rename data)
-    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "" }));
+  return proc as unknown as cp.ChildProcess;
+}
 
-    // When: getNewPathOfRenamedFile is called
-    const result = await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "file.ts");
+// S28: runGitCommandSpawn() / spawnGit() 出力バッファの結合デコード
+describe("spawn output buffer concat decoding (S28)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+  const VALID_HASH = "abc123def456";
+  const REPLACEMENT_CHAR = "�";
 
-    // Then: null is returned
-    expect(result).toBeNull();
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
   });
 
-  // TC-149: 正しい git 引数で spawn が呼ばれることを検証
-  it("passes correct arguments to git diff (TC-149)", async () => {
-    // Given: valid inputs and a successful git diff
-    spawnMock.mockImplementation(() => createCommandMockProcess({ stdout: "" }));
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
-    // When: getNewPathOfRenamedFile is called
-    await ds.getNewPathOfRenamedFile(REPO, VALID_HASH, "file.ts");
-
-    // Then: spawn is called with the correct diff arguments
-    expect(spawnMock).toHaveBeenCalledWith(
-      "git",
-      ["diff", "--diff-filter=R", "--find-renames", "-z", VALID_HASH, "HEAD", "--", "file.ts"],
-      { cwd: REPO }
+  it("restores a multibyte char split across chunk boundaries in spawnGit (TC-166)", async () => {
+    // Case: TC-166
+    // Given: the UTF-8 bytes of "あ" (E3 81 82) emitted as [E3,81] then [82]
+    spawnMock.mockImplementation(() =>
+      createChunkedMockProcess({
+        stdoutChunks: [Buffer.from([0xe3, 0x81]), Buffer.from([0x82])]
+      })
     );
+
+    // When: getCommitFile drives spawnGit with an identity successValue
+    const result = await ds.getCommitFile(REPO, VALID_HASH, "file.ts");
+
+    // Then: Buffer.concat restores "あ" with no U+FFFD replacement char
+    expect(result).toBe("あ");
+    expect(result).not.toContain(REPLACEMENT_CHAR);
+  });
+
+  it("decodes a single ASCII chunk in spawnGit (TC-167)", async () => {
+    // Case: TC-167
+    // Given: ASCII "abc" emitted in a single data event
+    spawnMock.mockImplementation(() => createChunkedMockProcess({ stdoutChunks: ["abc"] }));
+
+    // When: getCommitFile drives spawnGit
+    const result = await ds.getCommitFile(REPO, VALID_HASH, "file.ts");
+
+    // Then: the identity successValue receives "abc"
+    expect(result).toBe("abc");
+  });
+
+  it("yields an empty string in spawnGit when no data events fire (TC-168)", async () => {
+    // Case: TC-168
+    // Given: exit 0 with no stdout data events
+    spawnMock.mockImplementation(() => createChunkedMockProcess({ stdoutChunks: [] }));
+
+    // When: getCommitFile drives spawnGit
+    const result = await ds.getCommitFile(REPO, VALID_HASH, "file.ts");
+
+    // Then: Buffer.concat([]) decodes to "" and successValue receives ""
+    expect(result).toBe("");
+  });
+
+  it("resolves errorValue and skips successValue on non-zero exit in spawnGit (TC-169)", async () => {
+    // Case: TC-169
+    // Given: stdout "abc" is emitted but the process exits with code 1
+    spawnMock.mockImplementation(() =>
+      createChunkedMockProcess({ stdoutChunks: ["abc"], exitCode: 1 })
+    );
+
+    // When: getCommitFile drives spawnGit
+    const result = await ds.getCommitFile(REPO, VALID_HASH, "file.ts");
+
+    // Then: the errorValue "" is returned, proving successValue was not applied to "abc"
+    expect(result).toBe("");
+  });
+
+  it("restores multibyte stdout across chunks in runGitCommandSpawn error path (TC-170)", async () => {
+    // Case: TC-170
+    // Given: non-zero exit with "あ\n" (E3 81 82 0A) split as [E3,81] then [82,0A]
+    spawnMock.mockImplementation(() =>
+      createChunkedMockProcess({
+        stdoutChunks: [Buffer.from([0xe3, 0x81]), Buffer.from([0x82, 0x0a])],
+        exitCode: 1
+      })
+    );
+
+    // When: fetch drives runGitCommandSpawn
+    const result = await ds.fetch(REPO);
+
+    // Then: the concat-decoded stdout minus the trailing line resolves as "あ" without U+FFFD
+    expect(result).toBe("あ");
+    expect(result).not.toContain(REPLACEMENT_CHAR);
+  });
+
+  it("falls back to concat-decoded stderr when stdout is empty in runGitCommandSpawn (TC-171)", async () => {
+    // Case: TC-171
+    // Given: non-zero exit, empty stdout, and stderr "err\n" split across two chunks
+    spawnMock.mockImplementation(() =>
+      createChunkedMockProcess({ stderrChunks: ["er", "r\n"], exitCode: 1 })
+    );
+
+    // When: fetch drives runGitCommandSpawn
+    const result = await ds.fetch(REPO);
+
+    // Then: the stderr-derived "err" is resolved because stdout is empty
+    expect(result).toBe("err");
+  });
+
+  it("resolves null on a successful exit in runGitCommandSpawn (TC-172)", async () => {
+    // Case: TC-172
+    // Given: the process exits with code 0
+    spawnMock.mockImplementation(() => createChunkedMockProcess({ exitCode: 0 }));
+
+    // When: fetch drives runGitCommandSpawn
+    const result = await ds.fetch(REPO);
+
+    // Then: null is resolved (success)
+    expect(result).toBeNull();
+  });
+});
+
+describe("getGitLog --author regex meta character escaping (S29)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function getLogAuthorArgs(): string[] {
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    return logCall![1] as string[];
+  }
+
+  it("escapes bracket meta characters in a bot author (TC-173)", async () => {
+    // Case: TC-173
+    // Given: authors contains a bracketed bot name
+    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+
+    // When: getCommits is called with authors=["dependabot[bot]"]
+    await ds.getCommits(REPO, [], 10, false, ["dependabot[bot]"], "date");
+
+    // Then: git log args include --author with [ and ] backslash-escaped
+    expect(getLogAuthorArgs()).toContain("--author=dependabot\\[bot\\]");
+  });
+
+  it("leaves an author without meta characters unchanged (TC-174)", async () => {
+    // Case: TC-174
+    // Given: authors contains only apostrophe and space (outside the meta set)
+    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+
+    // When: getCommits is called with authors=["Jane O'Brien"]
+    await ds.getCommits(REPO, [], 10, false, ["Jane O'Brien"], "date");
+
+    // Then: git log args include the exact --author string
+    expect(getLogAuthorArgs()).toContain("--author=Jane O'Brien");
+  });
+
+  it("escapes dot and star meta characters (TC-175)", async () => {
+    // Case: TC-175
+    // Given: authors contains a dot and star
+    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+
+    // When: getCommits is called with authors=["a.b*c"]
+    await ds.getCommits(REPO, [], 10, false, ["a.b*c"], "date");
+
+    // Then: . and * are backslash-escaped
+    expect(getLogAuthorArgs()).toContain("--author=a\\.b\\*c");
+  });
+
+  it("doubles a backslash in the author (TC-176)", async () => {
+    // Case: TC-176
+    // Given: authors contains a single backslash
+    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+
+    // When: getCommits is called with authors=["a\\b"]
+    await ds.getCommits(REPO, [], 10, false, ["a\\b"], "date");
+
+    // Then: the backslash is doubled to \\
+    expect(getLogAuthorArgs()).toContain("--author=a\\\\b");
+  });
+
+  it("passes an empty author as --author= without throwing (TC-177)", async () => {
+    // Case: TC-177
+    // Given: authors contains an empty string
+    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+
+    // When: getCommits is called with authors=[""]
+    await ds.getCommits(REPO, [], 10, false, [""], "date");
+
+    // Then: git log args include --author= (empty value) with no meta replacement
+    expect(getLogAuthorArgs()).toContain("--author=");
+  });
+
+  it("escapes group and alternation meta characters (TC-178)", async () => {
+    // Case: TC-178
+    // Given: authors contains parentheses and a pipe
+    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+
+    // When: getCommits is called with authors=["(a|b)"]
+    await ds.getCommits(REPO, [], 10, false, ["(a|b)"], "date");
+
+    // Then: (, ) and | are backslash-escaped
+    expect(getLogAuthorArgs()).toContain("--author=\\(a\\|b\\)");
+  });
+});
+
+describe("getBranches detached HEAD pseudo-branch detection (S30)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function setupBranchOutput(output: string) {
+    spawnMock.mockImplementation(() => createMockProcess(output));
+  }
+
+  it("skips a 'detached at <hash>' pseudo-branch line (TC-179)", async () => {
+    // Case: TC-179
+    // Given: git branch output has a detached-at line and a real branch
+    setupBranchOutput("* (HEAD detached at 1a2b3c4)\n  main\n");
+
+    // When: getBranches parses the output
+    const result = await ds.getBranches(REPO, false);
+
+    // Then: the detached line is not added; only main remains
+    expect(result).toEqual({ branches: ["main"], head: null, error: false });
+  });
+
+  it("skips a 'detached from <ref>' pseudo-branch line (TC-180)", async () => {
+    // Case: TC-180
+    // Given: git branch output uses the "from" detached variant
+    setupBranchOutput("* (HEAD detached from origin/main)\n  main\n");
+
+    // When: getBranches parses the output
+    const result = await ds.getBranches(REPO, false);
+
+    // Then: the detached-from line is skipped; only main remains
+    expect(result).toEqual({ branches: ["main"], head: null, error: false });
+  });
+
+  it("skips a detached line whose ref contains non-alphanumeric chars (TC-181)", async () => {
+    // Case: TC-181
+    // Given: the detached ref contains . and -
+    setupBranchOutput("* (HEAD detached at v1.0-rc.1)\n  main\n");
+
+    // When: getBranches parses the output
+    const result = await ds.getBranches(REPO, false);
+
+    // Then: .+ matches the ref so the line is skipped
+    expect(result).toEqual({ branches: ["main"], head: null, error: false });
+  });
+
+  it("retains a normal branch name (TC-182)", async () => {
+    // Case: TC-182
+    // Given: git branch output has only a normal branch
+    setupBranchOutput("  main\n");
+
+    // When: getBranches parses the output
+    const result = await ds.getBranches(REPO, false);
+
+    // Then: main is added to branches
+    expect(result).toEqual({ branches: ["main"], head: null, error: false });
+  });
+
+  it("does not over-match a real branch containing the detached phrase (TC-183)", async () => {
+    // Case: TC-183
+    // Given: a real branch name embeds the detached phrase but does not start with (
+    setupBranchOutput("  feature/(HEAD detached at x)\n");
+
+    // When: getBranches parses the output
+    const result = await ds.getBranches(REPO, false);
+
+    // Then: the ^ anchor prevents a match, so the branch is retained
+    expect(result).toEqual({
+      branches: ["feature/(HEAD detached at x)"],
+      head: null,
+      error: false
+    });
+  });
+});
+
+describe("spawn options locale env LC_ALL=C (S31)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+  let originalPath: string | undefined;
+  let originalLcAll: string | undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+    originalPath = process.env.PATH;
+    originalLcAll = process.env.LC_ALL;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (originalPath === undefined) {
+      delete process.env.PATH;
+    } else {
+      process.env.PATH = originalPath;
+    }
+    if (originalLcAll === undefined) {
+      delete process.env.LC_ALL;
+    } else {
+      process.env.LC_ALL = originalLcAll;
+    }
+  });
+
+  it("passes LC_ALL=C env to runGitCommandSpawn spawn (TC-184)", async () => {
+    // Case: TC-184
+    // Given: pull drives runGitCommandSpawn
+    spawnMock.mockImplementation(() => createMockProcess("", 0));
+
+    // When: pull is called for the repo
+    await ds.pull(REPO);
+
+    // Then: cp.spawn is called with cwd=repo and env.LC_ALL="C"
+    expect(spawnMock).toHaveBeenCalledWith("git", ["pull"], {
+      cwd: REPO,
+      env: expect.objectContaining({ LC_ALL: "C" })
+    });
+  });
+
+  it("passes LC_ALL=C env to spawnGit spawn (TC-185)", async () => {
+    // Case: TC-185
+    // Given: getBranches drives spawnGit
+    spawnMock.mockImplementation(() => createMockProcess("  main\n"));
+
+    // When: getBranches is called for the repo
+    await ds.getBranches(REPO, false);
+
+    // Then: the branch spawn options carry cwd=repo and env.LC_ALL="C"
+    const branchCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "branch");
+    expect(branchCall).toBeDefined();
+    const opts = branchCall![2] as { cwd: string; env: NodeJS.ProcessEnv };
+    expect(opts.cwd).toBe(REPO);
+    expect(opts.env.LC_ALL).toBe("C");
+  });
+
+  it("preserves existing env variables alongside LC_ALL (TC-186)", async () => {
+    // Case: TC-186
+    // Given: PATH is set before spawning
+    process.env.PATH = "/usr/bin";
+    spawnMock.mockImplementation(() => createMockProcess("  main\n"));
+
+    // When: getBranches drives spawnGit
+    await ds.getBranches(REPO, false);
+
+    // Then: env.PATH is preserved and env.LC_ALL is "C"
+    const branchCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "branch");
+    expect(branchCall).toBeDefined();
+    const opts = branchCall![2] as { cwd: string; env: NodeJS.ProcessEnv };
+    expect(opts.env.PATH).toBe("/usr/bin");
+    expect(opts.env.LC_ALL).toBe("C");
+  });
+
+  it("overrides an inherited LC_ALL with C (TC-187)", async () => {
+    // Case: TC-187
+    // Given: LC_ALL is pre-set to a non-C locale
+    process.env.LC_ALL = "ja_JP.UTF-8";
+    spawnMock.mockImplementation(() => createMockProcess("  main\n"));
+
+    // When: getBranches drives spawnGit
+    await ds.getBranches(REPO, false);
+
+    // Then: env.LC_ALL is overridden to "C" (not the inherited value)
+    const branchCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "branch");
+    expect(branchCall).toBeDefined();
+    const opts = branchCall![2] as { cwd: string; env: NodeJS.ProcessEnv };
+    expect(opts.env.LC_ALL).toBe("C");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S32: spawnGit() stderr stream drain                                */
+/* ------------------------------------------------------------------ */
+
+describe("spawnGit stderr drain", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function createDrainMockProcess(options: {
+    stdout?: string;
+    stderrChunks?: string[];
+    exitCode?: number;
+  }): { proc: cp.ChildProcess; stderrEmitter: EventEmitter } {
+    const stdoutEmitter = new EventEmitter();
+    const stderrEmitter = new EventEmitter();
+    const proc = new EventEmitter();
+    Object.assign(proc, { stdout: stdoutEmitter, stderr: stderrEmitter });
+
+    queueMicrotask(() => {
+      for (const chunk of options.stderrChunks ?? []) {
+        stderrEmitter.emit("data", chunk);
+      }
+      if (options.stdout) stdoutEmitter.emit("data", options.stdout);
+      proc.emit("close", options.exitCode ?? 0);
+    });
+
+    return { proc: proc as unknown as cp.ChildProcess, stderrEmitter };
+  }
+
+  // Case: TC-188
+  it("registers exactly one data listener on the stderr stream (TC-188)", async () => {
+    // Given: a spawned process whose stderr emitter is observable
+    const handle = createDrainMockProcess({ stdout: "abc123\n", exitCode: 0 });
+    spawnMock.mockReturnValue(handle.proc);
+
+    // When: a spawnGit-backed method runs to completion
+    await ds.resolveRefToHash(REPO, "HEAD");
+
+    // Then: spawnGit registered a single "data" listener that drains stderr
+    expect(handle.stderrEmitter.listenerCount("data")).toBe(1);
+  });
+
+  // Case: TC-189
+  it("resolves without hanging when large stderr is emitted before close (TC-189)", async () => {
+    // Given: several large stderr chunks emitted before a successful close(0)
+    const largeChunk = "x".repeat(100_000);
+    const handle = createDrainMockProcess({
+      stdout: "abc123\n",
+      stderrChunks: [largeChunk, largeChunk, largeChunk],
+      exitCode: 0
+    });
+    spawnMock.mockReturnValue(handle.proc);
+
+    // When: the spawnGit-backed method runs
+    const result = await ds.resolveRefToHash(REPO, "HEAD");
+
+    // Then: the promise resolves with the stdout-derived value (stderr did not stall it)
+    expect(result).toBe("abc123");
+  });
+
+  // Case: TC-190
+  it("uses stdout for the success value and ignores drained stderr (TC-190)", async () => {
+    // Given: both stderr and stdout are emitted before a successful close(0)
+    const handle = createDrainMockProcess({
+      stdout: "def4567\n",
+      stderrChunks: ["warning: some noise\n"],
+      exitCode: 0
+    });
+    spawnMock.mockReturnValue(handle.proc);
+
+    // When: the spawnGit-backed method runs
+    const result = await ds.resolveRefToHash(REPO, "HEAD");
+
+    // Then: the resolved value derives from stdout only, not from stderr
+    expect(result).toBe("def4567");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S33: runGitCommandSpawn() conditional trailing-line removal        */
+/* ------------------------------------------------------------------ */
+
+describe("runGitCommandSpawn trailing line handling", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Case: TC-191
+  it("pops only the trailing empty line when output ends with a newline (TC-191)", async () => {
+    // Given: a non-zero exit whose stdout ends with a trailing newline
+    spawnMock.mockReturnValue(createCommandMockProcess({ stdout: "error line\n", exitCode: 1 }));
+
+    // When: a runGitCommandSpawn-backed command runs
+    const result = await ds.deleteTag(REPO, "v1");
+
+    // Then: the resolved string drops only the trailing empty line
+    expect(result).toBe("error line");
+  });
+
+  // Case: TC-192
+  it("preserves the last line when output has no trailing newline (TC-192)", async () => {
+    // Given: a non-zero exit whose stdout has no trailing newline
+    spawnMock.mockReturnValue(
+      createCommandMockProcess({ stdout: "fatal: bad revision", exitCode: 1 })
+    );
+
+    // When: a runGitCommandSpawn-backed command runs
+    const result = await ds.deleteTag(REPO, "v1");
+
+    // Then: the whole message is preserved (old unconditional slice dropped it)
+    expect(result).toBe("fatal: bad revision");
+  });
+
+  // Case: TC-193
+  it("keeps intermediate lines while removing only the trailing empty one (TC-193)", async () => {
+    // Given: a non-zero exit with multiple lines and a trailing newline
+    spawnMock.mockReturnValue(createCommandMockProcess({ stdout: "line1\nline2\n", exitCode: 1 }));
+
+    // When: a runGitCommandSpawn-backed command runs
+    const result = await ds.deleteTag(REPO, "v1");
+
+    // Then: intermediate lines are kept and only the trailing empty line is removed
+    expect(result).toBe("line1\nline2");
+  });
+
+  // Case: TC-194
+  it("resolves to an empty string when both stdout and stderr are empty (TC-194)", async () => {
+    // Given: a non-zero exit with empty stdout and empty stderr
+    spawnMock.mockReturnValue(createCommandMockProcess({ stdout: "", stderr: "", exitCode: 1 }));
+
+    // When: a runGitCommandSpawn-backed command runs
+    const result = await ds.deleteTag(REPO, "v1");
+
+    // Then: split yields [""], the empty element is popped, and the join is ""
+    expect(result).toBe("");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S34: addTag()/createBranch() leading-hyphen ref name rejection     */
+/* ------------------------------------------------------------------ */
+
+describe("ref name option-injection guard", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+  const INVALID_REF_NAME_MESSAGE = "Invalid ref name.";
+  const VALID_HASH = "abc123def456";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Case: TC-195
+  it("runs git tag for a valid tag name (TC-195)", async () => {
+    // Given: spawn succeeds for a normal (non-hyphen) tag name
+    spawnMock.mockReturnValue(createCommandMockProcess({ exitCode: 0 }));
+
+    // When: addTag is called with a valid tag name
+    const result = await ds.addTag(REPO, "v1.0.0", VALID_HASH, true, "");
+
+    // Then: the git tag command runs and the ref-name error is not returned
+    expect(result).not.toBe(INVALID_REF_NAME_MESSAGE);
+    const tagCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "tag");
+    expect(tagCall).toBeDefined();
+  });
+
+  // Case: TC-196
+  it("runs git branch for a valid branch name (TC-196)", async () => {
+    // Given: spawn succeeds for a normal branch name
+    spawnMock.mockReturnValue(createCommandMockProcess({ exitCode: 0 }));
+
+    // When: createBranch is called with a valid branch name and hash
+    const result = await ds.createBranch(REPO, "feature/x", VALID_HASH);
+
+    // Then: the git branch command runs and the ref-name error is not returned
+    expect(result).not.toBe(INVALID_REF_NAME_MESSAGE);
+    const branchCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "branch");
+    expect(branchCall).toBeDefined();
+  });
+
+  // Case: TC-197
+  it("rejects a tag name starting with a hyphen without spawning git (TC-197)", async () => {
+    // Given: a tag name that would be parsed as an option
+    // When: addTag is called with "--delete"
+    const result = await ds.addTag(REPO, "--delete", VALID_HASH, true, "");
+
+    // Then: the ref-name error is returned and git is not spawned
+    expect(result).toBe(INVALID_REF_NAME_MESSAGE);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  // Case: TC-198
+  it("rejects a hyphen branch name before the commit-hash check (TC-198)", async () => {
+    // Given: a hyphen branch name paired with an invalid commit hash
+    // When: createBranch is called with "-D" and a non-hash value
+    const result = await ds.createBranch(REPO, "-D", "not-a-hash");
+
+    // Then: the ref-name guard short-circuits (not the commit-hash message) and git is not spawned
+    expect(result).toBe(INVALID_REF_NAME_MESSAGE);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  // Case: TC-199
+  it("rejects a lone hyphen tag name (TC-199)", async () => {
+    // Given: the minimal invalid input "-"
+    // When: addTag is called with "-"
+    const result = await ds.addTag(REPO, "-", VALID_HASH, true, "");
+
+    // Then: the ref-name error is returned
+    expect(result).toBe(INVALID_REF_NAME_MESSAGE);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  // Case: TC-200
+  it("passes an empty branch name through the hyphen guard to the hash check (TC-200)", async () => {
+    // Given: spawn succeeds and the branch name is empty (not hyphen-prefixed)
+    spawnMock.mockReturnValue(createCommandMockProcess({ exitCode: 0 }));
+
+    // When: createBranch is called with an empty name and a valid hash
+    const result = await ds.createBranch(REPO, "", VALID_HASH);
+
+    // Then: the hyphen guard is bypassed and the command reaches spawn (not the ref-name error)
+    expect(result).not.toBe(INVALID_REF_NAME_MESSAGE);
+    expect(spawnMock).toHaveBeenCalledTimes(1);
   });
 });

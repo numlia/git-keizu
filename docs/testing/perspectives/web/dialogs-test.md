@@ -77,3 +77,23 @@
 | TC-019  | `select` option `value = "1\""`, `name = "<b>boom</b>"` で呼ぶ                                      | Boundary - special chars in option                                         | `<option>` が 1 件のみ生成され、表示テキストが `<b>boom</b>`、`select.value` 読み出し値が `1"` となる | option 境界 + 値往復   |
 | TC-020  | multi form の `checkbox` input `name = "</td><script>"` で呼ぶ                                      | Boundary - special chars in checkbox name                                  | 追加の `</td>` / `<script>` 要素が生成されず、テキストとして表示される                                | checkbox name 描画境界 |
 | TC-021  | `message = "<b>hi</b>"` を渡し、`text` input `name = "x"` で呼ぶ                                    | Normal - message HTML preserved                                            | `message` の `<b>` 要素が太字として描画され、エスケープされていない                                   | 既存 HTML 契約維持     |
+
+## S5: showFormDialog() ref 入力の input/keyup 両イベント検証
+
+> Origin: フェーズ3 修正 L14 (dialog-ref-input-event-validation)
+> Added: 2026-07-04T04:29:24Z
+> Status: active
+> Supersedes: -
+> Signature: `showFormDialog()` 内 text-ref 入力の検証ハンドラ（`validateRefInput`）
+> Target Path: `web/dialogs.ts:153-171`
+
+text-ref 入力の検証ロジックを匿名 `keyup` リスナから名前付き関数 `validateRefInput` に切り出し、`keyup` に加えて `input` イベントにもバインドする修正。旧実装は `keyup` のみを購読していたため、貼り付け・IME 確定・プログラム的な値変更など `input` は発火するが `keyup` を伴わない入力で検証（`active` / `noInput` / `inputInvalid` クラス付与と `invalidNotice` の更新）が走らなかった。検証ロジック自体は不変。
+
+| Case ID | Input / Precondition                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                         | Notes                 |
+| ------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | --------------------- |
+| TC-022  | ref 入力に有効値を設定し `input` イベントを dispatch                       | Normal - input event valid                                                 | dialog の className が `"active"`（noInput/inputInvalid なし）に更新される                              | input 経路の正常検証  |
+| TC-023  | ref 入力に `refInvalid` にマッチする値を設定し `input` イベントを dispatch | Validation - input event invalid chars                                     | className に `"inputInvalid"` が付与され、`invalidNotice` に `invalidCharacters` メッセージが設定される | 不正文字検証          |
+| TC-024  | ref 入力を空文字にし `input` イベントを dispatch                           | Boundary - input event empty                                               | className に `"noInput"` が付与される                                                                   | 空入力境界            |
+| TC-025  | ref 入力に有効値を設定し `keyup` イベントを dispatch                       | Normal - keyup event still bound                                           | className が `"active"` に更新される（keyup も同じ `validateRefInput` を購読）                          | 既存 keyup 経路の維持 |
+| TC-026  | `keyup` を発火させず `input` イベントのみを dispatch（貼り付け相当）       | Boundary - input without keyup                                             | `validateRefInput` が実行され className が更新される（旧 keyup 単独購読では未実行だった）               | L14 の中核回帰        |
+| TC-027  | inputInvalid 状態から有効値へ変更し `input` イベントを dispatch            | Boundary - notice cleared on valid input                                   | className が `"active"` に戻り、`invalidNotice` が空文字にクリアされる                                  | 検証結果の再計算      |

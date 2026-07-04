@@ -182,47 +182,97 @@ describe("openFile", () => {
     ).getNewPathOfRenamedFile.mockReset();
   });
 
-  // S2: path traversal
+  // S6: path.relative based path traversal guard
 
-  // TC-003: ".." セグメントを含むパスはエラーを返す
-  it("returns error for path with '..' segment (TC-003)", async () => {
-    // Given: filePath contains ".." segment
+  // Case: TC-013
+  it("allows a path inside the repo through the relative guard (TC-013)", async () => {
+    // Given: filePath resolves inside the repo and the file exists
+    mockAccess.mockResolvedValue(undefined);
+    mockExecuteCommand.mockResolvedValue(undefined);
+
+    // When: openFile is called with a repo-relative path
+    const result = await openFile(REPO, "src/a.ts", VALID_HASH, mockDataSource, -1);
+
+    // Then: the guard passes and vscode.open is invoked for the resolved path
+    expect(result).toBeNull();
+    expect(mockExecuteCommand).toHaveBeenCalledWith(
+      "vscode.open",
+      { scheme: "file", fsPath: "/repo/src/a.ts" },
+      { preview: true, viewColumn: -1 }
+    );
+  });
+
+  // Case: TC-014
+  it("rejects a relative escape path via the relative guard (TC-014)", async () => {
+    // Given: filePath escapes the repo with a leading ".." segment
     const filePath = "../etc/passwd";
 
     // When: openFile is called with the traversal path
     const result = await openFile(REPO, filePath, VALID_HASH, mockDataSource, -1);
 
-    // Then: error message is returned and vscode.open is not called
+    // Then: PATH_TRAVERSAL_ERROR is returned and vscode.open is not called
     expect(result).toBe("The file path is invalid.");
     expect(mockExecuteCommand).not.toHaveBeenCalled();
   });
 
-  // TC-004: リポジトリ外パスはエラーを返す
-  it("returns error when resolved path is outside repo (TC-004)", async () => {
-    // Given: filePath that resolves outside the repo root (absolute path escape)
+  // Case: TC-015
+  it("rejects an absolute path via the relative guard (TC-015)", async () => {
+    // Given: filePath is an absolute path outside the repo
     const filePath = "/etc/passwd";
 
     // When: openFile is called
     const result = await openFile(REPO, filePath, VALID_HASH, mockDataSource, -1);
 
-    // Then: error message is returned and vscode.open is not called
+    // Then: PATH_TRAVERSAL_ERROR is returned and vscode.open is not called
     expect(result).toBe("The file path is invalid.");
     expect(mockExecuteCommand).not.toHaveBeenCalled();
   });
 
-  // TC-005: リネーム先パスがリポジトリ外の場合エラーを返す
-  it("returns error when renamed path resolves outside repo (TC-005)", async () => {
-    // Given: file doesn't exist + rename tracking returns a path that resolves outside repo
+  // Case: TC-016
+  it("rejects a renamed path that escapes the repo (TC-016)", async () => {
+    // Given: file doesn't exist and rename tracking returns a path escaping the repo
     mockAccess.mockRejectedValue(new Error("ENOENT"));
     (
       mockDataSource as unknown as { getNewPathOfRenamedFile: ReturnType<typeof vi.fn> }
-    ).getNewPathOfRenamedFile.mockResolvedValue("/outside/repo/file.ts");
+    ).getNewPathOfRenamedFile.mockResolvedValue("../evil/file.ts");
 
     // When: openFile is called
     const result = await openFile(REPO, "src/file.ts", VALID_HASH, mockDataSource, -1);
 
-    // Then: error message is returned
+    // Then: PATH_TRAVERSAL_ERROR is returned for the renamed path
     expect(result).toBe("The file path is invalid.");
+    expect(mockExecuteCommand).not.toHaveBeenCalled();
+  });
+
+  // Case: TC-017
+  it("allows the repo root itself through the relative guard (TC-017)", async () => {
+    // Given: filePath is empty so it resolves to the repo root, which exists
+    mockAccess.mockResolvedValue(undefined);
+    mockExecuteCommand.mockResolvedValue(undefined);
+
+    // When: openFile is called with an empty filePath
+    const result = await openFile(REPO, "", VALID_HASH, mockDataSource, -1);
+
+    // Then: the guard passes (relative is "") and vscode.open is invoked for the repo root
+    expect(result).toBeNull();
+    expect(mockExecuteCommand).toHaveBeenCalledWith(
+      "vscode.open",
+      { scheme: "file", fsPath: "/repo" },
+      { preview: true, viewColumn: -1 }
+    );
+  });
+
+  // Case: TC-018
+  it("rejects a sibling directory that shares the repo prefix (TC-018)", async () => {
+    // Given: filePath resolves to /repo-evil/x, a sibling sharing the "/repo" prefix
+    const filePath = "../repo-evil/x";
+
+    // When: openFile is called
+    const result = await openFile(REPO, filePath, VALID_HASH, mockDataSource, -1);
+
+    // Then: the relative guard yields "../repo-evil/x" and rejects (old startsWith allowed it)
+    expect(result).toBe("The file path is invalid.");
+    expect(mockExecuteCommand).not.toHaveBeenCalled();
   });
 
   // S3: normal open

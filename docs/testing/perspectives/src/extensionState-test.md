@@ -209,3 +209,22 @@
 | TC-035  | `recentActions = ["commit.createBranch", "commit.createWorktree", "commit.createBranch", "ref.push"]` | Normal - dedupe order                                                      | `workspaceState.update("repoStates", ...)` に渡る `recentActions` が `["commit.createBranch", "commit.createWorktree", "ref.push"]` へ畳まれる | 先頭優先                 |
 | TC-036  | `recentActions` が 6 件以上のユニーク値を持つ                                                         | Boundary - max length                                                      | 永続化前に先頭 5 件へ切り詰められる                                                                                                            | `MAX_RECENT_ACTIONS = 5` |
 | TC-037  | repo A は `recentActions` 未定義、repo B は空配列、他の state あり                                    | Validation - empty and undefined                                           | `commitOrdering` / `fileViewType` / `columnWidths` など他フィールドは変わらず、未定義・空配列の repo state もそのまま保存できる                | 既存 state への影響なし  |
+
+## S14: waitForAvatarStorage() 初期化 Promise の完了待ち
+
+> Origin: フェーズ3 修正 L8 (avatar-storage-init-await)
+> Added: 2026-07-04T04:29:24Z
+> Status: active
+> Supersedes: -
+> Signature: `constructor(context: ExtensionContext)` / `public waitForAvatarStorage(): Promise<void>`
+> Target Path: `src/extensionState.ts:20-26, 61-63`
+
+コンストラクタで fire-and-forget していた `initAvatarStorage()` の戻り Promise を `this.avatarStorageInit` に保持し、`waitForAvatarStorage()` で同 Promise を公開する修正。呼び出し側（`gitGraphView.getHtmlForWebview`）が `await` することでアバターストレージ初期化の完了後に `isAvatarStorageAvailable()` を評価できるようにする。`initAvatarStorage()` は内部で例外を握りつぶすため、返る Promise は常に resolve し reject しない。
+
+| Case ID | Input / Precondition                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                             | Notes                              |
+| ------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| TC-038  | インスタンス生成後に `waitForAvatarStorage()` を呼ぶ                                  | Normal - returns retained promise                                          | コンストラクタで `avatarStorageInit` に代入された Promise と同一の Promise インスタンスが返る                               | `initAvatarStorage()` の戻り値保持 |
+| TC-039  | `fs.mkdir` 成功で `initAvatarStorage` が完了する状態で `await waitForAvatarStorage()` | Normal - resolves after init completes                                     | await 解決後に `isAvatarStorageAvailable()` が `true` を返す                                                                | 完了待ちによる状態確定             |
+| TC-040  | `waitForAvatarStorage()` を複数回呼ぶ                                                 | Boundary - idempotent single init                                          | 毎回同一 Promise インスタンスが返り、`initAvatarStorage`（fs.stat/mkdir）は生成時の1回のみで再実行されない                  | 初期化の単一性                     |
+| TC-041  | `fs.stat` 失敗かつ `fs.mkdir` 失敗の状態で `await waitForAvatarStorage()`             | External - init failure still resolves                                     | 返る Promise は reject せず resolve（`undefined`）し、await が throw しない。`isAvatarStorageAvailable()` は `false` のまま | 例外握りつぶしの検証               |
+| TC-042  | `initAvatarStorage` 完了後に `waitForAvatarStorage()` を呼び await                    | Boundary - already settled promise                                         | 既に settle 済みの Promise が即座に resolve し、追加の副作用（fs 呼び出し）は発生しない                                     | settle 後の再 await                |

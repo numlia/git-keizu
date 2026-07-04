@@ -638,12 +638,16 @@ export class Graph {
           if (parentVertex === null || parentVertexOnBranch) break;
         }
       }
-      // Process remaining nullVertex parents
-      while (vertex.getNextParent() !== null) {
-        if (vertex.getNextParent()!.getId() === NULL_VERTEX_ID) {
-          vertex.registerParentProcessed();
-        } else {
-          break;
+      // Process remaining nullVertex parents only when the loop reached the end.
+      // An early break means an off-screen parent edge is still pending for the
+      // remaining children of the current vertex and must not be marked processed.
+      if (i === this.vertices.length) {
+        while (vertex.getNextParent() !== null) {
+          if (vertex.getNextParent()!.getId() === NULL_VERTEX_ID) {
+            vertex.registerParentProcessed();
+          } else {
+            break;
+          }
         }
       }
       branch.setEnd(i);

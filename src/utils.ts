@@ -70,12 +70,9 @@ export async function openFile(
   dataSource: DataSource,
   viewColumn: vscode.ViewColumn
 ): Promise<string | null> {
-  if (filePath.split("/").includes("..")) {
-    return PATH_TRAVERSAL_ERROR;
-  }
-
   const resolvedPath = path.resolve(repo, filePath);
-  if (!resolvedPath.startsWith(repo)) {
+  const relativePath = path.relative(repo, resolvedPath);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
     return PATH_TRAVERSAL_ERROR;
   }
 
@@ -95,7 +92,8 @@ export async function openFile(
     const newPath = await dataSource.getNewPathOfRenamedFile(repo, commitHash, filePath);
     if (newPath !== null) {
       const resolvedNewPath = path.resolve(repo, newPath);
-      if (!resolvedNewPath.startsWith(repo)) {
+      const relativeNewPath = path.relative(repo, resolvedNewPath);
+      if (relativeNewPath.startsWith("..") || path.isAbsolute(relativeNewPath)) {
         return PATH_TRAVERSAL_ERROR;
       }
       if (await doesFileExist(resolvedNewPath)) {

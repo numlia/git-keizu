@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-07-04
+
+This release is a codebase-wide correctness and robustness pass: 32 defects found in a full audit of the extension host and webview were fixed (2 high, 13 medium, 17 low), covering security, Windows regressions, multibyte handling, avatar reliability, and graph rendering.
+
+### Fixed
+
+- **Commit details tree view no longer breaks on special characters in names**: File and folder names containing HTML metacharacters (e.g. `<img src=x>.txt`) are now escaped in the commit details tree view — previously they were inserted unescaped, corrupting the panel markup (script execution was already blocked by the CSP nonce, but markup injection was possible). The list view was already safe.
+- **Open File now works for renamed files**: Opening a file from a commit that predates a rename no longer always fails with "file does not exist" — the rename-tracking lookup that resolves the current path never returned a result and is now fixed, so renames are followed correctly.
+- **Author filter handles names with special characters**: Filtering by an author whose name contains regex metacharacters (e.g. `dependabot[bot]`) now matches literally instead of returning zero commits or, for names with an unbalanced `[`, blanking the entire graph.
+- **Multibyte characters no longer corrupt on large git output**: Japanese (and other multibyte) commit messages, author names, and file contents are no longer replaced with `�` when git output spans an internal buffer boundary — output is now decoded as a whole rather than chunk by chunk.
+- **Detached HEAD detected more reliably**: `(HEAD detached from …)` states, tag names containing `.`, `-`, or `/` (e.g. `v1.2.3`), and non-English git output no longer leak a placeholder string into the branch list that would blank the graph when selected.
+- **Windows auto-refresh restored**: The graph again refreshes automatically after commits, checkouts, and other git operations on Windows — a path-separator regression caused the file watcher glob to silently match nothing, leaving manual Refresh as the only option.
+- **Auto-refresh no longer stops permanently after an error**: An exception while handling a webview action (such as opening a folder or revealing a file) no longer leaves the file watcher muted for the life of the panel; concurrent actions are also reference-counted so one finishing early can no longer unmute another still in progress.
+- **Repository selection preserved when opening from the SCM panel**: Pressing the Git Keizu SCM button for one repository while a Git Keizu tab for another is in the background now reliably switches to the intended repository instead of staying on the previous one.
+- **Avatar fetches no longer hang or leak on stalled connections**: Avatar requests that stall now time out, settle, and retry correctly instead of hanging forever and leaking a socket.
+- **Avatar fetches no longer loop forever on header-less rate limits**: GitHub `403` / GitLab `429` responses that omit rate-limit headers (secondary rate limits, IP blocks) are now treated as normal failures that fall back to Gravatar, instead of re-requesting the API every 10 seconds indefinitely.
+- **Diffs refresh after committing outside the extension**: Opening a `HEAD` or uncommitted-changes diff after committing in a terminal now shows the current content instead of a stale cached diff.
+- **Diffs work for paths and repositories with special characters**: File names containing `#`, and repository paths containing `&`, `=`, or `%` (e.g. `C:\work\R&D\repo`), no longer produce broken or errored diff tabs.
+- **Merge lines render correctly for off-screen parents**: A merge commit whose second parent is outside the loaded window and that has two or more loaded children now correctly draws the line indicating the branch continues below, instead of appearing as a single-parent commit.
+- **Author dropdown stays complete after a tab switch**: Switching away from and back to the Git Keizu tab while an author filter is active no longer collapses the Author dropdown to only the selected author — the full author list is preserved so other authors can still be added.
+- **File-to-directory replacement commits no longer freeze the details panel**: A commit that removes a file `a` and adds a directory `a/` no longer crashes tree construction and leaves the commit details view stuck on the loading spinner; if the tree cannot be built an error dialog is shown instead.
+- **Details panel no longer hangs on repositories with many git warnings**: Large volumes of git `stderr` output (e.g. from damaged `refs/`) no longer stall the git process and leave the view spinning indefinitely.
+- **Empty error messages fixed**: Git failures with output that has no trailing newline no longer drop the final (often only) line, so error dialogs no longer appear blank.
+- **Branch and tag names starting with `-` are rejected**: Creating a branch or tag with a name such as `--list` is now refused with an error instead of being silently interpreted as a git option and reported as a success that created nothing.
+- **Uncommitted files with quotes, backslashes, or control characters open correctly**: Opening or diffing uncommitted files and 2-commit comparisons whose paths contain `"`, `\`, or control characters now works, matching the behaviour already correct in commit details.
+- **Simultaneous setting changes all take effect**: Saving `settings.json` with multiple Git Keizu settings changed at once (e.g. status bar item and date type together) now applies all of them instead of only the first.
+- **Avatars load on the first view**: The avatar storage is now ready before the view evaluates whether avatars are available, so enabling avatars no longer requires a panel reload to take effect.
+- **No error when closing a tab during a pending refresh**: Closing the Git Keizu tab while a refresh was debouncing no longer throws a "Webview is disposed" error when the timer fires.
+- **No stray git processes after the extension is disabled**: Pending debounce timers are cleared on shutdown, so no git commands run against disposed resources after the extension deactivates.
+- **Avatars load for remotes with short origin URLs**: An origin URL without a repository segment (e.g. `https://github.com/owner`) no longer throws and blocks all avatars for that repository — it now falls back to Gravatar.
+- **Path-traversal guard hardened on Windows**: The file-path safety check now rejects `..\` (backslash) traversal and only permits paths that genuinely resolve inside the repository, closing a defence-in-depth gap.
+- **Relative dates no longer overflow their unit**: Timestamps near a unit boundary now show `1 hour ago` / `1 day ago` instead of `60 minutes ago` / `24 hours ago`.
+- **Ref input dialogs validate on mouse paste and delete**: The branch/tag name dialogs now re-validate on `input` as well as `keyup`, so right-click paste enables the button for valid input and right-click delete disables submission for empty input.
+- **Avatars update live for emails with special characters**: Commit rows for authors whose email contains `&`, `'`, and similar characters (e.g. `o'brien@example.com`) now update as soon as the avatar arrives instead of waiting for the next full redraw.
+- **Branch actions work for names containing entity-like characters**: Branch names such as `fix-&-bug` are no longer double-unescaped, so context-menu actions and double-click checkout send the correct name to git instead of a corrupted one.
+- **Commit details reload after a tab restore**: If the details panel was mid-load when the webview state was saved, restoring the tab now re-requests the commit details instead of leaving the panel stuck on the loading spinner.
+
+### Changed
+
+- **Minimum Git version documented (Git 2.32+)**: A "Requirements" section in the README and the marketplace description now state that Git 2.32 or later is required, because viewing the contents of a stash entry uses `git stash show -u`, whose `-u` option was added in Git 2.32. No fallback for older Git versions is provided.
+
 ## [0.7.9] - 2026-05-28
 
 ### Fixed
@@ -406,7 +447,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.7.9...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/numlia/git-keizu/compare/v0.7.9...v0.8.0
 [0.7.9]: https://github.com/numlia/git-keizu/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/numlia/git-keizu/compare/v0.7.7...v0.7.8
 [0.7.7]: https://github.com/numlia/git-keizu/compare/v0.7.6...v0.7.7

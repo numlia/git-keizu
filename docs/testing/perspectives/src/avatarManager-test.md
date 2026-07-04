@@ -119,7 +119,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
-> Status: active
+> Status: superseded
+> Superseded By: S25
 > Supersedes: -
 
 **シグネチャ**: `private async getRemoteSource(avatarRequest: AvatarRequestItem)`
@@ -375,3 +376,62 @@
 | ------- | -------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----- |
 | TC-084  | GitHub HTTP 200 + 不正 JSON body | External - malformed provider response                                     | `fetchFromGravatar(avatarRequest)` が1回呼ばれ、GitHub 用 `downloadAvatarImage()` と `saveAvatar()` は呼ばれない | -     |
 | TC-085  | GitLab HTTP 200 + 不正 JSON body | External - malformed provider response                                     | `fetchFromGravatar(avatarRequest)` が1回呼ばれ、GitLab 用 `downloadAvatarImage()` と `saveAvatar()` は呼ばれない | -     |
+
+## S23: https リクエストの timeout イベントによる destroy
+
+> Origin: フェーズ2 修正 M7 (avatar-request-timeout-destroy)
+> Added: 2026-07-04T02:44:58Z
+> Status: active
+> Supersedes: -
+> Signature: `private fetchFromGithub(...)` / `private fetchFromGitLab(...)` / `private fetchFromGravatar(...)`
+> Target Path: `src/avatarManager.ts:232, 303, 382`
+
+3か所の `https.get`（`timeout: 15000` 指定）に `req.on("timeout", () => req.destroy(new Error("timeout")))` を追加する修正。ソケットが 15 秒で応答しない場合に `timeout` イベントが発火し、リクエストを timeout Error で破棄する。破棄は既存の `error` ハンドラへ伝播し、各プロバイダのネットワークエラー・フォールバック経路（timeout 更新 + 再キュー、または Gravatar 側の `resolve(null)`）が実行される。
+
+| Case ID | Input / Precondition                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                              | Notes                      |
+| ------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| TC-086  | fetchFromGithub の https リクエストで `timeout` イベントが発火         | External - GitHub request timeout                                          | `req.destroy` が `Error("timeout")` 引数で1回呼ばれ、`error` ハンドラ経由で `githubTimeout=現在時刻+300000`、`queue.addItem(avatarRequest, githubTimeout, false)` が呼ばれる | timeout→destroy→error 伝播 |
+| TC-087  | fetchFromGitLab の https リクエストで `timeout` イベントが発火         | External - GitLab request timeout                                          | `req.destroy` が `Error("timeout")` で1回呼ばれ、`error` 経由で `gitLabTimeout=現在時刻+300000`、`queue.addItem(avatarRequest, gitLabTimeout, false)` が呼ばれる             | GitLab 側 timeout          |
+| TC-088  | fetchFromGravatar の https リクエストで `timeout` イベントが発火       | External - Gravatar request timeout                                        | `req.destroy` が `Error("timeout")` で1回呼ばれ、`error` 経由で Promise が `null` で resolve され、`saveAvatar` は呼ばれない                                                 | Gravatar 側 timeout        |
+| TC-089  | fetchFromGithub で `timeout` イベントが発火せず正常 200 レスポンス受信 | Normal - no timeout                                                        | `req.destroy` が呼ばれず、通常のレスポンス処理（`downloadAvatarImage`→`saveAvatar`）が実行される                                                                             | 非タイムアウト時の非破棄   |
+
+## S24: レート制限応答の reset ヘッダ欠落時の再キュー分岐
+
+> Origin: フェーズ2 修正 M8 (rate-limit-headerless-requeue)
+> Added: 2026-07-04T02:44:58Z
+> Status: active
+> Supersedes: -
+> Signature: `private fetchFromGithub(...)`（403 分岐）/ `private fetchFromGitLab(...)`（429 分岐）
+> Target Path: `src/avatarManager.ts:199-207, 278-286`
+
+GitHub 403 / GitLab 429 のレート制限応答で、reset ヘッダから算出される `githubTimeout`/`gitLabTimeout` が `0`（有効なリセット時刻が得られない）の場合に、`queue.addItem(avatarRequest, t + RATE_LIMIT_RETRY_INTERVAL_MS, true)`（`failedAttempt=true` で試行回数を消費）でデフォルト 5 分後へ再キューする分岐を追加する修正。timeout が非0のときは従来どおり `queue.addItem(avatarRequest, timeout, false)`。既存 S9 TC-032 / S10 TC-041 の 403/429 挙動を timeout 値で精緻化する。
+
+| Case ID | Input / Precondition                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                   | Notes                               |
+| ------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| TC-090  | GitHub `statusCode=403`、`githubTimeout===0`（reset ヘッダ欠落）       | External - GitHub 403 headerless requeue                                   | `queue.addItem(avatarRequest, t + 300000, true)` が呼ばれる（`failedAttempt=true`）。`false` 引数の分岐は通らない | reset 不明時のデフォルト 5 分再試行 |
+| TC-091  | GitHub `statusCode=403`、`githubTimeout!==0`（reset ヘッダで設定済み） | External - GitHub 403 with reset                                           | `queue.addItem(avatarRequest, githubTimeout, false)` が呼ばれる                                                   | 従来分岐（S9 TC-032 の精緻化）      |
+| TC-092  | GitLab `statusCode=429`、`gitLabTimeout===0`（reset ヘッダ欠落）       | External - GitLab 429 headerless requeue                                   | `queue.addItem(avatarRequest, t + 300000, true)` が呼ばれる（`failedAttempt=true`）                               | reset 不明時のデフォルト 5 分再試行 |
+| TC-093  | GitLab `statusCode=429`、`gitLabTimeout!==0`（reset ヘッダで設定済み） | External - GitLab 429 with reset                                           | `queue.addItem(avatarRequest, gitLabTimeout, false)` が呼ばれる                                                   | 従来分岐（S10 TC-041 の精緻化）     |
+| TC-094  | `RATE_LIMIT_RETRY_INTERVAL_MS` 定数の参照                              | Boundary - constant value                                                  | 定数値が `300000`（5 分）であり、headerless 再キューの遅延に使用される                                            | マジックナンバー排除の検証          |
+| TC-095  | GitHub 403 headerless、fetch 開始時刻 `t` 既知                         | Boundary - retry offset from now                                           | 再キューの checkAfter が `t + 300000` であり、`this.githubTimeout`（=0）ではなく現在時刻起点で算出される          | オフセット基準時刻の検証            |
+
+## S25: getRemoteSource GitHub URL セグメント検証と Gravatar フォールバック
+
+> Origin: フェーズ3 修正 L11 (github-remote-url-length-guard)
+> Added: 2026-07-04T04:29:24Z
+> Status: active
+> Supersedes: S8
+> Signature: `private async getRemoteSource(avatarRequest: AvatarRequestItem)`
+> Target Path: `src/avatarManager.ts:128-143`
+
+`https://github.com/` で始まる remoteUrl を `/` 分割した際に、owner/repo セグメント（`remoteUrlComps[3]`/`[4]`）が欠ける URL を検証するガードを追加する修正。旧実装は `remoteUrlComps[4].replace(...)` を無条件で呼び、`[4]` が `undefined` のとき `TypeError` を throw していた。新実装は `remoteUrlComps.length >= 5 && remoteUrlComps[3] && remoteUrlComps[4]` を満たす場合のみ GitHub ソースを構築し、満たさない場合は throw せず `{ type: "gravatar" }` へフォールバックする。S8 の TypeError reject 前提（TC-025）を置き換える。
+
+| Case ID | Input / Precondition                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                           | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TC-096  | `getRemoteUrl()` が `https://github.com/owner/repo.git` を返す                         | Normal - valid github url                                                  | `{ type: "github", owner: "owner", repo: "repo" }` が返り、`remoteSourceCache[repo]` に保存される         | 正常な owner/repo                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| TC-097  | `getRemoteUrl()` が `https://gitlab.com/group/project.git` を返す                      | Normal - gitlab url                                                        | `{ type: "gitlab" }` が返り、キャッシュされる                                                             | GitLab 分岐                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| TC-098  | `getRemoteUrl()` が他ホスト（例 `https://bitbucket.org/x/y`）を返す                    | Validation - other host to gravatar                                        | `{ type: "gravatar" }` が返り、キャッシュされる                                                           | 非対応ホスト                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| TC-099  | `getRemoteUrl()` が `null` を返す                                                      | Boundary - null remote url                                                 | `{ type: "gravatar" }` が返る                                                                             | リモート無し                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| TC-100  | `getRemoteUrl()` が `https://github.com/owner`（repo セグメント欠落、split 長 4）      | Boundary - missing repo segment fallback                                   | throw されず `{ type: "gravatar" }` が返る（旧実装は `TypeError`）                                        | L11 の中核回帰。`length >= 5` ガード                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| TC-101  | `getRemoteUrl()` が `https://github.com/`（owner/repo とも欠落、末尾セグメント空文字） | Boundary - missing owner segment fallback                                  | `remoteUrlComps[3]`/`[4]` が空文字（falsy）のため `{ type: "gravatar" }` へフォールバックする             | 空セグメントの拒否                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| TC-102  | `remoteSourceCache[repo]` に文字列でない値（object）が入っている                       | Validation - cache miss on non-string                                      | `typeof ... === "string"` が false でキャッシュヒットせず、`dataSource.getRemoteUrl(repo)` が再度呼ばれる | キャッシュ判定（旧 TC-020 系）。未カバー: 現行実装のキャッシュ判定は `typeof === "string"` ではなく `cachedRemoteSource !== undefined`（Feature 042 / active S21 TC-083 で修正済み）であり、object がキャッシュにある場合はヒットして `getRemoteUrl` は呼ばれない。本 Expected Result は superseded 済みの旧 TC-020 挙動を指しており、実装および active な S21 TC-083 と矛盾するため実装不能。実装済み S21 TC-083 が非文字列 object のキャッシュ挙動（ヒット）を担保する。 |

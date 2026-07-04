@@ -435,3 +435,104 @@ describe("showFormDialog DialogInput plain text escaping (S4)", () => {
     expect(dialogEl.querySelector("b")!.textContent).toBe("hi");
   });
 });
+
+describe("showFormDialog ref input validation on input/keyup events", () => {
+  const INVALID_CHARS_NOTICE = "Unable to OK, one or more invalid characters entered.";
+
+  function openRefDialog(defaultValue: string): HTMLInputElement {
+    // A text-ref input at index 0 with the given default value.
+    const inputs: DialogInput[] = [createTextRefInput(defaultValue)];
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+    return document.getElementById("dialogInput0") as HTMLInputElement;
+  }
+
+  it("marks the dialog active for a valid value on the input event (TC-022)", () => {
+    // Case: TC-022
+    // Given: a ref input that starts empty (noInput state)
+    const refInput = openRefDialog("");
+    expect(dialogEl.className).toBe("active noInput");
+
+    // When: a valid value is set and the input event is dispatched
+    refInput.value = "feature/x";
+    refInput.dispatchEvent(new Event("input"));
+
+    // Then: the dialog className becomes "active" with no noInput/inputInvalid flags
+    expect(dialogEl.className).toBe("active");
+  });
+
+  it("marks the dialog inputInvalid and sets the notice on the input event (TC-023)", () => {
+    // Case: TC-023
+    // Given: a ref input with a valid default
+    const refInput = openRefDialog("main");
+    const actionBtn = document.getElementById("dialogAction") as HTMLElement;
+
+    // When: a value matching refInvalid is set and the input event is dispatched
+    refInput.value = "bad name";
+    refInput.dispatchEvent(new Event("input"));
+
+    // Then: className gains inputInvalid and the action button title holds the notice
+    expect(dialogEl.className).toBe("active inputInvalid");
+    expect(actionBtn.title).toBe(INVALID_CHARS_NOTICE);
+  });
+
+  it("marks the dialog noInput for an empty value on the input event (TC-024)", () => {
+    // Case: TC-024
+    // Given: a ref input with a valid default (active state)
+    const refInput = openRefDialog("main");
+    expect(dialogEl.className).toBe("active");
+
+    // When: the value is cleared and the input event is dispatched
+    refInput.value = "";
+    refInput.dispatchEvent(new Event("input"));
+
+    // Then: className becomes "active noInput"
+    expect(dialogEl.className).toBe("active noInput");
+  });
+
+  it("still validates on the keyup event (TC-025)", () => {
+    // Case: TC-025
+    // Given: a ref input that starts empty (noInput state)
+    const refInput = openRefDialog("");
+    expect(dialogEl.className).toBe("active noInput");
+
+    // When: a valid value is set and the keyup event is dispatched
+    refInput.value = "feature/x";
+    refInput.dispatchEvent(new Event("keyup"));
+
+    // Then: className becomes "active" (keyup shares the same validateRefInput handler)
+    expect(dialogEl.className).toBe("active");
+  });
+
+  it("validates on an input event that is not preceded by keyup (TC-026)", () => {
+    // Case: TC-026
+    // Given: a ref input that starts empty (noInput state), simulating a paste
+    const refInput = openRefDialog("");
+    expect(dialogEl.className).toBe("active noInput");
+
+    // When: the value is changed and only the input event is dispatched (no keyup)
+    refInput.value = "pasted-branch";
+    refInput.dispatchEvent(new Event("input"));
+
+    // Then: validateRefInput ran and className became "active"
+    expect(dialogEl.className).toBe("active");
+  });
+
+  it("clears the invalid notice when a valid value replaces an invalid one (TC-027)", () => {
+    // Case: TC-027
+    // Given: a ref input driven into the inputInvalid state via the input event
+    const refInput = openRefDialog("main");
+    const actionBtn = document.getElementById("dialogAction") as HTMLElement;
+    refInput.value = "bad name";
+    refInput.dispatchEvent(new Event("input"));
+    expect(dialogEl.className).toBe("active inputInvalid");
+    expect(actionBtn.title).toBe(INVALID_CHARS_NOTICE);
+
+    // When: a valid value is set and the input event is dispatched
+    refInput.value = "valid-branch";
+    refInput.dispatchEvent(new Event("input"));
+
+    // Then: className returns to "active" and the notice is cleared to empty string
+    expect(dialogEl.className).toBe("active");
+    expect(actionBtn.title).toBe("");
+  });
+});

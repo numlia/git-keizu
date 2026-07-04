@@ -2,20 +2,21 @@
 
 > Source: `src/gitGraphView.ts`
 > Storage Mode: sharded
-> Generated: 2026-05-10T00:00:00Z
+> Generated: 2026-07-04T04:29:24Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 4
-> Total Sections: 23
-> Total Cases: 75
+> Total Shards: 5
+> Total Sections: 28
+> Total Cases: 99
 
 ## Shards
 
 | Shard File                           | Responsibility              | Sections | Cases | Last Updated |
 | ------------------------------------ | --------------------------- | -------- | ----- | ------------ |
-| 01-message-routing-01.md             | message-routing             | 12       | 38    | 2026-05-17   |
-| 02-state-lifecycle-01.md             | state-lifecycle             | 6        | 18    | 2026-05-02   |
-| 03-worktree-actions-01.md            | worktree-actions            | 3        | 16    | 2026-05-02   |
+| 01-message-routing-01.md             | message-routing             | 12       | 38    | 2026-07-04   |
+| 01-message-routing-02.md             | message-routing             | 1        | 7     | 2026-07-04   |
+| 02-state-lifecycle-01.md             | state-lifecycle             | 9        | 29    | 2026-07-04   |
+| 03-worktree-actions-01.md            | worktree-actions            | 4        | 22    | 2026-07-04   |
 | 04-context-menu-recent-actions-01.md | context-menu-recent-actions | 2        | 3     | 2026-05-10   |
 
 ## Origin Coverage
@@ -39,3 +40,8 @@
 | Feature 039 (show-recent-actions-runtime-sync)               | 04-context-menu-recent-actions-01.md               |
 | Feature 040 (settings-and-copy-polish) (light-spec-plan)     | 01-message-routing-01.md                           |
 | test-plan (既存コード網羅)                                   | 01-message-routing-01.md                           |
+| フェーズ2 修正 M5 (message-handler-try-finally-unmute)       | 02-state-lifecycle-01.md                           |
+| フェーズ2 修正 M5 (worktree-command-error-response)          | 03-worktree-actions-01.md                          |
+| フェーズ2 修正 M6 (reveal-persist-last-active-repo)          | 02-state-lifecycle-01.md                           |
+| フェーズ2 修正 M9/M10 (view-diff-resolve-head)               | 01-message-routing-02.md                           |
+| フェーズ3 修正 L8 (avatar-storage-init-await)                | 02-state-lifecycle-01.md                           |

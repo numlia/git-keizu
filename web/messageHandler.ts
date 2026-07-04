@@ -59,10 +59,17 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
         gitKeizu.hideCommitDetails();
         showErrorDialog(t("error.commitDetails"), null, null);
       } else {
-        gitKeizu.showCommitDetails(
-          msg.commitDetails,
-          generateGitFileTree(msg.commitDetails.fileChanges)
-        );
+        try {
+          const fileTree = generateGitFileTree(msg.commitDetails.fileChanges);
+          gitKeizu.showCommitDetails(msg.commitDetails, fileTree);
+        } catch (error: unknown) {
+          gitKeizu.hideCommitDetails();
+          showErrorDialog(
+            t("error.commitDetails"),
+            error instanceof Error ? error.message : null,
+            null
+          );
+        }
       }
       break;
     case "compareCommits":

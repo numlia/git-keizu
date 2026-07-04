@@ -22,7 +22,8 @@ import { getPathFromStr } from "./utils";
 import { parseWorktreeList } from "./worktree";
 
 const eolRegex = /\r\n|\r|\n/g;
-const headRegex = /^\(HEAD detached at [0-9A-Za-z]+\)/g;
+const headRegex = /^\(HEAD detached (at|from) .+\)$/;
+const REGEX_META_CHARS = /[.*+?^${}()|[\]\\]/g;
 const gitLogSeparator = "XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb";
 const COMMIT_HASH_PATTERN = /^[0-9a-f]{4,40}$/i;
 const NO_QUOTE_PATH_CONFIG = ["-c", "core.quotePath=false"];
@@ -60,6 +61,10 @@ const COMMIT_DETAILS_FIELD = {
   COMMITTER_EMAIL: 6
 } as const;
 
+function escapeRegExp(str: string): string {
+  return str.replace(REGEX_META_CHARS, "\\$&");
+}
+
 function isValidCommitHash(hash: string): boolean {
   return COMMIT_HASH_PATTERN.test(hash);
 }
@@ -76,6 +81,13 @@ function isValidGitRef(ref: string): boolean {
 }
 
 const INVALID_COMMIT_HASH_MESSAGE = "Invalid commit hash.";
+const INVALID_REF_NAME_MESSAGE = "Invalid ref name.";
+const OPTION_ARG_PREFIX = "-";
+
+function isRefNameSafe(refName: string): boolean {
+  return !refName.startsWith(OPTION_ARG_PREFIX);
+}
+
 const VALID_RESET_MODES = new Set(["soft", "mixed", "hard"]);
 const VALID_GIT_BINARY_NAME = /^git(\.exe)?$/i;
 const DEFAULT_GIT_PATH = "git";
@@ -364,10 +376,11 @@ export class DataSource {
             "HEAD",
             "--name-status",
             "--find-renames",
-            "--diff-filter=AMDR"
+            "--diff-filter=AMDR",
+            NULL_BYTE_OPTION
           ],
           repo,
-          (stdout) => stdout.split(eolRegex),
+          (stdout) => stdout.split(NULL_BYTE_SEPARATOR),
           []
         ),
         this.spawnGit<string[]>(
@@ -377,10 +390,11 @@ export class DataSource {
             "HEAD",
             "--numstat",
             "--find-renames",
-            "--diff-filter=AMDR"
+            "--diff-filter=AMDR",
+            NULL_BYTE_OPTION
           ],
           repo,
-          (stdout) => stdout.split(eolRegex),
+          (stdout) => stdout.split(NULL_BYTE_SEPARATOR),
           []
         ),
         this.spawnGit<string[]>(
@@ -404,28 +418,54 @@ export class DataSource {
       };
 
       const fileLookup: { [file: string]: number } = {};
-      for (let i = 0; i < nameStatus.length - 1; i++) {
-        const line = nameStatus[i].split("\t");
-        if (line.length < 2) continue;
-        const oldFilePath = getPathFromStr(line[1]);
-        const newFilePath = getPathFromStr(line[line.length - 1]);
-        fileLookup[newFilePath] = details.fileChanges.length;
-        details.fileChanges.push({
-          oldFilePath,
-          newFilePath,
-          type: <GitFileChangeType>line[0][0],
-          additions: null,
-          deletions: null
-        });
+      let ns = 0;
+      while (ns < nameStatus.length && nameStatus[ns] !== "") {
+        const statusChar = (nameStatus[ns] ?? "")[0] ?? "";
+        if (!VALID_FILE_CHANGE_TYPES.has(statusChar)) break;
+        if (statusChar === "R") {
+          const oldFilePath = getPathFromStr(nameStatus[ns + 1] ?? "");
+          const newFilePath = getPathFromStr(nameStatus[ns + 2] ?? "");
+          fileLookup[newFilePath] = details.fileChanges.length;
+          details.fileChanges.push({
+            oldFilePath,
+            newFilePath,
+            type: statusChar as GitFileChangeType,
+            additions: null,
+            deletions: null
+          });
+          ns += 3;
+        } else {
+          const filePath = getPathFromStr(nameStatus[ns + 1] ?? "");
+          fileLookup[filePath] = details.fileChanges.length;
+          details.fileChanges.push({
+            oldFilePath: filePath,
+            newFilePath: filePath,
+            type: statusChar as GitFileChangeType,
+            additions: null,
+            deletions: null
+          });
+          ns += 2;
+        }
       }
 
-      for (let i = 0; i < numStat.length - 1; i++) {
-        const line = numStat[i].split("\t");
-        if (line.length !== 3) continue;
-        const fileName = line[2].replace(/(.*){.* => (.*)}/, "$1$2").replace(/.* => (.*)/, "$1");
-        if (typeof fileLookup[fileName] === "number") {
-          details.fileChanges[fileLookup[fileName]].additions = parseInt(line[0], 10);
-          details.fileChanges[fileLookup[fileName]].deletions = parseInt(line[1], 10);
+      let ni = 0;
+      while (ni < numStat.length && numStat[ni] !== "") {
+        const parts = numStat[ni].split(TAB_SEPARATOR);
+        if (parts.length !== NUMSTAT_FIELD_COUNT) break;
+        const additions = parseInt(parts[0], 10);
+        const deletions = parseInt(parts[1], 10);
+        let filePath: string;
+        if (parts[2] !== "") {
+          filePath = getPathFromStr(parts[2]);
+          ni += 1;
+        } else {
+          filePath = getPathFromStr(numStat[ni + 2] ?? "");
+          ni += 3;
+        }
+        const idx = fileLookup[filePath];
+        if (typeof idx === "number" && details.fileChanges[idx] !== undefined) {
+          details.fileChanges[idx].additions = Number.isNaN(additions) ? null : additions;
+          details.fileChanges[idx].deletions = Number.isNaN(deletions) ? null : deletions;
         }
       }
 
@@ -471,6 +511,7 @@ export class DataSource {
         "--name-status",
         "--find-renames",
         "--diff-filter=AMDR",
+        NULL_BYTE_OPTION,
         diffBaseHash
       ];
       const numStatArgs = [
@@ -479,6 +520,7 @@ export class DataSource {
         "--numstat",
         "--find-renames",
         "--diff-filter=AMDR",
+        NULL_BYTE_OPTION,
         diffBaseHash
       ];
 
@@ -488,8 +530,18 @@ export class DataSource {
       }
 
       const gitCommands: Promise<string[]>[] = [
-        this.spawnGit<string[]>(nameStatusArgs, repo, (stdout) => stdout.split(eolRegex), []),
-        this.spawnGit<string[]>(numStatArgs, repo, (stdout) => stdout.split(eolRegex), [])
+        this.spawnGit<string[]>(
+          nameStatusArgs,
+          repo,
+          (stdout) => stdout.split(NULL_BYTE_SEPARATOR),
+          []
+        ),
+        this.spawnGit<string[]>(
+          numStatArgs,
+          repo,
+          (stdout) => stdout.split(NULL_BYTE_SEPARATOR),
+          []
+        )
       ];
       if (isToWorkingTree) {
         gitCommands.push(
@@ -510,28 +562,54 @@ export class DataSource {
       const fileChanges: GitFileChange[] = [];
       const fileLookup: { [file: string]: number } = {};
 
-      for (let i = 0; i < nameStatus.length - 1; i++) {
-        const line = nameStatus[i].split("\t");
-        if (line.length < 2) continue;
-        const oldFilePath = getPathFromStr(line[1]);
-        const newFilePath = getPathFromStr(line[line.length - 1]);
-        fileLookup[newFilePath] = fileChanges.length;
-        fileChanges.push({
-          oldFilePath,
-          newFilePath,
-          type: line[0][0] as GitFileChangeType,
-          additions: null,
-          deletions: null
-        });
+      let ns = 0;
+      while (ns < nameStatus.length && nameStatus[ns] !== "") {
+        const statusChar = (nameStatus[ns] ?? "")[0] ?? "";
+        if (!VALID_FILE_CHANGE_TYPES.has(statusChar)) break;
+        if (statusChar === "R") {
+          const oldFilePath = getPathFromStr(nameStatus[ns + 1] ?? "");
+          const newFilePath = getPathFromStr(nameStatus[ns + 2] ?? "");
+          fileLookup[newFilePath] = fileChanges.length;
+          fileChanges.push({
+            oldFilePath,
+            newFilePath,
+            type: statusChar as GitFileChangeType,
+            additions: null,
+            deletions: null
+          });
+          ns += 3;
+        } else {
+          const filePath = getPathFromStr(nameStatus[ns + 1] ?? "");
+          fileLookup[filePath] = fileChanges.length;
+          fileChanges.push({
+            oldFilePath: filePath,
+            newFilePath: filePath,
+            type: statusChar as GitFileChangeType,
+            additions: null,
+            deletions: null
+          });
+          ns += 2;
+        }
       }
 
-      for (let i = 0; i < numStat.length - 1; i++) {
-        const line = numStat[i].split("\t");
-        if (line.length !== 3) continue;
-        const fileName = line[2].replace(/(.*){.* => (.*)}/, "$1$2").replace(/.* => (.*)/, "$1");
-        if (typeof fileLookup[fileName] === "number") {
-          fileChanges[fileLookup[fileName]].additions = parseInt(line[0], 10);
-          fileChanges[fileLookup[fileName]].deletions = parseInt(line[1], 10);
+      let ni = 0;
+      while (ni < numStat.length && numStat[ni] !== "") {
+        const parts = numStat[ni].split(TAB_SEPARATOR);
+        if (parts.length !== NUMSTAT_FIELD_COUNT) break;
+        const additions = parseInt(parts[0], 10);
+        const deletions = parseInt(parts[1], 10);
+        let filePath: string;
+        if (parts[2] !== "") {
+          filePath = getPathFromStr(parts[2]);
+          ni += 1;
+        } else {
+          filePath = getPathFromStr(numStat[ni + 2] ?? "");
+          ni += 3;
+        }
+        const idx = fileLookup[filePath];
+        if (typeof idx === "number" && fileChanges[idx] !== undefined) {
+          fileChanges[idx].additions = Number.isNaN(additions) ? null : additions;
+          fileChanges[idx].deletions = Number.isNaN(deletions) ? null : deletions;
         }
       }
 
@@ -564,6 +642,18 @@ export class DataSource {
     return this.spawnGit(["show", `${commitHash}:${filePath}`], repo, (stdout) => stdout, "");
   }
 
+  public resolveRefToHash(repo: string, ref: string): Promise<string | null> {
+    if (!isValidGitRef(ref)) {
+      return Promise.resolve(null);
+    }
+    return this.spawnGit<string | null>(
+      ["rev-parse", ref],
+      repo,
+      (stdout) => stdout.split(eolRegex)[0] || null,
+      null
+    );
+  }
+
   public getNewPathOfRenamedFile(
     repo: string,
     commitHash: string,
@@ -578,21 +668,29 @@ export class DataSource {
     return this.spawnGit<string | null>(
       [
         "diff",
+        NAME_STATUS_OPTION,
         DIFF_FILTER_R_OPTION,
         DIFF_FIND_RENAMES_OPTION,
         NULL_BYTE_OPTION,
         commitHash,
-        "HEAD",
-        "--",
-        oldFilePath
+        "HEAD"
       ],
       repo,
       (stdout) => {
-        const fields = stdout.split(NULL_BYTE_SEPARATOR);
         // Format: status\0oldPath\0newPath\0...
-        for (let i = 0; i < fields.length; i++) {
-          if ((fields[i] ?? "")[0] === "R" && i + 2 < fields.length) {
-            return getPathFromStr(fields[i + 2] ?? "");
+        const fields = stdout.split(NULL_BYTE_SEPARATOR);
+        let cursor = 0;
+        while (cursor < fields.length && fields[cursor] !== "") {
+          const statusChar = (fields[cursor] ?? "")[0] ?? "";
+          if (!VALID_FILE_CHANGE_TYPES.has(statusChar)) break;
+          if (statusChar === "R") {
+            const oldPath = getPathFromStr(fields[cursor + 1] ?? "");
+            if (oldPath === oldFilePath) {
+              return getPathFromStr(fields[cursor + 2] ?? "");
+            }
+            cursor += 3;
+          } else {
+            cursor += 2;
           }
         }
         return null;
@@ -648,6 +746,9 @@ export class DataSource {
     lightweight: boolean,
     message: string
   ) {
+    if (!isRefNameSafe(tagName)) {
+      return Promise.resolve(INVALID_REF_NAME_MESSAGE);
+    }
     let args = ["tag"];
     if (lightweight) {
       args.push(tagName);
@@ -667,6 +768,9 @@ export class DataSource {
   }
 
   public createBranch(repo: string, branchName: string, commitHash: string) {
+    if (!isRefNameSafe(branchName)) {
+      return Promise.resolve(INVALID_REF_NAME_MESSAGE);
+    }
     if (!isValidCommitHash(commitHash)) {
       return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
     }
@@ -952,7 +1056,7 @@ export class DataSource {
       COMMIT_ORDER_FLAGS[commitOrdering]
     ];
     for (const author of authors) {
-      args.push(`--author=${author}`);
+      args.push(`--author=${escapeRegExp(author)}`);
     }
     if (branches.length > 0) {
       args.push(...branches);
@@ -1091,15 +1195,18 @@ export class DataSource {
 
   private runGitCommandSpawn(args: string[], repo: string) {
     return new Promise<GitCommandStatus>((resolve) => {
-      let stdout = "",
-        stderr = "",
-        err = false;
-      const cmd = cp.spawn(this.gitPath, args, { cwd: repo });
-      cmd.stdout.on("data", (d: string | Uint8Array) => {
-        stdout += d;
+      const stdoutChunks: Buffer[] = [];
+      const stderrChunks: Buffer[] = [];
+      let err = false;
+      const cmd = cp.spawn(this.gitPath, args, {
+        cwd: repo,
+        env: { ...process.env, LC_ALL: "C" }
       });
-      cmd.stderr.on("data", (d: string | Uint8Array) => {
-        stderr += d;
+      cmd.stdout.on("data", (d: string | Buffer) => {
+        stdoutChunks.push(Buffer.from(d));
+      });
+      cmd.stderr.on("data", (d: string | Buffer) => {
+        stderrChunks.push(Buffer.from(d));
       });
       cmd.on("error", (e: Error) => {
         resolve(e.message.split(eolRegex).join("\n"));
@@ -1110,8 +1217,12 @@ export class DataSource {
         if (code === 0) {
           resolve(null);
         } else {
-          let lines = (stdout !== "" ? stdout : stderr !== "" ? stderr : "").split(eolRegex);
-          resolve(lines.slice(0, lines.length - 1).join("\n"));
+          const stdout = Buffer.concat(stdoutChunks).toString();
+          const stderr = Buffer.concat(stderrChunks).toString();
+          const raw = stdout !== "" ? stdout : stderr !== "" ? stderr : "";
+          const lines = raw.split(eolRegex);
+          if (lines[lines.length - 1] === "") lines.pop();
+          resolve(lines.join("\n"));
         }
       });
     });
@@ -1124,19 +1235,23 @@ export class DataSource {
     errorValue: T
   ) {
     return new Promise<T>((resolve) => {
-      let stdout = "",
-        err = false;
-      const cmd = cp.spawn(this.gitPath, args, { cwd: repo });
-      cmd.stdout.on("data", (d: string | Uint8Array) => {
-        stdout += d;
+      const stdoutChunks: Buffer[] = [];
+      let err = false;
+      const cmd = cp.spawn(this.gitPath, args, {
+        cwd: repo,
+        env: { ...process.env, LC_ALL: "C" }
       });
+      cmd.stdout.on("data", (d: string | Buffer) => {
+        stdoutChunks.push(Buffer.from(d));
+      });
+      cmd.stderr.on("data", () => {});
       cmd.on("error", () => {
         resolve(errorValue);
         err = true;
       });
       cmd.on("close", (code: number | null) => {
         if (err) return;
-        resolve(code === 0 ? successValue(stdout) : errorValue);
+        resolve(code === 0 ? successValue(Buffer.concat(stdoutChunks).toString()) : errorValue);
       });
     });
   }

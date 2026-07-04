@@ -56,8 +56,9 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S11
 
 **シグネチャ**: `public mute()`
 **テスト対象パス**: `src/repoFileWatcher.ts:39-41`
@@ -70,8 +71,9 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S11
 
 **シグネチャ**: `public unmute()`
 **テスト対象パス**: `src/repoFileWatcher.ts:43-46`
@@ -169,3 +171,63 @@ fileChangeRegex は3パターンのOR:
 | TC-043  | watchRoots=[linked git-dir, common-dir], common-dir で `refs/heads/main` が変化   | Normal - second watch root                                                 | 共通 root 側イベントでも 750ms 後に `repoChangeCallback` が1回呼ばれる                                               | shared refs                       |
 | TC-044  | 複数 root から 750ms 以内に `HEAD` と `refs/remotes/origin/main` の変更が連続到達 | Normal - cross-root debounce                                               | `clearTimeout` が1回呼ばれ、750ms 後の `repoChangeCallback` は合計1回だけ実行される                                  | デバウンス維持                    |
 | TC-045  | watchRoots=[linked git-dir], common-dir 配下の `refs/heads/main` を誤って渡す     | Validation - outside configured roots                                      | `repoChangeCallback` が呼ばれない                                                                                    | root 外イベントを拒否             |
+
+## S10: start() glob 構築時の区切り正規化（Windows バックスラッシュ対策）
+
+> Origin: フェーズ1 修正 M4 (watcher-glob-separator-normalize)
+> Added: 2026-07-04T01:35:00Z
+> Status: active
+> Supersedes: -
+> Signature: `public start(watchRoots: string[]): void`
+> Target Path: `src/repoFileWatcher.ts:41-49`
+
+各 watchRoot を `getPathFromStr(path.normalize(watchRoot))` で正規化してから `` `${watchRoot}/**` `` を連結する修正。`getPathFromStr` はバックスラッシュ `\` を `/` へ置換するため、Windows 形式パスでも glob 区切りがフォワードスラッシュに統一される（POSIX 実行時 `path.normalize` は `\` を区切りとして扱わず、`getPathFromStr` が変換を担う）。
+
+| Case ID | Input / Precondition                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                              | Notes                                                                                                                                                  |
+| ------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| TC-046  | watchRoots=[`C:\\repo\\.git`]（バックスラッシュ区切り）        | Normal - backslash normalized                                              | `createFileSystemWatcher` が `C:/repo/.git/**` で1回呼ばれる。glob 引数にバックスラッシュ `\` を含まない                     | getPathFromStr による `\`→`/` 変換                                                                                                                     |
+| TC-047  | watchRoots=[`/path/to/repo/.git`]（既にフォワードスラッシュ）  | Normal - posix path unchanged                                              | `createFileSystemWatcher` が `/path/to/repo/.git/**` で1回呼ばれる。区切りは変化しない                                       | 変換対象なし                                                                                                                                           |
+| TC-048  | watchRoots=[`/path/to/repo/./.git`]（冗長な `./` セグメント）  | Normal - redundant segment collapsed                                       | `path.normalize` により `/./` が畳まれ、`createFileSystemWatcher` が `/path/to/repo/.git/**` で呼ばれる                      | normalize の正規化検証                                                                                                                                 |
+| TC-049  | watchRoots=[]（空配列）                                        | Boundary - empty roots array                                               | `createFileSystemWatcher` が呼ばれない（0回）。`fsWatchers.length === 0`                                                     | map が空配列を返す                                                                                                                                     |
+| TC-050  | watchRoots=[`""`]（空文字列）                                  | Boundary - empty string root                                               | `path.normalize("")` が `"."` を返し、`createFileSystemWatcher` が `./**` で1回呼ばれる                                      | 空文字 root の境界                                                                                                                                     |
+| TC-051  | watchRoots=[`C:\\repo\\.git\\`]（末尾バックスラッシュ）        | Boundary - trailing separator                                              | `path.normalize` が末尾区切りを除去し、`createFileSystemWatcher` が `C:/repo/.git/**` で呼ばれる。`\**` や `//**` を含まない | 末尾区切り + `\`→`/`。テスト未カバー: 期待値は Windows の `path.normalize` 挙動前提で、POSIX 実行環境（CI）では `\` を区切りとして扱わず再現不能のため |
+| TC-052  | watchRoots=[`C:\\a\\.git`, `/b/.git`]（混在区切りの複数 root） | Boundary - mixed separators multi-root                                     | `createFileSystemWatcher` が2回呼ばれ、glob は各々 `C:/a/.git/**` と `/b/.git/**`。いずれもバックスラッシュを含まない        | 複数 root ごとに正規化される                                                                                                                           |
+
+## S11: mute()/unmute() 参照カウント方式（muteCount）
+
+> Origin: フェーズ2 修正 L7 (watcher-ref-counted-mute)
+> Added: 2026-07-04T02:44:58Z
+> Status: active
+> Supersedes: S4, S5
+> Signature: `public mute(): void` / `public unmute(): void` / `private refresh(uri)`
+> Target Path: `src/repoFileWatcher.ts:34, 60-72`
+
+`muted: boolean` を `muteCount: number` へ変更し、`mute()` で +1、`unmute()` で（`muteCount > 0` のときのみ）-1、`refresh` の無視判定を `muteCount > 0` とする修正。ネストした mute/unmute を正しく釣り合わせ、対応する回数だけ unmute しない限り監視が再開されないことを保証する。過剰 unmute でも負値に沈まない（1回の mute が確実に抑止を成立させる）。旧 S4/S5（boolean `muted`）を置き換える。観測は「マッチする git 管理パス変更時に `repoChangeCallback` がスケジュールされるか」で行う。
+
+| Case ID | Input / Precondition                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                             | Notes                                      |
+| ------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| TC-053  | `mute()` を1回呼んだ後、マッチする `HEAD` 変更を発火                        | Normal - single mute suppresses                                            | `muteCount===1` で `refresh` が早期リターンし、`repoChangeCallback` がスケジュールされない                  | 単一 mute の抑止                           |
+| TC-054  | `mute()` を2回（ネスト）呼んだ後、マッチする変更を発火                      | Normal - nested mute still suppresses                                      | `muteCount===2`（>0）で `repoChangeCallback` がスケジュールされない                                         | ネスト mute で加算                         |
+| TC-055  | `mute()`×2 → `unmute()`×1 の後、マッチする変更を発火                        | Boundary - partial unmute still muted                                      | `muteCount===1`（まだ>0）で `repoChangeCallback` がスケジュールされない                                     | 参照カウントの肝（対応回数まで再開しない） |
+| TC-056  | `mute()`×2 → `unmute()`×2 の後、`resumeAt` 経過後にマッチする変更を発火     | Boundary - fully balanced resumes                                          | `muteCount===0` かつ猶予期間経過で、750ms 後に `repoChangeCallback` が1回呼ばれる                           | 釣り合った unmute で再開                   |
+| TC-057  | `muteCount===0` の状態で `unmute()`（過剰）→ 続けて `mute()`×1 → 変更を発火 | Boundary - underflow guard                                                 | 過剰 unmute で `muteCount` が負に沈まず0維持。後続 `mute()`×1 で確実に `muteCount===1` となり callback 抑止 | `if (muteCount > 0)` ガードの効果          |
+| TC-058  | `mute()` 後に `unmute()` を呼ぶ                                             | Boundary - resumeAt set on unmute                                          | `unmute()` 実行時に `resumeAt` が `Date.now() + 1500` 付近（±50ms）に設定される                             | 猶予期間の維持（旧 S5 の観点を継承）       |
+
+## S12: stop()/mute() 保留デバウンスタイマーのクリア
+
+> Origin: フェーズ2 修正 L9 (watcher-clear-pending-timer)
+> Added: 2026-07-04T02:44:58Z
+> Status: active
+> Supersedes: -
+> Signature: `public stop(): void` / `public mute(): void`
+> Target Path: `src/repoFileWatcher.ts:57-70`
+
+`stop()` と `mute()` に「`refreshTimeout !== null` なら `clearTimeout` して `null` 化する」処理を追加する修正。監視停止・ミュート時に保留中のデバウンス済み `repoChangeCallback` が後から発火してしまうのを防ぐ。
+
+| Case ID | Input / Precondition                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                           | Notes                          |
+| ------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| TC-059  | マッチ変更で `refreshTimeout` 保留中に `stop()` を呼ぶ                 | Normal - stop clears pending timer                                         | `clearTimeout(refreshTimeout)` が呼ばれ `refreshTimeout=null`。タイマー満了時刻を過ぎても callback 未発火 | 停止時の保留クリア             |
+| TC-060  | `refreshTimeout===null`（保留なし）で `stop()` を呼ぶ                  | Boundary - stop no pending timer                                           | `refreshTimeout` 用の `clearTimeout` は呼ばれない（既に null）。エラーなく完了                            | 保留なし境界                   |
+| TC-061  | マッチ変更で `refreshTimeout` 保留中に `mute()` を呼ぶ                 | Normal - mute clears pending timer                                         | `clearTimeout(refreshTimeout)` が呼ばれ `refreshTimeout=null`。加えて `muteCount` が +1 される            | ミュート時の保留クリア         |
+| TC-062  | `refreshTimeout===null`（保留なし）で `mute()` を呼ぶ                  | Boundary - mute no pending timer                                           | `refreshTimeout` 用の `clearTimeout` は呼ばれず、`muteCount` のみ +1 される                               | 保留なし境界                   |
+| TC-063  | `mute()` で保留タイマークリア後、時間を `advanceTimersByTime` で進める | Boundary - cleared timer never fires                                       | クリア済みの保留分の `repoChangeCallback` が発火しない（0回）                                             | クリア済みタイマーの非発火保証 |

@@ -1,3 +1,5 @@
+import { EventEmitter } from "node:events";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -46,6 +48,24 @@ const LONG_HISTORY_RETRY_COMMIT_INDEX = 6;
 const RATE_LIMIT_RESET_MS = 1_700_000_000_000;
 const RATE_LIMIT_RESET_SECONDS = "1700000000";
 const SHORT_HISTORY_RETRY_COMMIT_INDEX = 1;
+const REQUEST_TIMEOUT_ERROR = "timeout";
+
+// Simulates an https.get whose socket emits a "timeout" event; the request exposes a destroy
+// spy that (like Node's ClientRequest) emits "error" with the passed error when destroyed.
+function mockHttpsTimeout(): { destroy: ReturnType<typeof vi.fn> } {
+  const request = new EventEmitter();
+  const destroy = vi.fn((error?: unknown) => {
+    request.emit("error", error);
+  });
+  (request as unknown as { destroy: typeof destroy }).destroy = destroy;
+  httpsGetMock.mockImplementationOnce(() => {
+    queueMicrotask(() => {
+      request.emit("timeout");
+    });
+    return request as unknown as ReturnType<typeof httpsGetMock>;
+  });
+  return { destroy };
+}
 
 describe("AvatarManager remote fetch flows", () => {
   beforeEach(() => {
@@ -626,6 +646,269 @@ describe("AvatarManager remote fetch flows", () => {
       // Then: No avatar is saved after the two null results.
       expect(downloadAvatarImageSpy).toHaveBeenCalledTimes(2);
       expect(saveAvatarSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("request timeout destroy (S23)", () => {
+    it("TC-086: destroys the GitHub request and requeues on socket timeout", async () => {
+      // Case: TC-086
+      // Given: the GitHub request socket times out
+      useFixedTime();
+      const harness = createAvatarManager();
+      const avatarRequest = createAvatarRequest();
+      const queueAddItemSpy = vi
+        .spyOn(harness.queue, "addItem")
+        .mockImplementation(() => undefined);
+      const { destroy } = mockHttpsTimeout();
+
+      // When: fetchFromGithub encounters the timeout event
+      harness.manager.fetchFromGithub(avatarRequest, GITHUB_REMOTE_OWNER, GITHUB_REMOTE_REPO);
+      await flushAsyncWork();
+
+      // Then: req.destroy(Error("timeout")) fires and the error path requeues after 5 minutes
+      expect(destroy).toHaveBeenCalledTimes(1);
+      expect(destroy).toHaveBeenCalledWith(new Error(REQUEST_TIMEOUT_ERROR));
+      expect(harness.manager.githubTimeout).toBe(DEFAULT_TIME_MS + FIVE_MINUTES_MS);
+      expect(queueAddItemSpy).toHaveBeenCalledWith(
+        avatarRequest,
+        DEFAULT_TIME_MS + FIVE_MINUTES_MS,
+        false
+      );
+    });
+
+    it("TC-087: destroys the GitLab request and requeues on socket timeout", async () => {
+      // Case: TC-087
+      // Given: the GitLab request socket times out
+      useFixedTime();
+      const harness = createAvatarManager();
+      const avatarRequest = createAvatarRequest();
+      const queueAddItemSpy = vi
+        .spyOn(harness.queue, "addItem")
+        .mockImplementation(() => undefined);
+      const { destroy } = mockHttpsTimeout();
+
+      // When: fetchFromGitLab encounters the timeout event
+      harness.manager.fetchFromGitLab(avatarRequest);
+      await flushAsyncWork();
+
+      // Then: req.destroy(Error("timeout")) fires and the error path requeues after 5 minutes
+      expect(destroy).toHaveBeenCalledTimes(1);
+      expect(destroy).toHaveBeenCalledWith(new Error(REQUEST_TIMEOUT_ERROR));
+      expect(harness.manager.gitLabTimeout).toBe(DEFAULT_TIME_MS + FIVE_MINUTES_MS);
+      expect(queueAddItemSpy).toHaveBeenCalledWith(
+        avatarRequest,
+        DEFAULT_TIME_MS + FIVE_MINUTES_MS,
+        false
+      );
+    });
+
+    it("TC-088: destroys the Gravatar download request and saves nothing on timeout", async () => {
+      // Case: TC-088
+      // Given: the first Gravatar download times out and the identicon download resolves null
+      useFixedTime();
+      const harness = createAvatarManager();
+      const avatarRequest = createAvatarRequest();
+      const saveAvatarSpy = vi.spyOn(harness.manager, "saveAvatar");
+      const { destroy } = mockHttpsTimeout();
+      mockHttpsResponse({ statusCode: 404 });
+
+      // When: fetchFromGravatar runs the download that times out
+      await harness.manager.fetchFromGravatar(avatarRequest);
+      await flushAsyncWork();
+
+      // Then: req.destroy(Error("timeout")) fires once and no avatar is saved
+      expect(destroy).toHaveBeenCalledTimes(1);
+      expect(destroy).toHaveBeenCalledWith(new Error(REQUEST_TIMEOUT_ERROR));
+      expect(saveAvatarSpy).not.toHaveBeenCalled();
+    });
+
+    it("TC-089: does not destroy the GitHub request on a normal 200 response", async () => {
+      // Case: TC-089
+      // Given: the GitHub request returns a normal 200 response (no timeout)
+      const harness = createAvatarManager();
+      const avatarRequest = createAvatarRequest();
+      const downloadAvatarImageSpy = vi
+        .spyOn(harness.manager, "downloadAvatarImage")
+        .mockResolvedValue(PNG_IMAGE_NAME);
+      const saveAvatarSpy = vi.spyOn(harness.manager, "saveAvatar");
+      const httpRequest = mockHttpsResponse({
+        chunks: [Buffer.from(JSON.stringify({ author: { avatar_url: GITHUB_AVATAR_URL } }))],
+        statusCode: GITHUB_OK_STATUS
+      });
+      const destroy = vi.fn();
+      (httpRequest as unknown as { destroy: typeof destroy }).destroy = destroy;
+
+      // When: fetchFromGithub processes the successful response
+      harness.manager.fetchFromGithub(avatarRequest, GITHUB_REMOTE_OWNER, GITHUB_REMOTE_REPO);
+      await flushAsyncWork();
+
+      // Then: destroy is never called and the normal download/save path runs
+      expect(destroy).not.toHaveBeenCalled();
+      expect(downloadAvatarImageSpy).toHaveBeenCalledTimes(1);
+      expect(saveAvatarSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("rate limit headerless requeue (S24)", () => {
+    it("TC-090: requeues a GitHub 403 with a default 5-minute delay when reset is unavailable", async () => {
+      // Case: TC-090
+      // Given: a GitHub 403 response with no rate-limit reset header (githubTimeout stays 0)
+      useFixedTime();
+      const harness = createAvatarManager();
+      const avatarRequest = createAvatarRequest();
+      const queueAddItemSpy = vi
+        .spyOn(harness.queue, "addItem")
+        .mockImplementation(() => undefined);
+      const fetchFromGravatarSpy = vi
+        .spyOn(harness.manager, "fetchFromGravatar")
+        .mockResolvedValue(undefined);
+      mockHttpsResponse({
+        chunks: [Buffer.from(JSON.stringify({}))],
+        statusCode: GITHUB_FORBIDDEN_STATUS
+      });
+
+      // When: fetchFromGithub handles the headerless 403
+      harness.manager.fetchFromGithub(avatarRequest, GITHUB_REMOTE_OWNER, GITHUB_REMOTE_REPO);
+      await flushAsyncWork();
+
+      // Then: it requeues with failedAttempt=true after a default 5-minute delay
+      expect(queueAddItemSpy).toHaveBeenCalledTimes(1);
+      expect(queueAddItemSpy).toHaveBeenCalledWith(
+        avatarRequest,
+        DEFAULT_TIME_MS + FIVE_MINUTES_MS,
+        true
+      );
+      expect(fetchFromGravatarSpy).not.toHaveBeenCalled();
+    });
+
+    it("TC-091: requeues a GitHub 403 for githubTimeout when the reset time is known", async () => {
+      // Case: TC-091
+      // Given: a GitHub 403 with a preset non-zero githubTimeout
+      const harness = createAvatarManager();
+      const avatarRequest = createAvatarRequest();
+      harness.manager.githubTimeout = RATE_LIMIT_RESET_MS;
+      const queueAddItemSpy = vi
+        .spyOn(harness.queue, "addItem")
+        .mockImplementation(() => undefined);
+      mockHttpsResponse({
+        chunks: [Buffer.from(JSON.stringify({}))],
+        statusCode: GITHUB_FORBIDDEN_STATUS
+      });
+
+      // When: fetchFromGithub handles the 403 with a known reset time
+      harness.manager.fetchFromGithub(avatarRequest, GITHUB_REMOTE_OWNER, GITHUB_REMOTE_REPO);
+      await flushAsyncWork();
+
+      // Then: it requeues for githubTimeout with failedAttempt=false
+      expect(queueAddItemSpy).toHaveBeenCalledTimes(1);
+      expect(queueAddItemSpy).toHaveBeenCalledWith(avatarRequest, RATE_LIMIT_RESET_MS, false);
+    });
+
+    it("TC-092: requeues a GitLab 429 with a default 5-minute delay when reset is unavailable", async () => {
+      // Case: TC-092
+      // Given: a GitLab 429 response with no rate-limit reset header (gitLabTimeout stays 0)
+      useFixedTime();
+      const harness = createAvatarManager();
+      const avatarRequest = createAvatarRequest();
+      const queueAddItemSpy = vi
+        .spyOn(harness.queue, "addItem")
+        .mockImplementation(() => undefined);
+      const fetchFromGravatarSpy = vi
+        .spyOn(harness.manager, "fetchFromGravatar")
+        .mockResolvedValue(undefined);
+      mockHttpsResponse({
+        chunks: [Buffer.from(JSON.stringify([]))],
+        statusCode: GITLAB_RATE_LIMIT_STATUS
+      });
+
+      // When: fetchFromGitLab handles the headerless 429
+      harness.manager.fetchFromGitLab(avatarRequest);
+      await flushAsyncWork();
+
+      // Then: it requeues with failedAttempt=true after a default 5-minute delay
+      expect(queueAddItemSpy).toHaveBeenCalledTimes(1);
+      expect(queueAddItemSpy).toHaveBeenCalledWith(
+        avatarRequest,
+        DEFAULT_TIME_MS + FIVE_MINUTES_MS,
+        true
+      );
+      expect(fetchFromGravatarSpy).not.toHaveBeenCalled();
+    });
+
+    it("TC-093: requeues a GitLab 429 for gitLabTimeout when the reset time is known", async () => {
+      // Case: TC-093
+      // Given: a GitLab 429 with a preset non-zero gitLabTimeout
+      const harness = createAvatarManager();
+      const avatarRequest = createAvatarRequest();
+      harness.manager.gitLabTimeout = RATE_LIMIT_RESET_MS;
+      const queueAddItemSpy = vi
+        .spyOn(harness.queue, "addItem")
+        .mockImplementation(() => undefined);
+      mockHttpsResponse({
+        chunks: [Buffer.from(JSON.stringify([]))],
+        statusCode: GITLAB_RATE_LIMIT_STATUS
+      });
+
+      // When: fetchFromGitLab handles the 429 with a known reset time
+      harness.manager.fetchFromGitLab(avatarRequest);
+      await flushAsyncWork();
+
+      // Then: it requeues for gitLabTimeout with failedAttempt=false
+      expect(queueAddItemSpy).toHaveBeenCalledTimes(1);
+      expect(queueAddItemSpy).toHaveBeenCalledWith(avatarRequest, RATE_LIMIT_RESET_MS, false);
+    });
+
+    it("TC-094: uses a 5-minute (300000ms) constant for the headerless requeue delay", async () => {
+      // Case: TC-094
+      // Given: the retry interval constant mirrored in the test utilities is 5 minutes
+      expect(FIVE_MINUTES_MS).toBe(300_000);
+      useFixedTime();
+      const harness = createAvatarManager();
+      const avatarRequest = createAvatarRequest();
+      const queueAddItemSpy = vi
+        .spyOn(harness.queue, "addItem")
+        .mockImplementation(() => undefined);
+      vi.spyOn(harness.manager, "fetchFromGravatar").mockResolvedValue(undefined);
+      mockHttpsResponse({
+        chunks: [Buffer.from(JSON.stringify({}))],
+        statusCode: GITHUB_FORBIDDEN_STATUS
+      });
+
+      // When: a headerless 403 is requeued
+      harness.manager.fetchFromGithub(avatarRequest, GITHUB_REMOTE_OWNER, GITHUB_REMOTE_REPO);
+      await flushAsyncWork();
+
+      // Then: the requeue delay past the fetch time equals the 300000ms constant
+      const checkAfter = queueAddItemSpy.mock.calls[FIRST_CALL_INDEX][1] as number;
+      expect(checkAfter - DEFAULT_TIME_MS).toBe(300_000);
+    });
+
+    it("TC-095: bases the headerless requeue on the fetch time, not on githubTimeout (0)", async () => {
+      // Case: TC-095
+      // Given: a headerless GitHub 403 with githubTimeout still 0
+      useFixedTime();
+      const harness = createAvatarManager();
+      const avatarRequest = createAvatarRequest();
+      const queueAddItemSpy = vi
+        .spyOn(harness.queue, "addItem")
+        .mockImplementation(() => undefined);
+      vi.spyOn(harness.manager, "fetchFromGravatar").mockResolvedValue(undefined);
+      mockHttpsResponse({
+        chunks: [Buffer.from(JSON.stringify({}))],
+        statusCode: GITHUB_FORBIDDEN_STATUS
+      });
+
+      // When: fetchFromGithub requeues the headerless 403
+      harness.manager.fetchFromGithub(avatarRequest, GITHUB_REMOTE_OWNER, GITHUB_REMOTE_REPO);
+      await flushAsyncWork();
+
+      // Then: checkAfter is fetch-time + 5 minutes, not githubTimeout(0) + 5 minutes
+      expect(queueAddItemSpy).toHaveBeenCalledWith(
+        avatarRequest,
+        DEFAULT_TIME_MS + FIVE_MINUTES_MS,
+        true
+      );
+      expect(harness.manager.githubTimeout).toBe(0);
     });
   });
 });

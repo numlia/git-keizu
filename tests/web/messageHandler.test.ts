@@ -9,8 +9,9 @@ vi.mock("../../web/fileTree", () => ({
   generateGitFileTree: vi.fn()
 }));
 
-import type { ResponseMessage } from "../../src/types";
+import type { GitCommitDetails, ResponseMessage } from "../../src/types";
 import { showErrorDialog } from "../../web/dialogs";
+import { generateGitFileTree } from "../../web/fileTree";
 import { type GitKeizuViewAPI, handleMessage } from "../../web/messageHandler";
 
 function createMockGitKeizuView(): GitKeizuViewAPI {
@@ -511,5 +512,100 @@ describe("handleMessage setShowRecentActions response (S9)", () => {
     expect(gitKeizu.setShowRecentActions).toHaveBeenCalledWith(false);
     expect(gitKeizu.refresh).not.toHaveBeenCalled();
     expect(showErrorDialog).not.toHaveBeenCalled();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S10: commitDetails fileTree generation try/catch (messageHandler)   */
+/* ------------------------------------------------------------------ */
+
+function makeCommitDetails(): GitCommitDetails {
+  return {
+    hash: "abc123",
+    parents: [],
+    author: "Alice",
+    email: "alice@test.com",
+    date: 1700000000,
+    committer: "Alice",
+    committerEmail: "alice@test.com",
+    body: "commit body",
+    fileChanges: []
+  };
+}
+
+describe("handleMessage commitDetails try/catch (S10)", () => {
+  let gitKeizu: GitKeizuViewAPI;
+  const COMMIT_DETAILS_ERROR = "Unable to load commit details";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitKeizu = createMockGitKeizuView();
+  });
+
+  it("shows commit details when the file tree builds successfully (TC-028)", () => {
+    // Case: TC-028
+    // Given: a valid commitDetails and generateGitFileTree returning a tree
+    const commitDetails = makeCommitDetails();
+    const fileTree = { type: "folder", name: "", folderPath: "", contents: {}, open: true };
+    vi.mocked(generateGitFileTree).mockReturnValue(
+      fileTree as ReturnType<typeof generateGitFileTree>
+    );
+    const msg: ResponseMessage = { command: "commitDetails", commitDetails };
+
+    // When: handleMessage processes the response
+    handleMessage(msg, gitKeizu);
+
+    // Then: showCommitDetails is called once with the details and tree; no error path runs
+    expect(gitKeizu.showCommitDetails).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.showCommitDetails).toHaveBeenCalledWith(commitDetails, fileTree);
+    expect(gitKeizu.hideCommitDetails).not.toHaveBeenCalled();
+    expect(showErrorDialog).not.toHaveBeenCalled();
+  });
+
+  it("hides details and surfaces the Error message when the tree build throws (TC-029)", () => {
+    // Case: TC-029
+    // Given: generateGitFileTree throws an Error
+    vi.mocked(generateGitFileTree).mockImplementation(() => {
+      throw new Error("dup");
+    });
+    const msg: ResponseMessage = { command: "commitDetails", commitDetails: makeCommitDetails() };
+
+    // When: handleMessage processes the response
+    handleMessage(msg, gitKeizu);
+
+    // Then: loading is cleared and the Error message is shown; showCommitDetails is not called
+    expect(gitKeizu.hideCommitDetails).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(COMMIT_DETAILS_ERROR, "dup", null);
+    expect(gitKeizu.showCommitDetails).not.toHaveBeenCalled();
+  });
+
+  it("passes a null message when the tree build throws a non-Error (TC-030)", () => {
+    // Case: TC-030
+    // Given: generateGitFileTree throws a non-Error value
+    vi.mocked(generateGitFileTree).mockImplementation(() => {
+      // eslint-disable-next-line no-throw-literal -- intentionally testing the non-Error branch
+      throw "x";
+    });
+    const msg: ResponseMessage = { command: "commitDetails", commitDetails: makeCommitDetails() };
+
+    // When: handleMessage processes the response
+    handleMessage(msg, gitKeizu);
+
+    // Then: the error dialog message is null (error is not an Error instance)
+    expect(showErrorDialog).toHaveBeenCalledWith(COMMIT_DETAILS_ERROR, null, null);
+  });
+
+  it("hides details and shows an error without building a tree when details are null (TC-031)", () => {
+    // Case: TC-031
+    // Given: commitDetails is null
+    const msg: ResponseMessage = { command: "commitDetails", commitDetails: null };
+
+    // When: handleMessage processes the response
+    handleMessage(msg, gitKeizu);
+
+    // Then: loading is cleared and an error is shown; the tree builder is never called
+    expect(gitKeizu.hideCommitDetails).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(COMMIT_DETAILS_ERROR, null, null);
+    expect(generateGitFileTree).not.toHaveBeenCalled();
   });
 });

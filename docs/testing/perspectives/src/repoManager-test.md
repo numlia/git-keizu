@@ -342,3 +342,22 @@
 | TC-102  | workspaceFolders に2件、一方で searchDirectoryForRepos が true  | Normal - standard                                                          | 2回 searchDirectoryForRepos 呼ばれ、sendRepos が1回呼ばれる                       | 複数フォルダ混合    |
 | TC-103  | workspaceFolders が空配列                                       | Boundary - empty                                                           | ループ未実行、sendRepos 呼ばれない                                                | L201                |
 | TC-104  | maxDepthOfRepoSearch が 0                                       | Boundary - zero                                                            | searchDirectoryForRepos が maxDepth=0 で呼ばれ、再帰なしで false → sendRepos なし | L205 maxDepth境界値 |
+
+## S19: dispose() 保留イベント処理タイマーのクリア
+
+> Origin: フェーズ2 修正 L10 (repo-manager-dispose-clear-timers)
+> Added: 2026-07-04T02:44:58Z
+> Status: active
+> Supersedes: -
+> Signature: `public dispose(): void`
+> Target Path: `src/repoManager.ts:62-80`
+
+`dispose()` に「`processCreateEventsTimeout` / `processChangeEventsTimeout` がそれぞれ `!== null` なら `clearTimeout` して `null` 化する」処理を追加する修正。破棄後に保留中のデバウンス済み `processCreateEvents` / `processChangeEvents` が発火してしまうのを防ぐ。既存 S3（handler/watcher の破棄）に対する追加処理であり、S3 の観点は変更しない。
+
+| Case ID | Input / Precondition                                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                      | Notes                        |
+| ------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| TC-105  | `processCreateEventsTimeout` が保留中（`!== null`）で `dispose()` を呼ぶ        | Normal - create timeout cleared                                            | `clearTimeout(processCreateEventsTimeout)` が呼ばれ `null` 化される。保留の `processCreateEvents` が発火しない       | 作成イベントタイマーのクリア |
+| TC-106  | `processCreateEventsTimeout === null` で `dispose()` を呼ぶ                     | Boundary - create timeout null                                             | `processCreateEventsTimeout` 用の `clearTimeout` は呼ばれない。エラーなく完了                                        | 保留なし境界                 |
+| TC-107  | `processChangeEventsTimeout` が保留中（`!== null`）で `dispose()` を呼ぶ        | Normal - change timeout cleared                                            | `clearTimeout(processChangeEventsTimeout)` が呼ばれ `null` 化される。保留の `processChangeEvents` が発火しない       | 変更イベントタイマーのクリア |
+| TC-108  | `processChangeEventsTimeout === null` で `dispose()` を呼ぶ                     | Boundary - change timeout null                                             | `processChangeEventsTimeout` 用の `clearTimeout` は呼ばれない。エラーなく完了                                        | 保留なし境界                 |
+| TC-109  | 両タイマーとも保留中で `dispose()` を呼び、`advanceTimersByTime` で時間を進める | Boundary - both cleared no fire                                            | 両 timeout に `clearTimeout` + `null` 化が行われ、`processCreateEvents` / `processChangeEvents` がどちらも発火しない | 破棄後の保留イベント非発火   |

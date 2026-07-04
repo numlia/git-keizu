@@ -263,7 +263,7 @@ describe("getCommitDate", () => {
     });
   });
 
-  describe("S5: time unit boundary values", () => {
+  describe("S9: time unit boundaries with round-carry correction", () => {
     beforeEach(() => {
       vi.useFakeTimers();
       vi.setSystemTime(MOCK_NOW_MS);
@@ -274,160 +274,121 @@ describe("getCommitDate", () => {
       vi.useRealTimers();
     });
 
-    it("TC-015: diff=0 returns 0 seconds ago", () => {
-      // Case: TC-015
-      // Given: dateVal equals current time (diff=0)
-      const dateVal = MOCK_NOW_SEC;
-
-      // When: getCommitDate is called
-      const result = getCommitDate(dateVal);
-
-      // Then: value = "0 seconds ago" (0 !== 1 -> plural)
-      expect(result.value).toBe("0 seconds ago");
-    });
-
-    it("TC-016: diff=59 returns 59 seconds ago (max second)", () => {
-      // Case: TC-016
-      // Given: diff = 59 seconds (just below SECONDS_IN_MINUTE=60)
-      const dateVal = MOCK_NOW_SEC - 59;
-
-      // When: getCommitDate is called
-      const result = getCommitDate(dateVal);
-
-      // Then: value = "59 seconds ago"
-      expect(result.value).toBe("59 seconds ago");
-    });
-
-    it("TC-017: diff=60 returns 1 minute ago (seconds -> minutes boundary)", () => {
-      // Case: TC-017
-      // Given: diff = 60 seconds (exactly SECONDS_IN_MINUTE)
+    it("TC-035: diff=60 returns 1 minute ago (min minute, no carry)", () => {
+      // Case: TC-035
+      // Given: diff = 60 seconds (exactly the minute threshold)
       const dateVal = MOCK_NOW_SEC - 60;
 
       // When: getCommitDate is called
       const result = getCommitDate(dateVal);
 
-      // Then: value = "1 minute ago" (60/60=1, singular)
+      // Then: value = "1 minute ago" (round(60/60)=1, 1*60=60 < 3600 so no carry)
       expect(result.value).toBe("1 minute ago");
     });
 
-    it("TC-018: diff=3599 returns 60 minutes ago (max minute)", () => {
-      // Case: TC-018
-      // Given: diff = 3599 seconds (just below SECONDS_IN_HOUR=3600)
+    it("TC-036: diff=59 returns 59 seconds ago (max second, no carry)", () => {
+      // Case: TC-036
+      // Given: diff = 59 seconds (just below the minute threshold)
+      const dateVal = MOCK_NOW_SEC - 59;
+
+      // When: getCommitDate is called
+      const result = getCommitDate(dateVal);
+
+      // Then: value = "59 seconds ago" (59*1=59 < 60 so no carry)
+      expect(result.value).toBe("59 seconds ago");
+    });
+
+    it("TC-037: diff=3570 carries minute rounding up to 1 hour ago", () => {
+      // Case: TC-037
+      // Given: diff = 3570 seconds (round(3570/60)=60, reaching the hour threshold)
+      const dateVal = MOCK_NOW_SEC - 3570;
+
+      // When: getCommitDate is called
+      const result = getCommitDate(dateVal);
+
+      // Then: value = "1 hour ago" (60*60=3600 >= 3600 carries to hour, count=1)
+      expect(result.value).toBe("1 hour ago");
+    });
+
+    it("TC-038: diff=3599 carries max minute up to 1 hour ago", () => {
+      // Case: TC-038
+      // Given: diff = 3599 seconds (round(3599/60)=60), old behavior was "60 minutes ago"
       const dateVal = MOCK_NOW_SEC - 3599;
 
       // When: getCommitDate is called
       const result = getCommitDate(dateVal);
 
-      // Then: value = "60 minutes ago" (3599/60 ~ 59.98, Math.round=60)
-      expect(result.value).toBe("60 minutes ago");
-    });
-
-    it("TC-019: diff=3600 returns 1 hour ago (minutes -> hours boundary)", () => {
-      // Case: TC-019
-      // Given: diff = 3600 seconds (exactly SECONDS_IN_HOUR)
-      const dateVal = MOCK_NOW_SEC - 3600;
-
-      // When: getCommitDate is called
-      const result = getCommitDate(dateVal);
-
-      // Then: value = "1 hour ago" (3600/3600=1, singular)
+      // Then: value = "1 hour ago" (carry to hour, replacing old "60 minutes ago")
       expect(result.value).toBe("1 hour ago");
     });
 
-    it("TC-020: diff=86399 returns 24 hours ago (max hour)", () => {
-      // Case: TC-020
-      // Given: diff = 86399 seconds (just below SECONDS_IN_DAY=86400)
+    it("TC-039: diff=86399 carries max hour up to 1 day ago", () => {
+      // Case: TC-039
+      // Given: diff = 86399 seconds (round(86399/3600)=24), old behavior was "24 hours ago"
       const dateVal = MOCK_NOW_SEC - 86_399;
 
       // When: getCommitDate is called
       const result = getCommitDate(dateVal);
 
-      // Then: value = "24 hours ago" (86399/3600 ~ 23.99, Math.round=24)
-      expect(result.value).toBe("24 hours ago");
-    });
-
-    it("TC-021: diff=86400 returns 1 day ago (hours -> days boundary)", () => {
-      // Case: TC-021
-      // Given: diff = 86400 seconds (exactly SECONDS_IN_DAY)
-      const dateVal = MOCK_NOW_SEC - 86_400;
-
-      // When: getCommitDate is called
-      const result = getCommitDate(dateVal);
-
-      // Then: value = "1 day ago" (86400/86400=1, singular)
+      // Then: value = "1 day ago" (24*3600=86400 >= 86400 carries to day)
       expect(result.value).toBe("1 day ago");
     });
 
-    it("TC-022: diff=604799 returns 7 days ago (max day)", () => {
-      // Case: TC-022
-      // Given: diff = 604799 seconds (just below SECONDS_IN_WEEK=604800)
+    it("TC-040: diff=604799 carries max day up to 1 week ago", () => {
+      // Case: TC-040
+      // Given: diff = 604799 seconds (round(604799/86400)=7), old behavior was "7 days ago"
       const dateVal = MOCK_NOW_SEC - 604_799;
 
       // When: getCommitDate is called
       const result = getCommitDate(dateVal);
 
-      // Then: value = "7 days ago" (604799/86400 ~ 6.99, Math.round=7)
-      expect(result.value).toBe("7 days ago");
-    });
-
-    it("TC-023: diff=604800 returns 1 week ago (days -> weeks boundary)", () => {
-      // Case: TC-023
-      // Given: diff = 604800 seconds (exactly SECONDS_IN_WEEK)
-      const dateVal = MOCK_NOW_SEC - 604_800;
-
-      // When: getCommitDate is called
-      const result = getCommitDate(dateVal);
-
-      // Then: value = "1 week ago" (604800/604800=1, singular)
+      // Then: value = "1 week ago" (7*86400=604800 >= 604800 carries to week)
       expect(result.value).toBe("1 week ago");
     });
 
-    it("TC-024: diff=2629799 returns 4 weeks ago (max week)", () => {
-      // Case: TC-024
-      // Given: diff = 2629799 seconds (just below SECONDS_IN_MONTH=2629800)
-      const dateVal = MOCK_NOW_SEC - 2_629_799;
-
-      // When: getCommitDate is called
-      const result = getCommitDate(dateVal);
-
-      // Then: value = "4 weeks ago" (2629799/604800 ~ 4.35, Math.round=4)
-      expect(result.value).toBe("4 weeks ago");
-    });
-
-    it("TC-025: diff=2629800 returns 1 month ago (weeks -> months boundary)", () => {
-      // Case: TC-025
-      // Given: diff = 2629800 seconds (exactly SECONDS_IN_MONTH)
-      const dateVal = MOCK_NOW_SEC - 2_629_800;
-
-      // When: getCommitDate is called
-      const result = getCommitDate(dateVal);
-
-      // Then: value = "1 month ago" (2629800/2629800=1, singular)
-      expect(result.value).toBe("1 month ago");
-    });
-
-    it("TC-026: diff=31557599 returns 12 months ago (max month)", () => {
-      // Case: TC-026
-      // Given: diff = 31557599 seconds (just below SECONDS_IN_YEAR=31557600)
+    it("TC-041: diff=31557599 carries max month up to 1 year ago", () => {
+      // Case: TC-041
+      // Given: diff = 31557599 seconds (round(31557599/2629800)=12), old behavior was "12 months ago"
       const dateVal = MOCK_NOW_SEC - 31_557_599;
 
       // When: getCommitDate is called
       const result = getCommitDate(dateVal);
 
-      // Then: value = "12 months ago" (31557599/2629800 ~ 12.0, Math.round=12)
-      expect(result.value).toBe("12 months ago");
+      // Then: value = "1 year ago" (12*2629800=31557600 >= 31557600 carries to year)
+      expect(result.value).toBe("1 year ago");
     });
 
-    it("TC-027: diff=31557600 returns 1 year ago (months -> years boundary)", () => {
-      // Case: TC-027
-      // Given: diff = 31557600 seconds (exactly SECONDS_IN_YEAR)
-      const dateVal = MOCK_NOW_SEC - 31_557_600;
+    it("TC-042: diff=2629799 returns 4 weeks ago (week max, no carry)", () => {
+      // Case: TC-042
+      // Given: diff = 2629799 seconds (round(2629799/604800)=4)
+      const dateVal = MOCK_NOW_SEC - 2_629_799;
 
       // When: getCommitDate is called
       const result = getCommitDate(dateVal);
 
-      // Then: value = "1 year ago" (31557600/31557600=1, singular)
-      expect(result.value).toBe("1 year ago");
+      // Then: value = "4 weeks ago" (4*604800=2419200 < 2629800 so no carry)
+      expect(result.value).toBe("4 weeks ago");
+    });
+
+    it("TC-043: diff=86400 returns 1 day ago (min day, no carry)", () => {
+      // Case: TC-043
+      // Given: diff = 86400 seconds (exactly the day threshold)
+      const dateVal = MOCK_NOW_SEC - 86_400;
+
+      // When: getCommitDate is called
+      const result = getCommitDate(dateVal);
+
+      // Then: value = "1 day ago" (1*86400=86400 < 604800 so no carry)
+      expect(result.value).toBe("1 day ago");
+    });
+
+    it("TC-044: diff=Infinity falls back to the year unit (findIndex -1)", () => {
+      // Case: TC-044
+      // Given: dateVal = -Infinity so diff = Infinity and findIndex returns -1
+      const result = getCommitDate(Number.NEGATIVE_INFINITY);
+
+      // When/Then: fallback selects the last unit (year), count is Infinity (plural)
+      expect(result.value).toBe("Infinity years ago");
     });
   });
 

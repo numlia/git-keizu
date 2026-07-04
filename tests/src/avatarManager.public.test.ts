@@ -21,7 +21,6 @@ import {
   resetAvatarManagerTestEnvironment,
   SECONDARY_PNG_IMAGE_NAME,
   TEN_SECONDS_MS,
-  URL_REPLACE_ERROR_FRAGMENT,
   useFixedTime
 } from "./avatarManager.testUtils";
 
@@ -468,9 +467,9 @@ describe("AvatarManager public behavior", () => {
       expect(harness.dataSource.getRemoteUrl).not.toHaveBeenCalled();
     });
 
-    it("TC-021: parses GitHub remotes into owner/repo metadata and caches the result", async () => {
-      // Case: TC-021
-      // Given: DataSource resolves the repo remote to a GitHub HTTPS URL.
+    it("TC-096: parses a valid GitHub remote into owner/repo metadata and caches it", async () => {
+      // Case: TC-096
+      // Given: DataSource resolves the repo remote to a valid GitHub HTTPS URL.
       const harness = createAvatarManager();
       const request = createAvatarRequest();
       harness.dataSource.getRemoteUrl.mockResolvedValue(GITHUB_REMOTE_URL);
@@ -483,8 +482,8 @@ describe("AvatarManager public behavior", () => {
       expect(harness.manager.remoteSourceCache[DEFAULT_REPO_PATH]).toEqual(GITHUB_REMOTE_SOURCE);
     });
 
-    it("TC-022: parses GitLab remotes into a gitlab source and caches the result", async () => {
-      // Case: TC-022
+    it("TC-097: parses a GitLab remote into a gitlab source and caches it", async () => {
+      // Case: TC-097
       // Given: DataSource resolves the repo remote to a GitLab HTTPS URL.
       const harness = createAvatarManager();
       const request = createAvatarRequest();
@@ -498,12 +497,12 @@ describe("AvatarManager public behavior", () => {
       expect(harness.manager.remoteSourceCache[DEFAULT_REPO_PATH]).toEqual(GITLAB_REMOTE_SOURCE);
     });
 
-    it("TC-023: falls back to gravatar for non-GitHub and non-GitLab remotes", async () => {
-      // Case: TC-023
+    it("TC-098: falls back to gravatar for another host and caches it", async () => {
+      // Case: TC-098
       // Given: DataSource resolves the repo remote to an unsupported host.
       const harness = createAvatarManager();
       const request = createAvatarRequest();
-      harness.dataSource.getRemoteUrl.mockResolvedValue("https://example.com/org/project.git");
+      harness.dataSource.getRemoteUrl.mockResolvedValue("https://bitbucket.org/x/y");
 
       // When: getRemoteSource is called.
       const result = await harness.manager.getRemoteSource(request);
@@ -513,8 +512,8 @@ describe("AvatarManager public behavior", () => {
       expect(harness.manager.remoteSourceCache[DEFAULT_REPO_PATH]).toEqual(GRAVATAR_REMOTE_SOURCE);
     });
 
-    it("TC-024: falls back to gravatar when no remote URL is available", async () => {
-      // Case: TC-024
+    it("TC-099: falls back to gravatar when no remote URL is available", async () => {
+      // Case: TC-099
       // Given: DataSource resolves the repo remote to null.
       const harness = createAvatarManager();
       const request = createAvatarRequest();
@@ -527,21 +526,33 @@ describe("AvatarManager public behavior", () => {
       expect(result).toEqual(GRAVATAR_REMOTE_SOURCE);
     });
 
-    it("TC-025: rejects with TypeError when a GitHub URL is missing the repo segment", async () => {
-      // Case: TC-025
-      // Given: DataSource returns a malformed GitHub URL that lacks the repository path segment.
+    it("TC-100: falls back to gravatar (no throw) when the GitHub URL lacks the repo segment", async () => {
+      // Case: TC-100
+      // Given: DataSource returns a GitHub URL missing the repository path segment (split length 4).
       const harness = createAvatarManager();
       const request = createAvatarRequest();
       harness.dataSource.getRemoteUrl.mockResolvedValue(INVALID_GITHUB_REMOTE_URL);
 
       // When: getRemoteSource is called with that malformed GitHub URL.
-      const getRemoteSourcePromise = harness.manager.getRemoteSource(request);
+      const result = await harness.manager.getRemoteSource(request);
 
-      // Then: The promise rejects with a TypeError whose message mentions the failed replace call.
-      await expect(getRemoteSourcePromise).rejects.toThrow(TypeError);
-      await expect(harness.manager.getRemoteSource(request)).rejects.toThrow(
-        URL_REPLACE_ERROR_FRAGMENT
-      );
+      // Then: The length guard falls back to gravatar without throwing (old impl threw TypeError).
+      expect(result).toEqual(GRAVATAR_REMOTE_SOURCE);
+      expect(harness.manager.remoteSourceCache[DEFAULT_REPO_PATH]).toEqual(GRAVATAR_REMOTE_SOURCE);
+    });
+
+    it("TC-101: falls back to gravatar when owner and repo segments are absent", async () => {
+      // Case: TC-101
+      // Given: DataSource returns "https://github.com/" so owner/repo segments are absent.
+      const harness = createAvatarManager();
+      const request = createAvatarRequest();
+      harness.dataSource.getRemoteUrl.mockResolvedValue("https://github.com/");
+
+      // When: getRemoteSource is called.
+      const result = await harness.manager.getRemoteSource(request);
+
+      // Then: The guard rejects the empty/missing segments and falls back to gravatar.
+      expect(result).toEqual(GRAVATAR_REMOTE_SOURCE);
     });
   });
 });

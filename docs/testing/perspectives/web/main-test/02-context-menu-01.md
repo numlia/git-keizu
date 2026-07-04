@@ -109,3 +109,23 @@
 | TC-191  | 現在の有効ソート順が "topo"                               | Normal - checkmark                                                         | "Topological" にチェックマーク（"✓ " プレフィックス）が表示される                  | 視覚的識別                 |
 | TC-192  | コンテキストメニューで "Author Date" を選択               | Normal - select                                                            | repoState.commitOrdering が "author-date" に更新され、saveRepoState メッセージ送信 | 永続化                     |
 | TC-193  | コンテキストメニューでソート順を選択                      | Normal - refresh                                                           | requestLoadCommits がハードリフレッシュ（hard=true）で呼ばれる                     | 即時反映                   |
+
+## S44: gitRef contextmenu/checkout の dataset.name 生値読み取り
+
+> Origin: フェーズ3 修正 L16 (ref-dataset-raw-read)
+> Added: 2026-07-04T04:29:24Z
+> Status: active
+> Supersedes: -
+> Signature: `.gitRef` の contextmenu ハンドラ / checkout ハンドラ（`worktrees` ルックアップ含む）
+> Target Path: `web/main.ts:937-982`
+
+`.gitRef` の contextmenu ハンドラおよび checkout ハンドラで、`dataset.name`（ref 名）の読み取りから `unescapeHtml(...)` を除去し生値をそのまま使う修正（計5箇所）。`dataset.name` は生 ref 名で格納されるため、旧 `unescapeHtml` 適用は特殊文字を含む ref 名を二重デコードして破壊していた。対象は (1) contextmenu の `refName`（`isRemoteCombined` 時 `target.dataset.name`／それ以外 `sourceElem.dataset.name`）、(2) `worktrees[sourceElem.dataset.name]` ルックアップ、(3) checkout の remote-combined／local 両分岐の ref 名。
+
+| Case ID | Input / Precondition                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                     | Notes                |
+| ------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | -------------------- |
+| TC-246  | `.gitRef`（非 remote-combined）を右クリック、`sourceElem.dataset.name="main"`              | Normal - plain ref name context menu                                       | `refName` が生値 `"main"` として `buildRefContextMenuItems` へ渡される              | 通常 ref 名          |
+| TC-247  | ref 名に特殊文字を含む（例 `dataset.name="feat&x"`）要素を右クリック                       | Boundary - special-char ref raw                                            | `refName` が生値 `"feat&x"` のまま渡される（旧 `unescapeHtml` の二重デコードなし）  | L16 の中核回帰       |
+| TC-248  | `head` かつ非 remote-combined、`worktrees` に `sourceElem.dataset.name` の生キーで登録あり | Boundary - worktree raw-key lookup                                         | `worktrees[生ref名]` がヒットし `worktreeInfo`（path / isMainWorktree）が構築される | 生キー突合           |
+| TC-249  | remote-combined（`gitRefHeadRemote`）ラベルをダブルクリックで checkout                     | Normal - checkout remote raw name                                          | `checkoutBranchAction` が `target.dataset.name` の生値と `true` で呼ばれる          | remote-combined 分岐 |
+| TC-250  | 非 remote-combined の gitRef をダブルクリックで checkout                                   | Normal - checkout local raw name                                           | `checkoutBranchAction` が `sourceElem.dataset.name` の生値で呼ばれる                | local 分岐           |
+| TC-251  | `head` かつ `worktrees` に該当キーが存在しない ref を右クリック                            | Boundary - worktree lookup miss                                            | `worktrees[生ref名]` が undefined で `worktreeInfo` が `null` のまま（例外なし）    | 非ヒット境界         |

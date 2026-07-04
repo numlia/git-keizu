@@ -149,6 +149,10 @@ Per-repository override is available via the table header right-click context me
 | `...mergeCommits`                     | `true`  | Display merge commits with reduced opacity                |
 | `...commitsThatAreNotAncestorsOfHead` | `false` | Display non-ancestor-of-HEAD commits with reduced opacity |
 
+## Requirements
+
+- **Git 2.32 or later** is required. Viewing the changes contained in a stash entry uses `git stash show -u`, whose `-u` (`--include-untracked`) option was added in Git 2.32. Older Git versions are not supported.
+
 ## Security
 
 Git Keizu has undergone a full security audit and remediation (27 issues fixed):

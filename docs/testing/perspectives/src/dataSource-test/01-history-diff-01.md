@@ -129,7 +129,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 2.2
 > Added: 2026-02-25
-> Status: active
+> Status: superseded
+> Superseded By: S35
 > Supersedes: -
 
 **シグネチャ**: `getCommitComparison(repo: string, fromHash: string, toHash: string): Promise<GitFileChange[] | null>`
@@ -157,7 +158,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 2.2
 > Added: 2026-02-25
-> Status: active
+> Status: superseded
+> Superseded By: S36
 > Supersedes: -
 
 **シグネチャ**: `getUncommittedDetails(repo: string): Promise<GitCommitDetails | null>`
@@ -172,3 +174,61 @@
 | TC-065  | ls-files出力に空行が混在                    | Boundary - empty line                                                      | 空行はスキップされ、有効なファイルパスのみ追加される | filePath === "" ガード                     |
 | TC-066  | git diff または ls-files が例外をスロー     | Exception - handled error                                                  | null を返す                                          | catch ブロックでnull返却                   |
 | TC-067  | 正常なdiff出力（リネーム含む）              | Normal - standard                                                          | GitCommitDetails を返す。正しいtype/pathが設定される | nameStatus パースの基本検証                |
+
+## S28: runGitCommandSpawn() / spawnGit() 出力バッファの結合デコード
+
+> Origin: フェーズ1 修正 M2 (spawn-buffer-concat)
+> Added: 2026-07-04T01:35:00Z
+> Status: active
+> Supersedes: -
+> Signature: `private runGitCommandSpawn(args: string[], repo: string): Promise<GitCommandStatus>` / `private spawnGit<T>(args, repo, successValue, errorValue): Promise<T>`
+> Target Path: `src/dataSource.ts:1100-1153`
+
+stdout/stderr を文字列連結（`stdout += d`）で蓄積していた実装を Buffer 配列（`stdoutChunks.push(Buffer.from(d))`）+ `Buffer.concat(chunks).toString()` の一括デコード方式へ変更。マルチバイト文字がチャンク境界で分割されても文字化け（U+FFFD 置換文字）せずに復元されることを保証する追加観点。
+
+| Case ID | Input / Precondition                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                             | Notes                                     |
+| ------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| TC-166  | spawnGit, exit 0。UTF-8 3バイト文字 "あ"(E3 81 82) を data イベント2回 `[E3,81]` と `[82]` に分割して emit | Normal - multibyte chunk boundary restore                                  | successValue が結合デコード後の `"あ"` で1回呼ばれる。U+FFFD(`�`) を含まない                | Buffer.concat による境界復元              |
+| TC-167  | spawnGit, exit 0。ASCII `"abc"` を単一 data イベントで emit                                                | Normal - single chunk decode                                               | successValue が `"abc"` で1回呼ばれる                                                       | 単一チャンクの通常経路                    |
+| TC-168  | spawnGit, exit 0。data イベントを一度も emit しない                                                        | Boundary - no data events                                                  | `Buffer.concat([])` が空文字となり、successValue が `""` で1回呼ばれる                      | 出力なし境界                              |
+| TC-169  | spawnGit, exit code 非0（close code=1）                                                                    | Exception - error value fallback                                           | errorValue がそのまま解決される。successValue は呼ばれない（0回）                           | 非正常終了時フォールバック                |
+| TC-170  | runGitCommandSpawn, exit code 非0。stdout にマルチバイト文字を2チャンク分割で emit                         | Exception - error stdout multibyte restore                                 | 結合デコードされた stdout を eol 分割し末尾行を除いた文字列が解決される。文字化けを含まない | close code≠0 の stdout 経路（L1121-1124） |
+| TC-171  | runGitCommandSpawn, exit code 非0。stdout は空、stderr に2チャンク emit                                    | Exception - stderr concat fallback                                         | stdout が空のため結合デコードされた stderr 由来の文字列が解決される                         | stdout 空時の stderr フォールバック       |
+| TC-172  | runGitCommandSpawn, exit code 0                                                                            | Normal - success null                                                      | `null` が解決される（成功）                                                                 | 正常終了時                                |
+
+## S30: getBranches() 分離 HEAD 疑似ブランチ行の検出拡張（headRegex）
+
+> Origin: フェーズ2 修正 M3 (detached-head-detection)
+> Added: 2026-07-04T02:44:58Z
+> Status: active
+> Supersedes: -
+> Signature: `const headRegex = /^\(HEAD detached (at\|from) .+\)$/` / `getBranches()` の `stdout` パーサ
+> Target Path: `src/dataSource.ts:25, 129-132`
+
+`headRegex` を旧 `/^\(HEAD detached at [0-9A-Za-z]+\)/g`（`at` のみ・16進英数字のみ・非アンカー・global）から `/^\(HEAD detached (at\|from) .+\)$/`（`at`/`from` 両対応・任意文字・行末アンカー・非global）へ差し替える修正。`git branch` 出力に現れる分離 HEAD の疑似ブランチ行（`(HEAD detached at <hash>)` / `(HEAD detached from <ref>)`）を確実に検出して `continue` でスキップし、実ブランチ一覧に混入させない。global フラグ除去により `String.match` の `lastIndex` 状態を持たない。
+
+| Case ID | Input / Precondition                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                          | Notes                                              |
+| ------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| TC-179  | branch 行 name=`(HEAD detached at 1a2b3c4)`                         | Normal - detached at skipped                                               | `headRegex.match` が非 null となり `continue`。`branches` 配列にこの行が追加されない                     | 従来 `at` 形式の分離 HEAD 行                       |
+| TC-180  | branch 行 name=`(HEAD detached from origin/main)`                   | Normal - detached from variant                                             | `headRegex` にマッチし `continue`。`branches` に追加されない（旧 `at` 限定正規表現では取りこぼしていた） | `from` 形式検出の追加ケース                        |
+| TC-181  | branch 行 name=`(HEAD detached at v1.0-rc.1)`（非英数字を含む ref） | Boundary - non-alphanumeric ref                                            | `.+` により `.`/`-` を含む ref でもマッチし `continue`。`branches` に追加されない                        | 旧 `[0-9A-Za-z]+` では不一致だった境界             |
+| TC-182  | branch 行 name=`main`（通常ブランチ）                               | Normal - real branch retained                                              | `headRegex.match` が null となり `continue` せず、`branches` に `main` が追加される                      | 実ブランチが誤スキップされないこと                 |
+| TC-183  | branch 行 name=`feature/(HEAD detached at x)`（語句を含む枝名）     | Boundary - start anchor                                                    | `^` アンカーにより先頭が `(` でないためマッチせず、`branches` に追加される                               | `^` アンカーで語句を含む実ブランチを過剰一致しない |
+
+## S31: spawn オプションへのロケール固定 env 付与（LC_ALL=C）
+
+> Origin: フェーズ2 修正 M3 (spawn-locale-lc-all-c)
+> Added: 2026-07-04T02:44:58Z
+> Status: active
+> Supersedes: -
+> Signature: `private runGitCommandSpawn(args, repo)` / `private spawnGit<T>(args, repo, successValue, errorValue)`
+> Target Path: `src/dataSource.ts:1107-1110, 1147-1150`
+
+両 spawn ヘルパーの `cp.spawn` 第3引数を `{ cwd: repo }` から `{ cwd: repo, env: { ...process.env, LC_ALL: "C" } }` へ変更する修正。git のメッセージ・porcelain 出力を C ロケールに固定し、実行環境のロケール差異に依存せず（headRegex の英語文言マッチ等が）決定的に動作することを保証する。`process.env` を展開して既存の環境変数を保持しつつ `LC_ALL` のみ `"C"` で上書きする。
+
+| Case ID | Input / Precondition                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                            | Notes                                        |
+| ------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | -------------------------------------------- |
+| TC-184  | runGitCommandSpawn 実行、repo=`/r`                                      | Normal - env option present                                                | `cp.spawn` が第3引数 `{ cwd: "/r", env: objectContaining({ LC_ALL: "C" }) }` で1回呼ばれる | run 側 spawn オプション                      |
+| TC-185  | spawnGit 実行、repo=`/r`                                                | Normal - env option present                                                | `cp.spawn` の第3引数の `cwd` が `"/r"`、`env.LC_ALL` が `"C"` である                       | spawnGit 側 spawn オプション                 |
+| TC-186  | `process.env.PATH="/usr/bin"` が存在する状態で spawnGit 実行            | Boundary - existing env preserved                                          | spawn へ渡る `env.PATH` が `"/usr/bin"` のまま保持され、かつ `env.LC_ALL` が `"C"` である  | `...process.env` 展開で既存変数が消えない    |
+| TC-187  | `process.env.LC_ALL="ja_JP.UTF-8"` が事前設定された状態で spawnGit 実行 | Boundary - override precedence                                             | spawn へ渡る `env.LC_ALL` が継承値 `"ja_JP.UTF-8"` ではなく `"C"` に上書きされている       | 上書き優先順位（スプレッド後に LC_ALL 指定） |

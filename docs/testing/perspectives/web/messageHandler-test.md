@@ -148,3 +148,21 @@
 | ------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
 | TC-026  | ResponseSetShowRecentActions: command="setShowRecentActions", showRecentActions=true  | Normal - standard                                                          | `gitKeizu.setShowRecentActions(true)` が 1 回呼ばれる。`refresh` / `showErrorDialog` / 他の API は呼ばれない  | runtime 同期経路の routing を検証    |
 | TC-027  | ResponseSetShowRecentActions: command="setShowRecentActions", showRecentActions=false | Normal - standard                                                          | `gitKeizu.setShowRecentActions(false)` が 1 回呼ばれる。`refresh` / `showErrorDialog` / 他の API は呼ばれない | 設定値 `false` でも routing は同経路 |
+
+## S10: commitDetails レスポンスの fileTree 生成 try/catch
+
+> Origin: フェーズ2 修正 M13 (commit-details-file-tree-guard)
+> Added: 2026-07-04T02:44:58Z
+> Status: active
+> Supersedes: -
+> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void`（`case "commitDetails"`）
+> Target Path: `web/messageHandler.ts:55-75`
+
+`commitDetails` レスポンスの `else`（`msg.commitDetails !== null`）分岐で `generateGitFileTree(msg.commitDetails.fileChanges)` を `try/catch` で包む修正。ツリー構築が例外を投げた場合に `hideCommitDetails()` でローディングを解除し、`showErrorDialog(t("error.commitDetails"), error instanceof Error ? error.message : null, null)` を表示する。
+
+| Case ID | Input / Precondition                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                              | Notes                             |
+| ------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| TC-028  | `msg.commitDetails` が有効、`generateGitFileTree` が正常にツリーを返す               | Normal - success                                                           | `gitKeizu.showCommitDetails(msg.commitDetails, fileTree)` が1回呼ばれる。`hideCommitDetails` と `showErrorDialog` は呼ばれない               | 成功経路                          |
+| TC-029  | `msg.commitDetails` が有効、`generateGitFileTree` が `Error("dup")` を throw         | Exception - handled error                                                  | `gitKeizu.hideCommitDetails()` が1回 + `showErrorDialog(t("error.commitDetails"), "dup", null)` が呼ばれる。`showCommitDetails` は呼ばれない | catch 経路（Error インスタンス）  |
+| TC-030  | `msg.commitDetails` が有効、`generateGitFileTree` が非 Error（文字列 `"x"`）を throw | Type - non-Error thrown                                                    | `showErrorDialog(t("error.commitDetails"), null, null)` が呼ばれる（`error instanceof Error` が false のため message が `null`）             | 非 Error 例外時の message null    |
+| TC-031  | `msg.commitDetails === null`                                                         | Validation - null commit details                                           | `gitKeizu.hideCommitDetails()` + `showErrorDialog(t("error.commitDetails"), null, null)` が呼ばれ、`generateGitFileTree` は呼ばれない        | null ガード（catch には入らない） |

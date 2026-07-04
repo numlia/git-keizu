@@ -2,7 +2,7 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
-import { getPathFromUri } from "./utils";
+import { getPathFromStr, getPathFromUri } from "./utils";
 
 const watchedRepositoryStateFiles = new Set([
   "HEAD",
@@ -31,7 +31,7 @@ export class RepoFileWatcher {
   private readonly repoChangeCallback: () => void;
   private fsWatchers: vscode.FileSystemWatcher[] = [];
   private refreshTimeout: NodeJS.Timeout | null = null;
-  private muted: boolean = false;
+  private muteCount: number = 0;
   private resumeAt: number = 0;
 
   constructor(repoChangeCallback: () => void) {
@@ -41,7 +41,7 @@ export class RepoFileWatcher {
   public start(watchRoots: string[]) {
     this.stop();
 
-    this.watchRoots = watchRoots.map((watchRoot) => path.normalize(watchRoot));
+    this.watchRoots = watchRoots.map((watchRoot) => getPathFromStr(path.normalize(watchRoot)));
     this.fsWatchers = this.watchRoots.map((watchRoot) => {
       const fsWatcher = vscode.workspace.createFileSystemWatcher(`${watchRoot}/**`);
       fsWatcher.onDidCreate((uri) => this.refresh(uri));
@@ -57,19 +57,29 @@ export class RepoFileWatcher {
     }
     this.fsWatchers = [];
     this.watchRoots = [];
+    if (this.refreshTimeout !== null) {
+      clearTimeout(this.refreshTimeout);
+      this.refreshTimeout = null;
+    }
   }
 
   public mute() {
-    this.muted = true;
+    this.muteCount += 1;
+    if (this.refreshTimeout !== null) {
+      clearTimeout(this.refreshTimeout);
+      this.refreshTimeout = null;
+    }
   }
 
   public unmute() {
-    this.muted = false;
+    if (this.muteCount > 0) {
+      this.muteCount -= 1;
+    }
     this.resumeAt = new Date().getTime() + 1500;
   }
 
   private refresh(uri: vscode.Uri) {
-    if (this.muted) return;
+    if (this.muteCount > 0) return;
     const filePath = path.normalize(getPathFromUri(uri));
     const matchingPath = this.watchRoots
       .map((watchRoot) => path.relative(watchRoot, filePath))

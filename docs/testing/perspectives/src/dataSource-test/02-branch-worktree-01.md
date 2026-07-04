@@ -187,8 +187,9 @@
 
 > Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
 > Added: 2026-04-04
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S27
 
 **シグネチャ**: `getNewPathOfRenamedFile(repo: string, commitHash: string, oldFilePath: string): Promise<string | null>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -203,3 +204,27 @@
 | TC-147  | spawn が error イベントを emit                        | Exception - spawn error                                                    | null が返される                                                                                           | プロセスエラー                     |
 | TC-148  | git diff の stdout が空                               | Boundary - empty output                                                    | null が返される                                                                                           | 空出力                             |
 | TC-149  | 有効な入力で git diff を実行                          | Normal - args verification                                                 | cp.spawn が ["diff", "--diff-filter=R", "--find-renames", "-z", hash, "HEAD", "--", "file.ts"] で呼ばれる | git 引数の正確性検証               |
+
+## S27: getNewPathOfRenamedFile() リネーム追跡（pathspec 除去 + name-status カーソルパース）
+
+> Origin: フェーズ1 修正 H2 (rename-tracking-repair)
+> Added: 2026-07-04T01:35:00Z
+> Status: active
+> Supersedes: S25
+> Signature: `getNewPathOfRenamedFile(repo: string, commitHash: string, oldFilePath: string): Promise<string | null>`
+> Target Path: `src/dataSource.ts:567-610`
+
+pathspec 制限（`"--", oldFilePath`）を除去し `--name-status` を追加した新 args と、NUL 区切り name-status（`R<score>\0old\0new\0`）をカーソル方式（R は +3 / 他は +2）でパースする実装への差し替え。`getPathFromStr(old) === oldFilePath` 一致レコードの new を返す。旧 S25 は pathspec 付き args と単純ループを固定していたため supersede する。
+
+| Case ID | Input / Precondition                                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                           | Notes                                        |
+| ------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| TC-156  | stdout=`"R100\0old.ts\0new.ts\0"`, oldFilePath=`"old.ts"`                                 | Normal - single rename match                                               | `"new.ts"` が返される（`getPathFromStr(fields[2])`）                                                                                                      | 単一 R レコードの old 一致                   |
+| TC-157  | 有効な commitHash と oldFilePath で実行                                                   | Normal - args (no pathspec)                                                | cp.spawn が `["diff", "--name-status", "--diff-filter=R", "--find-renames", "-z", commitHash, "HEAD"]` で呼ばれる。末尾に `"--"` / oldFilePath を含まない | pathspec 除去の検証                          |
+| TC-158  | stdout=`"R100\0a.ts\0b.ts\0R100\0old.ts\0new.ts\0"`, oldFilePath=`"old.ts"`               | Normal - multiple records second match                                     | 1件目（a.ts→b.ts）は old 不一致で cursor+=3、2件目の old 一致で `"new.ts"` が返される                                                                     | カーソル前進と複数レコード走査               |
+| TC-159  | stdout=`"R100\0other.ts\0renamed.ts\0"`, oldFilePath=`"old.ts"`                           | Validation - no matching old path                                          | old 不一致のまま cursor が末尾へ到達し `null` が返される                                                                                                  | 一致レコードなし                             |
+| TC-160  | stdout=`""`（空文字）, oldFilePath=`"old.ts"`                                             | Boundary - empty output                                                    | `fields=[""]` で while 条件 `fields[0] !== ""` が false となり `null` が返される                                                                          | 空 diff 出力                                 |
+| TC-161  | stdout=`"X\0a.ts\0b.ts\0"`（VALID_FILE_CHANGE_TYPES 外の status）, oldFilePath=`"a.ts"`   | Type - invalid status char                                                 | `VALID_FILE_CHANGE_TYPES.has("X")` が false のため break し `null` が返される                                                                             | 想定外 status での防御的中断                 |
+| TC-162  | commitHash=`"not-a-hex-hash"`（16進数以外）                                               | Validation - invalid hash guard                                            | `null` が返される。cp.spawn が呼ばれない（0回）                                                                                                           | `isValidCommitHash()` ガード（L572）         |
+| TC-163  | oldFilePath=`"../secret.ts"`（".." セグメント含む）                                       | Validation - path traversal guard                                          | `null` が返される。cp.spawn が呼ばれない（0回）                                                                                                           | パストラバーサルガード（L575）               |
+| TC-164  | git diff が exit code 非0 で終了                                                          | Exception - git error fallback                                             | spawnGit の errorValue により `null` が返される                                                                                                           | 外部プロセス失敗時フォールバック             |
+| TC-165  | stdout=`"R100\0old.ts\0"`（new フィールド欠落の切り詰めレコード）, oldFilePath=`"old.ts"` | Boundary - truncated record missing new path                               | `fields[cursor+2]` が undefined のため `getPathFromStr("")` すなわち空文字 `""` が返される                                                                | 欠損 new フィールドの `?? ""` フォールバック |

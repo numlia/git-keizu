@@ -22,7 +22,7 @@ export function generateGitFileTree(gitFiles: GitFileChange[]) {
     path = gitFiles[i].newFilePath.split("/");
     for (j = 0; j < path.length; j++) {
       if (j < path.length - 1) {
-        if (cur.contents[path[j]] === undefined) {
+        if (cur.contents[path[j]] === undefined || cur.contents[path[j]].type === "file") {
           contents = {};
           cur.contents[path[j]] = {
             type: "folder",
@@ -69,7 +69,7 @@ function buildFileItemHtml(gitFile: GitFileChange, displayName: string): string 
 export function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GitFileChange[]) {
   let html =
       (folder.name !== ""
-        ? `<span class="gitFolder" data-folderpath="${encodeURIComponent(folder.folderPath)}"><span class="gitFolderIcon">${folder.open ? svgIcons.openFolder : svgIcons.closedFolder}</span><span class="gitFolderName">${folder.name}</span></span>`
+        ? `<span class="gitFolder" data-folderpath="${encodeURIComponent(folder.folderPath)}"><span class="gitFolderIcon">${folder.open ? svgIcons.openFolder : svgIcons.closedFolder}</span><span class="gitFolderName">${escapeHtml(folder.name)}</span></span>`
         : "") + `<ul class="gitFolderContents${!folder.open ? " hidden" : ""}">`,
     keys = Object.keys(folder.contents),
     i,
@@ -92,7 +92,7 @@ export function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GitFileChan
       html += `<li${!gitFolder.open ? ' class="closed"' : ""}>${generateGitFileTreeHtml(gitFolder, gitFiles)}</li>`;
     } else {
       gitFile = gitFiles[(<GitFile>folder.contents[keys[i]]).index];
-      html += buildFileItemHtml(gitFile, folder.contents[keys[i]].name);
+      html += buildFileItemHtml(gitFile, escapeHtml(folder.contents[keys[i]].name));
     }
   }
   return `${html}</ul>`;

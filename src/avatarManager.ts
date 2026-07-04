@@ -18,6 +18,9 @@ const ALLOWED_AVATAR_HOSTNAMES = new Set([
 
 const ALLOWED_IMAGE_FORMATS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg+xml"]);
 
+// Default retry interval (5 minutes) used when a rate-limited response provides no usable reset time
+const RATE_LIMIT_RETRY_INTERVAL_MS = 300000;
+
 export class AvatarManager {
   private readonly dataSource: DataSource;
   private readonly extensionState: ExtensionState;
@@ -125,11 +128,16 @@ export class AvatarManager {
         // Depending on the domain of the remote repo source, determine the type of source it is
         if (remoteUrl.startsWith("https://github.com/")) {
           let remoteUrlComps = remoteUrl.split("/");
-          remoteSource = {
-            type: "github",
-            owner: remoteUrlComps[3],
-            repo: remoteUrlComps[4].replace(/\.git$/, "")
-          };
+          if (remoteUrlComps.length >= 5 && remoteUrlComps[3] && remoteUrlComps[4]) {
+            remoteSource = {
+              type: "github",
+              owner: remoteUrlComps[3],
+              repo: remoteUrlComps[4].replace(/\.git$/, "")
+            };
+          } else {
+            // owner / repo segment missing, fall back to Gravatar
+            remoteSource = { type: "gravatar" };
+          }
         } else if (remoteUrl.startsWith("https://gitlab.com/")) {
           remoteSource = { type: "gitlab" };
         } else {
@@ -155,7 +163,7 @@ export class AvatarManager {
       avatarRequest.commits.length < 5
         ? avatarRequest.commits.length - 1 - avatarRequest.attempts
         : Math.round((4 - avatarRequest.attempts) * 0.25 * (avatarRequest.commits.length - 1));
-    https
+    const req = https
       .get(
         {
           hostname: "api.github.com",
@@ -196,7 +204,12 @@ export class AvatarManager {
               }
             } else if (res.statusCode === 403) {
               // Rate limit reached, try again after timeout
-              this.queue.addItem(avatarRequest, this.githubTimeout, false);
+              if (this.githubTimeout === 0) {
+                // Rate limit reset time unavailable, retry after a default interval and count the attempt
+                this.queue.addItem(avatarRequest, t + RATE_LIMIT_RETRY_INTERVAL_MS, true);
+              } else {
+                this.queue.addItem(avatarRequest, this.githubTimeout, false);
+              }
               return;
             } else if (
               res.statusCode === 422 &&
@@ -221,6 +234,7 @@ export class AvatarManager {
         this.githubTimeout = t + 300000;
         this.queue.addItem(avatarRequest, this.githubTimeout, false);
       });
+    req.on("timeout", () => req.destroy(new Error("timeout")));
   }
 
   private fetchFromGitLab(avatarRequest: AvatarRequestItem) {
@@ -231,7 +245,7 @@ export class AvatarManager {
       this.fetchAvatarsInterval();
       return;
     }
-    https
+    const req = https
       .get(
         {
           hostname: "gitlab.com",
@@ -269,7 +283,12 @@ export class AvatarManager {
               }
             } else if (res.statusCode === 429) {
               // Rate limit reached, try again after timeout
-              this.queue.addItem(avatarRequest, this.gitLabTimeout, false);
+              if (this.gitLabTimeout === 0) {
+                // Rate limit reset time unavailable, retry after a default interval and count the attempt
+                this.queue.addItem(avatarRequest, t + RATE_LIMIT_RETRY_INTERVAL_MS, true);
+              } else {
+                this.queue.addItem(avatarRequest, this.gitLabTimeout, false);
+              }
               return;
             } else if (res.statusCode! >= 500) {
               // If server error, try again after 10 minutes
@@ -286,6 +305,7 @@ export class AvatarManager {
         this.gitLabTimeout = t + 300000;
         this.queue.addItem(avatarRequest, this.gitLabTimeout, false);
       });
+    req.on("timeout", () => req.destroy(new Error("timeout")));
   }
 
   private async fetchFromGravatar(avatarRequest: AvatarRequestItem) {
@@ -319,7 +339,7 @@ export class AvatarManager {
     }
 
     return new Promise((resolve) => {
-      https
+      const req = https
         .get(
           {
             hostname: imgUrl.hostname,
@@ -364,6 +384,7 @@ export class AvatarManager {
         .on("error", () => {
           resolve(null);
         });
+      req.on("timeout", () => req.destroy(new Error("timeout")));
     });
   }
 
