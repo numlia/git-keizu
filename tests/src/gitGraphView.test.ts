@@ -30,6 +30,9 @@ const mocks = vi.hoisted(() => ({
   terminalShow: vi.fn(),
   repoFileWatcherStart: vi.fn(),
   repoFileWatcherStop: vi.fn(),
+  addTag: vi.fn(),
+  resolveRefToHash: vi.fn(),
+  reveal: vi.fn(),
   panelDisposeHandler: null as (() => void) | null,
   panelViewStateHandler: null as (() => void) | null,
   messageHandler: { current: null as ((msg: unknown) => Promise<void>) | null }
@@ -53,7 +56,7 @@ vi.mock("vscode", () => ({
       onDidChangeViewState: vi.fn((handler: () => void) => {
         mocks.panelViewStateHandler = handler;
       }),
-      reveal: vi.fn(),
+      reveal: mocks.reveal,
       visible: true,
       iconPath: null,
       dispose: vi.fn()
@@ -2042,23 +2045,26 @@ describe("GitKeizuView viewState commitOrdering / loadCommits handler (S14)", ()
 });
 
 /* ------------------------------------------------------------------ */
-/* S16: viewDiff エラーハンドリング                                    */
+/* S24: viewDiff() HEAD resolveRefToHash 解決と未コミット版数クエリ     */
 /* ------------------------------------------------------------------ */
 
-describe("GitKeizuView viewDiff error handling (S16)", () => {
+describe("GitKeizuView viewDiff HEAD resolution and version query (S24)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
     GitKeizuView.currentPanel = undefined;
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.executeCommand.mockResolvedValue(undefined);
     mocks.encodeDiffDocUri.mockImplementation(
       (_repo: string, filePath: string, commit: string) => ({
         toString: () => `git-keizu:${filePath}?commit=${commit}`
       })
     );
 
-    const mockDataSource = {} as unknown as DataSource;
+    const mockDataSource = {
+      resolveRefToHash: mocks.resolveRefToHash
+    } as unknown as DataSource;
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
@@ -2090,9 +2096,97 @@ describe("GitKeizuView viewDiff error handling (S16)", () => {
     GitKeizuView.currentPanel = undefined;
   });
 
-  it("returns success=false when vscode.diff rejects in compare mode (TC-070)", async () => {
-    // Case: TC-070
-    // Given: compareWithHash is supplied and vscode.commands.executeCommand rejects
+  it("resolves HEAD to a fixed hash for the left URI in compare mode (TC-089)", async () => {
+    // Case: TC-089
+    // Given: compare mode with uncommitted fromHash; resolveRefToHash returns a fixed hash
+    mocks.resolveRefToHash.mockResolvedValue("deadbeef");
+
+    // When: viewDiff compares uncommitted changes against another commit
+    await mocks.messageHandler.current!({
+      command: "viewDiff",
+      repo: TEST_REPO,
+      commitHash: UNCOMMITTED_CHANGES_HASH,
+      oldFilePath: "src/old.ts",
+      newFilePath: "src/new.ts",
+      type: "M",
+      compareWithHash: "def4567890abcdef1234567890abcdef12345678"
+    });
+
+    // Then: HEAD is resolved and the resolved hash is used for the left URI
+    expect(mocks.resolveRefToHash).toHaveBeenCalledWith(TEST_REPO, "HEAD");
+    expect(mocks.encodeDiffDocUri).toHaveBeenCalledWith(TEST_REPO, "src/old.ts", "deadbeef");
+  });
+
+  it("uses the commit hash directly for a normal commit in compare mode (TC-090)", async () => {
+    // Case: TC-090
+    // Given: compare mode where the fromHash is a normal commit
+    const commitHash = "abc1234567890abcdef1234567890abcdef123456";
+
+    // When: viewDiff compares a normal commit against another commit
+    await mocks.messageHandler.current!({
+      command: "viewDiff",
+      repo: TEST_REPO,
+      commitHash,
+      oldFilePath: "src/old.ts",
+      newFilePath: "src/new.ts",
+      type: "M",
+      compareWithHash: "def4567890abcdef1234567890abcdef12345678"
+    });
+
+    // Then: resolveRefToHash is not consulted and the commit hash is used directly
+    expect(mocks.resolveRefToHash).not.toHaveBeenCalled();
+    expect(mocks.encodeDiffDocUri).toHaveBeenCalledWith(TEST_REPO, "src/old.ts", commitHash);
+  });
+
+  it("falls back to 'HEAD' when resolveRefToHash returns null in compare mode (TC-091)", async () => {
+    // Case: TC-091
+    // Given: compare mode with uncommitted fromHash; resolveRefToHash returns null
+    mocks.resolveRefToHash.mockResolvedValue(null);
+
+    // When: viewDiff compares uncommitted changes against another commit
+    await mocks.messageHandler.current!({
+      command: "viewDiff",
+      repo: TEST_REPO,
+      commitHash: UNCOMMITTED_CHANGES_HASH,
+      oldFilePath: "src/old.ts",
+      newFilePath: "src/new.ts",
+      type: "M",
+      compareWithHash: "def4567890abcdef1234567890abcdef12345678"
+    });
+
+    // Then: the left URI falls back to the literal "HEAD"
+    expect(mocks.encodeDiffDocUri).toHaveBeenCalledWith(TEST_REPO, "src/old.ts", "HEAD");
+  });
+
+  it("resolves HEAD and appends a version query in uncommitted delete mode (TC-092)", async () => {
+    // Case: TC-092
+    // Given: non-compare uncommitted mode, type "D"; resolveRefToHash returns a fixed hash
+    mocks.resolveRefToHash.mockResolvedValue("cafe01");
+
+    // When: viewDiff renders a deleted uncommitted file
+    await mocks.messageHandler.current!({
+      command: "viewDiff",
+      repo: TEST_REPO,
+      commitHash: UNCOMMITTED_CHANGES_HASH,
+      oldFilePath: "src/file.ts",
+      newFilePath: "src/file.ts",
+      type: "D"
+    });
+
+    // Then: the left URI uses the resolved hash and the right URI carries a version query
+    expect(mocks.encodeDiffDocUri).toHaveBeenCalledWith(TEST_REPO, "src/file.ts", "cafe01");
+    expect(mocks.encodeDiffDocUri).toHaveBeenCalledWith(
+      TEST_REPO,
+      "src/file.ts",
+      UNCOMMITTED_CHANGES_HASH,
+      expect.any(String)
+    );
+  });
+
+  it("returns success=false when vscode.diff rejects in compare mode (TC-093)", async () => {
+    // Case: TC-093
+    // Given: compare mode and executeCommand rejects
+    mocks.resolveRefToHash.mockResolvedValue("deadbeef");
     mocks.executeCommand.mockRejectedValueOnce(new Error("diff editor unavailable"));
 
     // When: viewDiff message with compareWithHash is dispatched
@@ -2107,16 +2201,16 @@ describe("GitKeizuView viewDiff error handling (S16)", () => {
     });
 
     // Then: success=false is posted; the rejection is swallowed by the try/catch
-    expect(mocks.executeCommand).toHaveBeenCalledTimes(1);
     expect(mocks.postMessage).toHaveBeenCalledWith({
       command: "viewDiff",
       success: false
     });
   });
 
-  it("returns success=false when vscode.diff rejects in uncommitted mode (TC-071)", async () => {
-    // Case: TC-071
-    // Given: commitHash equals UNCOMMITTED_CHANGES_HASH and vscode.commands.executeCommand rejects
+  it("returns success=false when vscode.diff rejects in uncommitted mode (TC-094)", async () => {
+    // Case: TC-094
+    // Given: uncommitted mode and executeCommand rejects
+    mocks.resolveRefToHash.mockResolvedValue("cafe01");
     mocks.executeCommand.mockRejectedValueOnce(new Error("diff editor unavailable"));
 
     // When: viewDiff message for uncommitted changes is dispatched
@@ -2130,16 +2224,15 @@ describe("GitKeizuView viewDiff error handling (S16)", () => {
     });
 
     // Then: success=false is posted; the rejection is swallowed by the try/catch
-    expect(mocks.executeCommand).toHaveBeenCalledTimes(1);
     expect(mocks.postMessage).toHaveBeenCalledWith({
       command: "viewDiff",
       success: false
     });
   });
 
-  it("returns success=false when vscode.diff rejects in normal commit mode (TC-072)", async () => {
-    // Case: TC-072
-    // Given: a normal commit hash (no compareWithHash) and vscode.commands.executeCommand rejects
+  it("returns success=false when vscode.diff rejects in normal commit mode (TC-095)", async () => {
+    // Case: TC-095
+    // Given: a normal commit (no compareWithHash) and executeCommand rejects
     mocks.executeCommand.mockRejectedValueOnce(new Error("diff editor unavailable"));
 
     // When: viewDiff message for a normal commit is dispatched
@@ -2153,7 +2246,7 @@ describe("GitKeizuView viewDiff error handling (S16)", () => {
     });
 
     // Then: success=false is posted; the rejection is swallowed by the try/catch
-    expect(mocks.executeCommand).toHaveBeenCalledTimes(1);
+    expect(mocks.resolveRefToHash).not.toHaveBeenCalled();
     expect(mocks.postMessage).toHaveBeenCalledWith({
       command: "viewDiff",
       success: false
@@ -2998,6 +3091,378 @@ describe("GitKeizuView notifyShowRecentActionsChanged runtime sync", () => {
 
     getConfigMock.mockImplementation(
       () => baseConfig as unknown as ReturnType<typeof configModule.getConfig>
+    );
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S21: メッセージハンドラ try/finally による unmute 保証              */
+/* ------------------------------------------------------------------ */
+
+describe("GitKeizuView message handler try/finally unmute (S21)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitKeizuView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.addTag.mockResolvedValue(null);
+
+    const mockDataSource = {
+      addTag: mocks.addTag
+    } as unknown as DataSource;
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  function addTagMessage() {
+    return {
+      command: "addTag",
+      repo: TEST_REPO,
+      tagName: "v1",
+      commitHash: "abc123",
+      lightweight: true,
+      message: ""
+    };
+  }
+
+  it("unmutes once after a handler completes normally (TC-076)", async () => {
+    // Case: TC-076
+    // Given: a registered repo and addTag resolving successfully
+    mocks.addTag.mockResolvedValue(null);
+
+    // When: the addTag handler runs to completion
+    await mocks.messageHandler.current!(addTagMessage());
+
+    // Then: mute and unmute are each called exactly once
+    expect(mocks.mute).toHaveBeenCalledTimes(1);
+    expect(mocks.unmute).toHaveBeenCalledTimes(1);
+  });
+
+  it("unmutes once even when a DataSource method throws (TC-077)", async () => {
+    // Case: TC-077
+    // Given: addTag rejects with an error
+    mocks.addTag.mockRejectedValueOnce(new Error("boom"));
+
+    // When: the handler runs and the error propagates
+    await expect(mocks.messageHandler.current!(addTagMessage())).rejects.toThrow("boom");
+
+    // Then: the finally block still unmutes exactly once
+    expect(mocks.unmute).toHaveBeenCalledTimes(1);
+  });
+
+  it("unmutes once even when sendMessage throws (TC-078)", async () => {
+    // Case: TC-078
+    // Given: posting the addTag response throws
+    mocks.addTag.mockResolvedValue(null);
+    mocks.postMessage.mockImplementation((message: { command: string }) => {
+      if (message.command === "addTag") {
+        throw new Error("send failed");
+      }
+    });
+
+    // When: the handler runs and the send error propagates
+    await expect(mocks.messageHandler.current!(addTagMessage())).rejects.toThrow("send failed");
+
+    // Then: the finally block still unmutes exactly once
+    expect(mocks.unmute).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not mute or unmute when the early-return guard trips (TC-079)", async () => {
+    // Case: TC-079
+    // Given: a message for an unregistered repo (guard before mute)
+    await mocks.messageHandler.current!({ ...addTagMessage(), repo: "/unregistered" });
+
+    // Then: neither mute nor unmute is called (return is outside the try)
+    expect(mocks.mute).not.toHaveBeenCalled();
+    expect(mocks.unmute).not.toHaveBeenCalled();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S22: worktree コマンドの個別 try/catch と status 応答               */
+/* ------------------------------------------------------------------ */
+
+describe("GitKeizuView worktree command error responses (S22)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitKeizuView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.executeCommand.mockResolvedValue(undefined);
+
+    const mockDataSource = {} as unknown as DataSource;
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  it("posts openWorktreeInNewWindow without status on success (TC-080)", async () => {
+    // Case: TC-080
+    // Given: executeCommand succeeds
+    mocks.executeCommand.mockResolvedValue(undefined);
+
+    // When: openWorktreeInNewWindow is handled
+    await mocks.messageHandler.current!({
+      command: "openWorktreeInNewWindow",
+      repo: TEST_REPO,
+      path: "wt"
+    });
+
+    // Then: the response carries no status field
+    expect(mocks.postMessage).toHaveBeenCalledWith({ command: "openWorktreeInNewWindow" });
+  });
+
+  it("posts the Error message as status when openFolder rejects with Error (TC-081)", async () => {
+    // Case: TC-081
+    // Given: executeCommand rejects with an Error
+    mocks.executeCommand.mockRejectedValueOnce(new Error("boom"));
+
+    // When: openWorktreeInNewWindow is handled
+    await mocks.messageHandler.current!({
+      command: "openWorktreeInNewWindow",
+      repo: TEST_REPO,
+      path: "wt"
+    });
+
+    // Then: status carries the Error message
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "openWorktreeInNewWindow",
+      status: "boom"
+    });
+  });
+
+  it("posts String(error) as status when openFolder rejects with a non-Error (TC-082)", async () => {
+    // Case: TC-082
+    // Given: executeCommand rejects with a plain string
+    mocks.executeCommand.mockRejectedValueOnce("x");
+
+    // When: openWorktreeInNewWindow is handled
+    await mocks.messageHandler.current!({
+      command: "openWorktreeInNewWindow",
+      repo: TEST_REPO,
+      path: "wt"
+    });
+
+    // Then: status is the String(error) coercion
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "openWorktreeInNewWindow",
+      status: "x"
+    });
+  });
+
+  it("posts revealWorktreeInOS without status on success (TC-083)", async () => {
+    // Case: TC-083
+    // Given: executeCommand succeeds
+    mocks.executeCommand.mockResolvedValue(undefined);
+
+    // When: revealWorktreeInOS is handled
+    await mocks.messageHandler.current!({
+      command: "revealWorktreeInOS",
+      repo: TEST_REPO,
+      path: "wt"
+    });
+
+    // Then: the response carries no status field
+    expect(mocks.postMessage).toHaveBeenCalledWith({ command: "revealWorktreeInOS" });
+  });
+
+  it("posts the Error message as status when revealFileInOS rejects with Error (TC-084)", async () => {
+    // Case: TC-084
+    // Given: executeCommand rejects with an Error
+    mocks.executeCommand.mockRejectedValueOnce(new Error("no"));
+
+    // When: revealWorktreeInOS is handled
+    await mocks.messageHandler.current!({
+      command: "revealWorktreeInOS",
+      repo: TEST_REPO,
+      path: "wt"
+    });
+
+    // Then: status carries the Error message
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "revealWorktreeInOS",
+      status: "no"
+    });
+  });
+
+  it("posts String(error) as status when revealFileInOS rejects with a non-Error (TC-085)", async () => {
+    // Case: TC-085
+    // Given: executeCommand rejects with a plain string
+    mocks.executeCommand.mockRejectedValueOnce("y");
+
+    // When: revealWorktreeInOS is handled
+    await mocks.messageHandler.current!({
+      command: "revealWorktreeInOS",
+      repo: TEST_REPO,
+      path: "wt"
+    });
+
+    // Then: status is the String(error) coercion
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "revealWorktreeInOS",
+      status: "y"
+    });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S23: createOrShow() reveal 前の lastActiveRepo 永続化               */
+/* ------------------------------------------------------------------ */
+
+describe("GitKeizuView createOrShow reveal persists lastActiveRepo (S23)", () => {
+  const SCM_REPO = "/scm/repo/path";
+  let mockSetLastActiveRepo: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitKeizuView.currentPanel = undefined;
+    mockSetLastActiveRepo = vi.fn();
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  function createDeps() {
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo", [SCM_REPO]: "SCM Repo" });
+
+    const mockDataSource = {} as unknown as DataSource;
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      setLastActiveRepo: mockSetLastActiveRepo
+    } as unknown as ExtensionState;
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn(),
+      registerRepoFromUri: vi.fn().mockResolvedValue(undefined)
+    } as unknown as RepoManager;
+
+    return { mockDataSource, mockExtensionState, mockAvatarManager, mockRepoManager };
+  }
+
+  function show(deps: ReturnType<typeof createDeps>, rootUri?: import("vscode").Uri) {
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      deps.mockDataSource,
+      deps.mockExtensionState,
+      deps.mockAvatarManager,
+      deps.mockRepoManager,
+      rootUri
+    );
+  }
+
+  it("persists the rootUri path when revealing an existing panel (TC-086)", () => {
+    // Case: TC-086
+    // Given: an existing panel (created without rootUri)
+    const deps = createDeps();
+    show(deps);
+    vi.clearAllMocks();
+
+    // When: createOrShow is called again with a rootUri
+    const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
+    show(deps, rootUri);
+
+    // Then: setLastActiveRepo is called once with the rootUri path
+    expect(mockSetLastActiveRepo).toHaveBeenCalledTimes(1);
+    expect(mockSetLastActiveRepo).toHaveBeenCalledWith(SCM_REPO);
+  });
+
+  it("does not persist and only reveals when rootUri is undefined (TC-087)", () => {
+    // Case: TC-087
+    // Given: an existing panel
+    const deps = createDeps();
+    show(deps);
+    vi.clearAllMocks();
+
+    // When: createOrShow is called again without a rootUri
+    show(deps);
+
+    // Then: setLastActiveRepo is not called, but the panel is revealed
+    expect(mockSetLastActiveRepo).not.toHaveBeenCalled();
+    expect(mocks.reveal).toHaveBeenCalledTimes(1);
+  });
+
+  it("persists the repo before revealing the panel (TC-088)", () => {
+    // Case: TC-088
+    // Given: an existing panel
+    const deps = createDeps();
+    show(deps);
+    vi.clearAllMocks();
+
+    // When: createOrShow is called again with a rootUri
+    const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
+    show(deps, rootUri);
+
+    // Then: setLastActiveRepo is invoked before panel.reveal
+    expect(mockSetLastActiveRepo).toHaveBeenCalledTimes(1);
+    expect(mocks.reveal).toHaveBeenCalledTimes(1);
+    expect(mockSetLastActiveRepo.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.reveal.mock.invocationCallOrder[0]
     );
   });
 });

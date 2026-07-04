@@ -10,7 +10,13 @@ vi.mock("vscode", () => ({
       const path = qIdx >= 0 ? rest.substring(0, qIdx) : rest;
       const query = qIdx >= 0 ? rest.substring(qIdx + 1) : "";
       return { scheme, path, query, toString: () => str };
-    })
+    }),
+    from: vi.fn((components: { scheme: string; path: string; query: string }) => ({
+      scheme: components.scheme,
+      path: components.path,
+      query: components.query,
+      toString: () => `${components.scheme}:${components.path}?${components.query}`
+    }))
   },
   workspace: {
     onDidCloseTextDocument: vi.fn(() => ({ dispose: vi.fn() }))
@@ -73,144 +79,159 @@ function getCloseCallback(): CloseTextDocumentHandler {
 // encodeDiffDocUri
 // ---------------------------------------------------------------------------
 
-describe("encodeDiffDocUri", () => {
+describe("encodeDiffDocUri version and Uri.from construction (S7)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("TC-001: constructs URI with correct scheme, path, and query params", () => {
-    // Case: TC-001
-    // Given: Valid repo, filePath, and commit
-    const repo = "/path/to/repo";
-    const filePath = "src/file.ts";
-    const commit = "abc123";
+  it("omits the version field from the query when version is not provided (TC-031)", () => {
+    // Case: TC-031
+    // Given: repo, filePath, commit with no version argument
+    const result = encodeDiffDocUri("/p/r", "src/f.ts", "abc123");
 
-    // When: encodeDiffDocUri is called
-    const result = encodeDiffDocUri(repo, filePath, commit);
-
-    // Then: URI has correct scheme, path from getPathFromStr, and encoded query params
+    // Then: scheme/path are set and query has commit&repo but no version
     expect(result.scheme).toBe("git-keizu");
-    expect(result.path).toBe("src/file.ts");
-    expect(result.query).toContain("commit=abc123");
-    expect(result.query).toContain("repo=%2Fpath%2Fto%2Frepo");
-    expect(getPathFromStr).toHaveBeenCalledWith("src/file.ts");
+    expect(result.path).toBe("src/f.ts");
+    expect(result.query).toBe("commit=abc123&repo=%2Fp%2Fr");
+    expect(getPathFromStr).toHaveBeenCalledWith("src/f.ts");
   });
 
-  it("TC-002: encodes space in commit value", () => {
-    // Case: TC-002
-    // Given: Commit containing a space character
-    const repo = "/repo";
-    const filePath = "dir/file.ts";
-    const commit = "abc def";
+  it("appends the version field to the query when provided (TC-032)", () => {
+    // Case: TC-032
+    // Given: a version argument is supplied
+    const result = encodeDiffDocUri("/r", "f.ts", "abc", "1720000000000");
 
-    // When: encodeDiffDocUri is called
-    const result = encodeDiffDocUri(repo, filePath, commit);
+    // Then: query includes commit, repo, and version fields
+    expect(result.query).toBe("commit=abc&repo=%2Fr&version=1720000000000");
+  });
 
-    // Then: Space in commit is percent-encoded as %20
+  it("percent-encodes a space in the commit component (TC-033)", () => {
+    // Case: TC-033
+    // Given: commit containing a space
+    const result = encodeDiffDocUri("/r", "f.ts", "abc def");
+
+    // Then: the space is encoded as %20
     expect(result.query).toContain("commit=abc%20def");
   });
 
-  it("TC-003: handles empty repo string", () => {
-    // Case: TC-003
-    // Given: Empty repo string (no input validation in source)
-    const repo = "";
-    const filePath = "src/file.ts";
-    const commit = "abc";
+  it("percent-encodes URI special characters in the repo component (TC-034)", () => {
+    // Case: TC-034
+    // Given: repo containing ?, &, and = characters
+    const result = encodeDiffDocUri("/p?q=1&x=2", "f.ts", "abc");
 
-    // When: encodeDiffDocUri is called
-    const result = encodeDiffDocUri(repo, filePath, commit);
-
-    // Then: Query contains repo= with empty value
-    expect(result.query).toMatch(/repo=(&|$)/);
+    // Then: ? → %3F, & → %26, = → %3D in the repo value
+    expect(result.query).toContain("%3F");
+    expect(result.query).toContain("%26");
+    expect(result.query).toContain("%3D");
   });
 
-  it("TC-004: handles empty filePath string", () => {
-    // Case: TC-004
-    // Given: Empty filePath string
-    const repo = "/repo";
-    const filePath = "";
-    const commit = "abc";
+  it("percent-encodes special characters in the version component (TC-035)", () => {
+    // Case: TC-035
+    // Given: version containing & and = characters
+    const result = encodeDiffDocUri("/r", "f.ts", "abc", "a&b=c");
 
-    // When: encodeDiffDocUri is called
-    const result = encodeDiffDocUri(repo, filePath, commit);
-
-    // Then: Path is the result of getPathFromStr("") which returns ""
-    expect(result.path).toBe("");
-    expect(getPathFromStr).toHaveBeenCalledWith("");
+    // Then: & → %26 and = → %3D in the version value
+    expect(result.query).toContain("version=a%26b%3Dc");
   });
 
-  it("TC-005: handles empty commit string", () => {
-    // Case: TC-005
-    // Given: Empty commit string (no input validation in source)
-    const repo = "/repo";
-    const filePath = "src/file.ts";
-    const commit = "";
+  it("normalizes backslash path separators via getPathFromStr (TC-036)", () => {
+    // Case: TC-036
+    // Given: filePath with a Windows-style backslash
+    const result = encodeDiffDocUri("/r", "dir\\file.ts", "abc");
 
-    // When: encodeDiffDocUri is called
-    const result = encodeDiffDocUri(repo, filePath, commit);
-
-    // Then: Query contains commit= with empty value followed by &
-    expect(result.query).toMatch(/commit=&/);
-  });
-
-  it("TC-006: encodes URI special characters in repo", () => {
-    // Case: TC-006
-    // Given: Repo path containing URI special characters ?, &, =
-    const repo = "/path?q=1&x=2";
-    const filePath = "file.ts";
-    const commit = "abc";
-
-    // When: encodeDiffDocUri is called
-    const result = encodeDiffDocUri(repo, filePath, commit);
-
-    // Then: Special characters are percent-encoded in repo value
-    expect(result.query).toContain("%3F"); // ? → %3F
-    expect(result.query).toContain("%26"); // & → %26
-    expect(result.query).toContain("%3D"); // = → %3D
-  });
-
-  it("TC-007: preserves space in filePath via getPathFromStr", () => {
-    // Case: TC-007
-    // Given: filePath containing a space
-    const repo = "/repo";
-    const filePath = "dir/my file.ts";
-    const commit = "abc";
-
-    // When: encodeDiffDocUri is called
-    const result = encodeDiffDocUri(repo, filePath, commit);
-
-    // Then: Path reflects getPathFromStr result with space preserved
-    expect(result.path).toBe("dir/my file.ts");
-    expect(getPathFromStr).toHaveBeenCalledWith("dir/my file.ts");
-  });
-
-  it("TC-008: normalizes backslash in filePath via getPathFromStr", () => {
-    // Case: TC-008
-    // Given: filePath with Windows-style backslash
-    const repo = "/repo";
-    const filePath = "dir\\file.ts";
-    const commit = "abc";
-
-    // When: encodeDiffDocUri is called
-    const result = encodeDiffDocUri(repo, filePath, commit);
-
-    // Then: Backslash is normalized to forward slash by getPathFromStr
+    // Then: the path is separator-normalized by getPathFromStr
     expect(result.path).toBe("dir/file.ts");
     expect(getPathFromStr).toHaveBeenCalledWith("dir\\file.ts");
   });
 
-  it("TC-009: handles full 40-character SHA hash commit", () => {
-    // Case: TC-009
-    // Given: Full SHA-1 hash (40 hex characters) as commit
-    const repo = "/repo";
-    const filePath = "file.ts";
-    const fullHash = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4e5f6a1b2";
+  it("includes an empty commit value without throwing (TC-037)", () => {
+    // Case: TC-037
+    // Given: an empty commit string
+    const result = encodeDiffDocUri("/r", "f.ts", "");
 
-    // When: encodeDiffDocUri is called
-    const result = encodeDiffDocUri(repo, filePath, fullHash);
+    // Then: query carries commit= with an empty value
+    expect(result.query).toContain("commit=&");
+  });
+});
 
-    // Then: Full hash is preserved as-is in query
-    expect(result.query).toContain(`commit=${fullHash}`);
+describe("encode/decode roundtrip and version cache key (S8)", () => {
+  let mockDataSource: { getCommitFile: ReturnType<typeof vi.fn> };
+  let provider: DiffDocProvider;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDataSource = { getCommitFile: vi.fn() };
+    provider = new DiffDocProvider(asDataSource(mockDataSource));
+  });
+
+  it("round-trips repo/filePath/commit without a version field (TC-038)", () => {
+    // Case: TC-038
+    // Given: a URI encoded without a version
+    const encoded = encodeDiffDocUri("/p/r", "src/f.ts", "abc");
+
+    // When: the encoded URI is decoded
+    const decoded = decodeDiffDocUri(encoded);
+
+    // Then: filePath/commit/repo are symmetrically restored
+    expect(decoded).toEqual({ filePath: "src/f.ts", commit: "abc", repo: "/p/r" });
+  });
+
+  it("round-trips while tolerating an extra version field (TC-039)", () => {
+    // Case: TC-039
+    // Given: a URI encoded with a version field
+    const encoded = encodeDiffDocUri("/r", "f.ts", "abc", "1720000000000");
+
+    // When: the encoded URI is decoded
+    const decoded = decodeDiffDocUri(encoded);
+
+    // Then: commit and repo are restored; the typed result exposes filePath/commit/repo
+    expect(decoded.commit).toBe("abc");
+    expect(decoded.repo).toBe("/r");
+    expect(decoded.filePath).toBe("f.ts");
+  });
+
+  it("busts the cache when the version differs for the same commit (TC-040)", async () => {
+    // Case: TC-040
+    // Given: two URIs identical except for the version field
+    mockDataSource.getCommitFile.mockResolvedValueOnce("A").mockResolvedValueOnce("B");
+    const uriA = encodeDiffDocUri("/r", "f.ts", "abc", "A");
+    const uriB = encodeDiffDocUri("/r", "f.ts", "abc", "B");
+
+    // When: both are requested from the provider
+    await provider.provideTextDocumentContent(uriA);
+    await provider.provideTextDocumentContent(uriB);
+
+    // Then: the toString keys differ and getCommitFile is called for each
+    expect(uriA.toString()).not.toBe(uriB.toString());
+    expect(mockDataSource.getCommitFile).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps a stable cache key when no version is present (TC-041)", async () => {
+    // Case: TC-041
+    // Given: the same version-less URI requested twice
+    mockDataSource.getCommitFile.mockResolvedValue("content");
+    const first = encodeDiffDocUri("/r", "f.ts", "abc");
+    const second = encodeDiffDocUri("/r", "f.ts", "abc");
+
+    // When: both requests hit the provider
+    await provider.provideTextDocumentContent(first);
+    await provider.provideTextDocumentContent(second);
+
+    // Then: the second request hits the cache; getCommitFile runs only once
+    expect(first.toString()).toBe(second.toString());
+    expect(mockDataSource.getCommitFile).toHaveBeenCalledTimes(1);
+  });
+
+  it("restores special characters in commit through a single decode (TC-042)", () => {
+    // Case: TC-042
+    // Given: a commit containing space, ampersand, and equals
+    const encoded = encodeDiffDocUri("/r", "f.ts", " &=");
+
+    // When: the encoded URI is decoded
+    const decoded = decodeDiffDocUri(encoded);
+
+    // Then: the commit is fully restored (not double-decoded)
+    expect(decoded.commit).toBe(" &=");
   });
 });
 

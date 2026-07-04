@@ -3584,280 +3584,250 @@ describe("Author, details, remotes & parent navigation", () => {
   });
 
   /* ---------------------------------------------------------------- */
-  /* S16: Author Dropdown UI                                          */
+  /* S41: buildAuthorOptions() 全著者 ∪ 選択中著者のマージ             */
   /* ---------------------------------------------------------------- */
 
-  describe("Author Dropdown UI", () => {
+  describe("buildAuthorOptions merge via loadCommits (S41)", () => {
     const ALL_AUTHORS_OPTION = { name: "All Authors", value: "" };
 
-    it("builds unique sorted author list on loadCommits (TC-107)", () => {
-      // Given: commits with authors Alice, Bob, Carol (selectedAuthors is empty)
-      vi.clearAllMocks();
+    // buildAuthorOptions is module-private; its merge behavior is observed through
+    // loadCommits -> authorDropdown.setOptions(options, selected).
+    function setSelectedAuthors(values: string[]): void {
+      capturedAuthorCallback!(values);
+    }
 
-      // When: loadCommits response is dispatched
+    function dispatchLoadCommits(authors?: string[], commits = MOCK_COMMITS): void {
       dispatchMessage({
         command: "loadCommits",
-        commits: MOCK_COMMITS,
+        commits,
         head: COMMIT_HASH_1,
         moreCommitsAvailable: false,
-        hard: true
+        hard: true,
+        ...(authors === undefined ? {} : { authors })
       });
+    }
 
-      // Then: authorDropdown.setOptions is called with sorted unique authors and empty array
+    it("does not duplicate a selected author already in the author list (TC-229)", () => {
+      // Given: selectedAuthors=["Alice"] with authors=["Alice","Bob"]
+      setSelectedAuthors(["Alice"]);
+      vi.clearAllMocks();
+
+      // When: loadCommits rebuilds the dropdown
+      dispatchLoadCommits(["Alice", "Bob"]);
+
+      // Then: Alice is not appended twice; selected stays ["Alice"]
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
+        [ALL_AUTHORS_OPTION, { name: "Alice", value: "Alice" }, { name: "Bob", value: "Bob" }],
+        ["Alice"]
+      );
+    });
+
+    it("appends a selected author that is absent from the author list (TC-230)", () => {
+      // Given: selectedAuthors=["Bob"] with authors=["Alice"] (Bob not in authors)
+      setSelectedAuthors(["Bob"]);
+      vi.clearAllMocks();
+
+      // When: loadCommits rebuilds the dropdown
+      dispatchLoadCommits(["Alice"]);
+
+      // Then: Bob is appended to the end; selected stays ["Bob"]
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
+        [ALL_AUTHORS_OPTION, { name: "Alice", value: "Alice" }, { name: "Bob", value: "Bob" }],
+        ["Bob"]
+      );
+    });
+
+    it("produces only All Authors when both lists are empty (TC-231)", () => {
+      // Given: selectedAuthors=[] and authors=[] with no commits
+      setSelectedAuthors([]);
+      vi.clearAllMocks();
+
+      // When: loadCommits rebuilds the dropdown with empty inputs
+      dispatchLoadCommits([], []);
+
+      // Then: only the All Authors option is produced; selected is empty
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith([ALL_AUTHORS_OPTION], []);
+    });
+
+    it("appends only the out-of-list selected authors (TC-232)", () => {
+      // Given: selectedAuthors=["Alice","Charlie"] with authors=["Alice"]
+      setSelectedAuthors(["Alice", "Charlie"]);
+      vi.clearAllMocks();
+
+      // When: loadCommits rebuilds the dropdown
+      dispatchLoadCommits(["Alice"]);
+
+      // Then: Alice stays once, Charlie is appended; selected preserved
       expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
         [
           ALL_AUTHORS_OPTION,
           { name: "Alice", value: "Alice" },
-          { name: "Bob", value: "Bob" },
-          { name: "Carol", value: "Carol" }
+          { name: "Charlie", value: "Charlie" }
         ],
-        []
+        ["Alice", "Charlie"]
       );
     });
 
-    it("sends loadCommits with authors on author selection (TC-108)", () => {
-      // Given: authorDropdown callback was captured during construction
-      expect(capturedAuthorCallback).not.toBeNull();
+    it("preserves author order and selected order when fully contained (TC-233)", () => {
+      // Given: selectedAuthors=["Bob","Alice"] with authors=["Alice","Bob"]
+      setSelectedAuthors(["Bob", "Alice"]);
       vi.clearAllMocks();
 
-      // When: user selects ["Alice"] from the author dropdown (multiselect)
-      capturedAuthorCallback!(["Alice"]);
+      // When: loadCommits rebuilds the dropdown
+      dispatchLoadCommits(["Alice", "Bob"]);
 
-      // Then: loadCommits message is sent with authors array
-      expect(liveVscode.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          command: "loadCommits",
-          authors: ["Alice"]
-        })
+      // Then: options follow authors order (no dedup append); selected keeps ["Bob","Alice"]
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
+        [ALL_AUTHORS_OPTION, { name: "Alice", value: "Alice" }, { name: "Bob", value: "Bob" }],
+        ["Bob", "Alice"]
       );
-    });
-
-    it("sends loadCommits with empty authors on All Authors selection (TC-109)", () => {
-      // Given: authors was previously set
-      expect(capturedAuthorCallback).not.toBeNull();
-      capturedAuthorCallback!(["Alice"]);
-      // Complete the pending loadCommits to clear loadCommitsCallback. TC-108 above leaves a
-      // pending loadCommitsCallback in-flight, so the call above queues; after dispatching the
-      // response the queued request flushes and sets a new callback — dispatch once more to
-      // drain that, leaving loadCommitsCallback null.
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-      vi.clearAllMocks();
-
-      // When: user selects "All Authors" (empty array)
-      capturedAuthorCallback!([]);
-
-      // Then: loadCommits message contains authors: []
-      const sentMessage = vi.mocked(liveVscode.postMessage).mock.calls[0][0] as Record<
-        string,
-        unknown
-      >;
-      expect(sentMessage.command).toBe("loadCommits");
-      expect(sentMessage).toHaveProperty("authors", []);
-    });
-
-    it("does not update author list when selectedAuthors is non-empty (TC-110)", () => {
-      // Given: selectedAuthors is set via dropdown callback
-      expect(capturedAuthorCallback).not.toBeNull();
-      capturedAuthorCallback!(["Alice"]);
-      vi.clearAllMocks();
-
-      // When: loadCommits response is dispatched (filtered commits)
-      dispatchMessage({
-        command: "loadCommits",
-        commits: [MOCK_COMMITS[0]],
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-
-      // Then: authorDropdown.setOptions is NOT called (list stays stable)
-      expect(mockAuthorDropdownInstance.setOptions).not.toHaveBeenCalled();
-
-      // Cleanup: reset authors by selecting All Authors
-      capturedAuthorCallback!([]);
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-    });
-
-    it("shows only All Authors for empty commits (TC-111)", () => {
-      // Given: selectedAuthors is empty (reset by previous test cleanup)
-      vi.clearAllMocks();
-
-      // When: loadCommits response with empty commits array
-      dispatchMessage({
-        command: "loadCommits",
-        commits: [],
-        head: null,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-
-      // Then: dropdown shows only "All Authors" with empty selected array
-      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith([ALL_AUTHORS_OPTION], []);
-
-      // Cleanup: restore normal commits
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
     });
   });
 
   /* ---------------------------------------------------------------- */
-  /* S21: loadCommits() サーバー提供 Author リスト対応                  */
+  /* S42: loadCommits() Author ドロップダウンの無条件再構築            */
   /* ---------------------------------------------------------------- */
 
-  describe("loadCommits server-provided authors (S21)", () => {
+  describe("loadCommits unconditional author dropdown rebuild (S42)", () => {
     const ALL_AUTHORS_OPTION = { name: "All Authors", value: "" };
 
-    it("uses server-provided authors for dropdown when selectedAuthors is empty (TC-129)", () => {
-      // Given: selectedAuthors is empty (default state)
-      vi.clearAllMocks();
+    function setSelectedAuthors(values: string[]): void {
+      capturedAuthorCallback!(values);
+    }
 
-      // When: loadCommits response includes authors array
+    function dispatchLoadCommits(authors: string[] | undefined, commits = MOCK_COMMITS): void {
       dispatchMessage({
         command: "loadCommits",
-        commits: MOCK_COMMITS,
+        commits,
         head: COMMIT_HASH_1,
         moreCommitsAvailable: false,
         hard: true,
-        authors: ["Alice", "Bob"]
+        ...(authors === undefined ? {} : { authors })
       });
+    }
 
-      // Then: dropdown is updated with server-provided authors (not extracted from commits)
+    it("rebuilds with server-provided authors when no filter is active (TC-234)", () => {
+      // Given: selectedAuthors=[] and server provides ["Alice","Bob"]
+      setSelectedAuthors([]);
+      vi.clearAllMocks();
+
+      // When: loadCommits is received
+      dispatchLoadCommits(["Alice", "Bob"]);
+
+      // Then: setOptions is called with the server list and empty selection
       expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
         [ALL_AUTHORS_OPTION, { name: "Alice", value: "Alice" }, { name: "Bob", value: "Bob" }],
         []
       );
     });
 
-    it("falls back to commit extraction when authors is undefined (TC-130)", () => {
-      // Given: selectedAuthors is empty (default state)
+    it("still rebuilds while a filter is active and keeps the selection (TC-235)", () => {
+      // Given: selectedAuthors=["Alice"] (filter active) and server provides ["Alice","Bob"]
+      setSelectedAuthors(["Alice"]);
       vi.clearAllMocks();
 
-      // When: loadCommits response does NOT include authors field
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
+      // When: loadCommits is received
+      dispatchLoadCommits(["Alice", "Bob"]);
 
-      // Then: dropdown is updated with authors extracted from commits (sorted, deduplicated)
+      // Then: the dropdown is rebuilt (old skip behavior removed) and selection is preserved
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
+        [ALL_AUTHORS_OPTION, { name: "Alice", value: "Alice" }, { name: "Bob", value: "Bob" }],
+        ["Alice"]
+      );
+    });
+
+    it("falls back to deduplicated sorted commit authors when authors is undefined (TC-236)", () => {
+      // Given: selectedAuthors=[] and commit authors are ["Bob","Alice","Bob"]
+      setSelectedAuthors([]);
+      vi.clearAllMocks();
+      const commits = [
+        { ...MOCK_COMMITS[0], author: "Bob" },
+        { ...MOCK_COMMITS[1], author: "Alice" },
+        { ...MOCK_COMMITS[2], author: "Bob" }
+      ];
+
+      // When: loadCommits is received without an authors field
+      dispatchLoadCommits(undefined, commits);
+
+      // Then: the author list is deduplicated and sorted to ["Alice","Bob"]
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
+        [ALL_AUTHORS_OPTION, { name: "Alice", value: "Alice" }, { name: "Bob", value: "Bob" }],
+        []
+      );
+    });
+
+    it("shows only All Authors for an empty author list (TC-237)", () => {
+      // Given: selectedAuthors=[] and authors=[]
+      setSelectedAuthors([]);
+      vi.clearAllMocks();
+
+      // When: loadCommits is received with empty authors and commits
+      dispatchLoadCommits([], []);
+
+      // Then: only the All Authors option is present
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith([ALL_AUTHORS_OPTION], []);
+    });
+
+    it("preserves an out-of-list selected author in the rebuilt options (TC-238)", () => {
+      // Given: selectedAuthors=["Charlie"] absent from authors=["Alice","Bob"]
+      setSelectedAuthors(["Charlie"]);
+      vi.clearAllMocks();
+
+      // When: loadCommits is received
+      dispatchLoadCommits(["Alice", "Bob"]);
+
+      // Then: Charlie is merged into the options and remains selected
       expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
         [
           ALL_AUTHORS_OPTION,
           { name: "Alice", value: "Alice" },
           { name: "Bob", value: "Bob" },
-          { name: "Carol", value: "Carol" }
+          { name: "Charlie", value: "Charlie" }
         ],
-        []
+        ["Charlie"]
       );
+
+      // Cleanup: clear the filter and drain the in-flight request
+      setSelectedAuthors([]);
+      dispatchLoadCommits(undefined);
     });
 
-    it("shows only All Authors when authors is empty array (TC-131)", () => {
-      // Given: selectedAuthors is empty
+    it('sends authors=["Alice"] when the dropdown selects Alice (TC-239)', () => {
+      // Given: no in-flight request and no active filter
+      expect(capturedAuthorCallback).not.toBeNull();
+      capturedAuthorCallback!([]);
+      dispatchLoadCommits(undefined);
       vi.clearAllMocks();
 
-      // When: loadCommits response includes empty authors array
-      dispatchMessage({
-        command: "loadCommits",
-        commits: [],
-        head: null,
-        moreCommitsAvailable: false,
-        hard: true,
-        authors: []
-      });
+      // When: Alice is selected in the dropdown
+      capturedAuthorCallback!(["Alice"]);
 
-      // Then: dropdown shows only "All Authors" with empty selected array
-      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith([ALL_AUTHORS_OPTION], []);
+      // Then: a loadCommits request is sent carrying authors: ["Alice"]
+      expect(liveVscode.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ command: "loadCommits", authors: ["Alice"] })
+      );
 
-      // Cleanup: restore normal commits
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
+      // Cleanup: drain the in-flight request
+      dispatchLoadCommits(undefined);
     });
 
-    it("skips dropdown update when selectedAuthors is non-empty (TC-132)", () => {
-      // Given: selectedAuthors is set via dropdown callback
+    it("sends authors=[] when All Authors is selected (TC-240)", () => {
+      // Given: an active filter with no in-flight request
       expect(capturedAuthorCallback).not.toBeNull();
       capturedAuthorCallback!(["Alice"]);
+      dispatchLoadCommits(undefined);
       vi.clearAllMocks();
 
-      // When: loadCommits response includes authors array
-      dispatchMessage({
-        command: "loadCommits",
-        commits: [MOCK_COMMITS[0]],
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true,
-        authors: ["Alice", "Bob"]
-      });
-
-      // Then: authorDropdown.setOptions is NOT called (filter active, list stays stable)
-      expect(mockAuthorDropdownInstance.setOptions).not.toHaveBeenCalled();
-
-      // Cleanup: reset selectedAuthors
+      // When: All Authors is selected (empty array)
       capturedAuthorCallback!([]);
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-    });
 
-    it("preserves server-provided order without re-sorting (TC-133)", () => {
-      // Given: selectedAuthors is empty
-      vi.clearAllMocks();
-
-      // When: loadCommits response includes authors in non-alphabetical order
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true,
-        authors: ["Charlie", "Alice", "Bob"]
-      });
-
-      // Then: dropdown options preserve the exact server-provided order
-      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledWith(
-        [
-          ALL_AUTHORS_OPTION,
-          { name: "Charlie", value: "Charlie" },
-          { name: "Alice", value: "Alice" },
-          { name: "Bob", value: "Bob" }
-        ],
-        []
+      // Then: a loadCommits request is sent carrying authors: []
+      expect(liveVscode.postMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ command: "loadCommits", authors: [] })
       );
+
+      // Cleanup: drain the in-flight request
+      dispatchLoadCommits(undefined);
     });
   });
 
@@ -4427,168 +4397,6 @@ describe("Multi-select filter state management", () => {
       expect(msg.branches).toEqual([]);
 
       // Cleanup
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-    });
-  });
-
-  /* ---------------------------------------------------------------- */
-  /* S23: Author multi-select state management                         */
-  /* ---------------------------------------------------------------- */
-
-  describe("Author multi-select state (S23)", () => {
-    it("initializes selectedAuthors as empty array (TC-139)", () => {
-      // Given: GitKeizuView was constructed with no prevState
-      // When: author callback fires with [] (Show All = default)
-      capturedAuthorCallback!([]);
-      const msg = vi.mocked(liveVscode.postMessage).mock.calls[0]?.[0] as Record<string, unknown>;
-      expect(msg).toBeDefined();
-      expect(msg.command).toBe("loadCommits");
-      expect(msg.authors).toEqual([]);
-
-      // Cleanup
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-    });
-
-    it("updates selectedAuthors on author dropdown callback (TC-140)", () => {
-      // Given: author dropdown callback was captured
-      expect(capturedAuthorCallback).not.toBeNull();
-      vi.clearAllMocks();
-
-      // When: author dropdown fires with ["Alice", "Bob"]
-      capturedAuthorCallback!(["Alice", "Bob"]);
-
-      // Then: requestLoadCommits is sent with authors: ["Alice", "Bob"]
-      expect(liveVscode.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          command: "loadCommits",
-          authors: ["Alice", "Bob"]
-        })
-      );
-
-      // Cleanup
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-    });
-
-    it("updates selectedAuthors to empty on Show All selection (TC-141)", () => {
-      // Given: author dropdown callback
-      expect(capturedAuthorCallback).not.toBeNull();
-      vi.clearAllMocks();
-
-      // When: author dropdown fires with [] (Show All)
-      capturedAuthorCallback!([]);
-
-      // Then: requestLoadCommits is sent with authors: []
-      expect(liveVscode.postMessage).toHaveBeenCalledWith(
-        expect.objectContaining({
-          command: "loadCommits",
-          authors: []
-        })
-      );
-
-      // Cleanup
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-    });
-
-    it("sends authors array in requestLoadCommits (TC-142)", () => {
-      // Given: selectedAuthors is ["Alice"]
-      expect(capturedAuthorCallback).not.toBeNull();
-      vi.clearAllMocks();
-
-      // When: author callback is called with ["Alice"]
-      capturedAuthorCallback!(["Alice"]);
-
-      // Then: sent message contains authors: ["Alice"]
-      const msg = vi.mocked(liveVscode.postMessage).mock.calls[0]?.[0] as Record<string, unknown>;
-      expect(msg.authors).toEqual(["Alice"]);
-
-      // Cleanup
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-    });
-
-    it("updates author dropdown when selectedAuthors is empty (TC-143)", () => {
-      // Given: selectedAuthors is [] (reset to Show All)
-      capturedAuthorCallback!([]);
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-      vi.clearAllMocks();
-
-      // When: loadCommits response is received with authors
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true,
-        authors: ["Alice", "Bob"]
-      });
-
-      // Then: author dropdown is updated
-      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalled();
-    });
-
-    it("skips author dropdown update when selectedAuthors is non-empty (TC-144)", () => {
-      // Given: selectedAuthors is ["Alice"]
-      expect(capturedAuthorCallback).not.toBeNull();
-      capturedAuthorCallback!(["Alice"]);
-      dispatchMessage({
-        command: "loadCommits",
-        commits: MOCK_COMMITS,
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true
-      });
-      vi.clearAllMocks();
-
-      // When: loadCommits response is received
-      dispatchMessage({
-        command: "loadCommits",
-        commits: [MOCK_COMMITS[0]],
-        head: COMMIT_HASH_1,
-        moreCommitsAvailable: false,
-        hard: true,
-        authors: ["Alice", "Bob"]
-      });
-
-      // Then: author dropdown is NOT updated
-      expect(mockAuthorDropdownInstance.setOptions).not.toHaveBeenCalled();
-
-      // Cleanup
-      capturedAuthorCallback!([]);
       dispatchMessage({
         command: "loadCommits",
         commits: MOCK_COMMITS,

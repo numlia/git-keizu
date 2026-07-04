@@ -2,7 +2,11 @@
 import { describe, expect, it } from "vitest";
 
 import type { GitFileChange } from "../../src/types";
-import { generateGitFileListHtml, generateGitFileTreeHtml } from "../../web/fileTree";
+import {
+  generateGitFileListHtml,
+  generateGitFileTree,
+  generateGitFileTreeHtml
+} from "../../web/fileTree";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
@@ -469,5 +473,97 @@ describe("generateGitFileTreeHtml", () => {
     // Then: the recursively rendered child folder name is escaped
     expect(html).toContain('<span class="gitFolderName">&lt;b&gt;&amp;</span>');
     expect(html).not.toContain("<b>&");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S4: generateGitFileTree file→folder replacement (fileTree-test.md)  */
+/* ------------------------------------------------------------------ */
+
+function asFolder(node: GitFolderOrFile): GitFolder {
+  if (node.type !== "folder") {
+    throw new Error(`expected folder, got ${node.type}`);
+  }
+  return node;
+}
+
+describe("generateGitFileTree", () => {
+  it("creates a new folder node for an undefined intermediate segment (TC-026)", () => {
+    // Case: TC-026
+    // Given: a single file under a not-yet-seen folder
+    const files = [makeFile({ newFilePath: "a/b", oldFilePath: "a/b" })];
+
+    // When: the tree is generated
+    const tree = generateGitFileTree(files);
+
+    // Then: segment "a" is a new folder that the walk descends into
+    const a = asFolder(tree.contents["a"]);
+    expect(a.type).toBe("folder");
+    expect(a.contents["b"].type).toBe("file");
+  });
+
+  it("reuses an existing folder node for a shared segment (TC-027)", () => {
+    // Case: TC-027
+    // Given: two files sharing the intermediate folder "a"
+    const files = [
+      makeFile({ newFilePath: "a/b", oldFilePath: "a/b" }),
+      makeFile({ newFilePath: "a/c", oldFilePath: "a/c" })
+    ];
+
+    // When: the tree is generated
+    const tree = generateGitFileTree(files);
+
+    // Then: the existing folder is reused and both leaves are preserved
+    const a = asFolder(tree.contents["a"]);
+    expect(a.contents["b"].type).toBe("file");
+    expect(a.contents["c"].type).toBe("file");
+  });
+
+  it("replaces a same-named file node with a folder node (TC-028)", () => {
+    // Case: TC-028
+    // Given: first a file "foo", then a file "foo/bar" needing foo as a directory
+    const files = [
+      makeFile({ newFilePath: "foo", oldFilePath: "foo" }),
+      makeFile({ newFilePath: "foo/bar", oldFilePath: "foo/bar" })
+    ];
+
+    // When: the tree is generated
+    const tree = generateGitFileTree(files);
+
+    // Then: the "foo" file node is replaced by a folder node
+    expect(tree.contents["foo"].type).toBe("folder");
+  });
+
+  it("adds the leaf under the replaced folder (TC-029)", () => {
+    // Case: TC-029
+    // Given: the file→folder replacement scenario
+    const files = [
+      makeFile({ newFilePath: "foo", oldFilePath: "foo" }),
+      makeFile({ newFilePath: "foo/bar", oldFilePath: "foo/bar" })
+    ];
+
+    // When: the tree is generated
+    const tree = generateGitFileTree(files);
+
+    // Then: the leaf "bar" is registered under the replaced folder
+    const foo = asFolder(tree.contents["foo"]);
+    expect(foo.contents["bar"].type).toBe("file");
+  });
+
+  it("handles a name collision without throwing (TC-030)", () => {
+    // Case: TC-030
+    // Given: colliding entries foo (file) and foo/bar (file)
+    const files = [
+      makeFile({ newFilePath: "foo", oldFilePath: "foo" }),
+      makeFile({ newFilePath: "foo/bar", oldFilePath: "foo/bar" })
+    ];
+
+    // When / Then: generation completes without throwing
+    expect(() => generateGitFileTree(files)).not.toThrow();
+
+    // Then: foo is a folder that contains bar
+    const tree = generateGitFileTree(files);
+    const foo = asFolder(tree.contents["foo"]);
+    expect(foo.contents["bar"].type).toBe("file");
   });
 });

@@ -401,3 +401,208 @@ describe("RepoFileWatcher start() glob separator normalization (S10)", () => {
     expect(globArgs[1]).not.toContain("\\");
   });
 });
+
+describe("RepoFileWatcher muteCount reference counting (S11)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("suppresses matching events after a single mute (TC-053)", () => {
+    // Case: TC-053
+    // Given: the watcher is muted once (muteCount === 1)
+    const callback = vi.fn();
+    const { rfWatcher, triggerChange } = startWatcher(callback);
+    rfWatcher.mute();
+
+    // When: a watched HEAD change fires
+    triggerChange(0, "HEAD");
+    vi.runAllTimers();
+
+    // Then: the callback is not scheduled
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("still suppresses events with nested mutes (TC-054)", () => {
+    // Case: TC-054
+    // Given: the watcher is muted twice (muteCount === 2)
+    const callback = vi.fn();
+    const { rfWatcher, triggerChange } = startWatcher(callback);
+    rfWatcher.mute();
+    rfWatcher.mute();
+
+    // When: a watched HEAD change fires
+    triggerChange(0, "HEAD");
+    vi.runAllTimers();
+
+    // Then: the callback is not scheduled (muteCount > 0)
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("remains muted after a partial unmute (TC-055)", () => {
+    // Case: TC-055
+    // Given: two mutes and one unmute leave muteCount === 1
+    const callback = vi.fn();
+    const { rfWatcher, triggerChange } = startWatcher(callback);
+    rfWatcher.mute();
+    rfWatcher.mute();
+    rfWatcher.unmute();
+
+    // When: a watched HEAD change fires
+    triggerChange(0, "HEAD");
+    vi.runAllTimers();
+
+    // Then: the callback is still suppressed
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("resumes after a fully balanced unmute past the grace period (TC-056)", () => {
+    // Case: TC-056
+    // Given: two mutes balanced by two unmutes leave muteCount === 0
+    const callback = vi.fn();
+    vi.setSystemTime(new Date(10_000));
+    const { rfWatcher, triggerChange } = startWatcher(callback);
+    rfWatcher.mute();
+    rfWatcher.mute();
+    rfWatcher.unmute();
+    rfWatcher.unmute();
+
+    // When: after the grace period, a watched HEAD change fires
+    vi.setSystemTime(new Date(10_000 + GRACE_PERIOD_MS + 1));
+    triggerChange(0, "HEAD");
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the callback fires once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not underflow on excess unmute and re-mutes correctly (TC-057)", () => {
+    // Case: TC-057
+    // Given: an excess unmute at muteCount 0 followed by a single mute
+    const callback = vi.fn();
+    const { rfWatcher, triggerChange } = startWatcher(callback);
+    rfWatcher.unmute();
+    rfWatcher.mute();
+
+    // When: a watched HEAD change fires
+    triggerChange(0, "HEAD");
+    vi.runAllTimers();
+
+    // Then: the single mute still suppresses (muteCount did not go negative)
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("sets resumeAt to now + 1500ms on unmute (TC-058)", () => {
+    // Case: TC-058
+    // Given: a mute/unmute cycle at a fixed time sets resumeAt to now + grace period
+    const callback = vi.fn();
+    vi.setSystemTime(new Date(10_000));
+    const { rfWatcher, triggerChange } = startWatcher(callback);
+    rfWatcher.mute();
+    rfWatcher.unmute();
+
+    // When: a change fires one millisecond before resumeAt (10_000 + 1500)
+    vi.setSystemTime(new Date(10_000 + GRACE_PERIOD_MS - 1));
+    triggerChange(0, "HEAD");
+    vi.runAllTimers();
+
+    // Then: the change is suppressed, confirming resumeAt is at/after now + 1500ms
+    expect(callback).not.toHaveBeenCalled();
+  });
+});
+
+describe("RepoFileWatcher pending debounce timer clearing (S12)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("clears a pending debounce timer on stop (TC-059)", () => {
+    // Case: TC-059
+    // Given: a matching change has scheduled a pending refresh timer
+    const callback = vi.fn();
+    const { rfWatcher, triggerChange } = startWatcher(callback);
+    triggerChange(0, "HEAD");
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    // When: stop() is called before the debounce elapses
+    rfWatcher.stop();
+
+    // Then: the pending timer is cleared and never fires
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("does not clear a refresh timer on stop when none is pending (TC-060)", () => {
+    // Case: TC-060
+    // Given: no matching change has scheduled a refresh timer
+    const callback = vi.fn();
+    const { rfWatcher } = startWatcher(callback);
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    // When: stop() is called with no pending timer
+    rfWatcher.stop();
+
+    // Then: clearTimeout is not called for a refresh timer and no error occurs
+    expect(clearTimeoutSpy).not.toHaveBeenCalled();
+  });
+
+  it("clears a pending debounce timer on mute and increments muteCount (TC-061)", () => {
+    // Case: TC-061
+    // Given: a matching change has scheduled a pending refresh timer
+    const callback = vi.fn();
+    const { rfWatcher, triggerChange } = startWatcher(callback);
+    triggerChange(0, "HEAD");
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    // When: mute() is called
+    rfWatcher.mute();
+
+    // Then: the pending timer is cleared, and the watcher is now muted (muteCount incremented)
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
+    triggerChange(0, "HEAD");
+    vi.runAllTimers();
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("does not clear a refresh timer on mute when none is pending but still mutes (TC-062)", () => {
+    // Case: TC-062
+    // Given: no matching change has scheduled a refresh timer
+    const callback = vi.fn();
+    const { rfWatcher, triggerChange } = startWatcher(callback);
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+
+    // When: mute() is called
+    rfWatcher.mute();
+
+    // Then: clearTimeout is not called, but muteCount is incremented (subsequent change suppressed)
+    expect(clearTimeoutSpy).not.toHaveBeenCalled();
+    triggerChange(0, "HEAD");
+    vi.runAllTimers();
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("keeps a mute-cleared timer from ever firing (TC-063)", () => {
+    // Case: TC-063
+    // Given: a matching change scheduled a refresh timer that mute() then cleared
+    const callback = vi.fn();
+    const { rfWatcher, triggerChange } = startWatcher(callback);
+    triggerChange(0, "HEAD");
+    rfWatcher.mute();
+
+    // When: time advances well past the debounce window
+    vi.advanceTimersByTime(DEBOUNCE_MS * 2);
+
+    // Then: the cleared timer never invokes the callback
+    expect(callback).not.toHaveBeenCalled();
+  });
+});

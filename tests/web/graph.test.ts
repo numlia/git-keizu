@@ -1231,3 +1231,100 @@ describe("Graph.getAlternativeChildIndex()", () => {
     expect(result).toBe(-1);
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* S18: determinePath() early-break off-screen parent edge (graph-test) */
+/* ------------------------------------------------------------------ */
+
+describe("Graph.determinePath() early break off-screen parent edge", () => {
+  beforeEach(() => {
+    allCreatedElements = [];
+    containerElement = createMockElement("div");
+    vi.clearAllMocks();
+  });
+
+  it("registers trailing nullVertex parents when the loop reaches the end (TC-060)", () => {
+    // Case: TC-060
+    // Given: a single commit whose two parents are both out of range (nullVertex)
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("aaa", ["missing1", "missing2"], null)];
+    const spy = vi.spyOn(Vertex.prototype, "registerParentProcessed");
+
+    // When: loadCommits runs determinePath and the outer loop reaches the end
+    graph.loadCommits(commits, null, { aaa: 0 });
+    graph.render(null);
+
+    // Then: both trailing nullVertex parents are registered as processed
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(getCircleElements().length).toBe(1);
+  });
+
+  it("does not register a pending nullVertex parent after an early break (TC-061)", () => {
+    // Case: TC-061
+    // Given: a merge whose first parent is in range and second is out of range (nullVertex)
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("m", ["a", "missing"], null), makeCommit("a", [], null)];
+    const spy = vi.spyOn(Vertex.prototype, "registerParentProcessed");
+
+    // When: the inner loop breaks early (i < vertices.length) after processing parent "a"
+    graph.loadCommits(commits, null, { m: 0, a: 1 });
+    graph.render(null);
+
+    // Then: the pending nullVertex edge is preserved during the early-break iteration (the
+    // guard skips the trailing while); it is registered on a later determinePath pass, so
+    // each parent is processed exactly once overall (no over-count, no infinite loop)
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(getCircleElements().length).toBe(2);
+  });
+
+  it("breaks the trailing while loop on a non-nullVertex parent without registering it (TC-062)", () => {
+    // Case: TC-062
+    // Given: a merge whose first parent is out of range (null) and second is in range
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("m", ["missing", "a"], null), makeCommit("a", [], null)];
+    const spy = vi.spyOn(Vertex.prototype, "registerParentProcessed");
+
+    // When: the loop reaches the end and the trailing while registers the null then breaks
+    graph.loadCommits(commits, null, { m: 0, a: 1 });
+    graph.render(null);
+
+    // Then: the while breaks on the non-null parent without over-registering it; both parents
+    // are processed exactly once across determinePath passes (total 2, no over-registration)
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(getCircleElements().length).toBe(2);
+  });
+
+  it("keeps the preserved off-screen edge available for remaining processing (TC-063)", () => {
+    // Case: TC-063
+    // Given: a merge with a preserved off-screen edge and further downstream commits
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [
+      makeCommit("m", ["a", "missing"], null),
+      makeCommit("a", ["b"], null),
+      makeCommit("b", [], null)
+    ];
+
+    // When: loadCommits processes all commits after the early break
+    expect(() => graph.loadCommits(commits, null, { m: 0, a: 1, b: 2 })).not.toThrow();
+    graph.render(null);
+
+    // Then: the graph renders all commits without consuming the preserved edge incorrectly
+    expect(getCircleElements().length).toBe(3);
+  });
+
+  it("does not enter the trailing while loop when there are no remaining parents (TC-064)", () => {
+    // Case: TC-064
+    // Given: a single root commit with no parents
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [makeCommit("aaa", [], null)];
+    const spy = vi.spyOn(Vertex.prototype, "registerParentProcessed");
+
+    // When: the loop reaches the end with getNextParent() === null
+    graph.loadCommits(commits, null, { aaa: 0 });
+    graph.render(null);
+
+    // Then: registerParentProcessed is never called
+    expect(spy).not.toHaveBeenCalled();
+    expect(getCircleElements().length).toBe(1);
+  });
+});

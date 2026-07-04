@@ -28,6 +28,7 @@ import { type CommitOrdering, type GitStash, UNCOMMITTED_CHANGES_HASH } from "..
 
 const SEP = "XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb";
 const REPO = "/test/repo";
+const SPAWN_OPTS = { cwd: REPO, env: { ...process.env, LC_ALL: "C" } };
 
 type DataSourceWithPrivate = DataSource & {
   getStashes: (repo: string) => Promise<GitStash[]>;
@@ -646,9 +647,7 @@ describe("getCommitFile", () => {
 
     // Then: returns the file content and passes correct args to git
     expect(result).toBe(fileContent);
-    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "abc123def456:src/file.ts"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "abc123def456:src/file.ts"], SPAWN_OPTS);
   });
 
   it("returns file content for commit hash with ^ suffix (TC-014)", async () => {
@@ -661,9 +660,11 @@ describe("getCommitFile", () => {
 
     // Then: passes the ^ suffix through to git show
     expect(result).toBe(fileContent);
-    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "abc123def456^:src/file.ts"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["show", "abc123def456^:src/file.ts"],
+      SPAWN_OPTS
+    );
   });
 
   it("returns empty string for invalid commit hash (TC-015)", async () => {
@@ -717,9 +718,7 @@ describe("getCommitFile", () => {
 
     // Then: returns the file content and passes correct args to git
     expect(result).toBe(fileContent);
-    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "HEAD:src/file.ts"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "HEAD:src/file.ts"], SPAWN_OPTS);
   });
 
   it("returns file content for HEAD^ ref (TC-020)", async () => {
@@ -732,9 +731,7 @@ describe("getCommitFile", () => {
 
     // Then: returns the file content with HEAD^ passed through to git
     expect(result).toBe(fileContent);
-    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "HEAD^:src/file.ts"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["show", "HEAD^:src/file.ts"], SPAWN_OPTS);
   });
 });
 
@@ -787,7 +784,7 @@ describe("stash commands", () => {
 
     // Then: spawn is called with ["stash", "apply", "stash@{0}"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "apply", "stash@{0}"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "apply", "stash@{0}"], SPAWN_OPTS);
   });
 
   it("applyStash passes --index flag when reinstateIndex is true (TC-022)", async () => {
@@ -799,9 +796,11 @@ describe("stash commands", () => {
 
     // Then: spawn is called with --index flag
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "apply", "--index", "stash@{0}"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["stash", "apply", "--index", "stash@{0}"],
+      SPAWN_OPTS
+    );
   });
 
   it("popStash passes correct args without --index (TC-023)", async () => {
@@ -813,7 +812,7 @@ describe("stash commands", () => {
 
     // Then: spawn is called with ["stash", "pop", "stash@{1}"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "pop", "stash@{1}"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "pop", "stash@{1}"], SPAWN_OPTS);
   });
 
   it("popStash passes --index flag when reinstateIndex is true (TC-024)", async () => {
@@ -825,9 +824,11 @@ describe("stash commands", () => {
 
     // Then: spawn is called with --index flag
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "pop", "--index", "stash@{1}"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["stash", "pop", "--index", "stash@{1}"],
+      SPAWN_OPTS
+    );
   });
 
   it("dropStash passes correct args (TC-025)", async () => {
@@ -839,7 +840,7 @@ describe("stash commands", () => {
 
     // Then: spawn is called with ["stash", "drop", "stash@{2}"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "drop", "stash@{2}"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "drop", "stash@{2}"], SPAWN_OPTS);
   });
 
   it("branchFromStash passes correct args (TC-026)", async () => {
@@ -851,9 +852,11 @@ describe("stash commands", () => {
 
     // Then: spawn is called with ["stash", "branch", "my-branch", "stash@{0}"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "branch", "my-branch", "stash@{0}"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["stash", "branch", "my-branch", "stash@{0}"],
+      SPAWN_OPTS
+    );
   });
 
   it("returns error message when applyStash encounters a conflict (TC-027)", async () => {
@@ -918,7 +921,7 @@ describe("uncommitted commands", () => {
     expect(spawnMock).toHaveBeenCalledWith(
       "git",
       ["stash", "push", "--message", "WIP message", "--include-untracked"],
-      { cwd: REPO }
+      SPAWN_OPTS
     );
   });
 
@@ -931,9 +934,11 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["stash", "push", "--message", "WIP message"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "push", "--message", "WIP message"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["stash", "push", "--message", "WIP message"],
+      SPAWN_OPTS
+    );
   });
 
   it("pushStash passes --include-untracked only when message is empty (TC-031)", async () => {
@@ -945,9 +950,11 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["stash", "push", "--include-untracked"] (no --message flag)
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "push", "--include-untracked"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["stash", "push", "--include-untracked"],
+      SPAWN_OPTS
+    );
   });
 
   it("pushStash passes minimal args when message is empty and includeUntracked is false (TC-032)", async () => {
@@ -959,7 +966,7 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["stash", "push"] only
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "push"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["stash", "push"], SPAWN_OPTS);
   });
 
   // --- resetUncommitted ---
@@ -973,7 +980,7 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["reset", "--mixed", "HEAD"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["reset", "--mixed", "HEAD"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["reset", "--mixed", "HEAD"], SPAWN_OPTS);
   });
 
   it("resetUncommitted passes correct args for hard mode (TC-034)", async () => {
@@ -985,7 +992,7 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["reset", "--hard", "HEAD"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["reset", "--hard", "HEAD"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["reset", "--hard", "HEAD"], SPAWN_OPTS);
   });
 
   it("resetUncommitted rejects soft mode (TC-035)", async () => {
@@ -1035,7 +1042,7 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["clean", "-f"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["clean", "-f"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["clean", "-f"], SPAWN_OPTS);
   });
 
   it("cleanUntrackedFiles passes -f -d when directories is true (TC-039)", async () => {
@@ -1047,7 +1054,7 @@ describe("uncommitted commands", () => {
 
     // Then: spawn is called with ["clean", "-f", "-d"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["clean", "-f", "-d"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["clean", "-f", "-d"], SPAWN_OPTS);
   });
 
   // --- Error handling ---
@@ -1109,7 +1116,7 @@ describe("fetch command", () => {
 
     // Then: spawn is called with ["fetch", "--all", "--prune"]
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["fetch", "--all", "--prune"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["fetch", "--all", "--prune"], SPAWN_OPTS);
   });
 
   it("fetch returns null on success (TC-043)", async () => {
@@ -1796,7 +1803,7 @@ describe("pull command", () => {
     const result = await ds.pull(REPO);
 
     // Then: spawn is called with ["pull"] and correct cwd
-    expect(spawnMock).toHaveBeenCalledWith("git", ["pull"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["pull"], SPAWN_OPTS);
     expect(result).toBeNull();
   });
 
@@ -1852,9 +1859,11 @@ describe("push command", () => {
     const result = await ds.push(REPO);
 
     // Then: spawn is called with --set-upstream args and correct cwd
-    expect(spawnMock).toHaveBeenCalledWith("git", ["push", "--set-upstream", "origin", "HEAD"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["push", "--set-upstream", "origin", "HEAD"],
+      SPAWN_OPTS
+    );
     expect(result).toBeNull();
   });
 
@@ -1928,9 +1937,11 @@ describe("deleteRemoteBranch", () => {
 
     // Then: spawn is called with correct args and returns null (success)
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["push", "origin", "--delete", "feature/x"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["push", "origin", "--delete", "feature/x"],
+      SPAWN_OPTS
+    );
   });
 
   it("returns error message when git push --delete fails (TC-079)", async () => {
@@ -1959,9 +1970,11 @@ describe("deleteRemoteBranch", () => {
 
     // Then: spawn is called with upstream as remote name and returns null
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["push", "upstream", "--delete", "fix/bug-123"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["push", "upstream", "--delete", "fix/bug-123"],
+      SPAWN_OPTS
+    );
   });
 });
 
@@ -1987,7 +2000,7 @@ describe("rebaseBranch", () => {
 
     // Then: spawn is called with correct args and returns null (success)
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["rebase", "main"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["rebase", "main"], SPAWN_OPTS);
   });
 
   it("returns error message with abort hint on conflict (TC-082)", async () => {
@@ -2489,7 +2502,7 @@ describe("getAuthors", () => {
     await ds.getAuthors(REPO);
 
     // Then: spawn is called with ["shortlog", "-s", "HEAD"] and correct cwd
-    expect(spawnMock).toHaveBeenCalledWith("git", ["shortlog", "-s", "HEAD"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["shortlog", "-s", "HEAD"], SPAWN_OPTS);
   });
 });
 
@@ -2770,7 +2783,7 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --no-ff <branch>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-ff"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-ff"], SPAWN_OPTS);
   });
 
   it("mergeBranch: createNewCommit=false, squash=false, noCommit=false → no flags (TC-111)", async () => {
@@ -2782,7 +2795,7 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge <branch> (no flags)
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH], SPAWN_OPTS);
   });
 
   it("mergeBranch: createNewCommit=true, squash=true → --squash overrides --no-ff (TC-112)", async () => {
@@ -2794,7 +2807,7 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --squash <branch> (no --no-ff)
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash"], SPAWN_OPTS);
   });
 
   it("mergeBranch: createNewCommit=false, squash=true → --squash only (TC-113)", async () => {
@@ -2806,7 +2819,7 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --squash <branch>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash"], SPAWN_OPTS);
   });
 
   it("mergeBranch: createNewCommit=true, noCommit=true → --no-ff --no-commit (TC-114)", async () => {
@@ -2818,9 +2831,11 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --no-ff --no-commit <branch>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-ff", "--no-commit"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["merge", BRANCH, "--no-ff", "--no-commit"],
+      SPAWN_OPTS
+    );
   });
 
   it("mergeBranch: createNewCommit=false, noCommit=true → --no-commit only (TC-115)", async () => {
@@ -2832,7 +2847,7 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --no-commit <branch>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-commit"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--no-commit"], SPAWN_OPTS);
   });
 
   it("mergeBranch: createNewCommit=true, squash=true, noCommit=true → --squash --no-commit (TC-116)", async () => {
@@ -2844,9 +2859,11 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --squash --no-commit <branch> (no --no-ff)
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash", "--no-commit"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["merge", BRANCH, "--squash", "--no-commit"],
+      SPAWN_OPTS
+    );
   });
 
   it("mergeBranch: squash=true, noCommit=true, createNewCommit=false → --squash --no-commit (TC-117)", async () => {
@@ -2858,9 +2875,11 @@ describe("mergeBranch/mergeCommit squash/noCommit", () => {
 
     // Then: git merge --squash --no-commit <branch>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["merge", BRANCH, "--squash", "--no-commit"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["merge", BRANCH, "--squash", "--no-commit"],
+      SPAWN_OPTS
+    );
   });
 
   it("mergeCommit: invalid commit hash with squash=true returns error (TC-118)", async () => {
@@ -2899,7 +2918,7 @@ describe("cherrypickCommit recordOrigin/noCommit", () => {
 
     // Then: git cherry-pick <hash>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT], SPAWN_OPTS);
   });
 
   it("parentIndex=0, recordOrigin=true → -x flag (TC-120)", async () => {
@@ -2911,7 +2930,7 @@ describe("cherrypickCommit recordOrigin/noCommit", () => {
 
     // Then: git cherry-pick -x <hash>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT, "-x"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT, "-x"], SPAWN_OPTS);
   });
 
   it("parentIndex=0, noCommit=true → --no-commit flag (TC-121)", async () => {
@@ -2923,9 +2942,11 @@ describe("cherrypickCommit recordOrigin/noCommit", () => {
 
     // Then: git cherry-pick --no-commit <hash>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT, "--no-commit"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["cherry-pick", COMMIT, "--no-commit"],
+      SPAWN_OPTS
+    );
   });
 
   it("parentIndex=0, recordOrigin=true, noCommit=true → both flags (TC-122)", async () => {
@@ -2937,9 +2958,11 @@ describe("cherrypickCommit recordOrigin/noCommit", () => {
 
     // Then: git cherry-pick -x --no-commit <hash>
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["cherry-pick", COMMIT, "-x", "--no-commit"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["cherry-pick", COMMIT, "-x", "--no-commit"],
+      SPAWN_OPTS
+    );
   });
 
   it("parentIndex=2, recordOrigin=true, noCommit=true → merge commit full flags (TC-123)", async () => {
@@ -2954,7 +2977,7 @@ describe("cherrypickCommit recordOrigin/noCommit", () => {
     expect(spawnMock).toHaveBeenCalledWith(
       "git",
       ["cherry-pick", COMMIT, "-m", "2", "-x", "--no-commit"],
-      { cwd: REPO }
+      SPAWN_OPTS
     );
   });
 
@@ -3147,9 +3170,7 @@ describe("getWorktrees", () => {
       main: { path: "/home/user/project", isMain: true },
       "feature/x": { path: "/home/user/project-feature", isMain: false }
     });
-    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "list", "--porcelain"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "list", "--porcelain"], SPAWN_OPTS);
   });
 
   it("returns empty map when spawnGit fails (TC-133)", async () => {
@@ -3234,10 +3255,13 @@ describe("getRepositoryStateWatchPaths", () => {
     // Then: One deduplicated absolute watch path is returned and both rev-parse commands are executed once
     expect(result).toEqual([`${REPO}/.git`]);
     expect(spawnMock).toHaveBeenCalledTimes(2);
-    expect(spawnMock).toHaveBeenNthCalledWith(1, "git", ["rev-parse", "--git-dir"], { cwd: REPO });
-    expect(spawnMock).toHaveBeenNthCalledWith(2, "git", ["rev-parse", "--git-common-dir"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenNthCalledWith(1, "git", ["rev-parse", "--git-dir"], SPAWN_OPTS);
+    expect(spawnMock).toHaveBeenNthCalledWith(
+      2,
+      "git",
+      ["rev-parse", "--git-common-dir"],
+      SPAWN_OPTS
+    );
   });
 
   it("returns both linked worktree git-dir and shared common-dir in call order (TC-151)", async () => {
@@ -3338,9 +3362,11 @@ describe("addWorktree", () => {
 
     // Then: spawn is called with correct args for existing branch
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "add", "/tmp/wt", "feature/x"], {
-      cwd: REPO
-    });
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["worktree", "add", "/tmp/wt", "feature/x"],
+      SPAWN_OPTS
+    );
   });
 
   it('passes ["worktree", "add", "-b", branchName, path, commitHash] when commitHash is provided (TC-136)', async () => {
@@ -3355,7 +3381,7 @@ describe("addWorktree", () => {
     expect(spawnMock).toHaveBeenCalledWith(
       "git",
       ["worktree", "add", "-b", "new-branch", "/tmp/wt", "abc1234"],
-      { cwd: REPO }
+      SPAWN_OPTS
     );
   });
 
@@ -3429,7 +3455,7 @@ describe("removeWorktree", () => {
 
     // Then: spawn is called with correct args and null is returned
     expect(result).toBeNull();
-    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "remove", "/tmp/wt"], { cwd: REPO });
+    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "remove", "/tmp/wt"], SPAWN_OPTS);
   });
 
   it("returns error message when worktree has uncommitted changes (TC-141)", async () => {
@@ -3491,7 +3517,7 @@ describe("getNewPathOfRenamedFile (S27)", () => {
     expect(spawnMock).toHaveBeenCalledWith(
       "git",
       ["diff", "--name-status", "--diff-filter=R", "--find-renames", "-z", VALID_HASH, "HEAD"],
-      { cwd: REPO }
+      SPAWN_OPTS
     );
     const passedArgs = spawnMock.mock.calls[0][1] as string[];
     expect(passedArgs).not.toContain("--");
@@ -3741,5 +3767,271 @@ describe("spawn output buffer concat decoding (S28)", () => {
 
     // Then: null is resolved (success)
     expect(result).toBeNull();
+  });
+});
+
+describe("getGitLog --author regex meta character escaping (S29)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function getLogAuthorArgs(): string[] {
+    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
+    expect(logCall).toBeDefined();
+    return logCall![1] as string[];
+  }
+
+  it("escapes bracket meta characters in a bot author (TC-173)", async () => {
+    // Case: TC-173
+    // Given: authors contains a bracketed bot name
+    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+
+    // When: getCommits is called with authors=["dependabot[bot]"]
+    await ds.getCommits(REPO, [], 10, false, ["dependabot[bot]"], "date");
+
+    // Then: git log args include --author with [ and ] backslash-escaped
+    expect(getLogAuthorArgs()).toContain("--author=dependabot\\[bot\\]");
+  });
+
+  it("leaves an author without meta characters unchanged (TC-174)", async () => {
+    // Case: TC-174
+    // Given: authors contains only apostrophe and space (outside the meta set)
+    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+
+    // When: getCommits is called with authors=["Jane O'Brien"]
+    await ds.getCommits(REPO, [], 10, false, ["Jane O'Brien"], "date");
+
+    // Then: git log args include the exact --author string
+    expect(getLogAuthorArgs()).toContain("--author=Jane O'Brien");
+  });
+
+  it("escapes dot and star meta characters (TC-175)", async () => {
+    // Case: TC-175
+    // Given: authors contains a dot and star
+    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+
+    // When: getCommits is called with authors=["a.b*c"]
+    await ds.getCommits(REPO, [], 10, false, ["a.b*c"], "date");
+
+    // Then: . and * are backslash-escaped
+    expect(getLogAuthorArgs()).toContain("--author=a\\.b\\*c");
+  });
+
+  it("doubles a backslash in the author (TC-176)", async () => {
+    // Case: TC-176
+    // Given: authors contains a single backslash
+    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+
+    // When: getCommits is called with authors=["a\\b"]
+    await ds.getCommits(REPO, [], 10, false, ["a\\b"], "date");
+
+    // Then: the backslash is doubled to \\
+    expect(getLogAuthorArgs()).toContain("--author=a\\\\b");
+  });
+
+  it("passes an empty author as --author= without throwing (TC-177)", async () => {
+    // Case: TC-177
+    // Given: authors contains an empty string
+    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+
+    // When: getCommits is called with authors=[""]
+    await ds.getCommits(REPO, [], 10, false, [""], "date");
+
+    // Then: git log args include --author= (empty value) with no meta replacement
+    expect(getLogAuthorArgs()).toContain("--author=");
+  });
+
+  it("escapes group and alternation meta characters (TC-178)", async () => {
+    // Case: TC-178
+    // Given: authors contains parentheses and a pipe
+    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+
+    // When: getCommits is called with authors=["(a|b)"]
+    await ds.getCommits(REPO, [], 10, false, ["(a|b)"], "date");
+
+    // Then: (, ) and | are backslash-escaped
+    expect(getLogAuthorArgs()).toContain("--author=\\(a\\|b\\)");
+  });
+});
+
+describe("getBranches detached HEAD pseudo-branch detection (S30)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function setupBranchOutput(output: string) {
+    spawnMock.mockImplementation(() => createMockProcess(output));
+  }
+
+  it("skips a 'detached at <hash>' pseudo-branch line (TC-179)", async () => {
+    // Case: TC-179
+    // Given: git branch output has a detached-at line and a real branch
+    setupBranchOutput("* (HEAD detached at 1a2b3c4)\n  main\n");
+
+    // When: getBranches parses the output
+    const result = await ds.getBranches(REPO, false);
+
+    // Then: the detached line is not added; only main remains
+    expect(result).toEqual({ branches: ["main"], head: null, error: false });
+  });
+
+  it("skips a 'detached from <ref>' pseudo-branch line (TC-180)", async () => {
+    // Case: TC-180
+    // Given: git branch output uses the "from" detached variant
+    setupBranchOutput("* (HEAD detached from origin/main)\n  main\n");
+
+    // When: getBranches parses the output
+    const result = await ds.getBranches(REPO, false);
+
+    // Then: the detached-from line is skipped; only main remains
+    expect(result).toEqual({ branches: ["main"], head: null, error: false });
+  });
+
+  it("skips a detached line whose ref contains non-alphanumeric chars (TC-181)", async () => {
+    // Case: TC-181
+    // Given: the detached ref contains . and -
+    setupBranchOutput("* (HEAD detached at v1.0-rc.1)\n  main\n");
+
+    // When: getBranches parses the output
+    const result = await ds.getBranches(REPO, false);
+
+    // Then: .+ matches the ref so the line is skipped
+    expect(result).toEqual({ branches: ["main"], head: null, error: false });
+  });
+
+  it("retains a normal branch name (TC-182)", async () => {
+    // Case: TC-182
+    // Given: git branch output has only a normal branch
+    setupBranchOutput("  main\n");
+
+    // When: getBranches parses the output
+    const result = await ds.getBranches(REPO, false);
+
+    // Then: main is added to branches
+    expect(result).toEqual({ branches: ["main"], head: null, error: false });
+  });
+
+  it("does not over-match a real branch containing the detached phrase (TC-183)", async () => {
+    // Case: TC-183
+    // Given: a real branch name embeds the detached phrase but does not start with (
+    setupBranchOutput("  feature/(HEAD detached at x)\n");
+
+    // When: getBranches parses the output
+    const result = await ds.getBranches(REPO, false);
+
+    // Then: the ^ anchor prevents a match, so the branch is retained
+    expect(result).toEqual({
+      branches: ["feature/(HEAD detached at x)"],
+      head: null,
+      error: false
+    });
+  });
+});
+
+describe("spawn options locale env LC_ALL=C (S31)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+  let originalPath: string | undefined;
+  let originalLcAll: string | undefined;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+    originalPath = process.env.PATH;
+    originalLcAll = process.env.LC_ALL;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    if (originalPath === undefined) {
+      delete process.env.PATH;
+    } else {
+      process.env.PATH = originalPath;
+    }
+    if (originalLcAll === undefined) {
+      delete process.env.LC_ALL;
+    } else {
+      process.env.LC_ALL = originalLcAll;
+    }
+  });
+
+  it("passes LC_ALL=C env to runGitCommandSpawn spawn (TC-184)", async () => {
+    // Case: TC-184
+    // Given: pull drives runGitCommandSpawn
+    spawnMock.mockImplementation(() => createMockProcess("", 0));
+
+    // When: pull is called for the repo
+    await ds.pull(REPO);
+
+    // Then: cp.spawn is called with cwd=repo and env.LC_ALL="C"
+    expect(spawnMock).toHaveBeenCalledWith("git", ["pull"], {
+      cwd: REPO,
+      env: expect.objectContaining({ LC_ALL: "C" })
+    });
+  });
+
+  it("passes LC_ALL=C env to spawnGit spawn (TC-185)", async () => {
+    // Case: TC-185
+    // Given: getBranches drives spawnGit
+    spawnMock.mockImplementation(() => createMockProcess("  main\n"));
+
+    // When: getBranches is called for the repo
+    await ds.getBranches(REPO, false);
+
+    // Then: the branch spawn options carry cwd=repo and env.LC_ALL="C"
+    const branchCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "branch");
+    expect(branchCall).toBeDefined();
+    const opts = branchCall![2] as { cwd: string; env: NodeJS.ProcessEnv };
+    expect(opts.cwd).toBe(REPO);
+    expect(opts.env.LC_ALL).toBe("C");
+  });
+
+  it("preserves existing env variables alongside LC_ALL (TC-186)", async () => {
+    // Case: TC-186
+    // Given: PATH is set before spawning
+    process.env.PATH = "/usr/bin";
+    spawnMock.mockImplementation(() => createMockProcess("  main\n"));
+
+    // When: getBranches drives spawnGit
+    await ds.getBranches(REPO, false);
+
+    // Then: env.PATH is preserved and env.LC_ALL is "C"
+    const branchCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "branch");
+    expect(branchCall).toBeDefined();
+    const opts = branchCall![2] as { cwd: string; env: NodeJS.ProcessEnv };
+    expect(opts.env.PATH).toBe("/usr/bin");
+    expect(opts.env.LC_ALL).toBe("C");
+  });
+
+  it("overrides an inherited LC_ALL with C (TC-187)", async () => {
+    // Case: TC-187
+    // Given: LC_ALL is pre-set to a non-C locale
+    process.env.LC_ALL = "ja_JP.UTF-8";
+    spawnMock.mockImplementation(() => createMockProcess("  main\n"));
+
+    // When: getBranches drives spawnGit
+    await ds.getBranches(REPO, false);
+
+    // Then: env.LC_ALL is overridden to "C" (not the inherited value)
+    const branchCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "branch");
+    expect(branchCall).toBeDefined();
+    const opts = branchCall![2] as { cwd: string; env: NodeJS.ProcessEnv };
+    expect(opts.env.LC_ALL).toBe("C");
   });
 });
