@@ -22,7 +22,7 @@ export function generateGitFileTree(gitFiles: GitFileChange[]) {
     path = gitFiles[i].newFilePath.split("/");
     for (j = 0; j < path.length; j++) {
       if (j < path.length - 1) {
-        if (cur.contents[path[j]] === undefined) {
+        if (cur.contents[path[j]] === undefined || cur.contents[path[j]].type === "file") {
           contents = {};
           cur.contents[path[j]] = {
             type: "folder",

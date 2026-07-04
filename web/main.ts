@@ -7,7 +7,7 @@ import {
   showContextMenu
 } from "./contextMenu";
 import { getCommitDate } from "./dates";
-import { hideDialog, isDialogActive } from "./dialogs";
+import { hideDialog, isDialogActive, showErrorDialog } from "./dialogs";
 import { Dropdown } from "./dropdown";
 import { buildFileContextMenuItems, resolveFileRow, sendOpenFileAction } from "./fileMenu";
 import {
@@ -1709,7 +1709,17 @@ class GitKeizuView {
       body: "",
       fileChanges
     };
-    this.showCommitDetails(syntheticDetails, generateGitFileTree(fileChanges));
+    try {
+      const fileTree = generateGitFileTree(fileChanges);
+      this.showCommitDetails(syntheticDetails, fileTree);
+    } catch (error: unknown) {
+      this.hideCommitDetails();
+      showErrorDialog(
+        t("error.compareCommits"),
+        error instanceof Error ? error.message : null,
+        null
+      );
+    }
   }
 }
 
