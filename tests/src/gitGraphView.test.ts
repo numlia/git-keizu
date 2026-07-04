@@ -191,6 +191,7 @@ describe("GitKeizuView stash message routing", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -389,6 +390,7 @@ describe("GitKeizuView compareCommits message routing", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -522,6 +524,7 @@ describe("GitKeizuView viewDiff with compareWithHash", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -646,6 +649,7 @@ describe("GitKeizuView pull/push message routing", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -747,6 +751,7 @@ describe("GitKeizuView createOrShow rootUri handling (S6)", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: mockSetLastActiveRepo
     } as unknown as ExtensionState;
 
@@ -910,6 +915,7 @@ describe("GitKeizuView viewState keybindings and loadMoreCommitsAutomatically (S
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -976,6 +982,132 @@ describe("GitKeizuView viewState keybindings and loadMoreCommitsAutomatically (S
   });
 });
 
+describe("GitKeizuView getHtmlForWebview avatar storage init await (S25)", () => {
+  let getConfigMock: ReturnType<typeof vi.mocked<typeof import("../../src/config").getConfig>>;
+  let baseConfig: ReturnType<typeof import("../../src/config").getConfig>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitKeizuView.currentPanel = undefined;
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+
+    const configModule = await import("../../src/config");
+    getConfigMock = vi.mocked(configModule.getConfig);
+    baseConfig = getConfigMock.getMockImplementation()!();
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+    getConfigMock.mockImplementation(
+      () => baseConfig as unknown as ReturnType<typeof getConfigMock>
+    );
+  });
+
+  function setFetchAvatars(enabled: boolean): void {
+    getConfigMock.mockImplementation(
+      () =>
+        ({
+          ...baseConfig,
+          fetchAvatars: () => enabled
+        }) as unknown as ReturnType<typeof getConfigMock>
+    );
+  }
+
+  function createPanel(storageAvailable: boolean): {
+    isAvatarStorageAvailable: ReturnType<typeof vi.fn>;
+    waitForAvatarStorage: ReturnType<typeof vi.fn>;
+  } {
+    const mockDataSource = {} as unknown as DataSource;
+    const isAvatarStorageAvailable = vi.fn(() => storageAvailable);
+    const waitForAvatarStorage = vi.fn().mockResolvedValue(undefined);
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable,
+      waitForAvatarStorage,
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+    return { isAvatarStorageAvailable, waitForAvatarStorage };
+  }
+
+  function parseViewState(): Record<string, unknown> {
+    const panelMock = vi.mocked(vscode.window.createWebviewPanel).mock.results[0].value as {
+      webview: { html: string };
+    };
+    const match = panelMock.webview.html.match(/var viewState = (.+?);/);
+    expect(match).not.toBeNull();
+    return JSON.parse(match![1]);
+  }
+
+  it("awaits waitForAvatarStorage before evaluating isAvatarStorageAvailable (TC-096)", async () => {
+    // Case: TC-096
+    // Given: fetchAvatars enabled and storage available so isAvatarStorageAvailable is evaluated
+    setFetchAvatars(true);
+    const spies = createPanel(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // When/Then: waitForAvatarStorage was awaited before isAvatarStorageAvailable was read
+    expect(spies.waitForAvatarStorage).toHaveBeenCalledTimes(1);
+    expect(spies.isAvatarStorageAvailable).toHaveBeenCalledTimes(1);
+    expect(spies.waitForAvatarStorage.mock.invocationCallOrder[0]).toBeLessThan(
+      spies.isAvatarStorageAvailable.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("sets viewState.fetchAvatars true when enabled and storage available (TC-097)", async () => {
+    // Case: TC-097
+    // Given: fetchAvatars enabled and storage available after init completes
+    setFetchAvatars(true);
+    createPanel(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Then: viewState.fetchAvatars is true
+    expect(parseViewState().fetchAvatars).toBe(true);
+  });
+
+  it("sets viewState.fetchAvatars false when storage is unavailable (TC-098)", async () => {
+    // Case: TC-098
+    // Given: fetchAvatars enabled but storage unavailable after init completes
+    setFetchAvatars(true);
+    createPanel(false);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Then: viewState.fetchAvatars is false
+    expect(parseViewState().fetchAvatars).toBe(false);
+  });
+
+  it("sets viewState.fetchAvatars false when config disables it (TC-099)", async () => {
+    // Case: TC-099
+    // Given: fetchAvatars disabled by config even though storage is available
+    setFetchAvatars(false);
+    createPanel(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Then: viewState.fetchAvatars is false (config side wins in the AND condition)
+    expect(parseViewState().fetchAvatars).toBe(false);
+  });
+});
+
 describe("GitKeizuView deleteRemoteBranch/rebaseBranch message routing (S8)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1002,6 +1134,7 @@ describe("GitKeizuView deleteRemoteBranch/rebaseBranch message routing (S8)", ()
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -1131,6 +1264,7 @@ describe("GitKeizuView deleteBranch extension (S9)", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -1310,6 +1444,7 @@ describe("GitKeizuView loadCommits authorFilter (S10)", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -1416,6 +1551,7 @@ describe("GitKeizuView createBranch + checkout orchestration (S11)", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -1597,6 +1733,7 @@ describe("GitKeizuView loadCommits branches/authors array passthrough (S12)", ()
     const es = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -1701,6 +1838,7 @@ describe("GitKeizuView merge/cherry-pick handler and viewState dialogDefaults (S
     const es = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -1886,6 +2024,7 @@ describe("GitKeizuView viewState commitOrdering / loadCommits handler (S14)", ()
     const es = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -2068,6 +2207,7 @@ describe("GitKeizuView viewDiff HEAD resolution and version query (S24)", () => 
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
     const mockAvatarManager = {
@@ -2279,6 +2419,7 @@ describe("GitKeizuView unregistered repo guard (S17)", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
     const mockAvatarManager = {
@@ -2392,6 +2533,7 @@ describe("GitKeizuView worktree message handlers", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -2556,6 +2698,7 @@ describe("GitKeizuView removeWorktree branch deletion (S16)", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
 
@@ -2732,6 +2875,7 @@ describe("GitKeizuView CSS_COLOR_VAR_PREFIX constant verification (S17)", () => 
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
     const mockAvatarManager = {
@@ -2810,6 +2954,7 @@ describe("GitKeizuView loadBranches watcher orchestration", () => {
     const extensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo
     } as unknown as ExtensionState;
 
@@ -3015,6 +3160,7 @@ describe("GitKeizuView notifyShowRecentActionsChanged runtime sync", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
     const mockAvatarManager = {
@@ -3114,6 +3260,7 @@ describe("GitKeizuView message handler try/finally unmute (S21)", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
     const mockAvatarManager = {
@@ -3223,6 +3370,7 @@ describe("GitKeizuView worktree command error responses (S22)", () => {
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: vi.fn()
     } as unknown as ExtensionState;
     const mockAvatarManager = {
@@ -3387,6 +3535,7 @@ describe("GitKeizuView createOrShow reveal persists lastActiveRepo (S23)", () =>
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
       setLastActiveRepo: mockSetLastActiveRepo
     } as unknown as ExtensionState;
     const mockAvatarManager = {

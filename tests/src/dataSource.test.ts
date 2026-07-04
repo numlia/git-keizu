@@ -1185,163 +1185,140 @@ describe("getCommitComparison", () => {
     });
   }
 
-  it("returns file changes for two valid commit hashes (TC-046)", async () => {
-    // Given: Two valid commit hashes with modified and added files in diff output
-    const nameStatus = "M\tsrc/modified.ts\nA\tsrc/added.ts\n";
-    const numStat = "10\t5\tsrc/modified.ts\n20\t0\tsrc/added.ts\n";
+  // Case: TC-201
+  it("parses a single modified file from NUL-delimited diff output (TC-201)", async () => {
+    // Given: NUL-delimited name-status and numstat for one modified file
+    const nameStatus = "M\0src/a.ts\0";
+    const numStat = "3\t1\tsrc/a.ts\0";
     setupSpawnForComparison(nameStatus, numStat);
 
     // When: getCommitComparison is called with two valid hashes
     const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
 
-    // Then: Returns GitFileChange[] with correct oldFilePath, newFilePath, type, additions, deletions
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(2);
-    expect(result![0]).toEqual({
-      oldFilePath: "src/modified.ts",
-      newFilePath: "src/modified.ts",
-      type: "M",
-      additions: 10,
-      deletions: 5
-    });
-    expect(result![1]).toEqual({
-      oldFilePath: "src/added.ts",
-      newFilePath: "src/added.ts",
-      type: "A",
-      additions: 20,
-      deletions: 0
-    });
-    // Verify nameStatus and numStat are executed in parallel (2 spawn calls)
-    expect(spawnMock).toHaveBeenCalledTimes(2);
-  });
-
-  it("returns different oldFilePath and newFilePath for renamed files (TC-047)", async () => {
-    // Given: Diff contains a renamed file (R100 status with old and new paths)
-    const nameStatus = "R100\tsrc/old-name.ts\tsrc/new-name.ts\n";
-    const numStat = "8\t3\tsrc/{old-name.ts => new-name.ts}\n";
-    setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called
-    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
-
-    // Then: oldFilePath and newFilePath differ, type is "R", additions/deletions are parsed
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(1);
-    expect(result![0].oldFilePath).toBe("src/old-name.ts");
-    expect(result![0].newFilePath).toBe("src/new-name.ts");
-    expect(result![0].type).toBe("R");
-    expect(result![0].additions).toBe(8);
-    expect(result![0].deletions).toBe(3);
-  });
-
-  it("correctly classifies all change types A/M/D/R (TC-048)", async () => {
-    // Given: Diff contains all 4 change types (Added, Modified, Deleted, Renamed)
-    const nameStatus = [
-      "A\tsrc/added.ts",
-      "M\tsrc/modified.ts",
-      "D\tsrc/deleted.ts",
-      "R100\tsrc/old.ts\tsrc/renamed.ts",
-      ""
-    ].join("\n");
-    const numStat = [
-      "10\t0\tsrc/added.ts",
-      "5\t3\tsrc/modified.ts",
-      "0\t15\tsrc/deleted.ts",
-      "2\t1\tsrc/{old.ts => renamed.ts}",
-      ""
-    ].join("\n");
-    setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called
-    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
-
-    // Then: Each change type is correctly identified
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(4);
-    expect(result![0].type).toBe("A");
-    expect(result![1].type).toBe("M");
-    expect(result![2].type).toBe("D");
-    expect(result![3].type).toBe("R");
-  });
-
-  it("parses numStat additions and deletions as numbers (TC-049)", async () => {
-    // Given: numStat output with specific addition/deletion counts
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "42\t17\tsrc/file.ts\n";
-    setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called
-    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
-
-    // Then: additions and deletions are parsed as numbers (not strings)
-    expect(result).not.toBeNull();
-    expect(result![0].additions).toBe(42);
-    expect(result![0].deletions).toBe(17);
-  });
-
-  it("omits toHash from git args when toHash is empty string (TC-050)", async () => {
-    // Given: toHash is empty string (working tree comparison)
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "5\t2\tsrc/file.ts\n";
-    setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called with empty toHash
-    const result = await ds.getCommitComparison(REPO, "abc123def456", "");
-
-    // Then: git diff args end with fromHash only (toHash not appended)
-    expect(result).not.toBeNull();
+    // Then: the -z option is present and the file change is parsed via +2 / +1 cursors
+    expect(result).toEqual([
+      {
+        oldFilePath: "src/a.ts",
+        newFilePath: "src/a.ts",
+        type: "M",
+        additions: 3,
+        deletions: 1
+      }
+    ]);
     const nameStatusCall = spawnMock.mock.calls.find((call) =>
       (call[1] as string[]).includes("--name-status")
     );
-    expect(nameStatusCall).toBeDefined();
-    const args = nameStatusCall![1] as string[];
-    expect(args).toEqual([
-      "-c",
-      "core.quotePath=false",
-      "diff",
-      "--name-status",
-      "--find-renames",
-      "--diff-filter=AMDR",
-      "abc123def456"
+    expect((nameStatusCall![1] as string[]).includes("-z")).toBe(true);
+  });
+
+  // Case: TC-202
+  it("parses a rename as a NUL triple-token in name-status and numstat (TC-202)", async () => {
+    // Given: rename tokens R\0old\0new and numstat with an empty path field then old/new tokens
+    const nameStatus = "R\0old.ts\0new.ts\0";
+    const numStat = "2\t2\t\0old.ts\0new.ts\0";
+    setupSpawnForComparison(nameStatus, numStat);
+
+    // When: getCommitComparison is called
+    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
+
+    // Then: name-status advances +3 and numstat reads old/new via +3
+    expect(result).toEqual([
+      {
+        oldFilePath: "old.ts",
+        newFilePath: "new.ts",
+        type: "R",
+        additions: 2,
+        deletions: 2
+      }
     ]);
   });
 
-  it("uses toHash as diff base when fromHash is UNCOMMITTED_CHANGES_HASH (TC-051)", async () => {
-    // Given: fromHash is UNCOMMITTED_CHANGES_HASH ("*")
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "3\t1\tsrc/file.ts\n";
+  // Case: TC-203
+  it("classifies all change types A/M/D/R from NUL tokens (TC-203)", async () => {
+    // Given: one entry of each change type with matching numstat tokens
+    const nameStatus = "A\0a.ts\0M\0m.ts\0D\0d.ts\0R\0o.ts\0r.ts\0";
+    const numStat = "1\t0\ta.ts\0" + "2\t3\tm.ts\0" + "0\t5\td.ts\0" + "4\t4\t\0o.ts\0r.ts\0";
     setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called with UNCOMMITTED_CHANGES_HASH as fromHash
-    const result = await ds.getCommitComparison(REPO, UNCOMMITTED_CHANGES_HASH, "abc123def456");
-
-    // Then: toHash is used as the single diff base (comparing toHash against working tree)
-    expect(result).not.toBeNull();
-    const nameStatusCall = spawnMock.mock.calls.find((call) =>
-      (call[1] as string[]).includes("--name-status")
-    );
-    const args = nameStatusCall![1] as string[];
-    expect(args).toContain("abc123def456");
-    expect(args).not.toContain(UNCOMMITTED_CHANGES_HASH);
-    // toHash should be the only commit arg (no second commit = working tree comparison)
-    const diffIndex = args.indexOf("diff");
-    const commitArgs = args.slice(diffIndex + 1).filter((a) => !a.startsWith("-"));
-    expect(commitArgs).toEqual(["abc123def456"]);
-  });
-
-  it("returns empty array when no changes exist (TC-052)", async () => {
-    // Given: git diff returns empty output (identical commits or no changes)
-    setupSpawnForComparison("", "");
 
     // When: getCommitComparison is called
     const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
 
-    // Then: Returns empty array (not null)
-    expect(result).toEqual([]);
-    expect(result).not.toBeNull();
+    // Then: each type is classified and counts come from numstat
+    expect(result).toEqual([
+      { oldFilePath: "a.ts", newFilePath: "a.ts", type: "A", additions: 1, deletions: 0 },
+      { oldFilePath: "m.ts", newFilePath: "m.ts", type: "M", additions: 2, deletions: 3 },
+      { oldFilePath: "d.ts", newFilePath: "d.ts", type: "D", additions: 0, deletions: 5 },
+      { oldFilePath: "o.ts", newFilePath: "r.ts", type: "R", additions: 4, deletions: 4 }
+    ]);
   });
 
-  it("returns null when git spawn throws an exception (TC-053)", async () => {
+  // Case: TC-204
+  it("sets additions/deletions null for a non-numeric (binary) numstat row (TC-204)", async () => {
+    // Given: a binary file whose numstat counts are "-" (non-numeric)
+    const nameStatus = "M\0binary.png\0";
+    const numStat = "-\t-\tbinary.png\0";
+    setupSpawnForComparison(nameStatus, numStat);
+
+    // When: getCommitComparison is called
+    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
+
+    // Then: parseInt("-") is NaN so additions/deletions become null
+    expect(result).toEqual([
+      {
+        oldFilePath: "binary.png",
+        newFilePath: "binary.png",
+        type: "M",
+        additions: null,
+        deletions: null
+      }
+    ]);
+  });
+
+  // Case: TC-206
+  it("breaks the parse loop on an invalid name-status status char (TC-206)", async () => {
+    // Given: the first name-status token has a status char outside VALID_FILE_CHANGE_TYPES
+    const nameStatus = "X\0src/x.ts\0M\0src/after.ts\0";
+    const numStat = "";
+    setupSpawnForComparison(nameStatus, numStat);
+
+    // When: getCommitComparison is called
+    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
+
+    // Then: the cursor loop breaks immediately and no later entries are parsed
+    expect(result).toEqual([]);
+  });
+
+  // Case: TC-207
+  it("leaves additions/deletions null when numstat has no matching path (TC-207)", async () => {
+    // Given: two name-status entries but numstat references an unrelated file
+    const nameStatus = "M\0src/file1.ts\0A\0src/file2.ts\0";
+    const numStat = "10\t5\tsrc/unrelated.ts\0";
+    setupSpawnForComparison(nameStatus, numStat);
+
+    // When: getCommitComparison is called
+    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
+
+    // Then: entries come from name-status with null counts (numstat orphan is ignored)
+    expect(result).toEqual([
+      {
+        oldFilePath: "src/file1.ts",
+        newFilePath: "src/file1.ts",
+        type: "M",
+        additions: null,
+        deletions: null
+      },
+      {
+        oldFilePath: "src/file2.ts",
+        newFilePath: "src/file2.ts",
+        type: "A",
+        additions: null,
+        deletions: null
+      }
+    ]);
+  });
+
+  // Case: TC-209
+  it("returns null when git spawn throws an exception (TC-209)", async () => {
     // Given: cp.spawn throws synchronously (e.g., binary not found)
     spawnMock.mockImplementation(() => {
       throw new Error("spawn ENOENT");
@@ -1350,26 +1327,8 @@ describe("getCommitComparison", () => {
     // When: getCommitComparison is called
     const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
 
-    // Then: Returns null (caught by try-catch block)
+    // Then: null is returned (caught by the try-catch block)
     expect(result).toBeNull();
-  });
-
-  it("returns file changes with null additions/deletions when numStat has no matching entry (TC-054)", async () => {
-    // Given: nameStatus has 2 entries but numStat output references a different file
-    const nameStatus = "M\tsrc/file1.ts\nA\tsrc/file2.ts\n";
-    const numStat = "10\t5\tsrc/unrelated.ts\n";
-    setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called
-    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
-
-    // Then: File changes are returned but additions/deletions remain null (no numStat match)
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(2);
-    expect(result![0].additions).toBeNull();
-    expect(result![0].deletions).toBeNull();
-    expect(result![1].additions).toBeNull();
-    expect(result![1].deletions).toBeNull();
   });
 
   it("returns null for invalid fromHash (non-hex characters)", async () => {
@@ -1416,122 +1375,51 @@ describe("getCommitComparison", () => {
     });
   }
 
-  it("includes untracked files when fromHash is UNCOMMITTED_CHANGES_HASH (TC-055)", async () => {
-    // Given: fromHash is UNCOMMITTED_CHANGES_HASH, diff has 1 modified file, ls-files has 1 untracked file
-    const nameStatus = "M\tsrc/existing.ts\n";
-    const numStat = "5\t2\tsrc/existing.ts\n";
-    const untracked = "src/newfile.ts\n";
+  // Case: TC-205
+  it("runs ls-files and includes untracked files for a working-tree comparison (TC-205)", async () => {
+    // Given: toHash is empty (working tree) with one modified file and one untracked file
+    const nameStatus = "M\0src/a.ts\0";
+    const numStat = "3\t1\tsrc/a.ts\0";
+    const untracked = "src/new.ts\n";
     setupSpawnForComparisonWithUntracked(nameStatus, numStat, untracked);
 
-    // When: getCommitComparison is called with UNCOMMITTED_CHANGES_HASH
-    const result = await ds.getCommitComparison(REPO, UNCOMMITTED_CHANGES_HASH, "abc123def456");
-
-    // Then: result includes both the diff file and the untracked file
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(2);
-    expect(result![0]).toEqual({
-      oldFilePath: "src/existing.ts",
-      newFilePath: "src/existing.ts",
-      type: "M",
-      additions: 5,
-      deletions: 2
-    });
-    expect(result![1]).toEqual({
-      oldFilePath: "src/newfile.ts",
-      newFilePath: "src/newfile.ts",
-      type: "A",
-      additions: null,
-      deletions: null
-    });
-  });
-
-  it("includes untracked files when toHash is empty string (TC-056)", async () => {
-    // Given: toHash is empty string (working tree comparison), ls-files has untracked files
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "3\t1\tsrc/file.ts\n";
-    const untracked = "src/untracked.ts\n";
-    setupSpawnForComparisonWithUntracked(nameStatus, numStat, untracked);
-
-    // When: getCommitComparison is called with empty toHash
+    // When: getCommitComparison is called with an empty toHash
     const result = await ds.getCommitComparison(REPO, "abc123def456", "");
 
-    // Then: result includes both the diff file and the untracked file
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(2);
-    expect(result![1]).toEqual({
-      oldFilePath: "src/untracked.ts",
-      newFilePath: "src/untracked.ts",
-      type: "A",
-      additions: null,
-      deletions: null
-    });
+    // Then: 3 spawns run and the result includes the diff file plus the untracked file
+    expect(result).toEqual([
+      {
+        oldFilePath: "src/a.ts",
+        newFilePath: "src/a.ts",
+        type: "M",
+        additions: 3,
+        deletions: 1
+      },
+      {
+        oldFilePath: "src/new.ts",
+        newFilePath: "src/new.ts",
+        type: "A",
+        additions: null,
+        deletions: null
+      }
+    ]);
+    expect(spawnMock).toHaveBeenCalledTimes(3);
   });
 
-  it("does not run ls-files for two-commit comparison (TC-057)", async () => {
-    // Given: both fromHash and toHash are valid commit hashes
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "3\t1\tsrc/file.ts\n";
-    setupSpawnForComparison(nameStatus, numStat);
-
-    // When: getCommitComparison is called with two valid hashes
-    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
-
-    // Then: only 2 spawn calls (nameStatus + numStat), no ls-files
-    expect(result).not.toBeNull();
-    expect(spawnMock).toHaveBeenCalledTimes(2);
-    const lsFilesCall = spawnMock.mock.calls.find((call) =>
-      (call[1] as string[]).includes("ls-files")
-    );
-    expect(lsFilesCall).toBeUndefined();
-  });
-
-  it("deduplicates untracked files already present in diff output (TC-058)", async () => {
-    // Given: working tree comparison, untracked file has same name as a file in diff output
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "3\t1\tsrc/file.ts\n";
+  // Case: TC-208
+  it("deduplicates an untracked file already present in the diff output (TC-208)", async () => {
+    // Given: working-tree comparison where an untracked file matches a diff newFilePath
+    const nameStatus = "M\0src/file.ts\0";
+    const numStat = "3\t1\tsrc/file.ts\0";
     const untracked = "src/file.ts\n";
     setupSpawnForComparisonWithUntracked(nameStatus, numStat, untracked);
 
     // When: getCommitComparison is called with UNCOMMITTED_CHANGES_HASH
     const result = await ds.getCommitComparison(REPO, UNCOMMITTED_CHANGES_HASH, "abc123def456");
 
-    // Then: file appears only once (fileLookup skips duplicate)
-    expect(result).not.toBeNull();
+    // Then: the file appears only once (fileLookup skips the duplicate)
     expect(result).toHaveLength(1);
     expect(result![0].type).toBe("M");
-  });
-
-  it("returns diff-only results when ls-files output is empty (TC-059)", async () => {
-    // Given: working tree comparison, ls-files returns empty output
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "3\t1\tsrc/file.ts\n";
-    const untracked = "";
-    setupSpawnForComparisonWithUntracked(nameStatus, numStat, untracked);
-
-    // When: getCommitComparison is called with UNCOMMITTED_CHANGES_HASH
-    const result = await ds.getCommitComparison(REPO, UNCOMMITTED_CHANGES_HASH, "abc123def456");
-
-    // Then: only diff result is returned, no extra entries
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(1);
-    expect(result![0].type).toBe("M");
-  });
-
-  it("skips empty lines in ls-files output (TC-060)", async () => {
-    // Given: working tree comparison, ls-files output has empty lines mixed in
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "3\t1\tsrc/file.ts\n";
-    const untracked = "src/new1.ts\n\nsrc/new2.ts\n";
-    setupSpawnForComparisonWithUntracked(nameStatus, numStat, untracked);
-
-    // When: getCommitComparison is called with UNCOMMITTED_CHANGES_HASH
-    const result = await ds.getCommitComparison(REPO, UNCOMMITTED_CHANGES_HASH, "abc123def456");
-
-    // Then: empty lines are skipped, only valid file paths are added
-    expect(result).not.toBeNull();
-    expect(result).toHaveLength(3);
-    expect(result![1].newFilePath).toBe("src/new1.ts");
-    expect(result![2].newFilePath).toBe("src/new2.ts");
   });
 });
 
@@ -1572,40 +1460,68 @@ describe("getUncommittedDetails", () => {
     });
   }
 
-  it("returns diff changes plus untracked files (TC-061)", async () => {
-    // Given: diff has 1 modified file, ls-files has 1 untracked file
-    const nameStatus = "M\tsrc/modified.ts\n";
-    const numStat = "10\t3\tsrc/modified.ts\n";
+  // Case: TC-210
+  it("parses NUL-delimited diff plus untracked files with 3 parallel spawns (TC-210)", async () => {
+    // Given: staged/unstaged change and an untracked file (name-status/numstat are NUL-delimited)
+    const nameStatus = "M\0src/modified.ts\0";
+    const numStat = "10\t3\tsrc/modified.ts\0";
     const untracked = "src/newfile.ts\n";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
     // When: getUncommittedDetails is called
     const result = await ds.getUncommittedDetails(REPO);
 
-    // Then: fileChanges contains both the diff file and untracked file
+    // Then: fileChanges holds the parsed diff file and the untracked file; 3 spawns ran
     expect(result).not.toBeNull();
     expect(result!.hash).toBe(UNCOMMITTED_CHANGES_HASH);
-    expect(result!.fileChanges).toHaveLength(2);
-    expect(result!.fileChanges[0]).toEqual({
-      oldFilePath: "src/modified.ts",
-      newFilePath: "src/modified.ts",
-      type: "M",
-      additions: 10,
-      deletions: 3
-    });
-    expect(result!.fileChanges[1]).toEqual({
-      oldFilePath: "src/newfile.ts",
-      newFilePath: "src/newfile.ts",
-      type: "A",
-      additions: null,
-      deletions: null
-    });
+    expect(result!.fileChanges).toEqual([
+      {
+        oldFilePath: "src/modified.ts",
+        newFilePath: "src/modified.ts",
+        type: "M",
+        additions: 10,
+        deletions: 3
+      },
+      {
+        oldFilePath: "src/newfile.ts",
+        newFilePath: "src/newfile.ts",
+        type: "A",
+        additions: null,
+        deletions: null
+      }
+    ]);
+    expect(spawnMock).toHaveBeenCalledTimes(3);
   });
 
-  it("returns diff changes only when no untracked files exist (TC-062)", async () => {
-    // Given: diff has changes but ls-files returns empty output
-    const nameStatus = "M\tsrc/file.ts\n";
-    const numStat = "5\t2\tsrc/file.ts\n";
+  // Case: TC-211
+  it("parses a rename as a NUL triple-token in both name-status and numstat (TC-211)", async () => {
+    // Given: a renamed file, numstat rename form has an empty path field then old/new tokens
+    const nameStatus = "R\0a/old\0a/new\0";
+    const numStat = "5\t0\t\0a/old\0a/new\0";
+    const untracked = "";
+    setupSpawnForUncommitted(nameStatus, numStat, untracked);
+
+    // When: getUncommittedDetails is called
+    const result = await ds.getUncommittedDetails(REPO);
+
+    // Then: the rename entry carries distinct old/new paths and numstat counts
+    expect(result).not.toBeNull();
+    expect(result!.fileChanges).toEqual([
+      {
+        oldFilePath: "a/old",
+        newFilePath: "a/new",
+        type: "R",
+        additions: 5,
+        deletions: 0
+      }
+    ]);
+  });
+
+  // Case: TC-212
+  it("returns diff changes only when there are no untracked files (TC-212)", async () => {
+    // Given: NUL-delimited diff with no untracked files
+    const nameStatus = "M\0src/file.ts\0";
+    const numStat = "5\t2\tsrc/file.ts\0";
     const untracked = "";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
@@ -1614,74 +1530,95 @@ describe("getUncommittedDetails", () => {
 
     // Then: fileChanges contains only the diff file
     expect(result).not.toBeNull();
-    expect(result!.fileChanges).toHaveLength(1);
-    expect(result!.fileChanges[0].type).toBe("M");
+    expect(result!.fileChanges).toEqual([
+      {
+        oldFilePath: "src/file.ts",
+        newFilePath: "src/file.ts",
+        type: "M",
+        additions: 5,
+        deletions: 2
+      }
+    ]);
   });
 
-  it("returns only untracked files when diff output is empty (TC-063)", async () => {
-    // Given: no diff output, ls-files has 2 untracked files
-    const nameStatus = "";
-    const numStat = "";
-    const untracked = "src/new1.ts\nsrc/new2.ts\n";
+  // Case: TC-213
+  it("sets additions/deletions null for a binary rename with non-numeric numstat (TC-213)", async () => {
+    // Given: a binary rename whose numstat counts are "-" (non-numeric)
+    const nameStatus = "R\0old\0new\0";
+    const numStat = "-\t-\t\0old\0new\0";
+    const untracked = "";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
     // When: getUncommittedDetails is called
     const result = await ds.getUncommittedDetails(REPO);
 
-    // Then: fileChanges contains only untracked files with type "A" and null additions/deletions
+    // Then: the rename is read via +3 and additions/deletions are null (NaN -> null)
     expect(result).not.toBeNull();
-    expect(result!.fileChanges).toHaveLength(2);
-    expect(result!.fileChanges[0]).toEqual({
-      oldFilePath: "src/new1.ts",
-      newFilePath: "src/new1.ts",
-      type: "A",
-      additions: null,
-      deletions: null
-    });
-    expect(result!.fileChanges[1]).toEqual({
-      oldFilePath: "src/new2.ts",
-      newFilePath: "src/new2.ts",
-      type: "A",
-      additions: null,
-      deletions: null
-    });
+    expect(result!.fileChanges).toEqual([
+      {
+        oldFilePath: "old",
+        newFilePath: "new",
+        type: "R",
+        additions: null,
+        deletions: null
+      }
+    ]);
   });
 
-  it("deduplicates untracked files already present in diff output (TC-064)", async () => {
+  // Case: TC-214
+  it("deduplicates an untracked file already present in the diff output (TC-214)", async () => {
     // Given: diff has a file, ls-files also lists the same file
-    const nameStatus = "A\tsrc/file.ts\n";
-    const numStat = "10\t0\tsrc/file.ts\n";
+    const nameStatus = "A\0src/file.ts\0";
+    const numStat = "10\t0\tsrc/file.ts\0";
     const untracked = "src/file.ts\n";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
     // When: getUncommittedDetails is called
     const result = await ds.getUncommittedDetails(REPO);
 
-    // Then: file appears only once (fileLookup prevents duplicate)
+    // Then: the file appears only once (fileLookup prevents the duplicate)
     expect(result).not.toBeNull();
     expect(result!.fileChanges).toHaveLength(1);
     expect(result!.fileChanges[0].type).toBe("A");
     expect(result!.fileChanges[0].additions).toBe(10);
   });
 
-  it("skips empty lines in ls-files output (TC-065)", async () => {
-    // Given: ls-files output has empty lines mixed in
-    const nameStatus = "";
+  // Case: TC-215
+  it("breaks the parse loop on an invalid name-status status char (TC-215)", async () => {
+    // Given: the first name-status token has a status char outside VALID_FILE_CHANGE_TYPES
+    const nameStatus = "X\0foo\0";
     const numStat = "";
-    const untracked = "src/a.ts\n\nsrc/b.ts\n";
+    const untracked = "";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
     // When: getUncommittedDetails is called
     const result = await ds.getUncommittedDetails(REPO);
 
-    // Then: empty lines are skipped, only valid paths are added
+    // Then: the cursor loop breaks and no file changes are parsed
     expect(result).not.toBeNull();
-    expect(result!.fileChanges).toHaveLength(2);
-    expect(result!.fileChanges[0].newFilePath).toBe("src/a.ts");
-    expect(result!.fileChanges[1].newFilePath).toBe("src/b.ts");
+    expect(result!.fileChanges).toEqual([]);
   });
 
-  it("returns null when spawn throws an exception (TC-066)", async () => {
+  // Case: TC-216
+  it("skips empty tokens in ls-files output (TC-216)", async () => {
+    // Given: ls-files output contains an empty token between valid paths
+    const nameStatus = "M\0src/a.ts\0";
+    const numStat = "1\t0\tsrc/a.ts\0";
+    const untracked = "src/new1.ts\n\nsrc/new2.ts\n";
+    setupSpawnForUncommitted(nameStatus, numStat, untracked);
+
+    // When: getUncommittedDetails is called
+    const result = await ds.getUncommittedDetails(REPO);
+
+    // Then: the empty path is skipped, only valid untracked files are added
+    expect(result).not.toBeNull();
+    expect(result!.fileChanges).toHaveLength(3);
+    expect(result!.fileChanges[1].newFilePath).toBe("src/new1.ts");
+    expect(result!.fileChanges[2].newFilePath).toBe("src/new2.ts");
+  });
+
+  // Case: TC-217
+  it("returns null when spawn throws an exception (TC-217)", async () => {
     // Given: cp.spawn throws synchronously
     spawnMock.mockImplementation(() => {
       throw new Error("spawn ENOENT");
@@ -1690,29 +1627,8 @@ describe("getUncommittedDetails", () => {
     // When: getUncommittedDetails is called
     const result = await ds.getUncommittedDetails(REPO);
 
-    // Then: Returns null (caught by try-catch block)
+    // Then: null is returned (caught by the try-catch block)
     expect(result).toBeNull();
-  });
-
-  it("parses renamed files correctly in diff output (TC-067)", async () => {
-    // Given: diff has a renamed file with R status
-    const nameStatus = "R100\tsrc/old.ts\tsrc/new.ts\n";
-    const numStat = "2\t1\tsrc/{old.ts => new.ts}\n";
-    const untracked = "";
-    setupSpawnForUncommitted(nameStatus, numStat, untracked);
-
-    // When: getUncommittedDetails is called
-    const result = await ds.getUncommittedDetails(REPO);
-
-    // Then: GitCommitDetails is returned with correct hash and file change data
-    expect(result).not.toBeNull();
-    expect(result!.hash).toBe(UNCOMMITTED_CHANGES_HASH);
-    expect(result!.fileChanges).toHaveLength(1);
-    expect(result!.fileChanges[0].oldFilePath).toBe("src/old.ts");
-    expect(result!.fileChanges[0].newFilePath).toBe("src/new.ts");
-    expect(result!.fileChanges[0].type).toBe("R");
-    expect(result!.fileChanges[0].additions).toBe(2);
-    expect(result!.fileChanges[0].deletions).toBe(1);
   });
 });
 
@@ -4033,5 +3949,254 @@ describe("spawn options locale env LC_ALL=C (S31)", () => {
     expect(branchCall).toBeDefined();
     const opts = branchCall![2] as { cwd: string; env: NodeJS.ProcessEnv };
     expect(opts.env.LC_ALL).toBe("C");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S32: spawnGit() stderr stream drain                                */
+/* ------------------------------------------------------------------ */
+
+describe("spawnGit stderr drain", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function createDrainMockProcess(options: {
+    stdout?: string;
+    stderrChunks?: string[];
+    exitCode?: number;
+  }): { proc: cp.ChildProcess; stderrEmitter: EventEmitter } {
+    const stdoutEmitter = new EventEmitter();
+    const stderrEmitter = new EventEmitter();
+    const proc = new EventEmitter();
+    Object.assign(proc, { stdout: stdoutEmitter, stderr: stderrEmitter });
+
+    queueMicrotask(() => {
+      for (const chunk of options.stderrChunks ?? []) {
+        stderrEmitter.emit("data", chunk);
+      }
+      if (options.stdout) stdoutEmitter.emit("data", options.stdout);
+      proc.emit("close", options.exitCode ?? 0);
+    });
+
+    return { proc: proc as unknown as cp.ChildProcess, stderrEmitter };
+  }
+
+  // Case: TC-188
+  it("registers exactly one data listener on the stderr stream (TC-188)", async () => {
+    // Given: a spawned process whose stderr emitter is observable
+    const handle = createDrainMockProcess({ stdout: "abc123\n", exitCode: 0 });
+    spawnMock.mockReturnValue(handle.proc);
+
+    // When: a spawnGit-backed method runs to completion
+    await ds.resolveRefToHash(REPO, "HEAD");
+
+    // Then: spawnGit registered a single "data" listener that drains stderr
+    expect(handle.stderrEmitter.listenerCount("data")).toBe(1);
+  });
+
+  // Case: TC-189
+  it("resolves without hanging when large stderr is emitted before close (TC-189)", async () => {
+    // Given: several large stderr chunks emitted before a successful close(0)
+    const largeChunk = "x".repeat(100_000);
+    const handle = createDrainMockProcess({
+      stdout: "abc123\n",
+      stderrChunks: [largeChunk, largeChunk, largeChunk],
+      exitCode: 0
+    });
+    spawnMock.mockReturnValue(handle.proc);
+
+    // When: the spawnGit-backed method runs
+    const result = await ds.resolveRefToHash(REPO, "HEAD");
+
+    // Then: the promise resolves with the stdout-derived value (stderr did not stall it)
+    expect(result).toBe("abc123");
+  });
+
+  // Case: TC-190
+  it("uses stdout for the success value and ignores drained stderr (TC-190)", async () => {
+    // Given: both stderr and stdout are emitted before a successful close(0)
+    const handle = createDrainMockProcess({
+      stdout: "def4567\n",
+      stderrChunks: ["warning: some noise\n"],
+      exitCode: 0
+    });
+    spawnMock.mockReturnValue(handle.proc);
+
+    // When: the spawnGit-backed method runs
+    const result = await ds.resolveRefToHash(REPO, "HEAD");
+
+    // Then: the resolved value derives from stdout only, not from stderr
+    expect(result).toBe("def4567");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S33: runGitCommandSpawn() conditional trailing-line removal        */
+/* ------------------------------------------------------------------ */
+
+describe("runGitCommandSpawn trailing line handling", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Case: TC-191
+  it("pops only the trailing empty line when output ends with a newline (TC-191)", async () => {
+    // Given: a non-zero exit whose stdout ends with a trailing newline
+    spawnMock.mockReturnValue(createCommandMockProcess({ stdout: "error line\n", exitCode: 1 }));
+
+    // When: a runGitCommandSpawn-backed command runs
+    const result = await ds.deleteTag(REPO, "v1");
+
+    // Then: the resolved string drops only the trailing empty line
+    expect(result).toBe("error line");
+  });
+
+  // Case: TC-192
+  it("preserves the last line when output has no trailing newline (TC-192)", async () => {
+    // Given: a non-zero exit whose stdout has no trailing newline
+    spawnMock.mockReturnValue(
+      createCommandMockProcess({ stdout: "fatal: bad revision", exitCode: 1 })
+    );
+
+    // When: a runGitCommandSpawn-backed command runs
+    const result = await ds.deleteTag(REPO, "v1");
+
+    // Then: the whole message is preserved (old unconditional slice dropped it)
+    expect(result).toBe("fatal: bad revision");
+  });
+
+  // Case: TC-193
+  it("keeps intermediate lines while removing only the trailing empty one (TC-193)", async () => {
+    // Given: a non-zero exit with multiple lines and a trailing newline
+    spawnMock.mockReturnValue(createCommandMockProcess({ stdout: "line1\nline2\n", exitCode: 1 }));
+
+    // When: a runGitCommandSpawn-backed command runs
+    const result = await ds.deleteTag(REPO, "v1");
+
+    // Then: intermediate lines are kept and only the trailing empty line is removed
+    expect(result).toBe("line1\nline2");
+  });
+
+  // Case: TC-194
+  it("resolves to an empty string when both stdout and stderr are empty (TC-194)", async () => {
+    // Given: a non-zero exit with empty stdout and empty stderr
+    spawnMock.mockReturnValue(createCommandMockProcess({ stdout: "", stderr: "", exitCode: 1 }));
+
+    // When: a runGitCommandSpawn-backed command runs
+    const result = await ds.deleteTag(REPO, "v1");
+
+    // Then: split yields [""], the empty element is popped, and the join is ""
+    expect(result).toBe("");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S34: addTag()/createBranch() leading-hyphen ref name rejection     */
+/* ------------------------------------------------------------------ */
+
+describe("ref name option-injection guard", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+  const INVALID_REF_NAME_MESSAGE = "Invalid ref name.";
+  const VALID_HASH = "abc123def456";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Case: TC-195
+  it("runs git tag for a valid tag name (TC-195)", async () => {
+    // Given: spawn succeeds for a normal (non-hyphen) tag name
+    spawnMock.mockReturnValue(createCommandMockProcess({ exitCode: 0 }));
+
+    // When: addTag is called with a valid tag name
+    const result = await ds.addTag(REPO, "v1.0.0", VALID_HASH, true, "");
+
+    // Then: the git tag command runs and the ref-name error is not returned
+    expect(result).not.toBe(INVALID_REF_NAME_MESSAGE);
+    const tagCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "tag");
+    expect(tagCall).toBeDefined();
+  });
+
+  // Case: TC-196
+  it("runs git branch for a valid branch name (TC-196)", async () => {
+    // Given: spawn succeeds for a normal branch name
+    spawnMock.mockReturnValue(createCommandMockProcess({ exitCode: 0 }));
+
+    // When: createBranch is called with a valid branch name and hash
+    const result = await ds.createBranch(REPO, "feature/x", VALID_HASH);
+
+    // Then: the git branch command runs and the ref-name error is not returned
+    expect(result).not.toBe(INVALID_REF_NAME_MESSAGE);
+    const branchCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "branch");
+    expect(branchCall).toBeDefined();
+  });
+
+  // Case: TC-197
+  it("rejects a tag name starting with a hyphen without spawning git (TC-197)", async () => {
+    // Given: a tag name that would be parsed as an option
+    // When: addTag is called with "--delete"
+    const result = await ds.addTag(REPO, "--delete", VALID_HASH, true, "");
+
+    // Then: the ref-name error is returned and git is not spawned
+    expect(result).toBe(INVALID_REF_NAME_MESSAGE);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  // Case: TC-198
+  it("rejects a hyphen branch name before the commit-hash check (TC-198)", async () => {
+    // Given: a hyphen branch name paired with an invalid commit hash
+    // When: createBranch is called with "-D" and a non-hash value
+    const result = await ds.createBranch(REPO, "-D", "not-a-hash");
+
+    // Then: the ref-name guard short-circuits (not the commit-hash message) and git is not spawned
+    expect(result).toBe(INVALID_REF_NAME_MESSAGE);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  // Case: TC-199
+  it("rejects a lone hyphen tag name (TC-199)", async () => {
+    // Given: the minimal invalid input "-"
+    // When: addTag is called with "-"
+    const result = await ds.addTag(REPO, "-", VALID_HASH, true, "");
+
+    // Then: the ref-name error is returned
+    expect(result).toBe(INVALID_REF_NAME_MESSAGE);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  // Case: TC-200
+  it("passes an empty branch name through the hyphen guard to the hash check (TC-200)", async () => {
+    // Given: spawn succeeds and the branch name is empty (not hyphen-prefixed)
+    spawnMock.mockReturnValue(createCommandMockProcess({ exitCode: 0 }));
+
+    // When: createBranch is called with an empty name and a valid hash
+    const result = await ds.createBranch(REPO, "", VALID_HASH);
+
+    // Then: the hyphen guard is bypassed and the command reaches spawn (not the ref-name error)
+    expect(result).not.toBe(INVALID_REF_NAME_MESSAGE);
+    expect(spawnMock).toHaveBeenCalledTimes(1);
   });
 });

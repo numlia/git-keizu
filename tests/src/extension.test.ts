@@ -729,8 +729,8 @@ describe("extension", () => {
     });
 
     describe("configuration change routing", () => {
-      it("TC-013: refreshes the status bar item when showStatusBarItem changes", () => {
-        // Case: TC-013
+      it("TC-024: refreshes the status bar item when only showStatusBarItem changes", () => {
+        // Case: TC-024
         // Given: activate registers the configuration listener and only showStatusBarItem matches
         activateExtension();
         const configHandler = getConfigurationChangeHandler();
@@ -746,9 +746,9 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).not.toHaveBeenCalled();
       });
 
-      it("TC-014: regenerates git command formats when dateType changes", () => {
-        // Case: TC-014
-        // Given: activate registers the configuration listener and only dateType matches after the first branch is false
+      it("TC-025: regenerates git command formats when only dateType changes", () => {
+        // Case: TC-025
+        // Given: activate registers the configuration listener and only dateType matches
         activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([DATE_TYPE_SETTING]);
@@ -763,9 +763,9 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).not.toHaveBeenCalled();
       });
 
-      it("TC-015: notifies RepoManager when maxDepthOfRepoSearch changes", () => {
-        // Case: TC-015
-        // Given: activate registers the configuration listener and only maxDepthOfRepoSearch matches after earlier branches are false
+      it("TC-026: notifies RepoManager when only maxDepthOfRepoSearch changes", () => {
+        // Case: TC-026
+        // Given: activate registers the configuration listener and only maxDepthOfRepoSearch matches
         activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([MAX_DEPTH_OF_REPO_SEARCH_SETTING]);
@@ -782,9 +782,9 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).not.toHaveBeenCalled();
       });
 
-      it("TC-016: registers the git path when git.path changes", () => {
-        // Case: TC-016
-        // Given: activate registers the configuration listener and only git.path matches after earlier branches are false
+      it("TC-027: registers the git path when only git.path changes", () => {
+        // Case: TC-027
+        // Given: activate registers the configuration listener and only git.path matches
         activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([GIT_PATH_SETTING]);
@@ -799,8 +799,8 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).toHaveBeenCalledTimes(ONE_CALL);
       });
 
-      it("TC-017: performs no action when no watched setting changes", () => {
-        // Case: TC-017
+      it("TC-028: performs no action when no watched setting changes", () => {
+        // Case: TC-028
         // Given: activate registers the configuration listener and no watched setting matches
         activateExtension();
         const configHandler = getConfigurationChangeHandler();
@@ -816,9 +816,9 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).not.toHaveBeenCalled();
       });
 
-      it("TC-018: gives priority to showStatusBarItem when multiple watched settings match", () => {
-        // Case: TC-018
-        // Given: activate registers the configuration listener and both showStatusBarItem and dateType report true
+      it("TC-029: runs both handlers when showStatusBarItem and dateType both match", () => {
+        // Case: TC-029
+        // Given: independent if statements and both showStatusBarItem and dateType report true
         activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([
@@ -829,16 +829,40 @@ describe("extension", () => {
         // When: the configuration change handler is called
         configHandler(event);
 
-        // Then: the first matching branch wins, so only statusBarItem.refresh runs
+        // Then: both handlers run once each (old else-if chain only ran refresh)
         expect(mocks.statusBarItemInstance.refresh).toHaveBeenCalledTimes(ONE_CALL);
-        expect(mocks.dataSourceInstance.generateGitCommandFormats).not.toHaveBeenCalled();
+        expect(mocks.dataSourceInstance.generateGitCommandFormats).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.repoManagerInstance.maxDepthOfRepoSearchChanged).not.toHaveBeenCalled();
         expect(mocks.dataSourceInstance.registerGitPath).not.toHaveBeenCalled();
       });
 
-      it("TC-019: rethrows routed configuration handler failures", () => {
-        // Case: TC-019
-        // Given: activate registers the configuration listener and statusBarItem.refresh throws on the first matching branch
+      it("TC-030: runs all four handlers when every watched setting matches", () => {
+        // Case: TC-030
+        // Given: independent if statements and all four watched settings report true
+        activateExtension();
+        const configHandler = getConfigurationChangeHandler();
+        const event = createConfigurationChangeEvent([
+          SHOW_STATUS_BAR_ITEM_SETTING,
+          DATE_TYPE_SETTING,
+          MAX_DEPTH_OF_REPO_SEARCH_SETTING,
+          GIT_PATH_SETTING
+        ]);
+
+        // When: the configuration change handler is called
+        configHandler(event);
+
+        // Then: all four routed handlers run exactly once
+        expect(mocks.statusBarItemInstance.refresh).toHaveBeenCalledTimes(ONE_CALL);
+        expect(mocks.dataSourceInstance.generateGitCommandFormats).toHaveBeenCalledTimes(ONE_CALL);
+        expect(mocks.repoManagerInstance.maxDepthOfRepoSearchChanged).toHaveBeenCalledTimes(
+          ONE_CALL
+        );
+        expect(mocks.dataSourceInstance.registerGitPath).toHaveBeenCalledTimes(ONE_CALL);
+      });
+
+      it("TC-031: propagates a handler failure and skips the later independent ifs", () => {
+        // Case: TC-031
+        // Given: showStatusBarItem matches and statusBarItem.refresh throws
         activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([SHOW_STATUS_BAR_ITEM_SETTING]);
@@ -849,7 +873,7 @@ describe("extension", () => {
         // When: the configuration change handler is called
         const configurationAction = () => configHandler(event);
 
-        // Then: the same Error and message are propagated and later branches are not evaluated
+        // Then: the same Error and message propagate and later ifs are not evaluated
         expectThrownError(configurationAction, REFRESH_FAILED_MESSAGE);
         expect(mocks.dataSourceInstance.generateGitCommandFormats).not.toHaveBeenCalled();
         expect(mocks.repoManagerInstance.maxDepthOfRepoSearchChanged).not.toHaveBeenCalled();

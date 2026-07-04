@@ -222,7 +222,7 @@ import {
   showSelectDialog
 } from "../../web/dialogs";
 import { generateGitFileListHtml, generateGitFileTreeHtml } from "../../web/fileTree";
-import { buildRefContextMenuItems } from "../../web/refMenu";
+import { buildRefContextMenuItems, checkoutBranchAction } from "../../web/refMenu";
 import { buildStashContextMenuItems } from "../../web/stashMenu";
 import { buildUncommittedContextMenuItems } from "../../web/uncommittedMenu";
 import {
@@ -6127,5 +6127,348 @@ describe("request queue / refresh contention (S40)", () => {
       moreCommitsAvailable: false,
       hard: true
     });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S43: loadAvatar raw email matching                                 */
+/* ------------------------------------------------------------------ */
+
+describe("loadAvatar raw email matching (S43)", () => {
+  let liveVscode: typeof vscode;
+
+  beforeAll(async () => {
+    const utilsMod = await import("../../web/utils");
+    liveVscode = utilsMod.vscode;
+  });
+
+  beforeEach(() => {
+    resetCommitState();
+  });
+
+  function addAvatarElem(email: string): HTMLElement {
+    const elem = document.createElement("span");
+    elem.className = "avatar";
+    elem.dataset.email = email;
+    document.body.appendChild(elem);
+    return elem;
+  }
+
+  it("applies the avatar and persists state on a plain email match (TC-241)", () => {
+    // Case: TC-241
+    // Given: an .avatar element with a plain data-email
+    const elem = addAvatarElem("a@x.com");
+
+    // When: a fetchAvatar message arrives for the same email
+    dispatchMessage({
+      command: "fetchAvatar",
+      email: "a@x.com",
+      image: "data:image/png;base64,AAA"
+    });
+
+    // Then: the element renders the avatar image and state is persisted with the avatar
+    expect(elem.innerHTML).toBe('<img class="avatarImg" src="data:image/png;base64,AAA">');
+    expect(liveVscode.setState).toHaveBeenCalled();
+    const savedState = vi.mocked(liveVscode.setState).mock.calls.at(-1)![0] as WebViewState;
+    expect(savedState.avatars["a@x.com"]).toBe("data:image/png;base64,AAA");
+  });
+
+  it("matches an email containing HTML special characters (TC-242)", () => {
+    // Case: TC-242
+    // Given: an .avatar element whose raw data-email contains HTML special characters
+    const elem = addAvatarElem("a<b@x.com");
+
+    // When: a fetchAvatar message arrives for the same raw email
+    dispatchMessage({ command: "fetchAvatar", email: "a<b@x.com", image: "img" });
+
+    // Then: raw email comparison matches and the element is updated (old escapeHtml compare missed it)
+    expect(elem.innerHTML).toBe('<img class="avatarImg" src="img">');
+  });
+
+  it("persists state but updates no element when no data-email matches (TC-243)", () => {
+    // Case: TC-243
+    // Given: an .avatar element for a different email
+    const elem = addAvatarElem("other@x.com");
+
+    // When: a fetchAvatar message arrives for an unmatched email
+    dispatchMessage({ command: "fetchAvatar", email: "nomatch@x.com", image: "img" });
+
+    // Then: no element is updated but the avatar is still recorded in persisted state
+    expect(elem.innerHTML).toBe("");
+    const savedState = vi.mocked(liveVscode.setState).mock.calls.at(-1)![0] as WebViewState;
+    expect(savedState.avatars["nomatch@x.com"]).toBe("img");
+  });
+
+  it("escapes the image value inside the src attribute (TC-244)", () => {
+    // Case: TC-244
+    // Given: an .avatar element and an image value containing a double quote
+    const elem = addAvatarElem("q@x.com");
+
+    // When: a fetchAvatar message arrives with a quote in the image value
+    dispatchMessage({ command: "fetchAvatar", email: "q@x.com", image: 'a"b' });
+
+    // Then: the src attribute is escaped and not broken; the img element parses cleanly
+    const img = elem.querySelector("img.avatarImg");
+    expect(img).not.toBeNull();
+    expect(img!.getAttribute("src")).toBe('a"b');
+    expect(elem.innerHTML).toContain("&quot;");
+  });
+
+  it("updates every element that shares the same data-email (TC-245)", () => {
+    // Case: TC-245
+    // Given: two .avatar elements with the same data-email
+    const first = addAvatarElem("dup@x.com");
+    const second = addAvatarElem("dup@x.com");
+
+    // When: a fetchAvatar message arrives for that email
+    dispatchMessage({ command: "fetchAvatar", email: "dup@x.com", image: "img" });
+
+    // Then: both matching elements are updated
+    expect(first.innerHTML).toBe('<img class="avatarImg" src="img">');
+    expect(second.innerHTML).toBe('<img class="avatarImg" src="img">');
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S44: gitRef contextmenu/checkout raw dataset.name reads            */
+/* ------------------------------------------------------------------ */
+
+describe("gitRef contextmenu and checkout raw dataset.name (S44)", () => {
+  beforeEach(() => {
+    resetCommitState();
+  });
+
+  function renderHead(name: string, remotes: string[], worktrees?: Record<string, unknown>): void {
+    vi.mocked(getBranchLabels).mockReturnValue({
+      heads: [{ name, remotes }],
+      remotes: [],
+      tags: []
+    });
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true,
+      worktrees: worktrees ?? {}
+    });
+    vi.clearAllMocks();
+  }
+
+  afterEach(() => {
+    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+  });
+
+  it("passes the raw ref name to buildRefContextMenuItems for a plain name (TC-246)", () => {
+    // Case: TC-246
+    // Given: a rendered head ref named "main"
+    renderHead("main", []);
+
+    // When: the gitRef receives a contextmenu event
+    const gitRef = document.querySelector(".gitRef.head");
+    gitRef!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // Then: buildRefContextMenuItems receives "main" as the raw refName argument
+    expect(buildRefContextMenuItems).toHaveBeenCalledWith(
+      expect.anything(),
+      "main",
+      expect.any(HTMLElement),
+      false,
+      expect.anything(),
+      undefined,
+      null
+    );
+  });
+
+  it("passes a special-character ref name raw without double-decoding (TC-247)", () => {
+    // Case: TC-247
+    // Given: a rendered head ref whose name contains an ampersand
+    renderHead("feat&x", []);
+
+    // When: the gitRef receives a contextmenu event
+    const gitRef = document.querySelector(".gitRef.head");
+    gitRef!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // Then: the raw "feat&x" is passed (no unescapeHtml double-decode)
+    expect(buildRefContextMenuItems).toHaveBeenCalledWith(
+      expect.anything(),
+      "feat&x",
+      expect.any(HTMLElement),
+      false,
+      expect.anything(),
+      undefined,
+      null
+    );
+  });
+
+  it("looks up the worktree by the raw ref-name key (TC-248)", () => {
+    // Case: TC-248
+    // Given: a head ref "feat&x" with a matching worktree entry under the raw key
+    renderHead("feat&x", [], { "feat&x": { path: "/wt", isMain: false } });
+
+    // When: the gitRef receives a contextmenu event
+    const gitRef = document.querySelector(".gitRef.head");
+    gitRef!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // Then: worktreeInfo is built from the raw-key lookup
+    expect(buildRefContextMenuItems).toHaveBeenCalledWith(
+      expect.anything(),
+      "feat&x",
+      expect.any(HTMLElement),
+      false,
+      expect.anything(),
+      undefined,
+      { path: "/wt", isMainWorktree: false }
+    );
+  });
+
+  it("checks out a remote-combined ref using the raw target name (TC-249)", () => {
+    // Case: TC-249
+    // Given: a head "main" with an "origin" remote-combined label rendered
+    renderHead("main", ["origin"]);
+
+    // When: the remote-combined label is double-clicked
+    const remoteLabel = document.querySelector(".gitRefHeadRemote");
+    expect(remoteLabel).not.toBeNull();
+    remoteLabel!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+
+    // Then: checkoutBranchAction is called with the raw "origin/main" name and remote flag true
+    expect(checkoutBranchAction).toHaveBeenCalledWith(
+      TEST_REPO,
+      expect.any(HTMLElement),
+      "origin/main",
+      true
+    );
+  });
+
+  it("checks out a local ref using the raw source name (TC-250)", () => {
+    // Case: TC-250
+    // Given: a rendered local head ref "main"
+    renderHead("main", []);
+
+    // When: the gitRef is double-clicked
+    const gitRef = document.querySelector(".gitRef.head");
+    gitRef!.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+
+    // Then: checkoutBranchAction is called with the raw source name (no remote flag)
+    expect(checkoutBranchAction).toHaveBeenCalledWith(TEST_REPO, expect.any(HTMLElement), "main");
+  });
+
+  it("leaves worktreeInfo null when the raw key is not in the worktree map (TC-251)", () => {
+    // Case: TC-251
+    // Given: a head ref "main" with an empty worktree map
+    renderHead("main", [], {});
+
+    // When: the gitRef receives a contextmenu event
+    const gitRef = document.querySelector(".gitRef.head");
+    gitRef!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // Then: worktreeInfo is null (lookup miss, no exception)
+    expect(buildRefContextMenuItems).toHaveBeenCalledWith(
+      expect.anything(),
+      "main",
+      expect.any(HTMLElement),
+      false,
+      expect.anything(),
+      undefined,
+      null
+    );
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S45: restore-time loading branch resends commitDetails             */
+/* ------------------------------------------------------------------ */
+
+describe("expanded commit restore loading resend (S45)", () => {
+  let liveVscode: typeof vscode;
+
+  beforeAll(async () => {
+    const utilsMod = await import("../../web/utils");
+    liveVscode = utilsMod.vscode;
+  });
+
+  beforeEach(() => {
+    resetCommitState();
+  });
+
+  function reRenderCommits(commits: GitCommitNode[], head: string): void {
+    dispatchMessage({
+      command: "loadCommits",
+      commits,
+      head,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+  }
+
+  it("resends commitDetails with hasParents/isStash from the looked-up commit (TC-252)", () => {
+    // Case: TC-252
+    // Given: a commit with parents is clicked (loading state) but no details response arrives
+    clickCommit(COMMIT_HASH_2);
+    vi.clearAllMocks();
+
+    // When: the table is re-rendered while the expanded commit is still loading
+    reRenderCommits(MOCK_COMMITS, COMMIT_HASH_1);
+
+    // Then: commitDetails is re-sent with hasParents true and isStash false
+    expect(liveVscode.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "commitDetails",
+        repo: TEST_REPO,
+        commitHash: COMMIT_HASH_2,
+        hasParents: true,
+        isStash: false
+      })
+    );
+  });
+
+  it("resends commitDetails with isStash true for a stash commit (TC-254)", () => {
+    // Case: TC-254
+    // Given: a stash commit is loaded and clicked into the loading state
+    const stashHash = "eee555eee555eee5";
+    const stashCommits: GitCommitNode[] = [
+      {
+        hash: stashHash,
+        parentHashes: [COMMIT_HASH_1],
+        author: "Alice",
+        email: "alice@test.com",
+        date: 1700003000,
+        message: "WIP stash",
+        refs: [],
+        stash: { selector: "stash@{0}", baseHash: COMMIT_HASH_1, untrackedFilesHash: null }
+      },
+      ...MOCK_COMMITS
+    ];
+    reRenderCommits(stashCommits, COMMIT_HASH_1);
+    clickCommit(stashHash);
+    vi.clearAllMocks();
+
+    // When: the table is re-rendered while the stash commit is still loading
+    reRenderCommits(stashCommits, COMMIT_HASH_1);
+
+    // Then: the resent commitDetails marks isStash true
+    expect(liveVscode.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        command: "commitDetails",
+        commitHash: stashHash,
+        isStash: true
+      })
+    );
+  });
+
+  it("does not resend commitDetails when details are already cached (TC-255)", () => {
+    // Case: TC-255
+    // Given: a commit is expanded and its details/fileTree are cached
+    expandCommit(COMMIT_HASH_2);
+
+    // When: the table is re-rendered
+    reRenderCommits(MOCK_COMMITS, COMMIT_HASH_1);
+
+    // Then: no commitDetails request is re-sent (the cached-details branch is taken)
+    const commitDetailsCalls = vi
+      .mocked(liveVscode.postMessage)
+      .mock.calls.filter((call) => (call[0] as { command?: string }).command === "commitDetails");
+    expect(commitDetailsCalls).toHaveLength(0);
   });
 });

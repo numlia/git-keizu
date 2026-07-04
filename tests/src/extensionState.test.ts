@@ -773,4 +773,80 @@ describe("ExtensionState", () => {
       expect(mockContext.workspaceState.update).toHaveBeenCalledWith("repoStates", repoSet);
     });
   });
+
+  // ==========================================================================
+  // waitForAvatarStorage
+  // ==========================================================================
+  describe("waitForAvatarStorage", () => {
+    it("TC-038: returns the promise retained from initAvatarStorage", () => {
+      // Case: TC-038
+      // Given: a constructed ExtensionState (fs.stat resolves in beforeEach)
+      const state = new ExtensionState(toExtensionContext(mockContext));
+
+      // When: waitForAvatarStorage is called
+      const promise = state.waitForAvatarStorage();
+
+      // Then: it is a Promise and repeated calls return the same instance
+      expect(promise).toBeInstanceOf(Promise);
+      expect(state.waitForAvatarStorage()).toBe(promise);
+    });
+
+    it("TC-039: resolves after init completes so availability is settled to true", async () => {
+      // Case: TC-039
+      // Given: directory is missing but fs.mkdir succeeds
+      vi.mocked(fs.stat).mockRejectedValue(new Error("ENOENT"));
+      vi.mocked(fs.mkdir).mockResolvedValue(undefined);
+      const state = new ExtensionState(toExtensionContext(mockContext));
+
+      // When: awaiting waitForAvatarStorage
+      await state.waitForAvatarStorage();
+
+      // Then: initialization is complete and storage is available
+      expect(state.isAvatarStorageAvailable()).toBe(true);
+    });
+
+    it("TC-040: returns the same promise and runs init only once across calls", () => {
+      // Case: TC-040
+      // Given: a constructed ExtensionState (constructor ran initAvatarStorage once)
+      const state = new ExtensionState(toExtensionContext(mockContext));
+
+      // When: waitForAvatarStorage is called multiple times
+      const first = state.waitForAvatarStorage();
+      const second = state.waitForAvatarStorage();
+      const third = state.waitForAvatarStorage();
+
+      // Then: all calls return the same promise and fs.stat ran exactly once (no re-init)
+      expect(second).toBe(first);
+      expect(third).toBe(first);
+      expect(fs.stat).toHaveBeenCalledTimes(1);
+    });
+
+    it("TC-041: resolves (does not reject) when init fails, leaving availability false", async () => {
+      // Case: TC-041
+      // Given: both fs.stat and fs.mkdir fail
+      vi.mocked(fs.stat).mockRejectedValue(new Error("ENOENT"));
+      vi.mocked(fs.mkdir).mockRejectedValue(new Error("EPERM"));
+      const state = new ExtensionState(toExtensionContext(mockContext));
+
+      // When/Then: awaiting resolves with undefined (swallowed error, no throw)
+      await expect(state.waitForAvatarStorage()).resolves.toBeUndefined();
+      expect(state.isAvatarStorageAvailable()).toBe(false);
+    });
+
+    it("TC-042: awaiting an already-settled promise triggers no further fs calls", async () => {
+      // Case: TC-042
+      // Given: initialization already completed via an initial await
+      const state = new ExtensionState(toExtensionContext(mockContext));
+      await state.waitForAvatarStorage();
+      const statCallsAfterInit = vi.mocked(fs.stat).mock.calls.length;
+      const mkdirCallsAfterInit = vi.mocked(fs.mkdir).mock.calls.length;
+
+      // When: waitForAvatarStorage is awaited again
+      await state.waitForAvatarStorage();
+
+      // Then: no additional fs.stat / fs.mkdir invocations occur
+      expect(fs.stat).toHaveBeenCalledTimes(statCallsAfterInit);
+      expect(fs.mkdir).toHaveBeenCalledTimes(mkdirCallsAfterInit);
+    });
+  });
 });
