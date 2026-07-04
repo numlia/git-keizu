@@ -69,6 +69,14 @@ export class RepoManager {
     for (let i = 0; i < folders.length; i++) {
       this.stopWatchingFolder(folders[i]);
     }
+    if (this.processCreateEventsTimeout !== null) {
+      clearTimeout(this.processCreateEventsTimeout);
+      this.processCreateEventsTimeout = null;
+    }
+    if (this.processChangeEventsTimeout !== null) {
+      clearTimeout(this.processChangeEventsTimeout);
+      this.processChangeEventsTimeout = null;
+    }
   }
 
   public registerViewCallback(viewCallback: (repos: GitRepoSet, numRepos: number) => void) {

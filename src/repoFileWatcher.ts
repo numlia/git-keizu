@@ -57,10 +57,18 @@ export class RepoFileWatcher {
     }
     this.fsWatchers = [];
     this.watchRoots = [];
+    if (this.refreshTimeout !== null) {
+      clearTimeout(this.refreshTimeout);
+      this.refreshTimeout = null;
+    }
   }
 
   public mute() {
     this.muteCount += 1;
+    if (this.refreshTimeout !== null) {
+      clearTimeout(this.refreshTimeout);
+      this.refreshTimeout = null;
+    }
   }
 
   public unmute() {
