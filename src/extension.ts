@@ -49,11 +49,14 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("git-keizu.showStatusBarItem")) {
         statusBarItem.refresh();
-      } else if (e.affectsConfiguration("git-keizu.dateType")) {
+      }
+      if (e.affectsConfiguration("git-keizu.dateType")) {
         dataSource.generateGitCommandFormats();
-      } else if (e.affectsConfiguration("git-keizu.maxDepthOfRepoSearch")) {
+      }
+      if (e.affectsConfiguration("git-keizu.maxDepthOfRepoSearch")) {
         repoManager.maxDepthOfRepoSearchChanged();
-      } else if (e.affectsConfiguration("git.path")) {
+      }
+      if (e.affectsConfiguration("git.path")) {
         dataSource.registerGitPath();
       }
       if (e.affectsConfiguration("git-keizu.menu.showRecentActions")) {

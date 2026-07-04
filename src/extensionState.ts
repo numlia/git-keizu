@@ -17,13 +17,14 @@ export class ExtensionState {
   private workspaceState: Memento;
   private globalStoragePath: string;
   private avatarStorageAvailable: boolean = false;
+  private avatarStorageInit: Promise<void>;
 
   constructor(context: ExtensionContext) {
     this.globalState = context.globalState;
     this.workspaceState = context.workspaceState;
 
     this.globalStoragePath = getPathFromStr(context.globalStoragePath);
-    this.initAvatarStorage();
+    this.avatarStorageInit = this.initAvatarStorage();
   }
 
   private async initAvatarStorage() {
@@ -58,6 +59,9 @@ export class ExtensionState {
   }
 
   /* Avatars */
+  public waitForAvatarStorage(): Promise<void> {
+    return this.avatarStorageInit;
+  }
   public isAvatarStorageAvailable() {
     return this.avatarStorageAvailable;
   }

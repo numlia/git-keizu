@@ -606,6 +606,7 @@ export class GitKeizuView {
       nonce = getNonce();
     const locale = getLocale();
     const webviewMessages = await loadWebviewMessages(this.extensionPath);
+    await this.extensionState.waitForAvatarStorage();
     const viewState: GitKeizuViewState = {
       commitOrdering: config.commitOrdering(),
       dateFormat: config.dateFormat(),
