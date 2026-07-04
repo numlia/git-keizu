@@ -93,9 +93,13 @@ function buildAuthorOptions(
   authors: string[],
   selectedAuthors: string[]
 ): { options: { name: string; value: string }[]; selected: string[] } {
+  const mergedAuthors = [
+    ...authors,
+    ...selectedAuthors.filter((author) => !authors.includes(author))
+  ];
   const options = [
     { name: ALL_AUTHORS_LABEL, value: ALL_AUTHORS_VALUE },
-    ...authors.map((author) => ({ name: author, value: author }))
+    ...mergedAuthors.map((author) => ({ name: author, value: author }))
   ];
   return { options, selected: selectedAuthors };
 }
@@ -473,12 +477,10 @@ class GitKeizuView {
     }
     this.render();
 
-    if (this.selectedAuthors.length === 0) {
-      const authorList =
-        authors !== undefined ? authors : [...new Set(this.commits.map((c) => c.author))].sort();
-      const { options, selected } = buildAuthorOptions(authorList, this.selectedAuthors);
-      this.authorDropdown.setOptions(options, selected);
-    }
+    const authorList =
+      authors !== undefined ? authors : [...new Set(this.commits.map((c) => c.author))].sort();
+    const { options, selected } = buildAuthorOptions(authorList, this.selectedAuthors);
+    this.authorDropdown.setOptions(options, selected);
 
     this.triggerLoadCommitsCallback(true);
     this.fetchAvatars(avatarsNeeded);
