@@ -153,7 +153,7 @@ export function showFormDialog(
     let dialogInput = <HTMLInputElement>document.getElementById(`dialogInput${textRefInput}`);
     if (dialogInput.value === "") dialog.className = DIALOG_CLASS_NO_INPUT;
     dialogInput.focus();
-    dialogInput.addEventListener("keyup", () => {
+    let validateRefInput = () => {
       let noInput = dialogInput.value === "",
         invalidInput = dialogInput.value.match(refInvalid) !== null;
       let newClassName = `active${noInput ? " noInput" : invalidInput ? " inputInvalid" : ""}`;
@@ -163,7 +163,9 @@ export function showFormDialog(
           ? t("dialog.validation.invalidCharacters", actionName)
           : "";
       }
-    });
+    };
+    dialogInput.addEventListener("keyup", validateRefInput);
+    dialogInput.addEventListener("input", validateRefInput);
   } else {
     for (let i = 0; i < inputs.length; i++) {
       if (inputs[i].type === "text") {
