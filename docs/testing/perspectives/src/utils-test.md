@@ -24,7 +24,8 @@
 
 > Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
 > Added: 2026-04-04
-> Status: active
+> Status: superseded
+> Superseded By: S6
 > Supersedes: -
 
 **シグネチャ**: `openFile(repo: string, filePath: string, commitHash: string, dataSource: DataSource, viewColumn: vscode.ViewColumn): Promise<string | null>`
@@ -81,3 +82,23 @@
 | Case ID | Input / Precondition                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                        | Notes                    |
 | ------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------ |
 | TC-012  | ファイルが存在する + vscode.commands.executeCommand が例外をスロー | Exception - vscode.open failure                                            | "Visual Studio Code was unable to open ..." が返される | try-catch でのエラー変換 |
+
+## S6: openFile() path.relative ベースのパストラバーサル検証
+
+> Origin: フェーズ3 修正 L12 (path-relative-traversal-guard)
+> Added: 2026-07-04T04:29:24Z
+> Status: active
+> Supersedes: S2
+> Signature: `openFile(repo: string, filePath: string, commitHash: string, dataSource: DataSource, viewColumn: vscode.ViewColumn): Promise<string | null>`
+> Target Path: `src/utils.ts:70-99`
+
+パストラバーサル検証を、旧2段方式（`filePath.split("/").includes("..")` の第1段 + `!resolvedPath.startsWith(repo)` の第2段）から、`path.relative(repo, path.resolve(repo, filePath))` の結果が `".."` で始まる、または `path.isAbsolute` である場合に拒否する単一方式へ置き換える修正。リネーム先パスにも同じ relative 方式を適用する。旧 `startsWith(repo)` は `repo="/a"` と `resolvedPath="/ab/x"` のような接頭辞共有の兄弟ディレクトリを誤って許可していたが、relative 方式はこれを `"../ab/x"` として確実に拒否する。S2 の split-includes + startsWith 前提を置き換える。
+
+| Case ID | Input / Precondition                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                        | Notes                                                                                      |
+| ------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| TC-013  | repo=`/repo`、filePath=`src/a.ts`（repo 内）                                 | Normal - inside repo allowed                                               | `path.relative` が `"src/a.ts"`（`".."` 始まりでも絶対でもない）でガードを通過し、ファイルオープン処理へ進む                           | 正常パス                                                                                   |
+| TC-014  | repo=`/repo`、filePath=`../etc/passwd`                                       | Validation - relative escape rejected                                      | `path.relative` が `"../etc/passwd"` で `".."` 始まりのため `PATH_TRAVERSAL_ERROR` を返し、`vscode.commands.executeCommand` を呼ばない | 相対的な脱出                                                                               |
+| TC-015  | repo=`/repo`、filePath=`/etc/passwd`（絶対パス）                             | Type - absolute path rejected                                              | `path.resolve` 後の `path.relative` 判定で拒否され、`PATH_TRAVERSAL_ERROR` を返す（`..` 始まり／`isAbsolute` いずれかで捕捉）          | 絶対パス。`isAbsolute` 分岐は Windows のドライブ跨ぎで顕在化、POSIX では `..` 始まりで捕捉 |
+| TC-016  | ファイル不在 + `getNewPathOfRenamedFile` が repo 外へ脱出する新パスを返す    | Validation - renamed path escape rejected                                  | リネーム先の `path.relative` が `".."` 始まりのため `PATH_TRAVERSAL_ERROR` を返す                                                      | リネーム先にも relative 検証適用                                                           |
+| TC-017  | repo=`/repo`、filePath=`""`（repo ルート自身に解決）                         | Boundary - repo root allowed                                               | `path.relative(repo, repo)` が `""` で `".."` 始まりでも絶対でもないためガードを通過する                                               | repo ルート境界                                                                            |
+| TC-018  | repo=`/repo`、resolvedPath が `/repo-evil/x`（接頭辞共有の兄弟ディレクトリ） | Boundary - sibling prefix rejected                                         | `path.relative` が `"../repo-evil/x"` で `".."` 始まりのため拒否される（旧 `startsWith("/repo")` は誤許可していた）                    | L12 の中核回帰                                                                             |

@@ -2,12 +2,12 @@
 
 > Source: `src/dataSource.ts`
 > Storage Mode: sharded
-> Generated: 2026-07-04T01:35:00Z
+> Generated: 2026-07-04T04:29:24Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 3
-> Total Sections: 31
-> Total Cases: 187
+> Total Shards: 4
+> Total Sections: 36
+> Total Cases: 217
 
 ## Shards
 
@@ -16,6 +16,7 @@
 | 01-history-diff-01.md       | history-diff       | 11       | 83    | 2026-07-04   |
 | 02-branch-worktree-01.md    | branch-worktree    | 12       | 66    | 2026-07-04   |
 | 03-author-watch-paths-01.md | author-watch-paths | 8        | 38    | 2026-07-04   |
+| 04-spawn-refname-diff-01.md | spawn-refname-diff | 5        | 30    | 2026-07-04   |
 
 ## Origin Coverage
 
@@ -41,3 +42,7 @@
 | フェーズ2 修正 M1 (author-filter-regex-escape)         | 03-author-watch-paths-01.md                           |
 | フェーズ2 修正 M3 (detached-head-detection)            | 01-history-diff-01.md                                 |
 | フェーズ2 修正 M3 (spawn-locale-lc-all-c)              | 01-history-diff-01.md                                 |
+| フェーズ3 修正 L1 (spawn-stderr-drain)                 | 04-spawn-refname-diff-01.md                           |
+| フェーズ3 修正 L2 (spawn-conditional-trailing-slice)   | 04-spawn-refname-diff-01.md                           |
+| フェーズ3 修正 L4 (ref-name-option-injection-guard)    | 04-spawn-refname-diff-01.md                           |
+| フェーズ3 修正 L5 (diff-nul-delimited-parse)           | 04-spawn-refname-diff-01.md                           |

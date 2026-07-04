@@ -129,7 +129,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 2.2
 > Added: 2026-02-25
-> Status: active
+> Status: superseded
+> Superseded By: S35
 > Supersedes: -
 
 **シグネチャ**: `getCommitComparison(repo: string, fromHash: string, toHash: string): Promise<GitFileChange[] | null>`
@@ -157,7 +158,8 @@
 
 > Origin: Feature 002 (menubar-search-diff) Task 2.2
 > Added: 2026-02-25
-> Status: active
+> Status: superseded
+> Superseded By: S36
 > Supersedes: -
 
 **シグネチャ**: `getUncommittedDetails(repo: string): Promise<GitCommitDetails | null>`

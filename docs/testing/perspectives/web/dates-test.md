@@ -75,7 +75,8 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-21
-> Status: active
+> Status: superseded
+> Superseded By: S9
 > Supersedes: -
 
 **シグネチャ**: `export function getCommitDate(dateVal: number): { title: string; value: string }`
@@ -141,3 +142,27 @@
 | TC-032  | locale=`ja`, dateFormat=`Date & Time`        | Normal - locale branch                                                     | value/title が `YYYY-MM-DD HH:mm` 形式             | en 保存値は維持      |
 | TC-033  | locale=`ja`, dateFormat=`Date Only`          | Normal - locale branch                                                     | value が `YYYY-MM-DD`、title は `YYYY-MM-DD HH:mm` | title も locale 追従 |
 | TC-034  | locale=`ja`, dateFormat=`Relative`, diff=5分 | Normal - locale branch                                                     | value が `5分前`                                   | 相対時刻の日本語表示 |
+
+## S9: 境界値 - 丸め後繰り上がりを含む時間単位の切り替え境界
+
+> Origin: フェーズ3 修正 L13 (relative-date-round-carry)
+> Added: 2026-07-04T04:29:24Z
+> Status: active
+> Supersedes: S5
+> Signature: `export function getCommitDate(dateVal: number): { title: string; value: string }`
+> Target Path: `web/dates.ts:11-45`
+
+相対時刻の単位選択を `if/else if` チェーンから `RELATIVE_UNITS` テーブル + `findIndex` 方式へ置き換え、さらに単位内での丸め（`count = Math.round(diff / unit.seconds)`）の結果が次の単位の閾値（`nextUnit.seconds`）以上になった場合に上位単位へ繰り上げて `count=1` にする補正を追加する修正。旧実装は各単位内で丸めた数値をそのまま表示していたため、境界直下（例 3599 秒）で "60 minutes ago" のように上位単位の値がそのまま下位単位で表示される問題があった。S5 の非繰り上がり丸め前提（TC-018/020/022/026）を置き換える。
+
+| Case ID | Input / Precondition                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                           | Notes                                        |
+| ------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| TC-035  | Relative, diff=60秒                                                   | Boundary - min (minute)                                                    | value = "1 minute ago"。分の閾値ちょうどで下位からの繰り上がりなし                                                        | 秒→分の切替境界                              |
+| TC-036  | Relative, diff=59秒                                                   | Boundary - max (second, no carry)                                          | value = "59 seconds ago"。`59*1=59 < 60` のため繰り上がらない                                                             | 秒の上限、繰り上がりなし                     |
+| TC-037  | Relative, diff=3570秒                                                 | Boundary - minute carry to hour                                            | value = "1 hour ago"。`round(3570/60)=60`、`60*60=3600 >= 3600` で hour へ繰り上げ count=1                                | L13 の中核。task 例示ケース                  |
+| TC-038  | Relative, diff=3599秒                                                 | Boundary - max (minute) carry                                              | value = "1 hour ago"（旧 S5 TC-018 は "60 minutes ago"）。`round(3599/60)=60` → hour 繰り上げ                             | 旧挙動の置き換え                             |
+| TC-039  | Relative, diff=86399秒                                                | Boundary - hour carry to day                                               | value = "1 day ago"（旧 S5 TC-020 は "24 hours ago"）。`round(86399/3600)=24`、`24*3600=86400 >= 86400` で day へ繰り上げ | 旧挙動の置き換え                             |
+| TC-040  | Relative, diff=604799秒                                               | Boundary - day carry to week                                               | value = "1 week ago"（旧 S5 TC-022 は "7 days ago"）。`round(604799/86400)=7` → week 繰り上げ                             | 旧挙動の置き換え                             |
+| TC-041  | Relative, diff=31557599秒                                             | Boundary - month carry to year                                             | value = "1 year ago"（旧 S5 TC-026 は "12 months ago"）。`round(31557599/2629800)=12` → year 繰り上げ                     | 旧挙動の置き換え                             |
+| TC-042  | Relative, diff=2629799秒                                              | Boundary - week max, no carry                                              | value = "4 weeks ago"。`round(2629799/604800)=4`、`4*604800=2419200 < 2629800` で繰り上がらない                           | 繰り上がり非発生の対照                       |
+| TC-043  | Relative, diff=86400秒                                                | Boundary - min (day)                                                       | value = "1 day ago"。時→日の閾値ちょうど、`1*86400=86400 < 604800` で繰り上がらない                                       | 上位境界ちょうどの非繰り上がり               |
+| TC-044  | Relative, diff=Infinity（`dateVal=-Infinity` 相当で findIndex が -1） | Boundary - findIndex fallback to year                                      | `unitIndex===-1` のフォールバックで year 単位が選ばれ、value の単位が `year` になる                                       | `RELATIVE_UNITS.length-1` フォールバック分岐 |

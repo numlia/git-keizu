@@ -1,41 +1,41 @@
 # テスト観点表インデックス
 
-> Auto-generated: 2026-07-04T02:44:58Z
+> Auto-generated: 2026-07-04T04:29:24Z
 > Total sources: 33
-> Total physical files: 49
-> Total sections: 318
-> Total cases: 1530
+> Total physical files: 50
+> Total sections: 333
+> Total cases: 1622
 
 ## ソースファイル → 観点表（正引き）
 
 | Source File               | Storage Mode | Perspectives Entry                | Shards | Sections | Cases | Last Updated |
 | ------------------------- | ------------ | --------------------------------- | ------ | -------- | ----- | ------------ |
-| src/avatarManager.ts      | single-file  | src/avatarManager-test.md         | 1      | 24       | 95    | 2026-07-04   |
+| src/avatarManager.ts      | single-file  | src/avatarManager-test.md         | 1      | 25       | 102   | 2026-07-04   |
 | src/config.ts             | sharded      | src/config-test/INDEX.md          | 3      | 17       | 96    | 2026-05-17   |
-| src/dataSource.ts         | sharded      | src/dataSource-test/INDEX.md      | 3      | 31       | 187   | 2026-07-04   |
+| src/dataSource.ts         | sharded      | src/dataSource-test/INDEX.md      | 4      | 36       | 217   | 2026-07-04   |
 | src/diffDocProvider.ts    | single-file  | src/diffDocProvider-test.md       | 1      | 8        | 42    | 2026-07-04   |
-| src/extension.ts          | single-file  | src/extension-test.md             | 1      | 6        | 23    | 2026-05-10   |
-| src/extensionState.ts     | single-file  | src/extensionState-test.md        | 1      | 13       | 37    | 2026-05-02   |
-| src/gitGraphView.ts       | sharded      | src/gitGraphView-test/INDEX.md    | 5      | 27       | 95    | 2026-07-04   |
+| src/extension.ts          | single-file  | src/extension-test.md             | 1      | 7        | 31    | 2026-07-04   |
+| src/extensionState.ts     | single-file  | src/extensionState-test.md        | 1      | 14       | 42    | 2026-07-04   |
+| src/gitGraphView.ts       | sharded      | src/gitGraphView-test/INDEX.md    | 5      | 28       | 99    | 2026-07-04   |
 | src/i18n.ts               | single-file  | src/i18n-test.md                  | 1      | 1        | 6     | 2026-05-03   |
 | src/repoFileWatcher.ts    | single-file  | src/repoFileWatcher-test.md       | 1      | 12       | 63    | 2026-07-04   |
 | src/repoManager.ts        | single-file  | src/repoManager-test.md           | 1      | 19       | 109   | 2026-07-04   |
 | src/statusBarItem.ts      | single-file  | src/statusBarItem-test.md         | 1      | 3        | 13    | 2026-03-22   |
 | src/types.ts              | single-file  | src/types-test.md                 | 1      | 1        | 7     | 2026-02-25   |
-| src/utils.ts              | single-file  | src/utils-test.md                 | 1      | 5        | 12    | 2026-04-04   |
+| src/utils.ts              | single-file  | src/utils-test.md                 | 1      | 6        | 18    | 2026-07-04   |
 | src/worktree.ts           | single-file  | src/worktree-test.md              | 1      | 1        | 11    | 2026-03-12   |
 | web/branchLabels.ts       | single-file  | web/branchLabels-test.md          | 1      | 1        | 17    | 2026-03-21   |
 | web/commitMenu.ts         | single-file  | web/commitMenu-test.md            | 1      | 10       | 47    | 2026-05-22   |
 | web/contextMenu.ts        | single-file  | web/contextMenu-test.md           | 1      | 3        | 22    | 2026-05-02   |
-| web/dates.ts              | single-file  | web/dates-test.md                 | 1      | 8        | 34    | 2026-05-03   |
-| web/dialogs.ts            | single-file  | web/dialogs-test.md               | 1      | 4        | 21    | 2026-05-22   |
+| web/dates.ts              | single-file  | web/dates-test.md                 | 1      | 9        | 44    | 2026-07-04   |
+| web/dialogs.ts            | single-file  | web/dialogs-test.md               | 1      | 5        | 27    | 2026-07-04   |
 | web/dropdown.ts           | single-file  | web/dropdown-test.md              | 1      | 10       | 38    | 2026-03-07   |
 | web/fileMenu.ts           | single-file  | web/fileMenu-test.md              | 1      | 3        | 14    | 2026-05-02   |
 | web/fileTree.ts           | single-file  | web/fileTree-test.md              | 1      | 4        | 30    | 2026-07-04   |
 | web/findWidget.ts         | single-file  | web/findWidget-test.md            | 1      | 7        | 32    | 2026-02-25   |
 | web/graph.ts              | single-file  | web/graph-test.md                 | 1      | 18       | 64    | 2026-07-04   |
 | web/i18n.ts               | single-file  | web/i18n-test.md                  | 1      | 1        | 5     | 2026-05-03   |
-| web/main.ts               | sharded      | web/main-test/INDEX.md            | 9      | 43       | 247   | 2026-07-04   |
+| web/main.ts               | sharded      | web/main-test/INDEX.md            | 9      | 46       | 263   | 2026-07-04   |
 | web/messageHandler.ts     | single-file  | web/messageHandler-test.md        | 1      | 10       | 31    | 2026-07-04   |
 | web/refMenu.ts            | single-file  | web/refMenu-test.md               | 1      | 13       | 72    | 2026-05-09   |
 | web/stashMenu.ts          | single-file  | web/stashMenu-test.md             | 1      | 8        | 30    | 2026-04-30   |
@@ -122,3 +122,16 @@
 | フェーズ2 修正 L7 (watcher-ref-counted-mute)                          | src/repoFileWatcher-test.md                                                                                                                                                                                    |
 | フェーズ2 修正 L9 (watcher-clear-pending-timer)                       | src/repoFileWatcher-test.md                                                                                                                                                                                    |
 | フェーズ2 修正 L10 (repo-manager-dispose-clear-timers)                | src/repoManager-test.md                                                                                                                                                                                        |
+| フェーズ3 修正 L1 (spawn-stderr-drain)                                | src/dataSource-test/INDEX.md                                                                                                                                                                                   |
+| フェーズ3 修正 L2 (spawn-conditional-trailing-slice)                  | src/dataSource-test/INDEX.md                                                                                                                                                                                   |
+| フェーズ3 修正 L4 (ref-name-option-injection-guard)                   | src/dataSource-test/INDEX.md                                                                                                                                                                                   |
+| フェーズ3 修正 L5 (diff-nul-delimited-parse)                          | src/dataSource-test/INDEX.md                                                                                                                                                                                   |
+| フェーズ3 修正 L6 (config-change-independent-if)                      | src/extension-test.md                                                                                                                                                                                          |
+| フェーズ3 修正 L8 (avatar-storage-init-await)                         | src/extensionState-test.md, src/gitGraphView-test/INDEX.md                                                                                                                                                     |
+| フェーズ3 修正 L11 (github-remote-url-length-guard)                   | src/avatarManager-test.md                                                                                                                                                                                      |
+| フェーズ3 修正 L12 (path-relative-traversal-guard)                    | src/utils-test.md                                                                                                                                                                                              |
+| フェーズ3 修正 L13 (relative-date-round-carry)                        | web/dates-test.md                                                                                                                                                                                              |
+| フェーズ3 修正 L14 (dialog-ref-input-event-validation)                | web/dialogs-test.md                                                                                                                                                                                            |
+| フェーズ3 修正 L15 (avatar-raw-email-compare)                         | web/main-test/INDEX.md                                                                                                                                                                                         |
+| フェーズ3 修正 L16 (ref-dataset-raw-read)                             | web/main-test/INDEX.md                                                                                                                                                                                         |
+| フェーズ3 修正 L17 (restore-loading-resend-commit-details)            | web/main-test/INDEX.md                                                                                                                                                                                         |

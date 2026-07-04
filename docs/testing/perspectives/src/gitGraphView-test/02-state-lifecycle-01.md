@@ -131,3 +131,21 @@
 | TC-086  | `currentPanel` 既存、`rootUri` 指定あり                 | Normal - existing panel persists repo                                      | `extensionState.setLastActiveRepo(getPathFromUri(rootUri))` が1回呼ばれる | 既存パネル reveal 時の永続化 |
 | TC-087  | `currentPanel` 既存、`rootUri === undefined`            | Boundary - no rootUri                                                      | `setLastActiveRepo` は呼ばれず、`panel.reveal()` のみ実行される           | rootUri 無し時は記録しない   |
 | TC-088  | `currentPanel` 既存、`rootUri` 指定あり（呼び出し順序） | Normal - persist before reveal                                             | `setLastActiveRepo` が `panel.reveal()` より前に呼ばれる（呼び出し順序）  | reveal 前永続化の順序保証    |
+
+## S25: getHtmlForWebview() アバターストレージ初期化の完了待ち
+
+> Origin: フェーズ3 修正 L8 (avatar-storage-init-await)
+> Added: 2026-07-04T04:29:24Z
+> Status: active
+> Supersedes: -
+> Signature: `private async getHtmlForWebview(): Promise<string>`
+> Target Path: `src/gitGraphView.ts:604-614`
+
+`getHtmlForWebview` で viewState を構築する前に `await this.extensionState.waitForAvatarStorage()` を追加する修正。`viewState.fetchAvatars = config.fetchAvatars() && this.extensionState.isAvatarStorageAvailable()` の評価がアバターストレージ初期化（非同期の fs.stat/mkdir）の完了後に行われることを保証し、初期化レース中の暫定値 `false` を掴む不具合を防ぐ。
+
+| Case ID | Input / Precondition                                                                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                      | Notes                    |
+| ------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------ |
+| TC-096  | `getHtmlForWebview()` 呼び出し                                                                                  | Normal - awaits before viewState                                           | `extensionState.waitForAvatarStorage()` が viewState 構築（`isAvatarStorageAvailable` 評価）より前に1回 await される | 完了待ちの順序保証       |
+| TC-097  | `config.fetchAvatars()` が `true`、await 完了後に `isAvatarStorageAvailable()` が `true` を返す                 | Normal - fetchAvatars enabled after init                                   | 生成された `viewState.fetchAvatars` が `true` になる                                                                 | 初期化完了後の確定値反映 |
+| TC-098  | `config.fetchAvatars()` が `true`、await 完了後も `isAvatarStorageAvailable()` が `false`（ストレージ利用不可） | Boundary - storage unavailable                                             | `viewState.fetchAvatars` が `false` になる                                                                           | ストレージ不可時         |
+| TC-099  | `config.fetchAvatars()` が `false`、`isAvatarStorageAvailable()` が `true`                                      | Boundary - config disabled                                                 | `viewState.fetchAvatars` が `false`（AND 条件で config 側が優先的に false）                                          | 設定 OFF 時              |
