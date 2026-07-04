@@ -2,7 +2,7 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
-import { getPathFromUri } from "./utils";
+import { getPathFromStr, getPathFromUri } from "./utils";
 
 const watchedRepositoryStateFiles = new Set([
   "HEAD",
@@ -41,7 +41,7 @@ export class RepoFileWatcher {
   public start(watchRoots: string[]) {
     this.stop();
 
-    this.watchRoots = watchRoots.map((watchRoot) => path.normalize(watchRoot));
+    this.watchRoots = watchRoots.map((watchRoot) => getPathFromStr(path.normalize(watchRoot)));
     this.fsWatchers = this.watchRoots.map((watchRoot) => {
       const fsWatcher = vscode.workspace.createFileSystemWatcher(`${watchRoot}/**`);
       fsWatcher.onDidCreate((uri) => this.refresh(uri));
