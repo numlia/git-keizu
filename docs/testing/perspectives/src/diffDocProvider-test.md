@@ -9,8 +9,9 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-21
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S7
 
 **シグネチャ**: `export function encodeDiffDocUri(repo: string, filePath: string, commit: string): vscode.Uri`
 **テスト対象パス**: `src/diffDocProvider.ts:58-62`
@@ -113,3 +114,43 @@
 | Case ID | Input / Precondition              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                | Notes                          |
 | ------- | --------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------- | ------------------------------ |
 | TC-030  | DiffDocProviderインスタンス生成後 | Normal - standard                                                          | onDidChangeプロパティがonDidChangeEventEmitter.eventを返すこと | 単純なgetterアクセサ。分岐なし |
+
+## S7: encodeDiffDocUri version 引数対応と Uri.from 構築
+
+> Origin: フェーズ2 修正 M9/M10 (diff-uri-symmetric-encode)
+> Added: 2026-07-04T02:44:58Z
+> Status: active
+> Supersedes: S1
+> Signature: `export function encodeDiffDocUri(repo: string, filePath: string, commit: string, version?: string): vscode.Uri`
+> Target Path: `src/diffDocProvider.ts:58-71`
+
+`encodeDiffDocUri` を `vscode.Uri.parse(文字列連結)` から `vscode.Uri.from({ scheme, path, query })` 構築へ変更し、任意の `version` クエリフィールドを追加する修正。query 各フィールド（`commit` / `repo` / `version`）は `encodeURIComponent` で個別エンコードして `&` 連結する。`version` は `undefined` のとき付与しない。旧 S1（`commit` のみの `Uri.parse` 版）を置き換える。
+
+| Case ID | Input / Precondition                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                | Notes                             |
+| ------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- |
+| TC-031  | repo="/p/r", filePath="src/f.ts", commit="abc123", version 省略      | Normal - no version field                                                  | 返り値の scheme が `"git-keizu"`、path が `getPathFromStr("src/f.ts")`、query が `commit=abc123&repo=%2Fp%2Fr`（version 無し） | version 省略時は query に含めない |
+| TC-032  | repo="/r", filePath="f.ts", commit="abc", version="1720000000000"    | Normal - version field appended                                            | query が `commit=abc&repo=%2Fr&version=1720000000000` を含む                                                                   | version フィールド付与            |
+| TC-033  | repo="/r", filePath="f.ts", commit="abc def"（スペース含む）         | Normal - component encoded                                                 | query の commit 値が `abc%20def` にエンコードされる                                                                            | encodeURIComponent 適用           |
+| TC-034  | repo="/p?q=1&x=2", filePath="f.ts", commit="abc"                     | Boundary - special chars in repo                                           | query の repo 値で `?`→`%3F`、`&`→`%26`、`=`→`%3D` にエンコードされる                                                          | URI 特殊文字の無害化              |
+| TC-035  | repo="/r", filePath="f.ts", commit="abc", version="a&b=c"            | Boundary - special chars in version                                        | query の version 値が `a%26b%3Dc` にエンコードされる                                                                           | version 側も encodeURIComponent   |
+| TC-036  | repo="/r", filePath="dir\\file.ts"（バックスラッシュ）, commit="abc" | Boundary - backslash path                                                  | 返り値の path が `getPathFromStr` により区切り正規化された値になる                                                             | Uri.from の path 直接指定         |
+| TC-037  | repo="/r", filePath="f.ts", commit=""（空 commit）                   | Boundary - empty commit                                                    | query に `commit=`（空値）が含まれ、例外を投げない                                                                             | 空 commit の境界                  |
+
+## S8: encode/decode ラウンドトリップと version キャッシュキー
+
+> Origin: フェーズ2 修正 M9/M10 (diff-uri-roundtrip-cachekey)
+> Added: 2026-07-04T02:44:58Z
+> Status: active
+> Supersedes: -
+> Signature: `encodeDiffDocUri` ⇄ `decodeDiffDocUri` / `DiffDocProvider.provideTextDocumentContent`
+> Target Path: `src/diffDocProvider.ts:30-78`
+
+`encodeDiffDocUri` の出力を `decodeDiffDocUri` が対称に復元できること（一段の `encodeURIComponent`/`decodeURIComponent` 往復）、および `version` クエリを含めることで未コミット diff の URI が `uri.toString()` ベースのキャッシュキー（`provideTextDocumentContent` の `docs` Map）として一意化され、同一 repo/path/commit でも版数が変われば別キャッシュ・再取得となることを検証する。
+
+| Case ID | Input / Precondition                                                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                          | Notes                                |
+| ------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| TC-038  | `decodeDiffDocUri(encodeDiffDocUri("/p/r", "src/f.ts", "abc"))`                                 | Normal - roundtrip without version                                         | 結果が `{ filePath: getPathFromStr("src/f.ts"), commit: "abc", repo: "/p/r" }` に一致する                                | 対称復元（version 無し）             |
+| TC-039  | `decodeDiffDocUri(encodeDiffDocUri("/r", "f.ts", "abc", "1720000000000"))`                      | Normal - roundtrip with version tolerated                                  | 結果の `commit==="abc"`, `repo==="/r"` が復元される（型付き戻り値は filePath/commit/repo を公開し version は無視される） | 追加フィールドは復元結果に影響しない |
+| TC-040  | 同一 repo/path/commit で `version="A"` と `version="B"` の2 URI を `provideTextDocumentContent` | Boundary - version busts cache                                             | 2つの `uri.toString()` が異なり別キャッシュキーとなる。`getCommitFile` が2回呼ばれ `docs` に2エントリ追加される          | version による cache-bust（M9）      |
+| TC-041  | 同一 repo/path/commit で version 無しの同一 URI を2回 `provideTextDocumentContent`              | Boundary - stable key without version                                      | 2回目は同一キャッシュキーでヒットし、`getCommitFile` は合計1回のみ呼ばれる                                               | version 無し時のキー安定性           |
+| TC-042  | commit=`" &="`（特殊文字）で encode→decode                                                      | Boundary - special char roundtrip                                          | decode 結果の commit が `" &="` に完全復元される（一段の decodeURIComponent）                                            | 二重デコードされないこと             |

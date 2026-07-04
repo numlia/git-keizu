@@ -5,9 +5,9 @@
 > Generated: 2026-05-22T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 8
-> Total Sections: 41
-> Total Cases: 235
+> Total Shards: 9
+> Total Sections: 43
+> Total Cases: 247
 
 ## Shards
 
@@ -17,7 +17,8 @@
 | 02-context-menu-01.md       | context-menu       | 5        | 43    | 2026-03-22   |
 | 03-compare-find-01.md       | compare-find       | 3        | 25    | 2026-03-22   |
 | 04-keyboard-selection-01.md | keyboard-selection | 8        | 46    | 2026-05-17   |
-| 05-state-response-01.md     | state-response     | 13       | 54    | 2026-05-10   |
+| 05-state-response-01.md     | state-response     | 13       | 54    | 2026-07-04   |
+| 05-state-response-02.md     | state-response     | 2        | 12    | 2026-07-04   |
 | 06-file-actions-01.md       | file-actions       | 2        | 12    | 2026-04-04   |
 | 07-load-count-01.md         | load-count         | 1        | 5     | 2026-05-17   |
 | 08-request-queue-01.md      | request-queue      | 1        | 7     | 2026-05-22   |
@@ -47,3 +48,5 @@
 | Feature 040 (settings-and-copy-polish) (light-spec-plan)             | 07-load-count-01.md                                                                       |
 | Feature 041 (refresh-contention-and-dialog-escape) (light-spec-plan) | 08-request-queue-01.md                                                                    |
 | test-plan (既存コード網羅)                                           | 04-keyboard-selection-01.md                                                               |
+| フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                                                   |
+| フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                                                   |

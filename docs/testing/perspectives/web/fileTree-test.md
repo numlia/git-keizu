@@ -69,3 +69,22 @@
 | TC-023  | ファイル要素の `contents[key].name="<img src=x onerror=y>.ts"`（ツリー直下のファイル） | Validation - XSS escape (file basename)                                    | `buildFileItemHtml` に渡る displayName が `&lt;img src=x onerror=y&gt;.ts` となり、生成された `<li class="gitFile ...">` 内に生の `<img` を含まない | 表示名がエスケープ済みで埋め込まれる |
 | TC-024  | ファイル要素の `contents[key].name="main.ts"`（特殊文字なし）                          | Normal - plain file basename                                               | `<li class="gitFile ...">` 内に `main.ts` をそのまま含む。HTML エンティティを含まない                                                               | エスケープ対象外はそのまま           |
 | TC-025  | 親フォルダ配下の子フォルダ `child.name="<b>&"`（ネスト構造）                           | Validation - nested folder escape                                          | 再帰呼び出しで生成される子フォルダの `<span class="gitFolderName">&lt;b&gt;&amp;</span>` を出力 HTML が含む。生の `<b>&` を含まない                 | 再帰経路でも escapeHtml が適用される |
+
+## S4: generateGitFileTree() 同名 file→folder 差し替え
+
+> Origin: フェーズ2 修正 M13 (file-tree-file-to-folder-replacement)
+> Added: 2026-07-04T02:44:58Z
+> Status: active
+> Supersedes: -
+> Signature: `export function generateGitFileTree(gitFiles: GitFileChange[]): GitFolder`
+> Target Path: `web/fileTree.ts:16-40`
+
+ツリー構築時、中間パスセグメントの既存ノード判定を `cur.contents[path[j]] === undefined` から `cur.contents[path[j]] === undefined || cur.contents[path[j]].type === "file"` へ拡張する修正。既に `file` ノードとして存在するセグメントを `folder` ノードへ差し替えて降下を継続する。同一コミット内に `foo`（ファイル）と `foo/bar`（`foo` をディレクトリとするファイル）が混在しても、`file` ノードの存在しない `contents` へアクセスしてクラッシュすることなくツリーを構築できる。
+
+| Case ID | Input / Precondition                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                            | Notes                                |
+| ------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| TC-026  | 中間セグメントが未定義（`cur.contents[path[j]] === undefined`）             | Normal - new folder segment                                                | 当該セグメントに新規 `folder` ノード（空 `contents`）が作成され、`cur` がその folder へ降下する            | 通常のフォルダ生成経路               |
+| TC-027  | 中間セグメントが既存 `folder` ノード                                        | Normal - existing folder reused                                            | 差し替えずに既存 folder を再利用して降下する（`contents` が保持される）                                    | 既存フォルダは維持                   |
+| TC-028  | 中間セグメントが既存 `file` ノード（先に `foo`(file)、次に `foo/bar`）      | Boundary - file to folder replacement                                      | 当該セグメントの `file` ノードが `type==="folder"`・空 `contents` の folder へ差し替えられ、降下が継続する | 修正の肝（同名衝突の解消）           |
+| TC-029  | file→folder 差し替え後、末端の `bar` を追加                                 | Boundary - leaf added under replaced folder                                | 差し替えた folder の `contents["bar"]` に葉 `file` ノードが追加される                                      | 差し替え後の葉登録                   |
+| TC-030  | gitFiles=[`{newFilePath:"foo"}`, `{newFilePath:"foo/bar"}`]（同名衝突入力） | Exception - collision handled without throw                                | `generateGitFileTree` が例外を投げず完了し、結果ツリーで `foo` が `bar` を含む `folder` になる             | 旧実装ではクラッシュしていた回帰防止 |

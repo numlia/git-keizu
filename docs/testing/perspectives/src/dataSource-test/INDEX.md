@@ -6,16 +6,16 @@
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 3
-> Total Sections: 27
-> Total Cases: 164
+> Total Sections: 31
+> Total Cases: 187
 
 ## Shards
 
 | Shard File                  | Responsibility     | Sections | Cases | Last Updated |
 | --------------------------- | ------------------ | -------- | ----- | ------------ |
-| 01-history-diff-01.md       | history-diff       | 9        | 74    | 2026-07-04   |
-| 02-branch-worktree-01.md    | branch-worktree    | 11       | 58    | 2026-07-04   |
-| 03-author-watch-paths-01.md | author-watch-paths | 7        | 32    | 2026-05-02   |
+| 01-history-diff-01.md       | history-diff       | 11       | 83    | 2026-07-04   |
+| 02-branch-worktree-01.md    | branch-worktree    | 12       | 66    | 2026-07-04   |
+| 03-author-watch-paths-01.md | author-watch-paths | 8        | 38    | 2026-07-04   |
 
 ## Origin Coverage
 
@@ -38,3 +38,6 @@
 | test-plan (既存テスト)                                 | 01-history-diff-01.md                                 |
 | フェーズ1 修正 H2 (rename-tracking-repair)             | 02-branch-worktree-01.md                              |
 | フェーズ1 修正 M2 (spawn-buffer-concat)                | 01-history-diff-01.md                                 |
+| フェーズ2 修正 M1 (author-filter-regex-escape)         | 03-author-watch-paths-01.md                           |
+| フェーズ2 修正 M3 (detached-head-detection)            | 01-history-diff-01.md                                 |
+| フェーズ2 修正 M3 (spawn-locale-lc-all-c)              | 01-history-diff-01.md                                 |

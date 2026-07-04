@@ -124,3 +124,23 @@
 | TC-153  | `git-dir=".git"`, `git-common-dir` が非0終了                                 | External - git-common-dir failure                                          | 戻り値が `["/test/repo/.git"]` だけになり、失敗した `git-common-dir` は配列に含まれない                                    | 部分成功フォールバック                    |
 | TC-154  | `git-dir` が error event、`git-common-dir="/main/.git"`                      | External - git-dir failure                                                 | 戻り値が `["/main/.git"]` だけになり、成功した `git-common-dir` の結果だけを返す                                           | error event フォールバック                |
 | TC-155  | `git-dir` も `git-common-dir` も失敗                                         | External - all rev-parse failed                                            | 戻り値が空配列 `[]` になる                                                                                                 | watch root 解決不可時の最終フォールバック |
+
+## S29: getGitLog() `--author` 正規表現メタ文字エスケープ
+
+> Origin: フェーズ2 修正 M1 (author-filter-regex-escape)
+> Added: 2026-07-04T02:44:58Z
+> Status: active
+> Supersedes: -
+> Signature: `function escapeRegExp(str: string): string` / `private getGitLog(repo, branches, num, showRemoteBranches, authors: string[])`
+> Target Path: `src/dataSource.ts:64-66, 979-981`
+
+`git log --author=<pattern>` は値を正規表現として解釈するため、著者名に含まれる正規表現メタ文字（`. * + ? ^ $ { } ( ) | [ ] \`）を `escapeRegExp` で `\` エスケープしてから `--author=` に連結する修正。`dependabot[bot]` のようなブラケットを含む著者を意図した完全一致で絞り込めるようにする。メタ文字を含まない著者名はエスケープ後も不変。
+
+| Case ID | Input / Precondition                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                   | Notes                                |
+| ------- | -------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| TC-173  | authors=["dependabot[bot]"]                  | Normal - bracket escape                                                    | git log 引数に `--author=dependabot\[bot\]` が含まれる（`[` と `]` が `\` エスケープされる）      | ブラケットを含むボット著者の完全一致 |
+| TC-174  | authors=["Jane O'Brien"]（メタ文字なし）     | Normal - passthrough unchanged                                             | git log 引数に `--author=Jane O'Brien` がそのまま含まれる（`'` とスペースはメタ文字集合外で不変） | 既存挙動の後方互換（S13/S18 と整合） |
+| TC-175  | authors=["a.b*c"]                            | Normal - dot and star escape                                               | git log 引数に `--author=a\.b\*c` が含まれる（`.` と `*` が `\` エスケープされる）                | 任意文字・量指定子メタ文字の無害化   |
+| TC-176  | authors=["a\\b"]（バックスラッシュ）         | Boundary - backslash escape                                                | git log 引数に `--author=a\\b` が含まれる（`\` が `\\` へ二重化される）                           | バックスラッシュ自身のエスケープ     |
+| TC-177  | authors=[""]（空文字列著者）                 | Boundary - empty author                                                    | git log 引数に `--author=` が含まれる（`escapeRegExp("")==="" `）。spawn は例外を投げない         | 空文字はメタ文字置換対象なし         |
+| TC-178  | authors=["(a\|b)"]（グループ・選択メタ文字） | Boundary - group and alternation escape                                    | git log 引数に `--author=\(a\|b\)` が含まれる（`(`,`)`,`\|` が `\` エスケープされる）             | 選択・グループメタ文字の無害化       |
