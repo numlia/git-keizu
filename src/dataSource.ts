@@ -22,7 +22,8 @@ import { getPathFromStr } from "./utils";
 import { parseWorktreeList } from "./worktree";
 
 const eolRegex = /\r\n|\r|\n/g;
-const headRegex = /^\(HEAD detached at [0-9A-Za-z]+\)/g;
+const headRegex = /^\(HEAD detached (at|from) .+\)$/;
+const REGEX_META_CHARS = /[.*+?^${}()|[\]\\]/g;
 const gitLogSeparator = "XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb";
 const COMMIT_HASH_PATTERN = /^[0-9a-f]{4,40}$/i;
 const NO_QUOTE_PATH_CONFIG = ["-c", "core.quotePath=false"];
@@ -59,6 +60,10 @@ const COMMIT_DETAILS_FIELD = {
   COMMITTER: 5,
   COMMITTER_EMAIL: 6
 } as const;
+
+function escapeRegExp(str: string): string {
+  return str.replace(REGEX_META_CHARS, "\\$&");
+}
 
 function isValidCommitHash(hash: string): boolean {
   return COMMIT_HASH_PATTERN.test(hash);
@@ -960,7 +965,7 @@ export class DataSource {
       COMMIT_ORDER_FLAGS[commitOrdering]
     ];
     for (const author of authors) {
-      args.push(`--author=${author}`);
+      args.push(`--author=${escapeRegExp(author)}`);
     }
     if (branches.length > 0) {
       args.push(...branches);
@@ -1102,7 +1107,10 @@ export class DataSource {
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];
       let err = false;
-      const cmd = cp.spawn(this.gitPath, args, { cwd: repo });
+      const cmd = cp.spawn(this.gitPath, args, {
+        cwd: repo,
+        env: { ...process.env, LC_ALL: "C" }
+      });
       cmd.stdout.on("data", (d: string | Buffer) => {
         stdoutChunks.push(Buffer.from(d));
       });
@@ -1136,7 +1144,10 @@ export class DataSource {
     return new Promise<T>((resolve) => {
       const stdoutChunks: Buffer[] = [];
       let err = false;
-      const cmd = cp.spawn(this.gitPath, args, { cwd: repo });
+      const cmd = cp.spawn(this.gitPath, args, {
+        cwd: repo,
+        env: { ...process.env, LC_ALL: "C" }
+      });
       cmd.stdout.on("data", (d: string | Buffer) => {
         stdoutChunks.push(Buffer.from(d));
       });
