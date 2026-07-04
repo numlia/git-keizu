@@ -35,7 +35,6 @@ import {
   sendMessage,
   svgIcons,
   UNCOMMITTED_CHANGES_HASH,
-  unescapeHtml,
   vscode,
   worktreeMapsEqual
 } from "./utils";
@@ -498,10 +497,9 @@ class GitKeizuView {
   public loadAvatar(email: string, image: string) {
     this.avatars[email] = image;
     this.saveState();
-    let avatarsElems = <HTMLCollectionOf<HTMLElement>>document.getElementsByClassName("avatar"),
-      escapedEmail = escapeHtml(email);
+    let avatarsElems = <HTMLCollectionOf<HTMLElement>>document.getElementsByClassName("avatar");
     for (let i = 0; i < avatarsElems.length; i++) {
-      if (avatarsElems[i].dataset.email === escapedEmail) {
+      if (avatarsElems[i].dataset.email === email) {
         avatarsElems[i].innerHTML = `<img class="avatarImg" src="${escapeHtml(image)}">`;
       }
     }
@@ -808,6 +806,14 @@ class GitKeizuView {
         } else if (this.expandedCommit.loading) {
           elem.classList.add("commitDetailsOpen");
           this.renderCommitDetailsView();
+          const commit = this.commits[this.commitLookup[this.expandedCommit.hash]];
+          sendMessage({
+            command: "commitDetails",
+            repo: this.currentRepo!,
+            commitHash: this.expandedCommit.hash,
+            hasParents: commit !== undefined && commit.parentHashes.length > 0,
+            isStash: commit !== undefined && commit.stash !== null
+          });
         } else {
           this.loadCommitDetails(elem);
         }
@@ -931,15 +937,13 @@ class GitKeizuView {
       let target = <HTMLElement>e.target;
       let sourceElem = <HTMLElement>target.closest(".gitRef")!;
       let isRemoteCombined = target.classList.contains("gitRefHeadRemote");
-      let refName = isRemoteCombined
-        ? unescapeHtml(target.dataset.name!)
-        : unescapeHtml(sourceElem.dataset.name!);
+      let refName = isRemoteCombined ? target.dataset.name! : sourceElem.dataset.name!;
       const remotes = sourceElem.dataset.remotes
         ? sourceElem.dataset.remotes.split(",")
         : undefined;
       let worktreeInfo: { path: string; isMainWorktree: boolean } | null = null;
       if (sourceElem.classList.contains("head") && !isRemoteCombined) {
-        const wtEntry = this.worktrees[unescapeHtml(sourceElem.dataset.name!)];
+        const wtEntry = this.worktrees[sourceElem.dataset.name!];
         if (wtEntry) {
           worktreeInfo = { path: wtEntry.path, isMainWorktree: wtEntry.isMain };
         }
@@ -968,14 +972,9 @@ class GitKeizuView {
       let sourceElem = <HTMLElement>target.closest(".gitRef")!;
       let isRemoteCombined = target.classList.contains("gitRefHeadRemote");
       if (isRemoteCombined) {
-        checkoutBranchAction(
-          this.currentRepo,
-          sourceElem,
-          unescapeHtml(target.dataset.name!),
-          true
-        );
+        checkoutBranchAction(this.currentRepo, sourceElem, target.dataset.name!, true);
       } else {
-        checkoutBranchAction(this.currentRepo, sourceElem, unescapeHtml(sourceElem.dataset.name!));
+        checkoutBranchAction(this.currentRepo, sourceElem, sourceElem.dataset.name!);
       }
     });
 
