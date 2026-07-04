@@ -569,6 +569,18 @@ export class DataSource {
     return this.spawnGit(["show", `${commitHash}:${filePath}`], repo, (stdout) => stdout, "");
   }
 
+  public resolveRefToHash(repo: string, ref: string): Promise<string | null> {
+    if (!isValidGitRef(ref)) {
+      return Promise.resolve(null);
+    }
+    return this.spawnGit<string | null>(
+      ["rev-parse", ref],
+      repo,
+      (stdout) => stdout.split(eolRegex)[0] || null,
+      null
+    );
+  }
+
   public getNewPathOfRenamedFile(
     repo: string,
     commitHash: string,

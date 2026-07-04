@@ -55,10 +55,21 @@ class DiffDocument {
   }
 }
 
-export function encodeDiffDocUri(repo: string, filePath: string, commit: string): vscode.Uri {
-  return vscode.Uri.parse(
-    `${DiffDocProvider.scheme}:${getPathFromStr(filePath)}?commit=${encodeURIComponent(commit)}&repo=${encodeURIComponent(repo)}`
-  );
+export function encodeDiffDocUri(
+  repo: string,
+  filePath: string,
+  commit: string,
+  version?: string
+): vscode.Uri {
+  const queryFields = [`commit=${encodeURIComponent(commit)}`, `repo=${encodeURIComponent(repo)}`];
+  if (version !== undefined) {
+    queryFields.push(`version=${encodeURIComponent(version)}`);
+  }
+  return vscode.Uri.from({
+    scheme: DiffDocProvider.scheme,
+    path: getPathFromStr(filePath),
+    query: queryFields.join("&")
+  });
 }
 
 export function decodeDiffDocUri(uri: vscode.Uri) {

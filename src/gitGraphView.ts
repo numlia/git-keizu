@@ -748,7 +748,10 @@ export class GitKeizuView {
     const fileName = pathComponents[pathComponents.length - 1];
 
     if (compareWithHash !== undefined) {
-      const actualFromHash = commitHash === UNCOMMITTED_CHANGES_HASH ? "HEAD" : commitHash;
+      const actualFromHash =
+        commitHash === UNCOMMITTED_CHANGES_HASH
+          ? ((await this.dataSource.resolveRefToHash(repo, "HEAD")) ?? "HEAD")
+          : commitHash;
       const isWorkingTreeTarget = compareWithHash === UNCOMMITTED_CHANGES_HASH;
       const abbrevFrom =
         commitHash === UNCOMMITTED_CHANGES_HASH ? hostT("Uncommitted") : abbrevCommit(commitHash);
@@ -759,7 +762,7 @@ export class GitKeizuView {
         const leftUri = encodeDiffDocUri(repo, oldFilePath, actualFromHash);
         const rightUri = isWorkingTreeTarget
           ? type === "D"
-            ? encodeDiffDocUri(repo, oldFilePath, UNCOMMITTED_CHANGES_HASH)
+            ? encodeDiffDocUri(repo, oldFilePath, UNCOMMITTED_CHANGES_HASH, Date.now().toString())
             : vscode.Uri.file(path.join(repo, newFilePath))
           : encodeDiffDocUri(repo, newFilePath, compareWithHash);
 
@@ -777,13 +780,14 @@ export class GitKeizuView {
         type === "A" ? hostT("Added") : type === "D" ? hostT("Deleted") : hostT("Modified");
       const title = hostT("{0} (Uncommitted - {1})", fileName, changeDescription);
       try {
+        const resolvedHead = (await this.dataSource.resolveRefToHash(repo, "HEAD")) ?? "HEAD";
         const leftUri =
           type === "A"
-            ? encodeDiffDocUri(repo, newFilePath, "HEAD")
-            : encodeDiffDocUri(repo, oldFilePath, "HEAD");
+            ? encodeDiffDocUri(repo, newFilePath, resolvedHead)
+            : encodeDiffDocUri(repo, oldFilePath, resolvedHead);
         const rightUri =
           type === "D"
-            ? encodeDiffDocUri(repo, oldFilePath, UNCOMMITTED_CHANGES_HASH)
+            ? encodeDiffDocUri(repo, oldFilePath, UNCOMMITTED_CHANGES_HASH, Date.now().toString())
             : vscode.Uri.file(path.join(repo, newFilePath));
         await vscode.commands.executeCommand("vscode.diff", leftUri, rightUri, title, {
           preview: true
