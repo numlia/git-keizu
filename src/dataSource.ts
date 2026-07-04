@@ -1099,15 +1099,15 @@ export class DataSource {
 
   private runGitCommandSpawn(args: string[], repo: string) {
     return new Promise<GitCommandStatus>((resolve) => {
-      let stdout = "",
-        stderr = "",
-        err = false;
+      const stdoutChunks: Buffer[] = [];
+      const stderrChunks: Buffer[] = [];
+      let err = false;
       const cmd = cp.spawn(this.gitPath, args, { cwd: repo });
-      cmd.stdout.on("data", (d: string | Uint8Array) => {
-        stdout += d;
+      cmd.stdout.on("data", (d: string | Buffer) => {
+        stdoutChunks.push(Buffer.from(d));
       });
-      cmd.stderr.on("data", (d: string | Uint8Array) => {
-        stderr += d;
+      cmd.stderr.on("data", (d: string | Buffer) => {
+        stderrChunks.push(Buffer.from(d));
       });
       cmd.on("error", (e: Error) => {
         resolve(e.message.split(eolRegex).join("\n"));
@@ -1118,6 +1118,8 @@ export class DataSource {
         if (code === 0) {
           resolve(null);
         } else {
+          const stdout = Buffer.concat(stdoutChunks).toString();
+          const stderr = Buffer.concat(stderrChunks).toString();
           let lines = (stdout !== "" ? stdout : stderr !== "" ? stderr : "").split(eolRegex);
           resolve(lines.slice(0, lines.length - 1).join("\n"));
         }
@@ -1132,11 +1134,11 @@ export class DataSource {
     errorValue: T
   ) {
     return new Promise<T>((resolve) => {
-      let stdout = "",
-        err = false;
+      const stdoutChunks: Buffer[] = [];
+      let err = false;
       const cmd = cp.spawn(this.gitPath, args, { cwd: repo });
-      cmd.stdout.on("data", (d: string | Uint8Array) => {
-        stdout += d;
+      cmd.stdout.on("data", (d: string | Buffer) => {
+        stdoutChunks.push(Buffer.from(d));
       });
       cmd.on("error", () => {
         resolve(errorValue);
@@ -1144,7 +1146,7 @@ export class DataSource {
       });
       cmd.on("close", (code: number | null) => {
         if (err) return;
-        resolve(code === 0 ? successValue(stdout) : errorValue);
+        resolve(code === 0 ? successValue(Buffer.concat(stdoutChunks).toString()) : errorValue);
       });
     });
   }
