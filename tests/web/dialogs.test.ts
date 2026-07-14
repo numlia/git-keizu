@@ -536,3 +536,156 @@ describe("showFormDialog ref input validation on input/keyup events", () => {
     expect(actionBtn.title).toBe("");
   });
 });
+
+describe("showFormDialog multi-form checkbox label association", () => {
+  function realEscape(value: string): string {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;");
+  }
+
+  afterEach(() => {
+    vi.mocked(escapeHtml).mockImplementation((s: string) => s);
+  });
+
+  // Case: TC-028
+  it("renders a label whose for attribute matches the checkbox id in multi form (TC-028)", () => {
+    // Given: a multi-element form with one text input and one checkbox
+    const inputs: DialogInput[] = [createTextInput("Branch"), createCheckboxInput("Option")];
+
+    // When: showFormDialog renders the form
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+
+    // Then: exactly one label exists in the checkbox name cell, its for attribute is
+    // "dialogInput1" (the checkbox id), and its textContent equals the checkbox name
+    const labels = dialogEl.querySelectorAll("table.dialogForm td > label");
+    expect(labels).toHaveLength(1);
+    const label = labels[0];
+    expect(label.getAttribute("for")).toBe("dialogInput1");
+    expect(label.textContent).toBe("Option");
+  });
+
+  // Case: TC-029
+  it("toggles the checkbox from unchecked to checked when its label is clicked (TC-029)", () => {
+    // Given: a multi form (text + checkbox) whose checkbox starts unchecked
+    const inputs: DialogInput[] = [createTextInput("Branch"), createCheckboxInput("Option")];
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+    const checkbox = document.getElementById("dialogInput1") as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+
+    // When: the associated label is clicked (jsdom labeled control activation)
+    const label = dialogEl.querySelector('td > label[for="dialogInput1"]') as HTMLLabelElement;
+    label.click();
+
+    // Then: the checkbox checked state changes from false to true
+    expect(checkbox.checked).toBe(true);
+  });
+
+  // Case: TC-030
+  it("returns the checkbox to unchecked after two label clicks (TC-030)", () => {
+    // Given: a multi form (text + checkbox) whose checkbox starts unchecked
+    const inputs: DialogInput[] = [createTextInput("Branch"), createCheckboxInput("Option")];
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+    const checkbox = document.getElementById("dialogInput1") as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+    const label = dialogEl.querySelector('td > label[for="dialogInput1"]') as HTMLLabelElement;
+
+    // When: the label is clicked once
+    label.click();
+
+    // Then: the checkbox is checked
+    expect(checkbox.checked).toBe(true);
+
+    // When: the label is clicked a second time
+    label.click();
+
+    // Then: the checkbox returns to its original unchecked state
+    expect(checkbox.checked).toBe(false);
+  });
+
+  // Case: TC-031
+  it("toggles only the corresponding checkbox in an all-checkbox form (TC-031)", () => {
+    // Given: a multi form of two checkboxes, both initially unchecked
+    const inputs: DialogInput[] = [createCheckboxInput("First"), createCheckboxInput("Second")];
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+    const firstCheckbox = document.getElementById("dialogInput0") as HTMLInputElement;
+    const secondCheckbox = document.getElementById("dialogInput1") as HTMLInputElement;
+    expect(firstCheckbox.checked).toBe(false);
+    expect(secondCheckbox.checked).toBe(false);
+
+    // When: the second checkbox's label is clicked
+    const secondLabel = dialogEl.querySelector(
+      'td > label[for="dialogInput1"]'
+    ) as HTMLLabelElement;
+    secondLabel.click();
+
+    // Then: only the second checkbox toggles to true; the first stays unchecked
+    expect(secondCheckbox.checked).toBe(true);
+    expect(firstCheckbox.checked).toBe(false);
+  });
+
+  // Case: TC-032
+  it("renders the info icon outside the label and does not toggle on info click (TC-032)", () => {
+    // Given: a multi form containing a checkbox with an info tooltip, initially unchecked
+    const inputs: DialogInput[] = [
+      createTextInput("Branch"),
+      { type: "checkbox", name: "Option", value: false, info: "Help text" }
+    ];
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+    const checkbox = document.getElementById("dialogInput1") as HTMLInputElement;
+    expect(checkbox.checked).toBe(false);
+
+    // Then: the info icon is rendered outside the label (not a descendant of it)
+    const label = dialogEl.querySelector('td > label[for="dialogInput1"]') as HTMLLabelElement;
+    const infoSpan = dialogEl.querySelector(".dialogInfo");
+    expect(infoSpan).not.toBeNull();
+    expect(label.contains(infoSpan)).toBe(false);
+
+    // When: the info icon is clicked
+    (infoSpan as HTMLElement).click();
+
+    // Then: the checkbox checked state remains false
+    expect(checkbox.checked).toBe(false);
+  });
+
+  // Case: TC-033
+  it("keeps the legacy structure without a for-attribute label cell in single form (TC-033)", () => {
+    // Given: a single form with only one checkbox
+    const inputs: DialogInput[] = [createCheckboxInput("Option")];
+
+    // When: showFormDialog renders the form
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+
+    // Then: the checkbox name is contained in the label inside .dialogFormCheckbox
+    const checkboxLabel = dialogEl.querySelector(".dialogFormCheckbox > label");
+    expect(checkboxLabel).not.toBeNull();
+    expect(checkboxLabel!.textContent).toBe("Option");
+
+    // And: no name cell label with a for attribute (td > label[for]) is generated
+    expect(dialogEl.querySelector("td > label[for]")).toBeNull();
+  });
+
+  // Case: TC-034
+  it("escapes the checkbox name so no HTML element expands inside the label (TC-034)", () => {
+    // Given: a multi form whose checkbox name is an HTML payload, with real escaping behavior
+    const hostile = "<b>boom</b>";
+    vi.mocked(escapeHtml).mockClear();
+    vi.mocked(escapeHtml).mockImplementation(realEscape);
+    const inputs: DialogInput[] = [createTextInput("Other"), createCheckboxInput(hostile)];
+
+    // When: showFormDialog renders the form
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
+
+    // Then: escapeHtml was called with the checkbox name
+    expect(escapeHtml).toHaveBeenCalledWith(hostile);
+
+    // And: no <b> element is created inside the label; the name renders as literal text
+    const label = dialogEl.querySelector('td > label[for="dialogInput1"]');
+    expect(label).not.toBeNull();
+    expect(label!.querySelector("b")).toBeNull();
+    expect(label!.textContent).toBe(hostile);
+  });
+});
