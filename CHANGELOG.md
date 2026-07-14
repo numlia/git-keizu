@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-07-14
+
+### Fixed
+
+- **Checkbox labels now clickable in multi-input dialogs**: In dialogs that combine a checkbox with other inputs (Merge, Delete Branch, Rename Branch, Create/Remove Worktree, Stash, and other `commitMenu` actions), clicking the checkbox's label text now toggles the checkbox — previously only the small 15x15px checkbox icon itself was clickable, since the label text was rendered as plain text instead of an associated `<label>` element.
+
 ## [0.8.0] - 2026-07-04
 
 This release is a codebase-wide correctness and robustness pass: 32 defects found in a full audit of the extension host and webview were fixed (2 high, 13 medium, 17 low), covering security, Windows regressions, multibyte handling, avatar reliability, and graph rendering.
@@ -447,7 +453,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.8.1...HEAD
+[0.8.1]: https://github.com/numlia/git-keizu/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/numlia/git-keizu/compare/v0.7.9...v0.8.0
 [0.7.9]: https://github.com/numlia/git-keizu/compare/v0.7.8...v0.7.9
 [0.7.8]: https://github.com/numlia/git-keizu/compare/v0.7.7...v0.7.8
