@@ -116,7 +116,7 @@ export function showFormDialog(
       html += `<input id="dialogInput${i}" type="text" value="${escapeHtml(input.default)}"${placeholder}/>`;
       if (input.type === "text-ref") textRefInput = i;
     }
-    html += `</td>${multiElementForm && isCheckbox ? `<td>${escapeHtml(input.name)}${infoHtml}</td>` : ""}</tr>`;
+    html += `</td>${multiElementForm && isCheckbox ? `<td><label for="dialogInput${i}">${escapeHtml(input.name)}</label>${infoHtml}</td>` : ""}</tr>`;
   }
   html += "</table>";
   showDialog(

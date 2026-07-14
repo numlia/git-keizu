@@ -688,6 +688,10 @@ ul.contextMenuSubmenu li.contextMenuDivider {
   user-select: none;
   cursor: pointer;
 }
+#dialog > table.dialogForm td > label {
+  user-select: none;
+  cursor: pointer;
+}
 #dialog > table.dialogForm input[type="text"] {
   width: 100%;
 }
