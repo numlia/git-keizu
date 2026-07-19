@@ -263,6 +263,7 @@ export class RepoManager {
     }
   }
   private startWatchingFolder(path: string) {
+    if (this.folderWatchers[path] !== undefined) return;
     let watcher = vscode.workspace.createFileSystemWatcher(`${path}/**`);
     watcher.onDidCreate((uri) => this.onWatcherCreate(uri));
     watcher.onDidChange((uri) => this.onWatcherChange(uri));
@@ -270,7 +271,9 @@ export class RepoManager {
     this.folderWatchers[path] = watcher;
   }
   private stopWatchingFolder(path: string) {
-    this.folderWatchers[path].dispose();
+    const watcher = this.folderWatchers[path];
+    if (watcher === undefined) return;
+    watcher.dispose();
     delete this.folderWatchers[path];
   }
   private async onWatcherCreate(uri: vscode.Uri) {
