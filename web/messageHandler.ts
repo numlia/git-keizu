@@ -132,6 +132,11 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       break;
     case "openTerminal":
       break;
+    case "openWorktreeInNewWindow":
+      if (msg.status !== null) {
+        showErrorDialog(t("error.openWorktreeInNewWindow"), msg.status, null);
+      }
+      break;
     case "mergeCommit":
       refreshOrError(gitKeizu, msg.status, t("error.mergeCommit"));
       break;
@@ -175,6 +180,11 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       break;
     case "resetUncommitted":
       refreshOrError(gitKeizu, msg.status, t("error.resetUncommitted"));
+      break;
+    case "revealWorktreeInOS":
+      if (msg.status !== null) {
+        showErrorDialog(t("error.revealWorktreeInOS"), msg.status, null);
+      }
       break;
     case "revertCommit":
       refreshOrError(gitKeizu, msg.status, t("error.revertCommit"));

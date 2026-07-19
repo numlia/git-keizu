@@ -499,7 +499,7 @@ export class GitKeizuView {
                   vscode.Uri.file(path.resolve(msg.repo, msg.path)),
                   { forceNewWindow: true }
                 );
-                this.sendMessage({ command: "openWorktreeInNewWindow" });
+                this.sendMessage({ command: "openWorktreeInNewWindow", status: null });
               } catch (error) {
                 this.sendMessage({
                   command: "openWorktreeInNewWindow",
@@ -513,7 +513,7 @@ export class GitKeizuView {
                   "revealFileInOS",
                   vscode.Uri.file(path.resolve(msg.repo, msg.path))
                 );
-                this.sendMessage({ command: "revealWorktreeInOS" });
+                this.sendMessage({ command: "revealWorktreeInOS", status: null });
               } catch (error) {
                 this.sendMessage({
                   command: "revealWorktreeInOS",
