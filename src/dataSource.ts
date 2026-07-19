@@ -2,6 +2,7 @@ import * as cp from "node:child_process";
 import * as path from "node:path";
 
 import { getConfig } from "./config";
+import { DEFAULT_GIT_PATH, resolveGitExecutable } from "./gitExecutable";
 import {
   CommitOrdering,
   GitCommandStatus,
@@ -89,29 +90,19 @@ function isRefNameSafe(refName: string): boolean {
 }
 
 const VALID_RESET_MODES = new Set(["soft", "mixed", "hard"]);
-const VALID_GIT_BINARY_NAME = /^git(\.exe)?$/i;
-const DEFAULT_GIT_PATH = "git";
-
-function isValidGitPath(gitPath: string): boolean {
-  if (gitPath === DEFAULT_GIT_PATH) return true;
-  if (!path.isAbsolute(gitPath)) return false;
-  return VALID_GIT_BINARY_NAME.test(path.basename(gitPath));
-}
 
 export class DataSource {
-  private gitPath!: string;
+  private gitPath: string = DEFAULT_GIT_PATH;
   private gitLogFormat!: string;
   private gitStashFormat!: string;
   private gitCommitDetailsFormat!: string;
 
   constructor() {
-    this.registerGitPath();
     this.generateGitCommandFormats();
   }
 
-  public registerGitPath() {
-    const configPath = getConfig().gitPath();
-    this.gitPath = isValidGitPath(configPath) ? configPath : DEFAULT_GIT_PATH;
+  public async registerGitPath(): Promise<void> {
+    this.gitPath = await resolveGitExecutable(getConfig().gitPath());
   }
 
   public generateGitCommandFormats() {

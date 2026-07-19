@@ -219,9 +219,15 @@ class Config {
     return VIEW_COLUMN_MAPPING[value as OpenNewTabEditorGroupValue] ?? vscode.ViewColumn.Active;
   }
 
-  public gitPath(): string {
-    let path = vscode.workspace.getConfiguration("git").get("path", null);
-    return path !== null ? path : "git";
+  public gitPath(): string[] {
+    const value = vscode.workspace.getConfiguration("git").get<unknown>("path", null);
+    if (typeof value === "string") {
+      return [value];
+    }
+    if (Array.isArray(value)) {
+      return value.filter((candidate): candidate is string => typeof candidate === "string");
+    }
+    return [];
   }
 }
 
