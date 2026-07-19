@@ -103,3 +103,68 @@ describe("web i18n helper", () => {
     expect(getWebviewLocale()).toBe("en");
   });
 });
+
+// S1 (en) / S2 (ja): worktree 操作エラーの翻訳キー (Feature 045)
+// @see docs/testing/perspectives/l10n/web/web.l10n.en.json-test.md
+// @see docs/testing/perspectives/l10n/web/web.l10n.ja.json-test.md
+describe("worktree open/reveal error l10n keys (Feature 045)", () => {
+  const OPEN_WORKTREE_KEY = "error.openWorktreeInNewWindow";
+  const REVEAL_WORKTREE_KEY = "error.revealWorktreeInOS";
+
+  function loadBundle(fileName: string): Record<string, string> {
+    const jsonPath = resolve(process.cwd(), `l10n/web/${fileName}`);
+    return JSON.parse(readFileSync(jsonPath, "utf-8"));
+  }
+
+  it("English l10n JSON contains a non-empty open-worktree error key (en l10n TC-001)", () => {
+    // Case: TC-001 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const messages = loadBundle("web.l10n.en.json");
+
+    // When: looking up the open-worktree error key
+    const value = messages[OPEN_WORKTREE_KEY];
+
+    // Then: the key exists with a non-empty English string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("English l10n JSON contains a non-empty reveal-worktree error key (en l10n TC-002)", () => {
+    // Case: TC-002 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const messages = loadBundle("web.l10n.en.json");
+
+    // When: looking up the reveal-worktree error key
+    const value = messages[REVEAL_WORKTREE_KEY];
+
+    // Then: the key exists with a non-empty English string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("Japanese l10n JSON contains a non-empty open-worktree error key (ja l10n TC-003)", () => {
+    // Case: TC-003 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const messages = loadBundle("web.l10n.ja.json");
+
+    // When: looking up the open-worktree error key
+    const value = messages[OPEN_WORKTREE_KEY];
+
+    // Then: the key exists with a non-empty Japanese string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("Japanese l10n JSON contains a non-empty reveal-worktree error key (ja l10n TC-004)", () => {
+    // Case: TC-004 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const messages = loadBundle("web.l10n.ja.json");
+
+    // When: looking up the reveal-worktree error key
+    const value = messages[REVEAL_WORKTREE_KEY];
+
+    // Then: the key exists with a non-empty Japanese string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+});

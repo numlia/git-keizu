@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   createManager,
+  createRepoState,
   createWorkspaceFolder,
   getCreatedWatchers,
   type RepoManagerWithPrivate,
@@ -269,19 +270,90 @@ describe("RepoManager workspace change handling and watcher management", () => {
       expect(watcher.dispose).toHaveBeenCalledTimes(1);
       expect(Object.keys(internal.folderWatchers)).toEqual([]);
     });
+  });
 
-    it("TC-094: stopWatchingFolder throws a TypeError when the watcher entry does not exist", () => {
-      // Case: TC-094
-      const missingFolder = "/workspace/missing";
+  // S20: startWatchingFolder / stopWatchingFolder の冪等化
+  // @see docs/testing/perspectives/src/repoManager-test.md
+  describe("idempotent watcher start/stop", () => {
+    it("TC-110: startWatchingFolder called twice for the same path creates only one watcher", () => {
+      // Case: TC-110
+      const folder = "/workspace/repo";
       const { manager } = createManager();
       const internal = manager as RepoManagerWithPrivate;
-      const stopMissingWatcher = () => internal.stopWatchingFolder(missingFolder);
+
+      // Given: A watcher already exists for the normalized path
+      internal.startWatchingFolder(folder);
+      const firstWatcher = internal.folderWatchers[folder];
+
+      // When: startWatchingFolder is executed again with the same path
+      internal.startWatchingFolder(folder);
+
+      // Then: createFileSystemWatcher ran only once, the original watcher survives, and it was never disposed
+      expect(getCreatedWatchers()).toHaveLength(1);
+      expect(internal.folderWatchers[folder]).toBe(firstWatcher);
+      expect(firstWatcher.dispose).not.toHaveBeenCalled();
+    });
+
+    it("TC-111: stopWatchingFolder returns safely when the watcher entry does not exist", () => {
+      // Case: TC-111
+      const missingFolder = "/workspace/missing";
+      const registeredFolder = "/workspace/registered";
+      const { manager } = createManager();
+      const internal = manager as RepoManagerWithPrivate;
+      internal.startWatchingFolder(registeredFolder);
+      const registeredWatcher = internal.folderWatchers[registeredFolder];
 
       // Given: There is no watcher entry for the requested folder
-      // When: stopWatchingFolder is executed
-      // Then: The runtime throws a TypeError mentioning dispose on undefined
-      expect(stopMissingWatcher).toThrow(TypeError);
-      expect(stopMissingWatcher).toThrow("dispose");
+      // When: stopWatchingFolder is executed for the unregistered path
+      const stopMissingWatcher = () => internal.stopWatchingFolder(missingFolder);
+
+      // Then: No TypeError is thrown and no watcher is disposed
+      expect(stopMissingWatcher).not.toThrow();
+      expect(registeredWatcher.dispose).not.toHaveBeenCalled();
+    });
+
+    it("TC-112: stopWatchingFolder disposes once, removes the entry, and repeats as a no-op", () => {
+      // Case: TC-112
+      const folder = "/workspace/repo";
+      const { manager } = createManager();
+      const internal = manager as RepoManagerWithPrivate;
+      internal.startWatchingFolder(folder);
+      const watcher = internal.folderWatchers[folder];
+
+      // Given: The watcher map contains a watcher for the requested folder
+      // When: stopWatchingFolder is executed and then executed again for the same path
+      internal.stopWatchingFolder(folder);
+      const secondStop = () => internal.stopWatchingFolder(folder);
+
+      // Then: The first call disposed the watcher once and removed the entry; the second call adds no dispose
+      expect(watcher.dispose).toHaveBeenCalledTimes(1);
+      expect(Object.keys(internal.folderWatchers)).toEqual([]);
+      expect(secondStop).not.toThrow();
+      expect(watcher.dispose).toHaveBeenCalledTimes(1);
+    });
+
+    it("TC-113: a folder removed during startup still removes repos and sends repos once", async () => {
+      // Case: TC-113
+      const removedFolder = "/workspace/removed";
+      const repoInsideRemovedFolder = `${removedFolder}/repo`;
+      const { manager } = createManager({
+        repos: { [repoInsideRemovedFolder]: createRepoState() }
+      });
+      const internal = manager as RepoManagerWithPrivate;
+      const sendSpy = vi.spyOn(internal, "sendRepos").mockImplementation(() => undefined);
+
+      // Given: startupTasks has not populated folderWatchers yet (startup race window)
+      expect(Object.keys(internal.folderWatchers)).toEqual([]);
+
+      // When: A workspace folder removed event fires for the folder containing the repo
+      await triggerWorkspaceChange({
+        added: [],
+        removed: [createWorkspaceFolder(removedFolder)]
+      });
+
+      // Then: No TypeError interrupts the handler; the repo is removed and sendRepos runs once
+      expect(internal.repos[repoInsideRemovedFolder]).toBeUndefined();
+      expect(sendSpy).toHaveBeenCalledTimes(1);
     });
   });
 });

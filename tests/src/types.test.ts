@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { UNCOMMITTED_CHANGES_HASH, VALID_UNCOMMITTED_RESET_MODES } from "../../src/types";
+import {
+  ResponseOpenWorktreeInNewWindow,
+  ResponseRevealWorktreeInOS,
+  UNCOMMITTED_CHANGES_HASH,
+  VALID_UNCOMMITTED_RESET_MODES
+} from "../../src/types";
 
 describe("UNCOMMITTED_CHANGES_HASH", () => {
   it("equals '*' for backward compatibility (TC-001)", () => {
@@ -52,5 +57,55 @@ describe("VALID_UNCOMMITTED_RESET_MODES", () => {
     // When: has() is called with "MIXED"
     // Then: returns false (case-sensitive matching)
     expect(VALID_UNCOMMITTED_RESET_MODES.has("MIXED")).toBe(false);
+  });
+});
+
+// S2: worktree Open/Reveal 応答の status 必須化
+// @see docs/testing/perspectives/src/types-test.md
+describe("worktree open/reveal response status requirement", () => {
+  it("requires status on ResponseOpenWorktreeInNewWindow and accepts null and string (TC-008)", () => {
+    // Case: TC-008
+    // Given: object literals for the openWorktreeInNewWindow response type
+    // @ts-expect-error status is mandatory: omitting it must be a type error
+    const missingStatus: ResponseOpenWorktreeInNewWindow = {
+      command: "openWorktreeInNewWindow"
+    };
+    const successResponse: ResponseOpenWorktreeInNewWindow = {
+      command: "openWorktreeInNewWindow",
+      status: null
+    };
+    const failureResponse: ResponseOpenWorktreeInNewWindow = {
+      command: "openWorktreeInNewWindow",
+      status: "msg"
+    };
+
+    // When: the assignable literals are inspected at runtime
+    // Then: status null and status "msg" are both valid values of the required field
+    expect(missingStatus.command).toBe("openWorktreeInNewWindow");
+    expect(successResponse.status).toBeNull();
+    expect(failureResponse.status).toBe("msg");
+  });
+
+  it("requires status on ResponseRevealWorktreeInOS and accepts null and string (TC-009)", () => {
+    // Case: TC-009
+    // Given: object literals for the revealWorktreeInOS response type
+    // @ts-expect-error status is mandatory: omitting it must be a type error
+    const missingStatus: ResponseRevealWorktreeInOS = {
+      command: "revealWorktreeInOS"
+    };
+    const successResponse: ResponseRevealWorktreeInOS = {
+      command: "revealWorktreeInOS",
+      status: null
+    };
+    const failureResponse: ResponseRevealWorktreeInOS = {
+      command: "revealWorktreeInOS",
+      status: "msg"
+    };
+
+    // When: the assignable literals are inspected at runtime
+    // Then: status null and status "msg" are both valid values of the required field
+    expect(missingStatus.command).toBe("revealWorktreeInOS");
+    expect(successResponse.status).toBeNull();
+    expect(failureResponse.status).toBe("msg");
   });
 });

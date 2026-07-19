@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../web/dialogs", () => ({
   showRefInputDialog: vi.fn(),
@@ -40,7 +40,7 @@ import {
   showRefInputDialog
 } from "../../web/dialogs";
 import { buildRefContextMenuItems, checkoutBranchAction, parseRemoteRef } from "../../web/refMenu";
-import { getRepoName, sanitizeBranchNameForPath, sendMessage } from "../../web/utils";
+import { escapeHtml, getRepoName, sanitizeBranchNameForPath, sendMessage } from "../../web/utils";
 
 function createMockElement(classes: string[]): HTMLElement {
   const classList = {
@@ -1823,4 +1823,103 @@ describe("buildRefContextMenuItems tag menu recent actions exclusion (S15)", () 
   // TC-078 (Type - union extension): "ref.deleteBranch" / "ref.deleteRemoteBranch" を
   // GG.RecentActionId として渡せることは、本ファイル内の recordRecentAction 呼び出し箇所
   // (TC-072 / TC-073 / TC-074) が `pnpm run typecheck` を通過することで担保される。
+});
+
+// --- S16: Remove Worktree チェックボックス名の raw 引き渡し（単一エスケープ境界） ---
+// @see docs/testing/perspectives/web/refMenu-test.md
+describe("removeWorktree checkbox raw name (S16)", () => {
+  const AMPERSAND_BRANCH = "feature/a&b";
+  const AMPERSAND_WORKTREE_PATH = "/home/user/project-a-b";
+  const EXPECTED_CHECKBOX_NAME = "Also delete branch 'feature/a&b' (git branch -d)";
+
+  const productionHtmlEscapes: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#x27;",
+    "/": "&#x2F;"
+  };
+
+  function escapeHtmlLikeProduction(str: string): string {
+    return str.replace(/[&<>"'/]/g, (match) => productionHtmlEscapes[match]);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
+    vi.mocked(escapeHtml).mockImplementation(escapeHtmlLikeProduction);
+  });
+
+  afterEach(() => {
+    vi.mocked(escapeHtml).mockImplementation((str: string) => str);
+  });
+
+  function openRemoveWorktreeDialog(): void {
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(
+      REPO,
+      AMPERSAND_BRANCH,
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      { path: AMPERSAND_WORKTREE_PATH, isMainWorktree: false }
+    );
+    const removeItem = findMenuItem(menu, "Remove Worktree&#8230;");
+    expect(removeItem).toBeDefined();
+    removeItem!.onClick();
+  }
+
+  it("passes the raw branch name to the showFormDialog checkbox (TC-079)", () => {
+    // Case: TC-079
+    // Given: a worktree branch whose name contains & and / with production-like escaping active
+    // When: the Remove Worktree menu action is clicked
+    openRemoveWorktreeDialog();
+
+    // Then: the checkbox name argument carries the raw name without &amp; / &#x2F; entities
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs).toHaveLength(1);
+    const checkboxName = (inputs[0] as DialogCheckboxInput).name;
+    expect(checkboxName).toBe(EXPECTED_CHECKBOX_NAME);
+    expect(checkboxName).not.toContain("&amp;");
+    expect(checkboxName).not.toContain("&#x2F;");
+  });
+
+  it("renders the checkbox label through the single dialogs escape boundary (TC-080)", async () => {
+    // Case: TC-080
+    // Given: the captured showFormDialog arguments from the Remove Worktree click
+    openRemoveWorktreeDialog();
+    const dialogCall = vi.mocked(showFormDialog).mock.calls[0];
+    if (document.getElementById("dialog") === null) {
+      const dialogElem = document.createElement("div");
+      dialogElem.id = "dialog";
+      document.body.appendChild(dialogElem);
+      const dialogBackingElem = document.createElement("div");
+      dialogBackingElem.id = "dialogBacking";
+      document.body.appendChild(dialogBackingElem);
+    }
+    const actualDialogs =
+      await vi.importActual<typeof import("../../web/dialogs")>("../../web/dialogs");
+
+    // When: the real showFormDialog renders those arguments into the DOM
+    actualDialogs.showFormDialog(dialogCall[0], dialogCall[1], dialogCall[2], vi.fn(), null);
+
+    // Then: the checkbox label shows feature/a&b as-is with no literal double-escape artifacts
+    const label = document.querySelector("#dialog label");
+    expect(label).not.toBeNull();
+    expect(label!.textContent).toContain(AMPERSAND_BRANCH);
+    expect(label!.textContent).not.toContain("&amp;");
+    expect(label!.textContent).not.toContain("&#x2F;");
+    actualDialogs.hideDialog();
+  });
 });

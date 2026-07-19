@@ -61,6 +61,7 @@ const mocks = vi.hoisted(() => {
   };
   const avatarManagerInstance = {
     clearCache: vi.fn(),
+    dispose: vi.fn(),
     label: "avatar-manager"
   };
   const statusBarItemInstance = {
@@ -74,6 +75,7 @@ const mocks = vi.hoisted(() => {
   };
   const diffDocProviderInstance = { current: null as object | null };
   const diffDocProviderConstruct = vi.fn();
+  const diffDocProviderDispose = vi.fn();
   const createOutputChannel = vi.fn(() => outputChannel);
   const registerCommand = vi.fn(
     (
@@ -145,6 +147,8 @@ const mocks = vi.hoisted(() => {
   class DiffDocProviderMock {
     static scheme = diffDocProviderScheme;
 
+    dispose = diffDocProviderDispose;
+
     constructor(dataSource: unknown) {
       diffDocProviderConstruct(dataSource);
       diffDocProviderInstance.current = this;
@@ -169,6 +173,7 @@ const mocks = vi.hoisted(() => {
     createOutputChannel,
     dataSourceInstance,
     diffDocProviderConstruct,
+    diffDocProviderDispose,
     diffDocProviderInstance,
     diffDocProviderScheme,
     extensionStateInstance,
@@ -248,7 +253,8 @@ const LOG_FAILED_MESSAGE = "log failed";
 const SHOW_FAILED_MESSAGE = "show failed";
 const CLEAR_FAILED_MESSAGE = "clear failed";
 const REFRESH_FAILED_MESSAGE = "refresh failed";
-const DEFAULT_SUBSCRIPTION_PUSH_RESULT = 6;
+const DEFAULT_SUBSCRIPTION_PUSH_RESULT = 8;
+const MICROTASK_FLUSH_ROUNDS = 5;
 const ZERO_CALLS = 0;
 const ONE_CALL = 1;
 const TWO_COMMANDS = 2;
@@ -289,6 +295,30 @@ function expectThrownError(action: () => void, expectedMessage: string): void {
   expect(caughtError).toBeInstanceOf(Error);
   if (caughtError instanceof Error) {
     expect(caughtError.message).toBe(expectedMessage);
+  }
+}
+
+async function expectRejectedError(
+  promise: Promise<unknown>,
+  expectedMessage: string
+): Promise<void> {
+  let caughtError: unknown;
+
+  try {
+    await promise;
+  } catch (error) {
+    caughtError = error;
+  }
+
+  expect(caughtError).toBeInstanceOf(Error);
+  if (caughtError instanceof Error) {
+    expect(caughtError.message).toBe(expectedMessage);
+  }
+}
+
+async function flushMicrotasks(): Promise<void> {
+  for (let round = 0; round < MICROTASK_FLUSH_ROUNDS; round += 1) {
+    await Promise.resolve();
   }
 }
 
@@ -340,9 +370,17 @@ function getDiffDocProviderInstance(): object {
   return instance;
 }
 
-function activateExtension(context = createMockContext()): MockExtensionContext {
-  activate(toExtensionContext(context));
+async function activateExtension(context = createMockContext()): Promise<MockExtensionContext> {
+  await activate(toExtensionContext(context));
   return context;
+}
+
+function getPushedSubscriptions(context: MockExtensionContext): unknown[] {
+  const pushCall = context.subscriptions.push.mock.calls[0] as unknown[] | undefined;
+  if (pushCall === undefined) {
+    throw new Error("subscriptions.push was not called");
+  }
+  return pushCall;
 }
 
 function invokeViewCommand(arg?: unknown): void {
@@ -366,12 +404,15 @@ function resetMockState(): void {
   mocks.outputChannel.dispose.mockReset();
   mocks.dataSourceInstance.generateGitCommandFormats.mockReset();
   mocks.dataSourceInstance.registerGitPath.mockReset();
+  mocks.dataSourceInstance.registerGitPath.mockResolvedValue(undefined);
   mocks.avatarManagerInstance.clearCache.mockReset();
+  mocks.avatarManagerInstance.dispose.mockReset();
   mocks.statusBarItemInstance.refresh.mockReset();
   mocks.repoManagerInstance.dispose.mockReset();
   mocks.repoManagerInstance.maxDepthOfRepoSearchChanged.mockReset();
   mocks.diffDocProviderInstance.current = null;
   mocks.diffDocProviderConstruct.mockReset();
+  mocks.diffDocProviderDispose.mockReset();
   mocks.createOrShow.mockReset();
   mocks.notifyShowRecentActionsChanged.mockReset();
   mocks.gitKeizuViewModule.GitKeizuView.currentPanel = undefined;
@@ -449,13 +490,13 @@ describe("extension", () => {
 
   describe("activate", () => {
     describe("initialization and registrations", () => {
-      it("TC-001: initializes dependencies, registers disposables, and logs activation success", () => {
+      it("TC-001: initializes dependencies, registers disposables, and logs activation success", async () => {
         // Case: TC-001
         // Given: all VS Code APIs and imported collaborators are available and subscriptions.push can record disposables
         const context = createMockContext();
 
-        // When: activate is called with the extension context
-        const result = activateExtension(context);
+        // When: activate is awaited with the extension context
+        const result = await activateExtension(context);
 
         // Then: all collaborators are constructed, registered, and the activation log is written
         expect(result).toBe(context);
@@ -465,6 +506,7 @@ describe("extension", () => {
         expect(mocks.ExtensionStateMock).toHaveBeenCalledWith(context);
         expect(mocks.DataSourceMock).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.DataSourceMock).toHaveBeenCalledWith();
+        expect(mocks.dataSourceInstance.registerGitPath).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.AvatarManagerMock).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.AvatarManagerMock).toHaveBeenCalledWith(
           mocks.dataSourceInstance,
@@ -503,15 +545,17 @@ describe("extension", () => {
           mocks.outputChannel,
           getCommandDisposable(VIEW_COMMAND),
           getCommandDisposable(CLEAR_AVATAR_CACHE_COMMAND),
+          getDiffDocProviderInstance(),
           getTextDocumentDisposable(),
           getConfigurationDisposable(),
+          mocks.avatarManagerInstance,
           mocks.repoManagerInstance
         );
         expect(mocks.outputChannel.appendLine).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.outputChannel.appendLine).toHaveBeenCalledWith(ACTIVATION_SUCCESS_MESSAGE);
       });
 
-      it("TC-002: rethrows output channel creation failures before dependency setup starts", () => {
+      it("TC-002: rejects with output channel creation failures before dependency setup starts", async () => {
         // Case: TC-002
         // Given: createOutputChannel throws an error
         const context = createMockContext();
@@ -519,11 +563,10 @@ describe("extension", () => {
           throw new Error(OUTPUT_FAILED_MESSAGE);
         });
 
-        // When: activate is called
-        const activateAction = () => activate(toExtensionContext(context));
+        // When: activate is called and its promise settles
+        await expectRejectedError(activate(toExtensionContext(context)), OUTPUT_FAILED_MESSAGE);
 
         // Then: the same Error and message are propagated and no further setup occurs
-        expectThrownError(activateAction, OUTPUT_FAILED_MESSAGE);
         expect(mocks.ExtensionStateMock).not.toHaveBeenCalled();
         expect(mocks.DataSourceMock).not.toHaveBeenCalled();
         expect(mocks.AvatarManagerMock).not.toHaveBeenCalled();
@@ -532,7 +575,7 @@ describe("extension", () => {
         expect(context.subscriptions.push).not.toHaveBeenCalled();
       });
 
-      it("TC-003: rethrows RepoManager constructor failures before disposables are registered", () => {
+      it("TC-003: rejects with RepoManager constructor failures before disposables are registered", async () => {
         // Case: TC-003
         // Given: RepoManager construction throws after earlier dependencies are created
         const context = createMockContext();
@@ -540,18 +583,17 @@ describe("extension", () => {
           throw new Error(REPO_INIT_FAILED_MESSAGE);
         });
 
-        // When: activate is called
-        const activateAction = () => activate(toExtensionContext(context));
+        // When: activate is called and its promise settles
+        await expectRejectedError(activate(toExtensionContext(context)), REPO_INIT_FAILED_MESSAGE);
 
         // Then: the same Error and message are propagated, earlier constructors ran, and registration never happens
-        expectThrownError(activateAction, REPO_INIT_FAILED_MESSAGE);
         expect(mocks.AvatarManagerMock).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.StatusBarItemMock).toHaveBeenCalledTimes(ONE_CALL);
         expect(context.subscriptions.push).not.toHaveBeenCalled();
         expect(mocks.outputChannel.appendLine).not.toHaveBeenCalled();
       });
 
-      it("TC-004: rethrows subscription push failures after all disposables are prepared", () => {
+      it("TC-004: rejects with subscription push failures after all disposables are prepared", async () => {
         // Case: TC-004
         // Given: all initialization succeeds but subscriptions.push throws an error
         const pushMock = vi.fn(() => {
@@ -559,11 +601,10 @@ describe("extension", () => {
         });
         const context = createMockContext(pushMock);
 
-        // When: activate is called
-        const activateAction = () => activate(toExtensionContext(context));
+        // When: activate is called and its promise settles
+        await expectRejectedError(activate(toExtensionContext(context)), PUSH_FAILED_MESSAGE);
 
         // Then: the same Error and message are propagated and the activation log is never written
-        expectThrownError(activateAction, PUSH_FAILED_MESSAGE);
         expect(mocks.registerCommand).toHaveBeenCalledTimes(TWO_COMMANDS);
         expect(mocks.registerTextDocumentContentProvider).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.onDidChangeConfiguration).toHaveBeenCalledTimes(ONE_CALL);
@@ -571,7 +612,7 @@ describe("extension", () => {
         expect(mocks.outputChannel.appendLine).not.toHaveBeenCalled();
       });
 
-      it("TC-005: rethrows activation log failures after successful registration", () => {
+      it("TC-005: rejects with activation log failures after successful registration", async () => {
         // Case: TC-005
         // Given: registration succeeds but outputChannel.appendLine throws an error
         const context = createMockContext();
@@ -579,22 +620,129 @@ describe("extension", () => {
           throw new Error(LOG_FAILED_MESSAGE);
         });
 
-        // When: activate is called
-        const activateAction = () => activate(toExtensionContext(context));
+        // When: activate is called and its promise settles
+        await expectRejectedError(activate(toExtensionContext(context)), LOG_FAILED_MESSAGE);
 
         // Then: the same Error and message are propagated after subscriptions.push completes
-        expectThrownError(activateAction, LOG_FAILED_MESSAGE);
         expect(context.subscriptions.push).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.outputChannel.appendLine).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.outputChannel.appendLine).toHaveBeenCalledWith(ACTIVATION_SUCCESS_MESSAGE);
       });
     });
 
+    // S8: activate() 非同期化と初回 git path 解決の待機
+    // S9: DiffDocProvider / AvatarManager の subscriptions 登録
+    // @see docs/testing/perspectives/src/extension-test.md
+    describe("async activation and subscription ownership", () => {
+      it("TC-032: constructs dependent managers only after registerGitPath resolves", async () => {
+        // Case: TC-032
+        // Given: registerGitPath returns a promise whose resolution the test controls
+        const context = createMockContext();
+        let resolveRegisterGitPath!: () => void;
+        mocks.dataSourceInstance.registerGitPath.mockReturnValue(
+          new Promise<void>((resolve) => {
+            resolveRegisterGitPath = resolve;
+          })
+        );
+
+        // When: activate is started, microtasks flush, and the git path resolution completes
+        const activatePromise = activate(toExtensionContext(context));
+        await flushMicrotasks();
+        const avatarManagerCallsBeforeResolve = mocks.AvatarManagerMock.mock.calls.length;
+        const repoManagerCallsBeforeResolve = mocks.RepoManagerMock.mock.calls.length;
+        resolveRegisterGitPath();
+        await activatePromise;
+
+        // Then: managers are constructed only after the resolution, in registerGitPath-first call order
+        expect(avatarManagerCallsBeforeResolve).toBe(ZERO_CALLS);
+        expect(repoManagerCallsBeforeResolve).toBe(ZERO_CALLS);
+        expect(mocks.dataSourceInstance.registerGitPath).toHaveBeenCalledTimes(ONE_CALL);
+        expect(mocks.AvatarManagerMock).toHaveBeenCalledTimes(ONE_CALL);
+        expect(mocks.RepoManagerMock).toHaveBeenCalledTimes(ONE_CALL);
+        expect(mocks.dataSourceInstance.registerGitPath.mock.invocationCallOrder[0]).toBeLessThan(
+          mocks.AvatarManagerMock.mock.invocationCallOrder[0]
+        );
+        expect(mocks.dataSourceInstance.registerGitPath.mock.invocationCallOrder[0]).toBeLessThan(
+          mocks.RepoManagerMock.mock.invocationCallOrder[0]
+        );
+      });
+
+      it("TC-033: does not construct RepoManager while registerGitPath is still pending", async () => {
+        // Case: TC-033
+        // Given: registerGitPath returns a promise that never resolves during the test
+        const context = createMockContext();
+        mocks.dataSourceInstance.registerGitPath.mockReturnValue(new Promise<void>(() => {}));
+
+        // When: activate is started and microtasks are flushed without resolving the git path
+        void activate(toExtensionContext(context));
+        await flushMicrotasks();
+
+        // Then: no Git-command-starting manager has been constructed yet
+        expect(mocks.dataSourceInstance.registerGitPath).toHaveBeenCalledTimes(ONE_CALL);
+        expect(mocks.RepoManagerMock).toHaveBeenCalledTimes(ZERO_CALLS);
+        expect(mocks.AvatarManagerMock).toHaveBeenCalledTimes(ZERO_CALLS);
+      });
+
+      it("TC-034: registers the DiffDocProvider instance itself in subscriptions", async () => {
+        // Case: TC-034
+        // Given: activation completes and subscriptions.push recorded its arguments
+        const context = await activateExtension();
+
+        // When: the pushed subscription elements are inspected
+        const pushedSubscriptions = getPushedSubscriptions(context);
+
+        // Then: the exact DiffDocProvider instance (same reference) is among the subscriptions
+        expect(pushedSubscriptions).toContain(getDiffDocProviderInstance());
+      });
+
+      it("TC-035: registers the provider registration disposable as a separate element", async () => {
+        // Case: TC-035
+        // Given: activation completes and subscriptions.push recorded its arguments
+        const context = await activateExtension();
+
+        // When: the pushed subscription elements are inspected
+        const pushedSubscriptions = getPushedSubscriptions(context);
+
+        // Then: the disposable returned by registerTextDocumentContentProvider is a distinct element
+        const registrationDisposable = getTextDocumentDisposable();
+        expect(pushedSubscriptions).toContain(registrationDisposable);
+        expect(registrationDisposable).not.toBe(getDiffDocProviderInstance());
+      });
+
+      it("TC-036: registers the AvatarManager instance in subscriptions", async () => {
+        // Case: TC-036
+        // Given: activation completes and subscriptions.push recorded its arguments
+        const context = await activateExtension();
+
+        // When: the pushed subscription elements are inspected
+        const pushedSubscriptions = getPushedSubscriptions(context);
+
+        // Then: the exact AvatarManager instance (same reference) is among the subscriptions
+        expect(pushedSubscriptions).toContain(mocks.avatarManagerInstance);
+      });
+
+      it("TC-037: disposing every subscription disposes DiffDocProvider and AvatarManager once each", async () => {
+        // Case: TC-037
+        // Given: activation completes and all subscription elements are available
+        const context = await activateExtension();
+        const pushedSubscriptions = getPushedSubscriptions(context);
+
+        // When: dispose is invoked on every pushed subscription element
+        for (const subscription of pushedSubscriptions) {
+          (subscription as { dispose?: () => void }).dispose?.();
+        }
+
+        // Then: DiffDocProvider.dispose and AvatarManager.dispose are each called exactly once
+        expect(mocks.diffDocProviderDispose).toHaveBeenCalledTimes(ONE_CALL);
+        expect(mocks.avatarManagerInstance.dispose).toHaveBeenCalledTimes(ONE_CALL);
+      });
+    });
+
     describe("git-keizu.view command", () => {
-      it("TC-006: forwards a Uri argument as rootUri to GitKeizuView.createOrShow", () => {
+      it("TC-006: forwards a Uri argument as rootUri to GitKeizuView.createOrShow", async () => {
         // Case: TC-006
         // Given: activate registers the view command and the command is invoked with a Uri argument
-        activateExtension();
+        await activateExtension();
         const rootUri = vscode.Uri.file(DEFAULT_REPO_PATH);
 
         // When: the view command handler is called with the Uri argument
@@ -612,10 +760,10 @@ describe("extension", () => {
         );
       });
 
-      it("TC-007: forwards an object rootUri property when it contains a Uri instance", () => {
+      it("TC-007: forwards an object rootUri property when it contains a Uri instance", async () => {
         // Case: TC-007
         // Given: activate registers the view command and the handler receives an object with rootUri: Uri
-        activateExtension();
+        await activateExtension();
         const rootUri = vscode.Uri.file(DEFAULT_REPO_PATH);
 
         // When: the view command handler is called with the SourceControl-like object
@@ -633,10 +781,10 @@ describe("extension", () => {
         );
       });
 
-      it("TC-008: falls back to undefined when rootUri exists but is not a Uri instance", () => {
+      it("TC-008: falls back to undefined when rootUri exists but is not a Uri instance", async () => {
         // Case: TC-008
         // Given: activate registers the view command and the handler receives object inputs whose rootUri is invalid
-        activateExtension();
+        await activateExtension();
         const invalidArguments = [{ rootUri: "not-a-uri" }, { rootUri: null }, { rootUri: {} }];
 
         // When: the view command handler is called with each invalid rootUri shape
@@ -657,10 +805,10 @@ describe("extension", () => {
         }
       });
 
-      it("TC-009: falls back to undefined for nullish and primitive command arguments", () => {
+      it("TC-009: falls back to undefined for nullish and primitive command arguments", async () => {
         // Case: TC-009
         // Given: activate registers the view command and the handler receives nullish or primitive arguments
-        activateExtension();
+        await activateExtension();
         const invalidArguments = [undefined, null, "repo", ZERO_CALLS, false];
 
         // When: the view command handler is called with each nullish or primitive value
@@ -681,10 +829,10 @@ describe("extension", () => {
         }
       });
 
-      it("TC-010: rethrows createOrShow failures from the view command handler", () => {
+      it("TC-010: rethrows createOrShow failures from the view command handler", async () => {
         // Case: TC-010
         // Given: activate registers the view command and GitKeizuView.createOrShow throws an error
-        activateExtension();
+        await activateExtension();
         const rootUri = vscode.Uri.file(DEFAULT_REPO_PATH);
         mocks.createOrShow.mockImplementation(() => {
           throw new Error(SHOW_FAILED_MESSAGE);
@@ -699,10 +847,10 @@ describe("extension", () => {
     });
 
     describe("git-keizu.clearAvatarCache command", () => {
-      it("TC-011: delegates to AvatarManager.clearCache exactly once", () => {
+      it("TC-011: delegates to AvatarManager.clearCache exactly once", async () => {
         // Case: TC-011
         // Given: activate registers the clearAvatarCache command and AvatarManager.clearCache is observable
-        activateExtension();
+        await activateExtension();
 
         // When: the clearAvatarCache command handler is called
         invokeClearAvatarCacheCommand();
@@ -712,10 +860,10 @@ describe("extension", () => {
         expect(mocks.avatarManagerInstance.clearCache).toHaveBeenCalledWith();
       });
 
-      it("TC-012: rethrows AvatarManager.clearCache failures from the command handler", () => {
+      it("TC-012: rethrows AvatarManager.clearCache failures from the command handler", async () => {
         // Case: TC-012
         // Given: activate registers the clearAvatarCache command and AvatarManager.clearCache throws an error
-        activateExtension();
+        await activateExtension();
         mocks.avatarManagerInstance.clearCache.mockImplementation(() => {
           throw new Error(CLEAR_FAILED_MESSAGE);
         });
@@ -729,12 +877,13 @@ describe("extension", () => {
     });
 
     describe("configuration change routing", () => {
-      it("TC-024: refreshes the status bar item when only showStatusBarItem changes", () => {
+      it("TC-024: refreshes the status bar item when only showStatusBarItem changes", async () => {
         // Case: TC-024
         // Given: activate registers the configuration listener and only showStatusBarItem matches
-        activateExtension();
+        await activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([SHOW_STATUS_BAR_ITEM_SETTING]);
+        mocks.dataSourceInstance.registerGitPath.mockClear();
 
         // When: the configuration change handler is called
         configHandler(event);
@@ -746,12 +895,13 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).not.toHaveBeenCalled();
       });
 
-      it("TC-025: regenerates git command formats when only dateType changes", () => {
+      it("TC-025: regenerates git command formats when only dateType changes", async () => {
         // Case: TC-025
         // Given: activate registers the configuration listener and only dateType matches
-        activateExtension();
+        await activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([DATE_TYPE_SETTING]);
+        mocks.dataSourceInstance.registerGitPath.mockClear();
 
         // When: the configuration change handler is called
         configHandler(event);
@@ -763,12 +913,13 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).not.toHaveBeenCalled();
       });
 
-      it("TC-026: notifies RepoManager when only maxDepthOfRepoSearch changes", () => {
+      it("TC-026: notifies RepoManager when only maxDepthOfRepoSearch changes", async () => {
         // Case: TC-026
         // Given: activate registers the configuration listener and only maxDepthOfRepoSearch matches
-        activateExtension();
+        await activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([MAX_DEPTH_OF_REPO_SEARCH_SETTING]);
+        mocks.dataSourceInstance.registerGitPath.mockClear();
 
         // When: the configuration change handler is called
         configHandler(event);
@@ -782,12 +933,13 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).not.toHaveBeenCalled();
       });
 
-      it("TC-027: registers the git path when only git.path changes", () => {
+      it("TC-027: registers the git path when only git.path changes", async () => {
         // Case: TC-027
         // Given: activate registers the configuration listener and only git.path matches
-        activateExtension();
+        await activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([GIT_PATH_SETTING]);
+        mocks.dataSourceInstance.registerGitPath.mockClear();
 
         // When: the configuration change handler is called
         configHandler(event);
@@ -799,12 +951,13 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).toHaveBeenCalledTimes(ONE_CALL);
       });
 
-      it("TC-028: performs no action when no watched setting changes", () => {
+      it("TC-028: performs no action when no watched setting changes", async () => {
         // Case: TC-028
         // Given: activate registers the configuration listener and no watched setting matches
-        activateExtension();
+        await activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([]);
+        mocks.dataSourceInstance.registerGitPath.mockClear();
 
         // When: the configuration change handler is called
         configHandler(event);
@@ -816,15 +969,16 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).not.toHaveBeenCalled();
       });
 
-      it("TC-029: runs both handlers when showStatusBarItem and dateType both match", () => {
+      it("TC-029: runs both handlers when showStatusBarItem and dateType both match", async () => {
         // Case: TC-029
         // Given: independent if statements and both showStatusBarItem and dateType report true
-        activateExtension();
+        await activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([
           SHOW_STATUS_BAR_ITEM_SETTING,
           DATE_TYPE_SETTING
         ]);
+        mocks.dataSourceInstance.registerGitPath.mockClear();
 
         // When: the configuration change handler is called
         configHandler(event);
@@ -836,10 +990,10 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).not.toHaveBeenCalled();
       });
 
-      it("TC-030: runs all four handlers when every watched setting matches", () => {
+      it("TC-030: runs all four handlers when every watched setting matches", async () => {
         // Case: TC-030
         // Given: independent if statements and all four watched settings report true
-        activateExtension();
+        await activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([
           SHOW_STATUS_BAR_ITEM_SETTING,
@@ -847,6 +1001,7 @@ describe("extension", () => {
           MAX_DEPTH_OF_REPO_SEARCH_SETTING,
           GIT_PATH_SETTING
         ]);
+        mocks.dataSourceInstance.registerGitPath.mockClear();
 
         // When: the configuration change handler is called
         configHandler(event);
@@ -860,12 +1015,13 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).toHaveBeenCalledTimes(ONE_CALL);
       });
 
-      it("TC-031: propagates a handler failure and skips the later independent ifs", () => {
+      it("TC-031: propagates a handler failure and skips the later independent ifs", async () => {
         // Case: TC-031
         // Given: showStatusBarItem matches and statusBarItem.refresh throws
-        activateExtension();
+        await activateExtension();
         const configHandler = getConfigurationChangeHandler();
         const event = createConfigurationChangeEvent([SHOW_STATUS_BAR_ITEM_SETTING]);
+        mocks.dataSourceInstance.registerGitPath.mockClear();
         mocks.statusBarItemInstance.refresh.mockImplementation(() => {
           throw new Error(REFRESH_FAILED_MESSAGE);
         });
@@ -880,20 +1036,21 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).not.toHaveBeenCalled();
       });
 
-      it("TC-021: notifies the open panel when showRecentActions changes alone", () => {
+      it("TC-021: notifies the open panel when showRecentActions changes alone", async () => {
         // Case: TC-021
         // Given: activate registers the configuration listener and a panel exposes notifyShowRecentActionsChanged
-        activateExtension();
+        await activateExtension();
         const configHandler = getConfigurationChangeHandler();
         mocks.gitKeizuViewModule.GitKeizuView.currentPanel = {
           notifyShowRecentActionsChanged: mocks.notifyShowRecentActionsChanged
         };
         const event = createConfigurationChangeEvent([SHOW_RECENT_ACTIONS_SETTING]);
+        mocks.dataSourceInstance.registerGitPath.mockClear();
 
         // When: the configuration change handler is called
         configHandler(event);
 
-        // Then: only notifyShowRecentActionsChanged runs; the else-if chain handlers are not invoked
+        // Then: only notifyShowRecentActionsChanged runs; the other routed handlers are not invoked
         expect(mocks.notifyShowRecentActionsChanged).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.statusBarItemInstance.refresh).not.toHaveBeenCalled();
         expect(mocks.dataSourceInstance.generateGitCommandFormats).not.toHaveBeenCalled();
@@ -901,10 +1058,10 @@ describe("extension", () => {
         expect(mocks.dataSourceInstance.registerGitPath).not.toHaveBeenCalled();
       });
 
-      it("TC-022: notifies showRecentActions even when another watched setting also changes", () => {
+      it("TC-022: notifies showRecentActions even when another watched setting also changes", async () => {
         // Case: TC-022
         // Given: showStatusBarItem and showRecentActions both report true and the panel is open
-        activateExtension();
+        await activateExtension();
         const configHandler = getConfigurationChangeHandler();
         mocks.gitKeizuViewModule.GitKeizuView.currentPanel = {
           notifyShowRecentActionsChanged: mocks.notifyShowRecentActionsChanged
@@ -917,15 +1074,15 @@ describe("extension", () => {
         // When: the configuration change handler is called
         configHandler(event);
 
-        // Then: the else-if chain still routes statusBarItem.refresh and the standalone if also fires the recent-actions notification
+        // Then: statusBarItem.refresh routes as usual and the recent-actions notification also fires
         expect(mocks.statusBarItemInstance.refresh).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.notifyShowRecentActionsChanged).toHaveBeenCalledTimes(ONE_CALL);
       });
 
-      it("TC-023: short-circuits cleanly when no panel is open", () => {
+      it("TC-023: short-circuits cleanly when no panel is open", async () => {
         // Case: TC-023
         // Given: GitKeizuView.currentPanel is undefined and only showRecentActions matches
-        activateExtension();
+        await activateExtension();
         const configHandler = getConfigurationChangeHandler();
         mocks.gitKeizuViewModule.GitKeizuView.currentPanel = undefined;
         const event = createConfigurationChangeEvent([SHOW_RECENT_ACTIONS_SETTING]);
@@ -941,14 +1098,14 @@ describe("extension", () => {
   });
 
   describe("deactivate", () => {
-    it("TC-020: returns undefined and performs no additional work before or after activation", () => {
+    it("TC-020: returns undefined and performs no additional work before or after activation", async () => {
       // Case: TC-020
       // Given: deactivate is called once before activation and twice after activation
       const firstResult = deactivate();
       expect(firstResult).toBeUndefined();
       expect(mocks.createOutputChannel).not.toHaveBeenCalled();
 
-      activateExtension();
+      await activateExtension();
       const outputChannelCallCountAfterActivate = mocks.createOutputChannel.mock.calls.length;
       const registerCommandCallCountAfterActivate = mocks.registerCommand.mock.calls.length;
       const logCallCountAfterActivate = mocks.outputChannel.appendLine.mock.calls.length;

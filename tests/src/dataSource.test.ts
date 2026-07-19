@@ -13,7 +13,7 @@ vi.mock("vscode", () => ({
 
 vi.mock("../../src/config", () => ({
   getConfig: vi.fn(() => ({
-    gitPath: () => "git",
+    gitPath: () => ["git"],
     dateType: () => "Author Date",
     showUncommittedChanges: () => false
   }))
@@ -21,6 +21,13 @@ vi.mock("../../src/config", () => ({
 
 vi.mock("node:child_process", () => ({
   spawn: vi.fn()
+}));
+
+const resolveGitExecutableMock = vi.hoisted(() => vi.fn());
+
+vi.mock("../../src/gitExecutable", () => ({
+  DEFAULT_GIT_PATH: "git",
+  resolveGitExecutable: resolveGitExecutableMock
 }));
 
 import { COMMIT_ORDER_FLAGS, DataSource } from "../../src/dataSource";
@@ -1380,7 +1387,7 @@ describe("getCommitComparison", () => {
     // Given: toHash is empty (working tree) with one modified file and one untracked file
     const nameStatus = "M\0src/a.ts\0";
     const numStat = "3\t1\tsrc/a.ts\0";
-    const untracked = "src/new.ts\n";
+    const untracked = "src/new.ts\0";
     setupSpawnForComparisonWithUntracked(nameStatus, numStat, untracked);
 
     // When: getCommitComparison is called with an empty toHash
@@ -1411,7 +1418,7 @@ describe("getCommitComparison", () => {
     // Given: working-tree comparison where an untracked file matches a diff newFilePath
     const nameStatus = "M\0src/file.ts\0";
     const numStat = "3\t1\tsrc/file.ts\0";
-    const untracked = "src/file.ts\n";
+    const untracked = "src/file.ts\0";
     setupSpawnForComparisonWithUntracked(nameStatus, numStat, untracked);
 
     // When: getCommitComparison is called with UNCOMMITTED_CHANGES_HASH
@@ -1465,7 +1472,7 @@ describe("getUncommittedDetails", () => {
     // Given: staged/unstaged change and an untracked file (name-status/numstat are NUL-delimited)
     const nameStatus = "M\0src/modified.ts\0";
     const numStat = "10\t3\tsrc/modified.ts\0";
-    const untracked = "src/newfile.ts\n";
+    const untracked = "src/newfile.ts\0";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
     // When: getUncommittedDetails is called
@@ -1570,7 +1577,7 @@ describe("getUncommittedDetails", () => {
     // Given: diff has a file, ls-files also lists the same file
     const nameStatus = "A\0src/file.ts\0";
     const numStat = "10\t0\tsrc/file.ts\0";
-    const untracked = "src/file.ts\n";
+    const untracked = "src/file.ts\0";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
     // When: getUncommittedDetails is called
@@ -1604,7 +1611,7 @@ describe("getUncommittedDetails", () => {
     // Given: ls-files output contains an empty token between valid paths
     const nameStatus = "M\0src/a.ts\0";
     const numStat = "1\t0\tsrc/a.ts\0";
-    const untracked = "src/new1.ts\n\nsrc/new2.ts\n";
+    const untracked = "src/new1.ts\0\0src/new2.ts\0";
     setupSpawnForUncommitted(nameStatus, numStat, untracked);
 
     // When: getUncommittedDetails is called
@@ -4198,5 +4205,351 @@ describe("ref name option-injection guard", () => {
     // Then: the hyphen guard is bypassed and the command reaches spawn (not the ref-name error)
     expect(result).not.toBe(INVALID_REF_NAME_MESSAGE);
     expect(spawnMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S37: registerGitPath() 解決完了後の単一 path 一括代入               */
+/* @see docs/testing/perspectives/src/dataSource-test/05-git-path-01.md */
+/* ------------------------------------------------------------------ */
+
+describe("registerGitPath resolved path assignment (S37)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Case: TC-218
+  it("spawns later git commands with the resolved single path (TC-218)", async () => {
+    // Given: the resolver resolves to a concrete executable path
+    resolveGitExecutableMock.mockResolvedValue("/opt/git/bin/git");
+    await ds.registerGitPath();
+    spawnMock.mockImplementation(() => createMockProcess(""));
+
+    // When: a git command runs after registerGitPath has been awaited
+    await ds.getBranches(REPO, false);
+
+    // Then: the spawn command is the resolved single string
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    expect(spawnMock.mock.calls[0][0]).toBe("/opt/git/bin/git");
+  });
+
+  // Case: TC-219
+  it("keeps the safe single-string default while the resolver is pending (TC-219)", async () => {
+    // Given: the resolver returns a promise that stays pending
+    resolveGitExecutableMock.mockReturnValue(new Promise<string>(() => {}));
+    void ds.registerGitPath();
+    spawnMock.mockImplementation(() => createMockProcess(""));
+
+    // When: a git command runs before the resolution completes
+    await ds.getBranches(REPO, false);
+
+    // Then: the spawn command is the pre-resolution single-string default, never an array or undefined
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    const spawnCommand = spawnMock.mock.calls[0][0];
+    expect(typeof spawnCommand).toBe("string");
+    expect(spawnCommand).toBe("git");
+  });
+
+  // Case: TC-220
+  it("resolves registerGitPath and falls back to git when all candidates failed (TC-220)", async () => {
+    // Given: the resolver reports the final fallback "git" after every candidate failed
+    resolveGitExecutableMock.mockResolvedValue("git");
+
+    // When: registerGitPath is awaited and a git command runs
+    await expect(ds.registerGitPath()).resolves.toBeUndefined();
+    spawnMock.mockImplementation(() => createMockProcess(""));
+    await ds.getBranches(REPO, false);
+
+    // Then: no rejection occurred and the spawn command is "git"
+    expect(spawnMock.mock.calls[0][0]).toBe("git");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S38: ls-files -z による未追跡ファイルの NUL 区切り取得              */
+/* S39: numstat 共通パーサー（第1・第2 TAB 区切りと残余 path 保持）    */
+/* S40: renameBranch() 新ブランチ名の isRefNameSafe ガード             */
+/* @see docs/testing/perspectives/src/dataSource-test/04-spawn-refname-diff-01.md */
+/* ------------------------------------------------------------------ */
+
+describe("ls-files -z untracked file parsing (S38)", () => {
+  const SPECIAL_UNTRACKED_NAMES = [
+    'quote"name.txt',
+    "tab\tname.txt",
+    "new\nline.txt",
+    "back\\slash.txt"
+  ];
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function setupSpawnWithUntracked(untrackedOutput: string) {
+    spawnMock.mockImplementation((_cmd: unknown, args: unknown) => {
+      const argArray = args as string[];
+      if (argArray.includes("ls-files")) {
+        return createMockProcess(untrackedOutput);
+      }
+      return createMockProcess("");
+    });
+  }
+
+  function getLsFilesArgs(): string[] {
+    const lsFilesCall = spawnMock.mock.calls.find((call) =>
+      (call[1] as string[]).includes("ls-files")
+    );
+    expect(lsFilesCall).toBeDefined();
+    return lsFilesCall![1] as string[];
+  }
+
+  // Case: TC-221
+  it("returns raw special-character untracked names via getUncommittedDetails (TC-221)", async () => {
+    // Given: NUL-delimited ls-files output with quote/TAB/newline/backslash names
+    const untrackedOutput = `${SPECIAL_UNTRACKED_NAMES.join("\0")}\0`;
+    setupSpawnWithUntracked(untrackedOutput);
+
+    // When: getUncommittedDetails is called
+    const result = await ds.getUncommittedDetails(REPO);
+
+    // Then: ls-files was spawned with -z and every name survives as a raw string
+    expect(getLsFilesArgs()).toContain("-z");
+    expect(result).not.toBeNull();
+    expect(result!.fileChanges.map((change) => change.newFilePath)).toEqual(
+      SPECIAL_UNTRACKED_NAMES
+    );
+  });
+
+  // Case: TC-222
+  it("returns raw special-character untracked names via getCommitComparison (TC-222)", async () => {
+    // Given: a working-tree comparison (empty toHash) with the same special-character names
+    const untrackedOutput = `${SPECIAL_UNTRACKED_NAMES.join("\0")}\0`;
+    setupSpawnWithUntracked(untrackedOutput);
+
+    // When: getCommitComparison is called with an empty toHash
+    const result = await ds.getCommitComparison(REPO, "abc123def456", "");
+
+    // Then: ls-files was spawned with -z and the untracked names are raw in the result
+    expect(getLsFilesArgs()).toContain("-z");
+    expect(result).not.toBeNull();
+    expect(result!.map((change) => change.newFilePath)).toEqual(SPECIAL_UNTRACKED_NAMES);
+  });
+});
+
+describe("numstat shared record parser (S39)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function setupSpawnForCommitDetails(nameStatusOutput: string, numStatOutput: string) {
+    const detailsLine = [
+      "abc123def456",
+      "parent111",
+      "Author Name",
+      "author@example.com",
+      "1700000000",
+      "Committer Name",
+      "committer@example.com"
+    ].join(SEP);
+    spawnMock.mockImplementation((_cmd: unknown, args: unknown) => {
+      const argArray = args as string[];
+      if (argArray[0] === "show") {
+        return createMockProcess(`${detailsLine}\ncommit message\n`);
+      }
+      if (argArray.includes("--name-status")) {
+        return createMockProcess(nameStatusOutput);
+      }
+      if (argArray.includes("--numstat")) {
+        return createMockProcess(numStatOutput);
+      }
+      return createMockProcess("");
+    });
+  }
+
+  function setupSpawnForDiff(nameStatusOutput: string, numStatOutput: string) {
+    spawnMock.mockImplementation((_cmd: unknown, args: unknown) => {
+      const argArray = args as string[];
+      if (argArray.includes("--name-status")) {
+        return createMockProcess(nameStatusOutput);
+      }
+      if (argArray.includes("--numstat")) {
+        return createMockProcess(numStatOutput);
+      }
+      return createMockProcess("");
+    });
+  }
+
+  // Case: TC-223
+  it("applies a normal numstat record via commitDetails (TC-223)", async () => {
+    // Given: a single modified file whose numstat record uses the first and second TAB
+    setupSpawnForCommitDetails("M\0src/a.ts\0", "3\t1\tsrc/a.ts\0");
+
+    // When: commitDetails is called for a commit with parents
+    const result = await ds.commitDetails(REPO, "abc123def456", true, false);
+
+    // Then: the additions/deletions from the record land on the matching path
+    expect(result).not.toBeNull();
+    expect(result!.fileChanges).toEqual([
+      { oldFilePath: "src/a.ts", newFilePath: "src/a.ts", type: "M", additions: 3, deletions: 1 }
+    ]);
+  });
+
+  // Case: TC-224
+  it("keeps a TAB-containing path intact and continues to later records (TC-224)", async () => {
+    // Given: a numstat record whose path contains a TAB, followed by a normal record
+    const nameStatus = "M\0src/a\tb.ts\0M\0src/c.ts\0";
+    const numStat = "2\t5\tsrc/a\tb.ts\0" + "1\t1\tsrc/c.ts\0";
+    setupSpawnForDiff(nameStatus, numStat);
+
+    // When: getUncommittedDetails is called
+    const result = await ds.getUncommittedDetails(REPO);
+
+    // Then: the full TAB-containing remainder matches the path and the later record is not cut off
+    expect(result).not.toBeNull();
+    expect(result!.fileChanges).toEqual([
+      {
+        oldFilePath: "src/a\tb.ts",
+        newFilePath: "src/a\tb.ts",
+        type: "M",
+        additions: 2,
+        deletions: 5
+      },
+      { oldFilePath: "src/c.ts", newFilePath: "src/c.ts", type: "M", additions: 1, deletions: 1 }
+    ]);
+  });
+
+  // Case: TC-225
+  it("keeps a TAB-containing path intact in the comparison path (TC-225)", async () => {
+    // Given: the same TAB-containing numstat shape driven through getCommitComparison
+    const nameStatus = "M\0src/a\tb.ts\0M\0src/c.ts\0";
+    const numStat = "2\t5\tsrc/a\tb.ts\0" + "1\t1\tsrc/c.ts\0";
+    setupSpawnForDiff(nameStatus, numStat);
+
+    // When: getCommitComparison is called between two commits
+    const result = await ds.getCommitComparison(REPO, "abc123def456", "def456abc123");
+
+    // Then: the shared helper preserves the path remainder and later counts in this path too
+    expect(result).toEqual([
+      {
+        oldFilePath: "src/a\tb.ts",
+        newFilePath: "src/a\tb.ts",
+        type: "M",
+        additions: 2,
+        deletions: 5
+      },
+      { oldFilePath: "src/c.ts", newFilePath: "src/c.ts", type: "M", additions: 1, deletions: 1 }
+    ]);
+  });
+
+  // Case: TC-226
+  it("keeps the rename empty-path plus two-token contract via commitDetails (TC-226)", async () => {
+    // Given: a rename record with an empty path field followed by old/new NUL tokens
+    setupSpawnForCommitDetails("R\0old.ts\0new.ts\0", "5\t0\t\0old.ts\0new.ts\0");
+
+    // When: commitDetails is called for a commit with parents
+    const result = await ds.commitDetails(REPO, "abc123def456", true, false);
+
+    // Then: the empty path triggers the +3 cursor advance and the counts land on the rename
+    expect(result).not.toBeNull();
+    expect(result!.fileChanges).toEqual([
+      { oldFilePath: "old.ts", newFilePath: "new.ts", type: "R", additions: 5, deletions: 0 }
+    ]);
+  });
+
+  // Case: TC-227
+  it("ignores a malformed record alone and keeps parsing later records (TC-227)", async () => {
+    // Given: a TAB-less malformed record directly before a valid record
+    const nameStatus = "M\0src/bad.ts\0M\0src/ok.ts\0";
+    const numStat = "garbage\0" + "2\t2\tsrc/ok.ts\0";
+    setupSpawnForDiff(nameStatus, numStat);
+
+    // When: getUncommittedDetails is called
+    const result = await ds.getUncommittedDetails(REPO);
+
+    // Then: the unmatched file keeps null counts while the later record is applied (no loop break)
+    expect(result).not.toBeNull();
+    expect(result!.fileChanges).toEqual([
+      {
+        oldFilePath: "src/bad.ts",
+        newFilePath: "src/bad.ts",
+        type: "M",
+        additions: null,
+        deletions: null
+      },
+      { oldFilePath: "src/ok.ts", newFilePath: "src/ok.ts", type: "M", additions: 2, deletions: 2 }
+    ]);
+  });
+});
+
+describe("renameBranch ref name guard (S40)", () => {
+  const INVALID_REF_NAME_MESSAGE = "Invalid ref name.";
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  // Case: TC-228
+  it("rejects a hyphen-prefixed new branch name without spawning git (TC-228)", async () => {
+    // Given: a new name that would be parsed as a git option
+    // When: renameBranch is called with "-D"
+    const result = await ds.renameBranch(REPO, "old", "-D", false);
+
+    // Then: the ref-name error is returned and no git process is started
+    expect(result).toBe(INVALID_REF_NAME_MESSAGE);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  // Case: TC-229
+  it("rejects a lone hyphen new branch name (TC-229)", async () => {
+    // Given: the minimal invalid input "-"
+    // When: renameBranch is called with "-"
+    const result = await ds.renameBranch(REPO, "old", "-", false);
+
+    // Then: the ref-name error is returned and no git process is started
+    expect(result).toBe(INVALID_REF_NAME_MESSAGE);
+    expect(spawnMock).not.toHaveBeenCalled();
+  });
+
+  // Case: TC-230
+  it("runs the unchanged branch -m command for a valid new name (TC-230)", async () => {
+    // Given: spawn succeeds for the rename command
+    spawnMock.mockReturnValue(createCommandMockProcess({ exitCode: 0 }));
+
+    // When: renameBranch is called with a valid new name
+    const result = await ds.renameBranch(REPO, "old", "feature/renamed", false);
+
+    // Then: git branch -m runs exactly once with the existing argument structure
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    expect(spawnMock.mock.calls[0][1]).toEqual(["branch", "-m", "old", "feature/renamed"]);
   });
 });

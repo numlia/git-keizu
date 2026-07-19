@@ -609,3 +609,74 @@ describe("handleMessage commitDetails try/catch (S10)", () => {
     expect(generateGitFileTree).not.toHaveBeenCalled();
   });
 });
+
+// S11: openWorktreeInNewWindow / revealWorktreeInOS レスポンスのエラー表示
+// @see docs/testing/perspectives/web/messageHandler-test.md
+describe("worktree open/reveal response error display (S11)", () => {
+  const OPEN_WORKTREE_ERROR = "Unable to Open Worktree in New Window";
+  const REVEAL_WORKTREE_ERROR = "Unable to Reveal Worktree in File Manager";
+  let gitKeizu: GitKeizuViewAPI;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitKeizu = createMockGitKeizuView();
+  });
+
+  it("does nothing for an openWorktreeInNewWindow success response (TC-032)", () => {
+    // Case: TC-032
+    // Given: An openWorktreeInNewWindow success response (status = null)
+    const msg: ResponseMessage = { command: "openWorktreeInNewWindow", status: null };
+
+    // When: handleMessage processes the response
+    handleMessage(msg, gitKeizu);
+
+    // Then: no error dialog is shown and no gitKeizu API is invoked
+    expect(showErrorDialog).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+    expect(gitKeizu.hideCommitDetails).not.toHaveBeenCalled();
+    expect(gitKeizu.selectRepo).not.toHaveBeenCalled();
+  });
+
+  it("shows the dedicated open-worktree error dialog once on failure (TC-033)", () => {
+    // Case: TC-033
+    // Given: An openWorktreeInNewWindow failure response (status = "boom")
+    const msg: ResponseMessage = { command: "openWorktreeInNewWindow", status: "boom" };
+
+    // When: handleMessage processes the response
+    handleMessage(msg, gitKeizu);
+
+    // Then: showErrorDialog runs once with the operation-specific translation key
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(OPEN_WORKTREE_ERROR, "boom", null);
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("does nothing for a revealWorktreeInOS success response (TC-034)", () => {
+    // Case: TC-034
+    // Given: A revealWorktreeInOS success response (status = null)
+    const msg: ResponseMessage = { command: "revealWorktreeInOS", status: null };
+
+    // When: handleMessage processes the response
+    handleMessage(msg, gitKeizu);
+
+    // Then: no error dialog is shown and no gitKeizu API is invoked
+    expect(showErrorDialog).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+    expect(gitKeizu.hideCommitDetails).not.toHaveBeenCalled();
+    expect(gitKeizu.selectRepo).not.toHaveBeenCalled();
+  });
+
+  it("shows the dedicated reveal-worktree error dialog once on failure (TC-035)", () => {
+    // Case: TC-035
+    // Given: A revealWorktreeInOS failure response (status = "no")
+    const msg: ResponseMessage = { command: "revealWorktreeInOS", status: "no" };
+
+    // When: handleMessage processes the response
+    handleMessage(msg, gitKeizu);
+
+    // Then: showErrorDialog runs once with the operation-specific translation key
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(REVEAL_WORKTREE_ERROR, "no", null);
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+});

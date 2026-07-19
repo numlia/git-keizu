@@ -3357,7 +3357,9 @@ describe("GitKeizuView message handler try/finally unmute (S21)", () => {
 /* S22: worktree コマンドの個別 try/catch と status 応答               */
 /* ------------------------------------------------------------------ */
 
-describe("GitKeizuView worktree command error responses (S22)", () => {
+// S26: openWorktreeInNewWindow / revealWorktreeInOS の status 必須送出（成功時 null）
+// @see docs/testing/perspectives/src/gitGraphView-test/03-worktree-actions-01.md
+describe("GitKeizuView worktree command status responses (S26)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
@@ -3399,8 +3401,8 @@ describe("GitKeizuView worktree command error responses (S22)", () => {
     GitKeizuView.currentPanel = undefined;
   });
 
-  it("posts openWorktreeInNewWindow without status on success (TC-080)", async () => {
-    // Case: TC-080
+  it("posts openWorktreeInNewWindow with status null on success (TC-100)", async () => {
+    // Case: TC-100
     // Given: executeCommand succeeds
     mocks.executeCommand.mockResolvedValue(undefined);
 
@@ -3411,12 +3413,16 @@ describe("GitKeizuView worktree command error responses (S22)", () => {
       path: "wt"
     });
 
-    // Then: the response carries no status field
-    expect(mocks.postMessage).toHaveBeenCalledWith({ command: "openWorktreeInNewWindow" });
+    // Then: the response carries an explicit status: null (not an omitted field)
+    expect(mocks.postMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "openWorktreeInNewWindow",
+      status: null
+    });
   });
 
-  it("posts the Error message as status when openFolder rejects with Error (TC-081)", async () => {
-    // Case: TC-081
+  it("posts the Error message as status when openFolder rejects with Error (TC-101)", async () => {
+    // Case: TC-101
     // Given: executeCommand rejects with an Error
     mocks.executeCommand.mockRejectedValueOnce(new Error("boom"));
 
@@ -3434,8 +3440,8 @@ describe("GitKeizuView worktree command error responses (S22)", () => {
     });
   });
 
-  it("posts String(error) as status when openFolder rejects with a non-Error (TC-082)", async () => {
-    // Case: TC-082
+  it("posts String(error) as status when openFolder rejects with a non-Error (TC-102)", async () => {
+    // Case: TC-102
     // Given: executeCommand rejects with a plain string
     mocks.executeCommand.mockRejectedValueOnce("x");
 
@@ -3453,8 +3459,8 @@ describe("GitKeizuView worktree command error responses (S22)", () => {
     });
   });
 
-  it("posts revealWorktreeInOS without status on success (TC-083)", async () => {
-    // Case: TC-083
+  it("posts revealWorktreeInOS with status null on success (TC-103)", async () => {
+    // Case: TC-103
     // Given: executeCommand succeeds
     mocks.executeCommand.mockResolvedValue(undefined);
 
@@ -3465,12 +3471,16 @@ describe("GitKeizuView worktree command error responses (S22)", () => {
       path: "wt"
     });
 
-    // Then: the response carries no status field
-    expect(mocks.postMessage).toHaveBeenCalledWith({ command: "revealWorktreeInOS" });
+    // Then: the response carries an explicit status: null (not an omitted field)
+    expect(mocks.postMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.postMessage).toHaveBeenCalledWith({
+      command: "revealWorktreeInOS",
+      status: null
+    });
   });
 
-  it("posts the Error message as status when revealFileInOS rejects with Error (TC-084)", async () => {
-    // Case: TC-084
+  it("posts the Error message as status when revealFileInOS rejects with Error (TC-104)", async () => {
+    // Case: TC-104
     // Given: executeCommand rejects with an Error
     mocks.executeCommand.mockRejectedValueOnce(new Error("no"));
 
@@ -3488,8 +3498,8 @@ describe("GitKeizuView worktree command error responses (S22)", () => {
     });
   });
 
-  it("posts String(error) as status when revealFileInOS rejects with a non-Error (TC-085)", async () => {
-    // Case: TC-085
+  it("posts String(error) as status when revealFileInOS rejects with a non-Error (TC-105)", async () => {
+    // Case: TC-105
     // Given: executeCommand rejects with a plain string
     mocks.executeCommand.mockRejectedValueOnce("y");
 
@@ -3505,6 +3515,189 @@ describe("GitKeizuView worktree command error responses (S22)", () => {
       command: "revealWorktreeInOS",
       status: "y"
     });
+  });
+});
+
+// S27: script 埋め込み JSON の `<` エスケープ serializer
+// @see docs/testing/perspectives/src/gitGraphView-test/02-state-lifecycle-01.md
+describe("GitKeizuView script-embedded JSON serializer (S27)", () => {
+  const SCRIPT_BREAKOUT_PAYLOAD = "</script><script>alert(1)</script>";
+  const NONCE_SCRIPT_OPENING = '<script nonce="test-nonce">';
+  const SCRIPT_CLOSING = "</script>";
+
+  let getLocaleMock: ReturnType<typeof vi.mocked<typeof import("../../src/i18n").getLocale>>;
+  let loadWebviewMessagesMock: ReturnType<
+    typeof vi.mocked<typeof import("../../src/i18n").loadWebviewMessages>
+  >;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitKeizuView.currentPanel = undefined;
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+
+    const i18nModule = await import("../../src/i18n");
+    getLocaleMock = vi.mocked(i18nModule.getLocale);
+    loadWebviewMessagesMock = vi.mocked(i18nModule.loadWebviewMessages);
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  function createPanel(lastActiveRepo: string | null = null): void {
+    const mockDataSource = {} as unknown as DataSource;
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => lastActiveRepo),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  }
+
+  function getPanelHtml(panelIndex: number): string {
+    const panelMock = vi.mocked(vscode.window.createWebviewPanel).mock.results[panelIndex]
+      .value as { webview: { html: string } };
+    return panelMock.webview.html;
+  }
+
+  function extractViewStateJson(html: string): string {
+    const match = html.match(/var viewState = (.+?);/);
+    expect(match).not.toBeNull();
+    return match![1];
+  }
+
+  function countOccurrences(text: string, search: string): number {
+    return text.split(search).length - 1;
+  }
+
+  function waitForRender(): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 0));
+  }
+
+  it("embeds normal values as JSON that parses back to the original data (TC-106)", async () => {
+    // Case: TC-106
+    // Given: locale, webviewMessages, and viewState contain no "<" characters
+    createPanel();
+    await waitForRender();
+
+    // When: the embedded viewState JSON is extracted and parsed
+    const viewStateJson = extractViewStateJson(getPanelHtml(0));
+    const parsedViewState = JSON.parse(viewStateJson) as Record<string, unknown>;
+
+    // Then: no escape was applied and the parsed values deep-equal the source data
+    expect(viewStateJson).not.toContain("\\u003c");
+    expect(parsedViewState.repos).toEqual({ [TEST_REPO]: "Test Repo" });
+    expect(parsedViewState.lastActiveRepo).toBeNull();
+    expect(parsedViewState.keybindings).toEqual({
+      find: "f",
+      refresh: "r",
+      scrollToHead: "h",
+      scrollToStash: "s"
+    });
+  });
+
+  it("keeps the script element count stable when repo paths contain </script> (TC-107)", async () => {
+    // Case: TC-107
+    // Given: viewState repos key and lastActiveRepo contain a script breakout payload
+    const maliciousRepo = `/repo/${SCRIPT_BREAKOUT_PAYLOAD}`;
+    mocks.getRepos.mockReturnValue({ [maliciousRepo]: "Repo" });
+    createPanel(maliciousRepo);
+    await waitForRender();
+    const injectedHtml = getPanelHtml(0);
+
+    // When: a normal render is produced for comparison
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    createPanel();
+    await waitForRender();
+    const normalHtml = getPanelHtml(1);
+
+    // Then: the nonce script element count matches the normal render and the embedded JSON
+    // contains no literal </script> (the "<" is escaped to < instead)
+    expect(countOccurrences(injectedHtml, NONCE_SCRIPT_OPENING)).toBe(
+      countOccurrences(normalHtml, NONCE_SCRIPT_OPENING)
+    );
+    expect(countOccurrences(injectedHtml, SCRIPT_CLOSING)).toBe(
+      countOccurrences(normalHtml, SCRIPT_CLOSING)
+    );
+    const viewStateJson = extractViewStateJson(injectedHtml);
+    expect(viewStateJson).not.toContain(SCRIPT_CLOSING);
+    expect(viewStateJson).toContain("\\u003c");
+  });
+
+  it("serializes reversibly without mutating the input value (TC-108)", async () => {
+    // Case: TC-108
+    // Given: a value whose string content contains </script>
+    createPanel();
+    await waitForRender();
+    const panel = GitKeizuView.currentPanel as unknown as {
+      serializeJsonForScript(value: unknown): string;
+    };
+    const input = { path: `/repo/${SCRIPT_BREAKOUT_PAYLOAD}` };
+    const pristineCopy = { path: `/repo/${SCRIPT_BREAKOUT_PAYLOAD}` };
+
+    // When: the value is serialized and the output is parsed back
+    const serialized = panel.serializeJsonForScript(input);
+    const restored = JSON.parse(serialized) as { path: string };
+
+    // Then: the output holds no literal </script>, parses back to the exact input string,
+    // and the input object itself was not modified by the replacement
+    expect(serialized).not.toContain(SCRIPT_CLOSING);
+    expect(restored.path).toBe(pristineCopy.path);
+    expect(input).toEqual(pristineCopy);
+  });
+
+  it("escapes all three embeddings: locale, webviewMessages, and viewState (TC-109)", async () => {
+    // Case: TC-109
+    // Given: locale, a webview message value, and a repo path all contain the payload
+    const maliciousLocale = `en${SCRIPT_BREAKOUT_PAYLOAD}`;
+    const maliciousMessages = { "toolbar.showAll": `Show All ${SCRIPT_BREAKOUT_PAYLOAD}` };
+    const maliciousRepo = `/repo/${SCRIPT_BREAKOUT_PAYLOAD}`;
+    getLocaleMock.mockReturnValueOnce(maliciousLocale);
+    loadWebviewMessagesMock.mockResolvedValueOnce(maliciousMessages);
+    mocks.getRepos.mockReturnValue({ [maliciousRepo]: "Repo" });
+
+    // When: the webview HTML is rendered
+    createPanel();
+    await waitForRender();
+    const html = getPanelHtml(0);
+
+    // Then: each of the three embedded JSON strings is free of literal </script> and
+    // parses back to the injected values
+    const localeAndMessagesMatch = html.match(
+      /var webviewLocale = (.+); var webviewMessages = (.+);<\/script>/
+    );
+    expect(localeAndMessagesMatch).not.toBeNull();
+    const [, localeJson, messagesJson] = localeAndMessagesMatch!;
+    expect(localeJson).not.toContain(SCRIPT_CLOSING);
+    expect(messagesJson).not.toContain(SCRIPT_CLOSING);
+    expect(JSON.parse(localeJson)).toBe(maliciousLocale);
+    expect(JSON.parse(messagesJson)).toEqual(maliciousMessages);
+    const viewStateJson = extractViewStateJson(html);
+    expect(viewStateJson).not.toContain(SCRIPT_CLOSING);
+    expect(JSON.parse(viewStateJson).repos).toEqual({ [maliciousRepo]: "Repo" });
   });
 });
 

@@ -555,4 +555,69 @@ describe("AvatarManager public behavior", () => {
       expect(result).toEqual(GRAVATAR_REMOTE_SOURCE);
     });
   });
+
+  // S26: dispose() 冪等化と dispose 後の新規処理抑止
+  // @see docs/testing/perspectives/src/avatarManager-test.md
+  describe("dispose", () => {
+    it("TC-103: dispose clears the running interval and blocks later fetch ticks", () => {
+      // Case: TC-103
+      // Given: Fake timers, a pending queue item, and a live fetch interval.
+      useFixedTime();
+      const harness = createAvatarManager({ suppressQueueCallback: false });
+      const fetchAvatarsIntervalSpy = vi
+        .spyOn(harness.manager, "fetchAvatarsInterval")
+        .mockResolvedValue(undefined);
+      harness.queue.add(DEFAULT_EMAIL, DEFAULT_REPO_PATH, [...LONG_COMMITS], true);
+      expect(harness.manager.interval).not.toBeNull();
+      fetchAvatarsIntervalSpy.mockClear();
+      const clearIntervalSpy = vi.spyOn(global, "clearInterval");
+
+      // When: dispose is called.
+      harness.manager.dispose();
+
+      // Then: clearInterval ran once, the handle is nulled, and advancing the 10s timer starts no fetch.
+      expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+      expect(harness.manager.interval).toBeNull();
+      vi.advanceTimersByTime(TEN_SECONDS_MS);
+      expect(fetchAvatarsIntervalSpy).not.toHaveBeenCalled();
+    });
+
+    it("TC-104: a second dispose call is a no-throw no-op without extra clearInterval calls", () => {
+      // Case: TC-104
+      // Given: A manager with a live interval that has already been disposed once.
+      useFixedTime();
+      const harness = createAvatarManager({ suppressQueueCallback: false });
+      vi.spyOn(harness.manager, "fetchAvatarsInterval").mockResolvedValue(undefined);
+      harness.queue.add(DEFAULT_EMAIL, DEFAULT_REPO_PATH, [...LONG_COMMITS], true);
+      const clearIntervalSpy = vi.spyOn(global, "clearInterval");
+      harness.manager.dispose();
+      expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+
+      // When: dispose is called a second time.
+      const secondDispose = () => harness.manager.dispose();
+
+      // Then: No exception is thrown and clearInterval is not called again.
+      expect(secondDispose).not.toThrow();
+      expect(clearIntervalSpy).toHaveBeenCalledTimes(1);
+    });
+
+    it("TC-105: the queue callback after dispose does not recreate the interval or fetch", () => {
+      // Case: TC-105
+      // Given: A disposed manager whose queue callback is the real implementation.
+      useFixedTime();
+      const harness = createAvatarManager({ suppressQueueCallback: false });
+      const fetchAvatarsIntervalSpy = vi
+        .spyOn(harness.manager, "fetchAvatarsInterval")
+        .mockResolvedValue(undefined);
+      harness.manager.dispose();
+      const setIntervalSpy = vi.spyOn(global, "setInterval");
+
+      // When: The queue reports items available after disposal.
+      harness.queue.itemsAvailableCallback();
+
+      // Then: No interval is registered and no immediate fetch runs.
+      expect(setIntervalSpy).not.toHaveBeenCalled();
+      expect(fetchAvatarsIntervalSpy).not.toHaveBeenCalled();
+    });
+  });
 });
