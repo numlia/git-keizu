@@ -30,6 +30,7 @@ export class AvatarManager {
   private queue: AvatarRequestQueue;
   private remoteSourceCache: { [repo: string]: RemoteSource } = {};
   private interval: NodeJS.Timeout | null = null;
+  private disposed: boolean = false;
 
   private githubTimeout: number = 0;
   private gitLabTimeout: number = 0;
@@ -40,13 +41,24 @@ export class AvatarManager {
     this.avatarStorageFolder = this.extensionState.getAvatarStoragePath();
     this.avatars = this.extensionState.getAvatarCache();
     this.queue = new AvatarRequestQueue(() => {
-      if (this.interval !== null) return;
+      if (this.disposed || this.interval !== null) return;
       this.interval = setInterval(() => {
         // Fetch avatars every 10 seconds
         this.fetchAvatarsInterval();
       }, 10000);
       this.fetchAvatarsInterval();
     });
+  }
+
+  // Idempotent disposal: stops the fetch interval and prevents any new avatar processing
+  // (queue callback, retry/requeue, webview notification). In-flight HTTP requests are not aborted.
+  public dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    if (this.interval !== null) {
+      clearInterval(this.interval);
+      this.interval = null;
+    }
   }
 
   public fetchAvatarImage(email: string, repo: string, commits: string[]) {
@@ -93,6 +105,7 @@ export class AvatarManager {
   }
 
   private async fetchAvatarsInterval() {
+    if (this.disposed) return;
     if (this.queue.hasItems()) {
       let avatarRequest = this.queue.takeItem();
       if (avatarRequest === null) return; // No avatar can be checked at the current time
@@ -178,6 +191,7 @@ export class AvatarManager {
             respBody += chunk;
           });
           res.on("end", async () => {
+            if (this.disposed) return;
             if (res.headers["x-ratelimit-remaining"] === "0") {
               // If the GitHub Api rate limit was reached, store the github timeout to prevent subsequent requests
               const resetTime = parseInt(<string>res.headers["x-ratelimit-reset"], 10);
@@ -230,6 +244,7 @@ export class AvatarManager {
         }
       )
       .on("error", () => {
+        if (this.disposed) return;
         // If connection error, try again after 5 minutes
         this.githubTimeout = t + 300000;
         this.queue.addItem(avatarRequest, this.githubTimeout, false);
@@ -260,6 +275,7 @@ export class AvatarManager {
             respBody += chunk;
           });
           res.on("end", async () => {
+            if (this.disposed) return;
             if (res.headers["ratelimit-remaining"] === "0") {
               // If the GitLab Api rate limit was reached, store the github timeout to prevent subsequent requests
               const resetTime = parseInt(<string>res.headers["ratelimit-reset"], 10);
@@ -301,6 +317,7 @@ export class AvatarManager {
         }
       )
       .on("error", () => {
+        if (this.disposed) return;
         // If connection error, try again after 5 minutes
         this.gitLabTimeout = t + 300000;
         this.queue.addItem(avatarRequest, this.gitLabTimeout, false);
@@ -403,12 +420,12 @@ export class AvatarManager {
   }
 
   private async sendAvatarToWebView(email: string, onError: () => void) {
-    if (this.view === null) return;
+    if (this.disposed || this.view === null) return;
     const avatarImage = this.avatars[email]?.image;
     if (!avatarImage) return;
     try {
       const data = await fs.readFile(path.join(this.avatarStorageFolder, avatarImage));
-      if (this.view !== null) {
+      if (!this.disposed && this.view !== null) {
         const ext = avatarImage.split(".")[1];
         this.view.sendMessage({
           command: "fetchAvatar",

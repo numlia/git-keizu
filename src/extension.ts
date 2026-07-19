@@ -17,6 +17,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const avatarManager = new AvatarManager(dataSource, extensionState);
   const statusBarItem = new StatusBarItem(context);
   const repoManager = new RepoManager(dataSource, extensionState, statusBarItem);
+  const diffDocProvider = new DiffDocProvider(dataSource);
 
   context.subscriptions.push(
     outputChannel,
@@ -44,10 +45,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.commands.registerCommand("git-keizu.clearAvatarCache", () => {
       avatarManager.clearCache();
     }),
-    vscode.workspace.registerTextDocumentContentProvider(
-      DiffDocProvider.scheme,
-      new DiffDocProvider(dataSource)
-    ),
+    // Register both the provider instance and the registration disposable: unregistering alone
+    // does not release the provider's internal subscription and event emitter.
+    diffDocProvider,
+    vscode.workspace.registerTextDocumentContentProvider(DiffDocProvider.scheme, diffDocProvider),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("git-keizu.showStatusBarItem")) {
         statusBarItem.refresh();
@@ -66,6 +67,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         GitKeizuView.currentPanel?.notifyShowRecentActionsChanged();
       }
     }),
+    avatarManager,
     repoManager
   );
 
