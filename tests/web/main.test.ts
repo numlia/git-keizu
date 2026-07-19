@@ -2748,6 +2748,133 @@ describe("GitKeizuView frontend integration", () => {
         expect(spies.preventDefault).not.toHaveBeenCalled();
       });
     });
+
+    /* S46: Arrow ナビゲーション分岐の入力可能要素ガード */
+    // @see docs/testing/perspectives/web/main-test/04-keyboard-selection-01.md
+
+    describe("editable event-target guard (S46)", () => {
+      const appendedTargets: HTMLElement[] = [];
+
+      function appendTarget<T extends HTMLElement>(element: T): T {
+        document.body.appendChild(element);
+        appendedTargets.push(element);
+        return element;
+      }
+
+      function dispatchKeyFromElement(
+        target: HTMLElement,
+        key: string,
+        options?: { ctrlKey?: boolean }
+      ): ArrowKeySpies {
+        const event = new KeyboardEvent("keydown", {
+          key,
+          ctrlKey: options?.ctrlKey ?? false,
+          bubbles: true,
+          cancelable: true
+        });
+        const preventDefaultSpy = vi.spyOn(event, "preventDefault");
+        const stopPropagationSpy = vi.spyOn(event, "stopPropagation");
+        target.dispatchEvent(event);
+        return { preventDefault: preventDefaultSpy, stopPropagation: stopPropagationSpy };
+      }
+
+      afterEach(() => {
+        for (const target of appendedTargets.splice(0)) {
+          target.remove();
+        }
+      });
+
+      it("ArrowDown from an input element does not navigate commits (TC-257)", () => {
+        // Case: TC-257
+        // Given: a commit with a movable index is expanded and an input element exists
+        expandCommit(COMMIT_HASH_2);
+        const input = appendTarget(document.createElement("input"));
+
+        // When: ArrowDown keydown is dispatched with the input as the event target
+        const spies = dispatchKeyFromElement(input, "ArrowDown");
+
+        // Then: no commit details load and the caret events are not consumed
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
+      });
+
+      it("ArrowUp from a textarea element does not navigate commits (TC-258)", () => {
+        // Case: TC-258
+        // Given: a commit with a movable index is expanded and a textarea element exists
+        expandCommit(COMMIT_HASH_2);
+        const textarea = appendTarget(document.createElement("textarea"));
+
+        // When: ArrowUp keydown is dispatched with the textarea as the event target
+        const spies = dispatchKeyFromElement(textarea, "ArrowUp");
+
+        // Then: no commit details load and the caret events are not consumed
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
+      });
+
+      it("ArrowDown from a select element does not navigate commits (TC-259)", () => {
+        // Case: TC-259
+        // Given: a commit with a movable index is expanded and a select element exists
+        expandCommit(COMMIT_HASH_2);
+        const select = appendTarget(document.createElement("select"));
+
+        // When: ArrowDown keydown is dispatched with the select as the event target
+        const spies = dispatchKeyFromElement(select, "ArrowDown");
+
+        // Then: no commit details load and the dropdown events are not consumed
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
+      });
+
+      it("ArrowDown from a contenteditable element does not navigate commits (TC-260)", () => {
+        // Case: TC-260
+        // Given: a commit with a movable index is expanded and a contenteditable element exists
+        expandCommit(COMMIT_HASH_2);
+        const editableDiv = appendTarget(document.createElement("div"));
+        editableDiv.setAttribute("contenteditable", "true");
+
+        // When: ArrowDown keydown is dispatched with the contenteditable div as the event target
+        const spies = dispatchKeyFromElement(editableDiv, "ArrowDown");
+
+        // Then: no commit details load and the editing events are not consumed
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
+      });
+
+      it("ArrowDown from a non-editable target keeps the existing navigation (TC-261)", () => {
+        // Case: TC-261
+        // Given: a commit with an adjacent commit is expanded and the target is document.body
+        expandCommit(COMMIT_HASH_2);
+
+        // When: ArrowDown keydown is dispatched with document.body as the event target
+        const spies = dispatchKeyFromElement(document.body, "ArrowDown");
+
+        // Then: the next commit loads once and the event is consumed as before
+        expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+        expect(vscode.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ command: "commitDetails", commitHash: COMMIT_HASH_3 })
+        );
+        expect(spies.preventDefault).toHaveBeenCalledTimes(1);
+        expect(spies.stopPropagation).toHaveBeenCalledTimes(1);
+      });
+
+      it("Ctrl+F from an input element still opens the find widget (TC-262)", () => {
+        // Case: TC-262
+        // Given: an input element is the event target (no blanket early return at function start)
+        const input = appendTarget(document.createElement("input"));
+
+        // When: Ctrl+F keydown is dispatched from the input element
+        dispatchKeyFromElement(input, "f", { ctrlKey: true });
+
+        // Then: the global find shortcut still runs exactly once
+        expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(1);
+        expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
+      });
+    });
   });
 
   /* ---------------------------------------------------------------- */

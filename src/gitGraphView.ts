@@ -499,7 +499,7 @@ export class GitKeizuView {
                   vscode.Uri.file(path.resolve(msg.repo, msg.path)),
                   { forceNewWindow: true }
                 );
-                this.sendMessage({ command: "openWorktreeInNewWindow" });
+                this.sendMessage({ command: "openWorktreeInNewWindow", status: null });
               } catch (error) {
                 this.sendMessage({
                   command: "openWorktreeInNewWindow",
@@ -513,7 +513,7 @@ export class GitKeizuView {
                   "revealFileInOS",
                   vscode.Uri.file(path.resolve(msg.repo, msg.path))
                 );
-                this.sendMessage({ command: "revealWorktreeInOS" });
+                this.sendMessage({ command: "revealWorktreeInOS", status: null });
               } catch (error) {
                 this.sendMessage({
                   command: "revealWorktreeInOS",
@@ -664,8 +664,8 @@ export class GitKeizuView {
 			<ul id="contextMenu"></ul>
 			<div id="dialogBacking"></div>
 			<div id="dialog"></div>
-			<script nonce="${nonce}">var webviewLocale = ${JSON.stringify(locale)}; var webviewMessages = ${JSON.stringify(webviewMessages)};</script>
-			<script nonce="${nonce}">var viewState = ${JSON.stringify(viewState)};</script>
+			<script nonce="${nonce}">var webviewLocale = ${this.serializeJsonForScript(locale)}; var webviewMessages = ${this.serializeJsonForScript(webviewMessages)};</script>
+			<script nonce="${nonce}">var viewState = ${this.serializeJsonForScript(viewState)};</script>
 			<script src="${this.getCompiledOutputUri("web.min.js")}"></script>
 			</body>`;
     } else {
@@ -694,6 +694,12 @@ export class GitKeizuView {
 			</head>
 			${body}
 		</html>`;
+  }
+
+  // Escapes "<" in the serialized output (not the input value) so values containing
+  // "</script>" cannot terminate the inline <script> element they are embedded in.
+  private serializeJsonForScript(value: unknown): string {
+    return JSON.stringify(value).replace(/</g, "\\u003c");
   }
 
   private getMediaUri(file: string) {

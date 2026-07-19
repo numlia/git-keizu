@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
+  createAvatarCacheEntry,
   createAvatarManager,
   createAvatarRequest,
   createGravatarUrl,
@@ -10,6 +11,7 @@ import {
   DEFAULT_TIME_MS,
   FIVE_MINUTES_MS,
   flushAsyncWork,
+  fsMocks,
   GITHUB_HOSTNAME,
   GITHUB_RATE_LIMIT_HEADER,
   GITHUB_RATE_LIMIT_RESET_HEADER,
@@ -372,6 +374,28 @@ describe("AvatarManager remote fetch flows", () => {
         DEFAULT_TIME_MS + FIVE_MINUTES_MS,
         false
       );
+    });
+
+    // S26: dispose() 冪等化と dispose 後の新規処理抑止
+    // @see docs/testing/perspectives/src/avatarManager-test.md
+    it("TC-106: an in-flight fetch error after dispose neither requeues nor restarts the interval", async () => {
+      // Case: TC-106
+      // Given: A GitHub fetch is in flight and its network error has not been delivered yet.
+      useFixedTime();
+      const harness = createAvatarManager();
+      const request = createAvatarRequest();
+      const queueAddItemSpy = vi.spyOn(harness.queue, "addItem");
+      const setIntervalSpy = vi.spyOn(global, "setInterval");
+      mockHttpsError(NETWORK_ERROR_MESSAGE);
+      harness.manager.fetchFromGithub(request, GITHUB_REMOTE_OWNER, GITHUB_REMOTE_REPO);
+
+      // When: The manager is disposed before the error callback completes.
+      harness.manager.dispose();
+      await flushAsyncWork();
+
+      // Then: The disposed guard blocks the retry: no requeue and no interval recreation.
+      expect(queueAddItemSpy).not.toHaveBeenCalled();
+      expect(setIntervalSpy).not.toHaveBeenCalled();
     });
   });
 
@@ -909,6 +933,29 @@ describe("AvatarManager remote fetch flows", () => {
         true
       );
       expect(harness.manager.githubTimeout).toBe(0);
+    });
+  });
+
+  // S26: dispose() 冪等化と dispose 後の新規処理抑止
+  // @see docs/testing/perspectives/src/avatarManager-test.md
+  describe("webview notification after dispose (S26)", () => {
+    it("TC-107: does not send an avatar notification to the webview after dispose (TC-107)", async () => {
+      // Case: TC-107
+      // Given: A cached avatar, a registered webview, and a manager that has been disposed.
+      const harness = createAvatarManager({
+        avatarCache: { [DEFAULT_EMAIL]: createAvatarCacheEntry() }
+      });
+      harness.manager.registerView(harness.view);
+      const onError = vi.fn();
+      harness.manager.dispose();
+
+      // When: The avatar notification timing arrives after disposal.
+      await harness.manager.sendAvatarToWebView(DEFAULT_EMAIL, onError);
+
+      // Then: No webview message is sent, no avatar file is read, and the error callback stays idle.
+      expect(harness.sendMessage).not.toHaveBeenCalled();
+      expect(fsMocks.readFile).not.toHaveBeenCalled();
+      expect(onError).not.toHaveBeenCalled();
     });
   });
 });

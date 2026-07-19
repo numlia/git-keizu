@@ -30,7 +30,8 @@
 
 > Origin: Feature 040 (settings-and-copy-polish) (light-spec-plan)
 > Added: 2026-05-17
-> Status: active
+> Status: superseded
+> Superseded By: S19
 > Supersedes: -
 > Signature: `graphColours(): string[]`
 > Target Path: `src/config.ts`

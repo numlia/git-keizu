@@ -149,3 +149,44 @@
 | TC-097  | `config.fetchAvatars()` が `true`、await 完了後に `isAvatarStorageAvailable()` が `true` を返す                 | Normal - fetchAvatars enabled after init                                   | 生成された `viewState.fetchAvatars` が `true` になる                                                                 | 初期化完了後の確定値反映 |
 | TC-098  | `config.fetchAvatars()` が `true`、await 完了後も `isAvatarStorageAvailable()` が `false`（ストレージ利用不可） | Boundary - storage unavailable                                             | `viewState.fetchAvatars` が `false` になる                                                                           | ストレージ不可時         |
 | TC-099  | `config.fetchAvatars()` が `false`、`isAvatarStorageAvailable()` が `true`                                      | Boundary - config disabled                                                 | `viewState.fetchAvatars` が `false`（AND 条件で config 側が優先的に false）                                          | 設定 OFF 時              |
+
+## S27: script 埋め込み JSON の `<` エスケープ serializer
+
+> Origin: Feature 045 (defensive-fixes) (light-spec-plan)
+> Added: 2026-07-19
+> Status: active
+> Supersedes: -
+> Signature: private serializer（`JSON.stringify` 結果中の `<` を serialized literal `\u003c` へ置換。実装時に確定）
+> Target Path: `src/gitGraphView.ts:667-668`
+
+`<script>` 要素へ埋め込む3値（`locale` / `webviewMessages` / `viewState`）を共通の安全な serializer 経由へ変更する修正。`JSON.stringify` の出力中の `<` を JavaScript Unicode escape `\u003c`（TypeScript の置換文字列は `"\\u003c"`）へ置換し、repo path 等に `</script>` を含んでも script 要素が分断されないようにする（[17] の修正）。入力値そのものは変更せず、復元可能性を維持する。CSP・nonce・外部 script URI は変更しない。
+
+| Case ID | Input / Precondition                                                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                    | Notes                                  |
+| ------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| TC-106  | `<` を含まない通常の locale / webviewMessages / viewState で `getHtmlForWebview()` を実行                 | Normal - 通常値の等価性                                                    | 埋め込み JSON 文字列を `JSON.parse` した結果が元の値と deep-equal（既存 TC-019/020/039/044/097〜099 の viewState 経路が維持される）                | 通常値では `JSON.stringify` と同一出力 |
+| TC-107  | viewState の repo path（`repos` キーと `lastActiveRepo`）に `</script><script>alert(1)</script>` を含める | Boundary - script 要素の分断防止                                           | 生成 HTML の nonce 付き `<script>` 要素数が通常時と同数で、埋め込み JSON 内に literal な部分文字列 `</script>` が現れない（`\u003c` へ置換される） | HTML 注入を伴う機能不全の防止          |
+| TC-108  | `</script>` を含む文字列値を serializer で直列化し、出力を復元                                            | Normal - 復元同値性                                                        | serializer 出力（`\u003c` 置換済み）を `JSON.parse` した文字列が元の入力と厳密一致し、入力オブジェクト自体は置換で変更されていない                 | 非破壊・可逆性                         |
+| TC-109  | locale と webviewMessages の値にも `</script>` を含めて `getHtmlForWebview()` を実行                      | Boundary - 3埋め込みすべてへの適用                                         | `locale` / `webviewMessages` / `viewState` の3埋め込みすべてで literal `</script>` が現れない（一部の埋め込みだけの処理でない）                    | 適用漏れの検出                         |
+
+### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S27）
+
+| 失敗源                                                 | 対応ケースまたは除外理由                                                                    |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
+| `</script>` を含む値による script 要素の分断           | TC-107                                                                                      |
+| 一部の埋め込みだけへの適用（locale / messages の漏れ） | TC-109                                                                                      |
+| 置換による値の破壊（復元不能・入力の破壊的変更）       | TC-108                                                                                      |
+| 通常値の直列化退行                                     | TC-106                                                                                      |
+| `<` の単純な HTML エンティティ等への誤置換             | TC-108（`JSON.parse` での復元同値性で検出）                                                 |
+| script 実行への到達                                    | excluded(CSP の nonce 指定 `script-src` により防止済みで本修正の対象外。仕様確定済みの前提) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(serializer は任意の JSON 化可能値を受け入れ、拒否分岐を持たない)
+- Exception: excluded(`JSON.stringify` / 文字列置換に throw 分岐を追加しない。循環参照値は viewState 構築契約上発生しない)
+- External: excluded(外部依存なし。HTML 生成は純粋な文字列処理)
+- Boundary: TC-107、TC-109
+- Type: excluded(埋め込み3値の型は TypeScript コンパイル時に保証される)
+
+数値・空値境界（0 / minimum / maximum / +/-1 / empty / NULL）は、本セクションの対象が文字列エスケープ契約であり仕様上意味を持たないため対象外とする（意味のある境界は `</script>` 部分文字列の TC-107/TC-109 で充足）。
+
+**失敗系/正常系比（煙感知器）**: 正常系2件（TC-106、TC-108）、失敗系2件（TC-107、TC-109）。件数が同数のためインベントリを再導出したが、本変更の失敗源は上表のとおりすべて対応ケースまたは除外理由で充足されており、追加すべき失敗系ケースはないことを確認した（エスケープ契約のため失敗系は Boundary のみとなる）。

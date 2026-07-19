@@ -724,28 +724,6 @@ describe("graphColours RGBA filter", () => {
     expect(result).toEqual(["rgba(1, 2, 3, 1)"]);
   });
 
-  // Case: TC-089
-  it("rejects rgba(r, g, b) with only 3 arguments", () => {
-    // Given: graphColours contains rgba with only 3 args
-    withGraphColours(["rgba(1, 2, 3)"]);
-    // When: reading graphColours
-    const config = getConfig();
-    const result = config.graphColours();
-    // Then: 3-argument rgba is filtered out
-    expect(result).toEqual([]);
-  });
-
-  // Case: TC-090
-  it("rejects rgba with alpha out of range", () => {
-    // Given: graphColours contains rgba with alpha 1.5
-    withGraphColours(["rgba(1, 2, 3, 1.5)"]);
-    // When: reading graphColours
-    const config = getConfig();
-    const result = config.graphColours();
-    // Then: out-of-range alpha is filtered out
-    expect(result).toEqual([]);
-  });
-
   // Case: TC-091
   it("accepts rgb(r, g, b) and 6/8-digit HEX", () => {
     // Given: a mix of valid formats
@@ -766,6 +744,98 @@ describe("graphColours RGBA filter", () => {
     const result = config.graphColours();
     // Then: only valid entries remain in original order
     expect(result).toEqual(["rgba(1, 2, 3, 0.5)", "#0085d9"]);
+  });
+});
+
+// S19: graphColours() 空フィルタ結果の既定色フォールバック
+// @see docs/testing/perspectives/src/config-test/04-feature-045-defensive-fixes-01.md
+describe("graphColours empty-filter fallback", () => {
+  const DEFAULT_COLOUR_COUNT = 12;
+  const DEFAULT_FIRST_COLOUR = "#0085d9";
+  const DEFAULT_LAST_COLOUR = "#ffcc00";
+
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  function withGraphColours(values: string[]) {
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "graphColours" ? values : defaultValue
+    );
+  }
+
+  it("falls back to the 12 default colours when configured as an empty array (TC-101)", () => {
+    // Case: TC-101
+    // Given: graphColours is explicitly configured as an empty array
+    withGraphColours([]);
+
+    // When: reading graphColours
+    const config = getConfig();
+    const result = config.graphColours();
+
+    // Then: the 12 default colours are returned (first #0085d9, last #ffcc00)
+    expect(result).toHaveLength(DEFAULT_COLOUR_COUNT);
+    expect(result[0]).toBe(DEFAULT_FIRST_COLOUR);
+    expect(result[result.length - 1]).toBe(DEFAULT_LAST_COLOUR);
+  });
+
+  it("falls back to the 12 default colours when every entry is filtered out (TC-102)", () => {
+    // Case: TC-102
+    // Given: graphColours contains only entries that fail the colour pattern
+    withGraphColours(["not-a-color", "rgba(1, 2, 3)"]);
+
+    // When: reading graphColours
+    const config = getConfig();
+    const result = config.graphColours();
+
+    // Then: the 12 default colours are returned instead of an empty array
+    expect(result).toHaveLength(DEFAULT_COLOUR_COUNT);
+    expect(result[0]).toBe(DEFAULT_FIRST_COLOUR);
+    expect(result[result.length - 1]).toBe(DEFAULT_LAST_COLOUR);
+  });
+
+  it("keeps only the valid colours in order for mixed input without falling back (TC-103)", () => {
+    // Case: TC-103
+    // Given: graphColours mixes valid and invalid entries
+    withGraphColours(["rgba(1, 2, 3, 0.5)", "bad", "#0085d9"]);
+
+    // When: reading graphColours
+    const config = getConfig();
+    const result = config.graphColours();
+
+    // Then: only the valid colours remain in input order and the fallback is not applied
+    expect(result).toEqual(["rgba(1, 2, 3, 0.5)", "#0085d9"]);
+  });
+
+  it("passes through a fully valid colour list in input order (TC-104)", () => {
+    // Case: TC-104
+    // Given: graphColours contains only valid entries
+    withGraphColours(["#0085d9cc", "rgb(1, 2, 3)"]);
+
+    // When: reading graphColours
+    const config = getConfig();
+    const result = config.graphColours();
+
+    // Then: the configured colours are returned unchanged in input order
+    expect(result).toEqual(["#0085d9cc", "rgb(1, 2, 3)"]);
+  });
+
+  it("returns an independent copy of the default colours on each fallback (TC-105)", () => {
+    // Case: TC-105
+    // Given: an empty configuration triggered the fallback and the returned array is mutated
+    withGraphColours([]);
+    const config = getConfig();
+    const firstResult = config.graphColours();
+    firstResult.push("#000000");
+
+    // When: graphColours is read again
+    const secondResult = config.graphColours();
+
+    // Then: the second result is an unaffected 12-colour default array
+    expect(secondResult).toHaveLength(DEFAULT_COLOUR_COUNT);
+    expect(secondResult).not.toContain("#000000");
+    expect(secondResult[0]).toBe(DEFAULT_FIRST_COLOUR);
+    expect(secondResult[secondResult.length - 1]).toBe(DEFAULT_LAST_COLOUR);
   });
 });
 
@@ -852,70 +922,68 @@ describe("openNewTabEditorGroup", () => {
   });
 });
 
-// S17: gitPath() Git 実行パス解決
+// S18: gitPath() git.path 設定の候補列正規化
+// @see docs/testing/perspectives/src/config-test/04-feature-045-defensive-fixes-01.md
 describe("gitPath", () => {
   beforeEach(() => {
     mockGet.mockReset();
   });
 
-  it("returns 'git' when git.path is null (default fallback) (TC-093)", () => {
-    // Case: TC-093
+  function withGitPath(value: unknown) {
+    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+      key === "path" ? value : defaultValue
+    );
+  }
+
+  it("wraps a string git.path into a single-candidate list (TC-097)", () => {
+    // Case: TC-097
+    // Given: git.path configured to a single string path
+    withGitPath("/usr/local/bin/git");
+
+    // When: reading gitPath
+    const config = getConfig();
+    const result = config.gitPath();
+
+    // Then: a one-element candidate list containing the configured path is returned
+    expect(result).toEqual(["/usr/local/bin/git"]);
+  });
+
+  it("returns an array git.path in configured order (TC-098)", () => {
+    // Case: TC-098
+    // Given: git.path configured to an array of candidate paths
+    withGitPath(["C:\\Git\\git.exe", "/usr/bin/git"]);
+
+    // When: reading gitPath
+    const config = getConfig();
+    const result = config.gitPath();
+
+    // Then: the candidates are returned in the exact input order
+    expect(result).toEqual(["C:\\Git\\git.exe", "/usr/bin/git"]);
+  });
+
+  it("returns an empty candidate list when git.path is null (TC-099)", () => {
+    // Case: TC-099
     // Given: git.path setting returns null (VS Code default behavior)
-    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
-      key === "path" ? null : defaultValue
-    );
+    withGitPath(null);
 
     // When: reading gitPath
     const config = getConfig();
     const result = config.gitPath();
 
-    // Then: falls back to "git"
-    expect(result).toBe("git");
+    // Then: an empty array is returned (the final git fallback belongs to the resolver)
+    expect(result).toEqual([]);
   });
 
-  it("returns configured git.path as-is (TC-094)", () => {
-    // Case: TC-094
-    // Given: git.path configured to a Unix-style absolute path
-    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
-      key === "path" ? "/usr/local/bin/git" : defaultValue
-    );
+  it("filters non-string elements from an array git.path while keeping order (TC-100)", () => {
+    // Case: TC-100
+    // Given: git.path configured to an array with non-string elements mixed in
+    withGitPath(["/usr/bin/git", 42, null, {}]);
 
     // When: reading gitPath
     const config = getConfig();
     const result = config.gitPath();
 
-    // Then: the configured path is returned without modification
-    expect(result).toBe("/usr/local/bin/git");
-  });
-
-  it("returns empty string when git.path is set to empty string (TC-095)", () => {
-    // Case: TC-095
-    // Given: git.path configured to an empty string (only !== null is checked)
-    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
-      key === "path" ? "" : defaultValue
-    );
-
-    // When: reading gitPath
-    const config = getConfig();
-    const result = config.gitPath();
-
-    // Then: empty string is returned (not normalized to "git")
-    expect(result).toBe("");
-  });
-
-  it("returns Windows-style git.path as-is (TC-096)", () => {
-    // Case: TC-096
-    // Given: git.path configured to a Windows-style absolute path
-    const windowsPath = "C:\\Program Files\\Git\\bin\\git.exe";
-    mockGet.mockImplementation((key: string, defaultValue: unknown) =>
-      key === "path" ? windowsPath : defaultValue
-    );
-
-    // When: reading gitPath
-    const config = getConfig();
-    const result = config.gitPath();
-
-    // Then: the Windows path is returned without modification
-    expect(result).toBe(windowsPath);
+    // Then: only the string elements remain in input order
+    expect(result).toEqual(["/usr/bin/git"]);
   });
 });

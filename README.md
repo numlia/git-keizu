@@ -68,7 +68,7 @@ An actively maintained fork of [Git Graph](https://github.com/mhutchie/vscode-gi
 - **Fetch with automatic prune**: The Fetch button runs `git fetch --prune` — stale remote-tracking references are cleaned up automatically on every fetch
 - **SCM Panel Button**: Open the Git Keizu graph directly from the VS Code Source Control panel title bar; the repository is selected automatically based on the active SCM provider. Button position (Inline or More Actions menu) is configurable
 - **Keyboard Shortcuts**: Configurable shortcuts for Find (Ctrl/Cmd+F), Refresh (Ctrl/Cmd+R), Scroll to HEAD (Ctrl/Cmd+H), and Scroll to Stash (Ctrl/Cmd+S, Shift to go backward); each can be rebound or disabled in settings
-- **Arrow key commit navigation**: With a commit's detail panel open, navigate between commits using Arrow keys — no modifier for table order, Ctrl/Cmd for branch-tracking (parent/child on the same branch), and Ctrl/Cmd+Shift to cross to an alternative branch or merge source; disabled in comparison mode
+- **Arrow key commit navigation**: With a commit's detail panel open, navigate between commits using Arrow keys — no modifier for table order, Ctrl/Cmd for branch-tracking (parent/child on the same branch), and Ctrl/Cmd+Shift to cross to an alternative branch or merge source; disabled in comparison mode and while typing in a text input, so the search box and dialog fields keep normal caret behaviour
 - **Commit Search**: Press Ctrl/Cmd+F to open a search bar with regex mode, case-sensitive mode, match counter (N of M), and prev/next navigation
 - **2-Commit Comparison**: Ctrl/Cmd+click a second commit to compare it with the selected commit; the panel header shows "Displaying all changes from [older] to [newer]" in chronological order, file diffs always show old→new regardless of which commit was selected first, and comparison state is preserved when switching VS Code tabs
 - **Combined branch/remote labels**: Local and remote branches on the same commit merge into a single pill label — `[main | origin]`. Right-clicking either part opens the appropriate context menu.
@@ -158,7 +158,7 @@ Per-repository override is available via the table header right-click context me
 Git Keizu has undergone a full security audit and remediation (27 issues fixed):
 
 - **Shell injection eliminated** — all git commands use `child_process.spawn()` exclusively; `exec()` has been removed entirely
-- **Git binary validation** — the configured `git.path` is validated to be an absolute path pointing to a `git` executable, preventing arbitrary command execution via a malicious `.vscode/settings.json`
+- **Git binary resolution** — the configured `git.path` (a single path or, as VS Code allows, a list of candidate paths) is verified by running each candidate with `--version` and only the first working executable is adopted; unusable values fall back to `git` on the PATH
 - **Commit hash validation** — every operation that accepts a commit hash validates the format before passing it to git
 - **Repository path validation** — all messages from the webview are checked against the registered repository list, preventing commands from running against arbitrary directories
 - **Path traversal prevention** — file path arguments are checked for `..` sequences

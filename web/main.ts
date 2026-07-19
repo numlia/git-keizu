@@ -88,6 +88,15 @@ type PendingCommitLoad = {
   callbacks: ((changes: boolean) => void)[];
 };
 
+const EDITABLE_TAG_NAMES = ["INPUT", "TEXTAREA", "SELECT"];
+
+function isEditableEventTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (EDITABLE_TAG_NAMES.includes(target.tagName)) return true;
+  const contentEditable = target.getAttribute("contenteditable");
+  return target.isContentEditable || (contentEditable !== null && contentEditable !== "false");
+}
+
 function buildAuthorOptions(
   authors: string[],
   selectedAuthors: string[]
@@ -1228,6 +1237,10 @@ class GitKeizuView {
       (e.key === "ArrowUp" || e.key === "ArrowDown") &&
       this.expandedCommit.compareWithHash === null
     ) {
+      // Guard only this branch (not the whole handler) so global shortcuts
+      // such as Ctrl/Cmd+F keep working while typing in editable elements.
+      if (isEditableEventTarget(e.target)) return;
+
       const curIndex = this.commitLookup[this.expandedCommit.hash];
       if (typeof curIndex === "number") {
         let newIndex = -1;

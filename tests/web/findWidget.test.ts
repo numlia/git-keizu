@@ -642,4 +642,158 @@ describe("FindWidget", () => {
       expect(getPositionText()).toBe("1 of 1");
     });
   });
+
+  /* --- S8: stash セレクタ検索の表示文字列照合 --- */
+  // @see docs/testing/perspectives/web/findWidget-test.md
+
+  describe("stash selector display matching (S8)", () => {
+    const STASH_HASH = "ccc3333300000000";
+    const STASH_SELECTOR = "stash@{0}";
+    const STASH_DISPLAY_SELECTOR = "@{0}";
+
+    function setupStashCommitAndDom(): void {
+      const stashCommit = makeCommit({
+        hash: STASH_HASH,
+        message: "work in progress",
+        stash: { selector: STASH_SELECTOR } as unknown as GG.GitCommitNode["stash"]
+      });
+      (callbacks.getCommits as Mock).mockReturnValue([stashCommit]);
+      createCommitRow(0, [
+        STASH_DISPLAY_SELECTOR,
+        stashCommit.message,
+        stashCommit.author,
+        STASH_HASH.substring(0, ABBREV_LENGTH)
+      ]);
+    }
+
+    it("does not match the hidden stash prefix (TC-033)", () => {
+      // Case: TC-033
+      // Given: a stash row displayed with the short selector @{0} and no "stash" text elsewhere
+      setupStashCommitAndDom();
+
+      // When: searching for "stash"
+      triggerSearch(widget, "stash");
+
+      // Then: the stash row is not a match and no findMatch span is inserted
+      expect(getPositionText()).toBe("No Results");
+      expect(getMatchSpans()).toHaveLength(0);
+    });
+
+    it("matches and highlights the displayed short selector (TC-034)", () => {
+      // Case: TC-034
+      // Given: the same stash row
+      setupStashCommitAndDom();
+
+      // When: searching for the displayed selector "@{0}"
+      triggerSearch(widget, STASH_DISPLAY_SELECTOR);
+
+      // Then: the row matches with an in-row highlight span containing the selector text
+      expect(getPositionText()).toBe("1 of 1");
+      const matchSpans = getMatchSpans();
+      expect(matchSpans).toHaveLength(1);
+      expect(matchSpans[0].textContent).toBe(STASH_DISPLAY_SELECTOR);
+      const highlightedBefore = getHighlightedRows();
+      expect(highlightedBefore).toHaveLength(1);
+
+      // When: navigating with next and prev
+      (document.getElementById("findNext") as HTMLElement).click();
+      (document.getElementById("findPrev") as HTMLElement).click();
+
+      // Then: the same row stays the current match
+      const highlightedAfter = getHighlightedRows();
+      expect(highlightedAfter).toHaveLength(1);
+      expect(highlightedAfter[0]).toBe(highlightedBefore[0]);
+      expect(getPositionText()).toBe("1 of 1");
+    });
+
+    it("does not match the full stash selector (TC-035)", () => {
+      // Case: TC-035
+      // Given: the same stash row
+      setupStashCommitAndDom();
+
+      // When: searching for the full selector "stash@{0}"
+      triggerSearch(widget, STASH_SELECTOR);
+
+      // Then: nothing matches and no findMatch span is inserted
+      expect(getPositionText()).toBe("No Results");
+      expect(getMatchSpans()).toHaveLength(0);
+    });
+  });
+
+  /* --- S9: openCdvEnabled の状態保存・復元 --- */
+  // @see docs/testing/perspectives/web/findWidget-test.md
+
+  describe("openCdvEnabled state save and restore (S9)", () => {
+    const CLASS_ACTIVE = "active";
+
+    function getOpenCdvElem(): HTMLElement {
+      return document.getElementById("findOpenCdv") as HTMLElement;
+    }
+
+    function createState(overrides: Partial<FindWidgetState>): FindWidgetState {
+      return {
+        text: "",
+        currentHash: null,
+        visible: false,
+        caseSensitive: false,
+        regex: false,
+        ...overrides
+      };
+    }
+
+    it("saves openCdvEnabled as a boolean independent of visibility (TC-036)", () => {
+      // Case: TC-036
+      // Given: the open-CDV toggle is switched on while the widget stays hidden
+      getOpenCdvElem().click();
+
+      // When: getState is called
+      const state = widget.getState();
+
+      // Then: openCdvEnabled is the boolean true even though the widget is not visible
+      expect(state.openCdvEnabled).toBe(true);
+      expect(state.visible).toBe(false);
+    });
+
+    it("restores the value and active class before the hidden early return (TC-037)", () => {
+      // Case: TC-037
+      // Given: a saved state that is hidden but has openCdvEnabled true
+      const state = createState({ visible: false, openCdvEnabled: true });
+
+      // When: restoreState is called
+      widget.restoreState(state);
+
+      // Then: the internal value and #findOpenCdv active class are restored while staying hidden
+      expect(widget.getState().openCdvEnabled).toBe(true);
+      expect(getOpenCdvElem().classList.contains(CLASS_ACTIVE)).toBe(true);
+      expect(widget.isVisible()).toBe(false);
+    });
+
+    it("restores the value, class, and visibility for a visible state (TC-038)", () => {
+      // Case: TC-038
+      // Given: a saved state that is visible with openCdvEnabled true
+      const state = createState({ visible: true, openCdvEnabled: true });
+
+      // When: restoreState is called
+      widget.restoreState(state);
+
+      // Then: the internal value, active class, and widget visibility are all restored
+      expect(widget.getState().openCdvEnabled).toBe(true);
+      expect(getOpenCdvElem().classList.contains(CLASS_ACTIVE)).toBe(true);
+      expect(widget.isVisible()).toBe(true);
+    });
+
+    it("treats a legacy state without the field as false (TC-039)", () => {
+      // Case: TC-039
+      // Given: a legacy saved state that has no openCdvEnabled field
+      const legacyState = createState({ visible: true });
+      delete (legacyState as { openCdvEnabled?: boolean }).openCdvEnabled;
+
+      // When: restoreState is called
+      widget.restoreState(legacyState);
+
+      // Then: the internal value falls back to false and no active class is applied
+      expect(widget.getState().openCdvEnabled).toBe(false);
+      expect(getOpenCdvElem().classList.contains(CLASS_ACTIVE)).toBe(false);
+    });
+  });
 });

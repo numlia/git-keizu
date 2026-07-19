@@ -8,13 +8,16 @@ import { GitKeizuView } from "./gitGraphView";
 import { RepoManager } from "./repoManager";
 import { StatusBarItem } from "./statusBarItem";
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext): Promise<void> {
   const outputChannel = vscode.window.createOutputChannel("Git Keizu");
   const extensionState = new ExtensionState(context);
   const dataSource = new DataSource();
+  // Dependent managers must not start Git commands before the git path is resolved.
+  await dataSource.registerGitPath();
   const avatarManager = new AvatarManager(dataSource, extensionState);
   const statusBarItem = new StatusBarItem(context);
   const repoManager = new RepoManager(dataSource, extensionState, statusBarItem);
+  const diffDocProvider = new DiffDocProvider(dataSource);
 
   context.subscriptions.push(
     outputChannel,
@@ -42,10 +45,10 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.commands.registerCommand("git-keizu.clearAvatarCache", () => {
       avatarManager.clearCache();
     }),
-    vscode.workspace.registerTextDocumentContentProvider(
-      DiffDocProvider.scheme,
-      new DiffDocProvider(dataSource)
-    ),
+    // Register both the provider instance and the registration disposable: unregistering alone
+    // does not release the provider's internal subscription and event emitter.
+    diffDocProvider,
+    vscode.workspace.registerTextDocumentContentProvider(DiffDocProvider.scheme, diffDocProvider),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("git-keizu.showStatusBarItem")) {
         statusBarItem.refresh();
@@ -57,12 +60,14 @@ export function activate(context: vscode.ExtensionContext) {
         repoManager.maxDepthOfRepoSearchChanged();
       }
       if (e.affectsConfiguration("git.path")) {
-        dataSource.registerGitPath();
+        // Fire-and-forget: the previous git path stays in effect until resolution completes.
+        void dataSource.registerGitPath();
       }
       if (e.affectsConfiguration("git-keizu.menu.showRecentActions")) {
         GitKeizuView.currentPanel?.notifyShowRecentActionsChanged();
       }
     }),
+    avatarManager,
     repoManager
   );
 

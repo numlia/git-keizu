@@ -590,7 +590,7 @@ export interface RequestOpenWorktreeInNewWindow {
 }
 export interface ResponseOpenWorktreeInNewWindow {
   command: "openWorktreeInNewWindow";
-  status?: GitCommandStatus;
+  status: GitCommandStatus;
 }
 
 export interface RequestRevealWorktreeInOS {
@@ -600,7 +600,7 @@ export interface RequestRevealWorktreeInOS {
 }
 export interface ResponseRevealWorktreeInOS {
   command: "revealWorktreeInOS";
-  status?: GitCommandStatus;
+  status: GitCommandStatus;
 }
 
 export interface RequestFetch {

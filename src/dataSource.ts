@@ -2,6 +2,7 @@ import * as cp from "node:child_process";
 import * as path from "node:path";
 
 import { getConfig } from "./config";
+import { DEFAULT_GIT_PATH, resolveGitExecutable } from "./gitExecutable";
 import {
   CommitOrdering,
   GitCommandStatus,
@@ -38,7 +39,6 @@ const NULL_BYTE_SEPARATOR = "\0";
 const NAME_STATUS_OPTION = "--name-status";
 const NUMSTAT_OPTION = "--numstat";
 const TAB_SEPARATOR = "\t";
-const NUMSTAT_FIELD_COUNT = 3;
 const VALID_FILE_CHANGE_TYPES: ReadonlySet<string> = new Set(["A", "M", "D", "R"]);
 
 export const COMMIT_ORDER_FLAGS: Readonly<Record<CommitOrdering, string>> = {
@@ -89,29 +89,19 @@ function isRefNameSafe(refName: string): boolean {
 }
 
 const VALID_RESET_MODES = new Set(["soft", "mixed", "hard"]);
-const VALID_GIT_BINARY_NAME = /^git(\.exe)?$/i;
-const DEFAULT_GIT_PATH = "git";
-
-function isValidGitPath(gitPath: string): boolean {
-  if (gitPath === DEFAULT_GIT_PATH) return true;
-  if (!path.isAbsolute(gitPath)) return false;
-  return VALID_GIT_BINARY_NAME.test(path.basename(gitPath));
-}
 
 export class DataSource {
-  private gitPath!: string;
+  private gitPath: string = DEFAULT_GIT_PATH;
   private gitLogFormat!: string;
   private gitStashFormat!: string;
   private gitCommitDetailsFormat!: string;
 
   constructor() {
-    this.registerGitPath();
     this.generateGitCommandFormats();
   }
 
-  public registerGitPath() {
-    const configPath = getConfig().gitPath();
-    this.gitPath = isValidGitPath(configPath) ? configPath : DEFAULT_GIT_PATH;
+  public async registerGitPath(): Promise<void> {
+    this.gitPath = await resolveGitExecutable(getConfig().gitPath());
   }
 
   public generateGitCommandFormats() {
@@ -340,26 +330,7 @@ export class DataSource {
         }
       }
 
-      let ni = 0;
-      while (ni < numStatFields.length && numStatFields[ni] !== "") {
-        const parts = numStatFields[ni].split(TAB_SEPARATOR);
-        if (parts.length !== NUMSTAT_FIELD_COUNT) break;
-        const additions = parseInt(parts[0], 10);
-        const deletions = parseInt(parts[1], 10);
-        let filePath: string;
-        if (parts[2] !== "") {
-          filePath = getPathFromStr(parts[2]);
-          ni += 1;
-        } else {
-          filePath = getPathFromStr(numStatFields[ni + 2] ?? "");
-          ni += 3;
-        }
-        const idx = fileLookup[filePath];
-        if (typeof idx === "number" && details.fileChanges[idx] !== undefined) {
-          details.fileChanges[idx].additions = Number.isNaN(additions) ? null : additions;
-          details.fileChanges[idx].deletions = Number.isNaN(deletions) ? null : deletions;
-        }
-      }
+      this.applyNumStatRecords(numStatFields, fileLookup, details.fileChanges);
       return details;
     } catch {
       return null;
@@ -398,9 +369,9 @@ export class DataSource {
           []
         ),
         this.spawnGit<string[]>(
-          [...NO_QUOTE_PATH_CONFIG, "ls-files", "--others", "--exclude-standard"],
+          [...NO_QUOTE_PATH_CONFIG, "ls-files", "--others", "--exclude-standard", NULL_BYTE_OPTION],
           repo,
-          (stdout) => stdout.split(eolRegex),
+          (stdout) => stdout.split(NULL_BYTE_SEPARATOR),
           []
         )
       ]);
@@ -448,26 +419,7 @@ export class DataSource {
         }
       }
 
-      let ni = 0;
-      while (ni < numStat.length && numStat[ni] !== "") {
-        const parts = numStat[ni].split(TAB_SEPARATOR);
-        if (parts.length !== NUMSTAT_FIELD_COUNT) break;
-        const additions = parseInt(parts[0], 10);
-        const deletions = parseInt(parts[1], 10);
-        let filePath: string;
-        if (parts[2] !== "") {
-          filePath = getPathFromStr(parts[2]);
-          ni += 1;
-        } else {
-          filePath = getPathFromStr(numStat[ni + 2] ?? "");
-          ni += 3;
-        }
-        const idx = fileLookup[filePath];
-        if (typeof idx === "number" && details.fileChanges[idx] !== undefined) {
-          details.fileChanges[idx].additions = Number.isNaN(additions) ? null : additions;
-          details.fileChanges[idx].deletions = Number.isNaN(deletions) ? null : deletions;
-        }
-      }
+      this.applyNumStatRecords(numStat, fileLookup, details.fileChanges);
 
       for (let i = 0; i < untrackedFiles.length; i++) {
         const filePath = untrackedFiles[i];
@@ -546,9 +498,15 @@ export class DataSource {
       if (isToWorkingTree) {
         gitCommands.push(
           this.spawnGit<string[]>(
-            [...NO_QUOTE_PATH_CONFIG, "ls-files", "--others", "--exclude-standard"],
+            [
+              ...NO_QUOTE_PATH_CONFIG,
+              "ls-files",
+              "--others",
+              "--exclude-standard",
+              NULL_BYTE_OPTION
+            ],
             repo,
-            (stdout) => stdout.split(eolRegex),
+            (stdout) => stdout.split(NULL_BYTE_SEPARATOR),
             []
           )
         );
@@ -592,26 +550,7 @@ export class DataSource {
         }
       }
 
-      let ni = 0;
-      while (ni < numStat.length && numStat[ni] !== "") {
-        const parts = numStat[ni].split(TAB_SEPARATOR);
-        if (parts.length !== NUMSTAT_FIELD_COUNT) break;
-        const additions = parseInt(parts[0], 10);
-        const deletions = parseInt(parts[1], 10);
-        let filePath: string;
-        if (parts[2] !== "") {
-          filePath = getPathFromStr(parts[2]);
-          ni += 1;
-        } else {
-          filePath = getPathFromStr(numStat[ni + 2] ?? "");
-          ni += 3;
-        }
-        const idx = fileLookup[filePath];
-        if (typeof idx === "number" && fileChanges[idx] !== undefined) {
-          fileChanges[idx].additions = Number.isNaN(additions) ? null : additions;
-          fileChanges[idx].deletions = Number.isNaN(deletions) ? null : deletions;
-        }
-      }
+      this.applyNumStatRecords(numStat, fileLookup, fileChanges);
 
       for (let i = 0; i < untrackedFiles.length; i++) {
         const filePath = untrackedFiles[i];
@@ -804,6 +743,9 @@ export class DataSource {
     newName: string,
     updateUpstream: boolean
   ) {
+    if (!isRefNameSafe(newName)) {
+      return INVALID_REF_NAME_MESSAGE;
+    }
     const status = await this.runGitCommandSpawn(["branch", "-m", oldName, newName], repo);
     if (status !== null || !updateUpstream) {
       return status;
@@ -1191,6 +1133,46 @@ export class DataSource {
       NULL_BYTE_OPTION,
       commitHash
     ];
+  }
+
+  /**
+   * Applies additions/deletions from NUL-separated numstat fields onto fileChanges.
+   * Record forms: "add\tdel\tpath" (cursor +1), or rename "add\tdel\t" with the old/new
+   * paths in the following two NUL fields (cursor +3). Only the first two TABs delimit
+   * the numeric fields, so paths containing TABs are preserved in full. A malformed
+   * record (fewer than two TABs) is skipped on its own; subsequent records are parsed.
+   */
+  private applyNumStatRecords(
+    numStatFields: string[],
+    fileLookup: { [file: string]: number },
+    fileChanges: GitFileChange[]
+  ) {
+    let ni = 0;
+    while (ni < numStatFields.length && numStatFields[ni] !== "") {
+      const record = numStatFields[ni];
+      const firstTab = record.indexOf(TAB_SEPARATOR);
+      const secondTab = firstTab === -1 ? -1 : record.indexOf(TAB_SEPARATOR, firstTab + 1);
+      if (secondTab === -1) {
+        ni += 1;
+        continue;
+      }
+      const additions = parseInt(record.substring(0, firstTab), 10);
+      const deletions = parseInt(record.substring(firstTab + 1, secondTab), 10);
+      const rawPath = record.substring(secondTab + 1);
+      let filePath: string;
+      if (rawPath !== "") {
+        filePath = getPathFromStr(rawPath);
+        ni += 1;
+      } else {
+        filePath = getPathFromStr(numStatFields[ni + 2] ?? "");
+        ni += 3;
+      }
+      const idx = fileLookup[filePath];
+      if (typeof idx === "number" && fileChanges[idx] !== undefined) {
+        fileChanges[idx].additions = Number.isNaN(additions) ? null : additions;
+        fileChanges[idx].deletions = Number.isNaN(deletions) ? null : deletions;
+      }
+    }
   }
 
   private runGitCommandSpawn(args: string[], repo: string) {

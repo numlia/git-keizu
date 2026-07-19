@@ -293,7 +293,8 @@
 
 > Origin: test-plan (既存コード網羅)
 > Added: 2026-03-22
-> Status: active
+> Status: superseded
+> Superseded By: S20
 > Supersedes: -
 
 **シグネチャ**: `startWatchingFolders(): void` / `startWatchingFolder(path): void` / `stopWatchingFolder(path): void` (private)
@@ -361,3 +362,45 @@
 | TC-107  | `processChangeEventsTimeout` が保留中（`!== null`）で `dispose()` を呼ぶ        | Normal - change timeout cleared                                            | `clearTimeout(processChangeEventsTimeout)` が呼ばれ `null` 化される。保留の `processChangeEvents` が発火しない       | 変更イベントタイマーのクリア |
 | TC-108  | `processChangeEventsTimeout === null` で `dispose()` を呼ぶ                     | Boundary - change timeout null                                             | `processChangeEventsTimeout` 用の `clearTimeout` は呼ばれない。エラーなく完了                                        | 保留なし境界                 |
 | TC-109  | 両タイマーとも保留中で `dispose()` を呼び、`advanceTimersByTime` で時間を進める | Boundary - both cleared no fire                                            | 両 timeout に `clearTimeout` + `null` 化が行われ、`processCreateEvents` / `processChangeEvents` がどちらも発火しない | 破棄後の保留イベント非発火   |
+
+## S20: startWatchingFolder / stopWatchingFolder の冪等化
+
+> Origin: Feature 045 (defensive-fixes) (light-spec-plan)
+> Added: 2026-07-19
+> Status: active
+> Supersedes: S16
+> Signature: `private startWatchingFolder(path: string): void` / `private stopWatchingFolder(path: string): void`
+> Target Path: `src/repoManager.ts:256-275`
+
+watcher の開始を「同一正規化 path の entry が存在すれば何もしない」、停止を「entry が存在する場合だけ dispose/delete する」冪等な処理へ変更する修正。S16 の「未登録停止で `undefined.dispose()` のランタイムエラーの可能性」（TC-094）と「重複開始の上書き」を置き換える。startupTasks の await 中に folder removed イベントが発火しても、`removeReposWithinFolder` から `sendRepos()` まで継続できる契約を保証する（[6] の修正）。`startWatchingFolders` の列挙（S16 TC-090/TC-091 相当）は挙動を変えない。
+
+| Case ID | Input / Precondition                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                        | Notes                                |
+| ------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| TC-110  | 同一の正規化 path で `startWatchingFolder` を2回呼ぶ                                          | Boundary - 重複開始の冪等性                                                | `createFileSystemWatcher` の呼び出しが1回のみで、既存 watcher の `dispose()` は0回（上書き・リークなし）               | S16 の上書き挙動を置換               |
+| TC-111  | `folderWatchers` に存在しない path で `stopWatchingFolder` を呼ぶ                             | Boundary - 未登録停止の安全終了                                            | `TypeError` を throw せず正常終了し、いずれの watcher の `dispose()` も呼ばれない                                      | S16 TC-094 の潜在バグ期待を置換      |
+| TC-112  | 登録済み path で `stopWatchingFolder` を呼び、続けて同じ path でもう一度呼ぶ                  | Normal - 登録済み停止と entry 削除                                         | 1回目で対象 watcher の `dispose()` が1回呼ばれ entry が削除される。2回目は `dispose()` の追加呼び出し0回で正常終了する | dispose 1回 + delete の契約          |
+| TC-113  | `startupTasks` の await 中（`folderWatchers` が空）に workspace folder removed イベントを発火 | External - 起動中の folder 削除イベント                                    | `TypeError` が発生せず、`removeReposWithinFolder` による repo 削除後に `sendRepos` が1回呼ばれる（ビューが更新される） | 起動レース窓の回帰（[6] の観測条件） |
+
+### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S20）
+
+| 失敗源                                                   | 対応ケースまたは除外理由                                                               |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 未登録 path の停止による `undefined.dispose()` TypeError | TC-111、TC-113                                                                         |
+| 重複開始による既存 watcher の上書き・リーク              | TC-110                                                                                 |
+| throw による `sendRepos()` 未達（ビュー未更新）          | TC-113                                                                                 |
+| 登録済み watcher の解放漏れ                              | TC-112                                                                                 |
+| optional chaining だけで entry が残る退行                | TC-112（2回目呼び出しで entry 削除を検証）                                             |
+| workspaceFolders 未定義・空の列挙分岐                    | excluded(S16 TC-090/TC-091 相当の `startWatchingFolders` 列挙は本変更で挙動を変えない) |
+| watcher イベントハンドラの分岐                           | excluded(既存 S13〜S14 で担保済み。本変更の対象外)                                     |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(path 引数の検証分岐は追加しない。存在判定は Boundary として TC-110/TC-111 で検証)
+- Exception: excluded(冪等化により throw 経路を除去する変更のため、非 throw を TC-111/TC-113 で検証)
+- External: TC-113
+- Boundary: TC-110、TC-111
+- Type: excluded(引数は内部呼び出しの `string` で、実行時の型分岐が存在しない)
+
+数値・空値境界（0 / minimum / maximum / +/-1 / empty / NULL）は、本セクションの対象が Map entry の存在有無の契約であり数値境界を持たないため対象外とする（意味のある境界は「未登録」「重複」の TC-110/TC-111 で充足）。
+
+**失敗系/正常系比（煙感知器）**: 正常系1件（TC-112）、失敗系3件（TC-110、TC-111、TC-113）、比3.0。

@@ -151,3 +151,46 @@ Escape キー押下時の dismissal チェーン: `contextMenu → dialog → re
 | TC-226  | 上記すべて非アクティブ                                    | Boundary - no active UI                                                    | hide/close 系 API は一切呼ばれず、Escape は no-op として透過する                            | DOM 状態に副作用なし           |
 | TC-227  | `contextMenu` と `dialog` が両方 active                   | Validation - priority order                                                | `hideContextMenu()` のみ呼ばれ、`hideDialog()` は呼ばれない                                 | contextMenu が dialog より優先 |
 | TC-228  | `repoDropdown` と `branchDropdown` が両方 open            | Validation - priority order                                                | `repoDropdown.close()` のみ呼ばれ、`branchDropdown.close()` は呼ばれない                    | 宣言順に最初に open のもの優先 |
+
+## S46: handleKeyboardShortcut() Arrow ナビゲーション分岐の入力可能要素ガード
+
+> Origin: Feature 045 (defensive-fixes) (light-spec-plan)
+> Added: 2026-07-19
+> Status: active
+> Supersedes: -
+> Signature: `handleKeyboardShortcut(e: KeyboardEvent): void` の Arrow 分岐 + 入力可能要素判定 predicate
+> Target Path: `web/main.ts:1226-1263`
+
+ArrowUp/ArrowDown のコミット移動分岐に、event target が入力可能要素（`input` / `textarea` / `select` / contenteditable）かを判定する小さな predicate を追加し、入力可能要素からの発火時はコミット移動せず return する修正。predicate は Arrow 分岐内だけで使用し、関数先頭では return しない（入力中の Ctrl/Cmd+F 等のグローバルショートカットと、非入力要素の既存 Arrow ナビゲーションを維持する）。[4] の修正。既存 S29〜S33 の Arrow ナビゲーション観点は変更しない。
+
+| Case ID | Input / Precondition                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                         | Notes                                 |
+| ------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| TC-257  | CDV 展開中（移動可能な index）、`<input>` 要素を target に ArrowDown keydown を dispatch   | Validation - input target の抑止                                           | `loadCommitDetails` 呼び出し 0 回、`preventDefault()` / `stopPropagation()` 呼び出し 0 回（キャレット操作が奪われない） | 検索欄・ダイアログ入力の代表          |
+| TC-258  | CDV 展開中、`<textarea>` 要素を target に ArrowUp keydown を dispatch                      | Validation - textarea target の抑止                                        | `loadCommitDetails` 0 回、`preventDefault()` / `stopPropagation()` 0 回                                                 | -                                     |
+| TC-259  | CDV 展開中、`<select>` 要素を target に ArrowDown keydown を dispatch                      | Validation - select target の抑止                                          | `loadCommitDetails` 0 回、`preventDefault()` / `stopPropagation()` 0 回                                                 | ドロップダウン操作の維持              |
+| TC-260  | CDV 展開中、`contenteditable` な要素を target に ArrowDown keydown を dispatch             | Validation - contenteditable target の抑止                                 | `loadCommitDetails` 0 回、`preventDefault()` / `stopPropagation()` 0 回                                                 | `document.activeElement` に依存しない |
+| TC-261  | CDV 展開中、`document.body` を target に ArrowDown keydown を dispatch（隣接コミットあり） | Normal - 非入力要素の既存ナビ維持                                          | `loadCommitDetails` が1回呼ばれ、`preventDefault()` / `stopPropagation()` が各1回呼ばれる（S29 TC-164 と同挙動）        | ガード追加による退行なし              |
+| TC-262  | `<input>` 要素を target に Ctrl+F keydown を dispatch（config find="f"）                   | Normal - 入力中のグローバルショートカット維持                              | `findWidget.show(true)` が1回呼ばれる（関数先頭での一律 return が存在しない）                                           | NO-GO 条件（先頭 return）の検出       |
+
+### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S46）
+
+| 失敗源                                                           | 対応ケースまたは除外理由                                           |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------ |
+| `input` からの Arrow でコミット移動（入力横取り）                | TC-257                                                             |
+| `textarea` からの Arrow                                          | TC-258                                                             |
+| `select` からの Arrow                                            | TC-259                                                             |
+| contenteditable からの Arrow                                     | TC-260                                                             |
+| 関数先頭の一律 return による既存グローバルショートカットの無効化 | TC-262                                                             |
+| 非入力要素の Arrow ナビゲーション退行                            | TC-261                                                             |
+| IME 入力中の発火                                                 | excluded(既存 S32 TC-178 で担保済み。本変更で挙動を変えない)       |
+| 修飾キーパターン・境界 index の分岐                              | excluded(既存 S29〜S33 で担保済み。本変更の対象は target 判定のみ) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-257、TC-258、TC-259、TC-260
+- Exception: excluded(predicate は DOM プロパティ参照のみで throw 分岐を持たない)
+- External: excluded(外部依存なし。keydown はテスト側で直接 dispatch する)
+- Boundary: excluded(数値・空値境界が仕様上存在しない。target 種別4種の列挙が本変更の境界であり Validation 4件で充足)
+- Type: excluded(event target は DOM 型で、実行時の型分岐は要素種別判定として Validation 4件に含まれる)
+
+**失敗系/正常系比（煙感知器）**: 正常系2件（TC-261、TC-262）、失敗系4件（TC-257〜TC-260）、比2.0。

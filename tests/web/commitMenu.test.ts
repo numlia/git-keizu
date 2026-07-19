@@ -33,7 +33,7 @@ vi.mock("../../web/utils", () => {
 
 import { buildCommitContextMenuItems } from "../../web/commitMenu";
 import { recordRecentAction } from "../../web/contextMenu";
-import { showFormDialog, showSelectDialog } from "../../web/dialogs";
+import { showConfirmationDialog, showFormDialog, showSelectDialog } from "../../web/dialogs";
 import { sanitizeBranchNameForPath, sendMessage } from "../../web/utils";
 
 const REPO = "/test/repo";
@@ -1247,5 +1247,130 @@ describe("merge parent option plain text generation (S10)", () => {
 
     // Then: both option arrays are deep-equal (helper reuse)
     expect(revertOptions).toEqual(cherrySelect.options);
+  });
+});
+
+// --- S11: Cherry Pick / Revert の root commit 分岐（parentHashes.length <= 1） ---
+// @see docs/testing/perspectives/web/commitMenu-test.md
+describe("root commit cherry-pick/revert branch (S11)", () => {
+  const ROOT_PARENT_HASHES: string[] = [];
+  const MERGE_PARENT_HASHES = ["parent1234567890", "parent2234567890"];
+  const MERGE_COMMITS = [
+    { message: "msg-a" },
+    { message: "msg-b" }
+  ] as unknown as import("../../src/types").GitCommitNode[];
+  const MERGE_LOOKUP = { parent1234567890: 0, parent2234567890: 1 };
+
+  function setupViewState(): void {
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
+  }
+
+  function buildItems(parentHashes: string[]): ContextMenuElement[] {
+    return buildCommitContextMenuItems(
+      REPO,
+      HASH,
+      parentHashes,
+      parentHashes.length > 1 ? MERGE_COMMITS : [],
+      parentHashes.length > 1 ? MERGE_LOOKUP : {},
+      createMockElement()
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setupViewState();
+  });
+
+  it("shows a checkbox-only form and sends parentIndex 0 for a root-commit cherry pick (TC-048)", () => {
+    // Case: TC-048
+    // Given: a root commit with no parents
+    const cherryPickItem = findTopLevelMenuItem(
+      buildItems(ROOT_PARENT_HASHES),
+      "Cherry Pick&#8230;"
+    );
+
+    // When: Cherry Pick is clicked and the dialog is submitted
+    cherryPickItem.onClick();
+
+    // Then: showFormDialog receives 2 checkboxes and no select, and the payload carries parentIndex 0
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs).toHaveLength(2);
+    expect(inputs[0].type).toBe("checkbox");
+    expect(inputs[1].type).toBe("checkbox");
+    const actioned = vi.mocked(showFormDialog).mock.calls[0][3];
+    actioned(["checked", "unchecked"]);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "cherrypickCommit",
+      repo: REPO,
+      commitHash: HASH,
+      parentIndex: 0,
+      recordOrigin: true,
+      noCommit: false
+    });
+  });
+
+  it("shows a confirmation dialog and sends parentIndex 0 for a root-commit revert (TC-049)", () => {
+    // Case: TC-049
+    // Given: a root commit with no parents
+    const revertItem = findSubmenuItem(buildItems(ROOT_PARENT_HASHES), "Revert&#8230;");
+
+    // When: Revert is clicked and the confirmation is accepted
+    revertItem.onClick();
+
+    // Then: showConfirmationDialog runs (no select-bearing form dialog) and parentIndex 0 is sent
+    expect(showConfirmationDialog).toHaveBeenCalledTimes(1);
+    expect(showFormDialog).not.toHaveBeenCalled();
+    expect(showSelectDialog).not.toHaveBeenCalled();
+    const confirmed = vi.mocked(showConfirmationDialog).mock.calls[0][1];
+    confirmed();
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "revertCommit",
+      repo: REPO,
+      commitHash: HASH,
+      parentIndex: 0
+    });
+  });
+
+  it("keeps the parent select with two options for a two-parent merge cherry pick (TC-050)", () => {
+    // Case: TC-050
+    // Given: a merge commit with two parents
+    const cherryPickItem = findTopLevelMenuItem(
+      buildItems(MERGE_PARENT_HASHES),
+      "Cherry Pick&#8230;"
+    );
+
+    // When: Cherry Pick is clicked and the second parent is selected on submit
+    cherryPickItem.onClick();
+
+    // Then: the form keeps a 2-option select plus 2 checkboxes and the selection reaches parentIndex
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs).toHaveLength(3);
+    const select = inputs[0] as DialogSelectInput;
+    expect(select.type).toBe("select");
+    expect(select.options).toHaveLength(2);
+    expect(inputs[1].type).toBe("checkbox");
+    expect(inputs[2].type).toBe("checkbox");
+    const actioned = vi.mocked(showFormDialog).mock.calls[0][3];
+    actioned(["2", "checked", "unchecked"]);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "cherrypickCommit",
+      repo: REPO,
+      commitHash: HASH,
+      parentIndex: 2,
+      recordOrigin: true,
+      noCommit: false
+    });
   });
 });

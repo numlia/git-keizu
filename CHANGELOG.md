@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-07-19
+
+This release fixes 15 defects confirmed in a follow-up audit of the extension host and webview (1 high, 3 medium, 11 low), covering activation robustness, error reporting, keyboard handling, git output parsing, resource lifecycles, and webview state.
+
+### Fixed
+
+- **Setting `git.path` to an array no longer crashes the extension**: VS Code's `git.path` setting officially accepts a list of candidate paths, but Git Keizu treated it as a single string and failed during activation with a `TypeError`, leaving the extension entirely unusable. Candidates are now probed in order with `git --version` and the first working executable is used; if none works, the extension falls back to `git` on the PATH and shows the usual "Git not found" experience.
+- **Worktree "Open in New Window" and "Reveal in File Manager" failures are now reported**: When these actions failed (e.g. the worktree path no longer exists), the error was silently discarded and nothing happened. An error dialog with the git output is now shown, in both English and Japanese.
+- **Arrow keys are no longer hijacked while typing**: With a commit's details open, pressing ArrowUp/ArrowDown inside the search box, a dialog input, or a dropdown filter no longer switches to another commit behind the scenes — the caret moves within the input as expected. Arrow navigation on the graph itself and shortcuts like Ctrl/Cmd+F while typing are unaffected.
+- **Empty or fully invalid `graphColours` falls back to the default palette**: Setting `git-keizu.graphColours` to `[]` or to only invalid values previously produced `undefined` stroke/fill colours and broke the graph rendering; the default 12 colours are now used instead. A mix of valid and invalid values still keeps just the valid ones.
+- **Removing a workspace folder during startup no longer breaks the view**: A folder removed while the extension was still scanning for repositories caused an internal exception that left the repository list stale; folder watcher start/stop is now idempotent and the view updates correctly.
+- **"Also delete branch" checkbox no longer garbles branch names**: In the Remove Worktree dialog, branch names containing `/` or `&` (e.g. `feature/login`) were double-escaped and displayed as `feature&#x2F;login`; they now render correctly.
+- **Untracked files with special characters display and open correctly**: Untracked file names containing quotes, tabs, newlines, or backslashes appeared mangled (e.g. `"tab\tname.txt"`) in the uncommitted changes view and could not be opened; they are now read with NUL-separated output and shown verbatim.
+- **Cherry Pick / Revert works on root commits**: Right-clicking the repository's first commit no longer shows an empty parent-selection dropdown that always failed — root commits now use the normal single-parent flow. Merge commits keep their parent selector.
+- **Tab characters in file names no longer drop change counts**: A file name containing a tab caused the additions/deletions of every subsequent file in the commit details to be lost; the numstat parser now preserves the full path and a malformed record only affects its own file.
+- **Rename Branch validates the new name**: Renaming a branch to a name starting with `-` (e.g. `-D`) is now rejected upfront with "Invalid ref name." — consistent with Create Branch and Add Tag — instead of surfacing a confusing git usage error.
+- **Extension shutdown no longer leaks resources**: The diff document provider and the avatar manager are now disposed with the extension, so event subscriptions are released and the periodic avatar fetch timer can no longer keep running (or re-create itself via retries) after the extension is deactivated.
+- **Stash search matches what is displayed**: Searching for `@{0}` now matches and highlights the stash row. Previously the search matched the full internal selector (`stash@{0}`), so searching `stash` counted hits without any visible highlight; the hidden `stash` prefix is no longer searchable.
+- **"Open commit details on match" search toggle is remembered**: The toggle in the search bar no longer resets to off every time the tab is switched or the view is restored.
+- **Repository paths containing `</script>` no longer break the view**: JSON embedded in the webview bootstrap script now escapes `<`, so such a path can no longer terminate the script element and leave the view blank (script execution was already blocked by the CSP nonce).
+
 ## [0.8.1] - 2026-07-14
 
 ### Fixed
@@ -453,7 +474,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.8.1...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.8.2...HEAD
+[0.8.2]: https://github.com/numlia/git-keizu/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/numlia/git-keizu/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/numlia/git-keizu/compare/v0.7.9...v0.8.0
 [0.7.9]: https://github.com/numlia/git-keizu/compare/v0.7.8...v0.7.9
