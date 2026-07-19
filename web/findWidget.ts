@@ -2,7 +2,7 @@ import * as GG from "../src/types";
 import { getBranchLabels } from "./branchLabels";
 import { getCommitDate } from "./dates";
 import { t } from "./i18n";
-import { svgIcons, UNCOMMITTED_CHANGES_HASH } from "./utils";
+import { buildStashSelectorDisplay, svgIcons, UNCOMMITTED_CHANGES_HASH } from "./utils";
 
 /* === Constants === */
 
@@ -239,7 +239,8 @@ export class FindWidget {
       currentHash: this.getCurrentHash(),
       visible: this.visible,
       caseSensitive: this.caseSensitive,
-      regex: this.regex
+      regex: this.regex,
+      openCdvEnabled: this.openCdvEnabled
     };
   }
 
@@ -248,6 +249,8 @@ export class FindWidget {
   }
 
   public restoreState(state: FindWidgetState) {
+    this.openCdvEnabled = state.openCdvEnabled === true;
+    this.toggleClass(this.openCdvElem, CLASS_ACTIVE, this.openCdvEnabled);
     if (!state.visible) return;
     this.text = state.text;
     this.caseSensitive = state.caseSensitive;
@@ -306,7 +309,8 @@ export class FindWidget {
               branchLabels.remotes.some((remote) => findPattern!.test(remote.name)) ||
               branchLabels.tags.some((tag) => findPattern!.test(tag.name)) ||
               (colVisibility.date && findPattern.test(getCommitDate(commit.date).value)) ||
-              (commit.stash !== null && findPattern.test(commit.stash.selector)))
+              (commit.stash !== null &&
+                findPattern.test(buildStashSelectorDisplay(commit.stash.selector))))
           ) {
             const idStr = i.toString();
             while (j < commitElems.length && commitElems[j].dataset.id !== idStr) j++;

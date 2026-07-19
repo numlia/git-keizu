@@ -126,6 +126,7 @@ declare global {
     visible: boolean;
     caseSensitive: boolean;
     regex: boolean;
+    openCdvEnabled?: boolean;
   }
 
   interface WebViewState {
