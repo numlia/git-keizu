@@ -19,6 +19,22 @@ export function normalizeCommitLoadCount(value: number, defaultValue: number): n
   return Math.max(MIN_COMMIT_LOAD_COUNT, count);
 }
 
+// Must match the default of git-keizu.graphColours in package.json (same values, same order)
+const DEFAULT_GRAPH_COLOURS: readonly string[] = [
+  "#0085d9",
+  "#d9008f",
+  "#00d90a",
+  "#d98500",
+  "#a300d9",
+  "#ff0000",
+  "#00d9cc",
+  "#e138e8",
+  "#85d900",
+  "#dc5b23",
+  "#6f24d6",
+  "#ffcc00"
+];
+
 export const GRAPH_COLOUR_PATTERN =
   /^\s*(#[0-9a-fA-F]{6}|#[0-9a-fA-F]{8}|rgb\s*\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*\)|rgba\s*\(\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*\d{1,3}\s*,\s*(0(\.\d+)?|1(\.0+)?)\s*\))\s*$/;
 
@@ -115,22 +131,10 @@ class Config {
   }
 
   public graphColours() {
-    return this.workspaceConfiguration
-      .get("graphColours", [
-        "#0085d9",
-        "#d9008f",
-        "#00d90a",
-        "#d98500",
-        "#a300d9",
-        "#ff0000",
-        "#00d9cc",
-        "#e138e8",
-        "#85d900",
-        "#dc5b23",
-        "#6f24d6",
-        "#ffcc00"
-      ])
+    const colours = this.workspaceConfiguration
+      .get("graphColours", [...DEFAULT_GRAPH_COLOURS])
       .filter((v) => GRAPH_COLOUR_PATTERN.test(v));
+    return colours.length > 0 ? colours : [...DEFAULT_GRAPH_COLOURS];
   }
 
   public graphStyle(): GraphStyle {
