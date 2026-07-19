@@ -166,3 +166,41 @@
 | TC-029  | `msg.commitDetails` が有効、`generateGitFileTree` が `Error("dup")` を throw         | Exception - handled error                                                  | `gitKeizu.hideCommitDetails()` が1回 + `showErrorDialog(t("error.commitDetails"), "dup", null)` が呼ばれる。`showCommitDetails` は呼ばれない | catch 経路（Error インスタンス）  |
 | TC-030  | `msg.commitDetails` が有効、`generateGitFileTree` が非 Error（文字列 `"x"`）を throw | Type - non-Error thrown                                                    | `showErrorDialog(t("error.commitDetails"), null, null)` が呼ばれる（`error instanceof Error` が false のため message が `null`）             | 非 Error 例外時の message null    |
 | TC-031  | `msg.commitDetails === null`                                                         | Validation - null commit details                                           | `gitKeizu.hideCommitDetails()` + `showErrorDialog(t("error.commitDetails"), null, null)` が呼ばれ、`generateGitFileTree` は呼ばれない        | null ガード（catch には入らない） |
+
+## S11: openWorktreeInNewWindow / revealWorktreeInOS レスポンスのエラー表示
+
+> Origin: Feature 045 (defensive-fixes) (light-spec-plan)
+> Added: 2026-07-19
+> Status: active
+> Supersedes: -
+> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void`（`case "openWorktreeInNewWindow"` / `case "revealWorktreeInOS"` を追加）
+> Target Path: `web/messageHandler.ts`（handleMessage switch。実装後に行範囲へ更新）
+
+`handleMessage` の switch に両 command の case を追加し、`status !== null`（文字列）のときだけ操作別の翻訳キーで `showErrorDialog` を1回呼ぶ修正。成功時（`status === null`）は何も表示しない（[2] の webview 側。status の必須化により成功応答の `undefined` は到達しない。host 側の送出は `src/gitGraphView-test/` owner の責務）。
+
+| Case ID | Input / Precondition                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                             | Notes                |
+| ------- | -------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------- |
+| TC-032  | `{ command: "openWorktreeInNewWindow", status: null }`   | Normal - open 成功は無表示                                                 | `showErrorDialog` が呼ばれず、`gitKeizu` の API も呼ばれない（ノーオペレーション）          | 成功時は何もしない   |
+| TC-033  | `{ command: "openWorktreeInNewWindow", status: "boom" }` | Exception - open 失敗の表示                                                | `showErrorDialog` が `(t("error.openWorktreeInNewWindow"), "boom", null)` で1回だけ呼ばれる | 操作別の専用翻訳キー |
+| TC-034  | `{ command: "revealWorktreeInOS", status: null }`        | Normal - reveal 成功は無表示                                               | `showErrorDialog` が呼ばれず、`gitKeizu` の API も呼ばれない                                | -                    |
+| TC-035  | `{ command: "revealWorktreeInOS", status: "no" }`        | Exception - reveal 失敗の表示                                              | `showErrorDialog` が `(t("error.revealWorktreeInOS"), "no", null)` で1回だけ呼ばれる        | 操作別の専用翻訳キー |
+
+### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S11）
+
+| 失敗源                                        | 対応ケースまたは除外理由                                                                                  |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 応答が switch で未処理（エラーの握りつぶし）  | TC-033、TC-035                                                                                            |
+| 成功応答の誤エラー表示                        | TC-032、TC-034                                                                                            |
+| 操作別翻訳キーの取り違え・他 command との混同 | TC-033、TC-035（`showErrorDialog` の第1引数で検証）                                                       |
+| 成功応答の `undefined` status                 | excluded(`status: GitCommandStatus` の必須化により型で防止。`src/types-test.md` TC-008/TC-009 で担保)     |
+| 翻訳キーの欠落                                | excluded(`l10n/web/web.l10n.en.json-test.md` TC-001〜002 / `web.l10n.ja.json-test.md` TC-003〜004 で担保) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(handler は status の null / string 判定のみで、他の検証分岐を持たない)
+- Exception: TC-033、TC-035
+- External: excluded(外部依存なし。応答メッセージはテスト側で直接構築する)
+- Boundary: excluded(`null` は成功契約値として TC-032/TC-034 で検証済み。空文字 status は host が送らない契約で、`""` は文字列としてエラー表示経路に含まれる)
+- Type: excluded(応答型は TypeScript コンパイル時に保証される)
+
+**失敗系/正常系比（煙感知器）**: 正常系2件（TC-032、TC-034）、失敗系2件（TC-033、TC-035）。件数が同数のためインベントリを再導出したが、本変更（2 command × 成功/失敗の4分岐）の失敗源は上表のとおりすべて対応ケースまたは除外理由で充足されており、追加すべき失敗系ケースはないことを確認した。

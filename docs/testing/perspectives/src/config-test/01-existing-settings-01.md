@@ -167,7 +167,8 @@
 
 > Origin: test-plan (既存コード網羅)
 > Added: 2026-05-17
-> Status: active
+> Status: superseded
+> Superseded By: S18
 > Supersedes: -
 > Signature: `gitPath(): string`
 > Target Path: `src/config.ts`

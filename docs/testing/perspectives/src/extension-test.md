@@ -128,3 +128,61 @@
 | TC-029  | `showStatusBarItem` と `dateType` の両方が `true`                                            | Boundary - overlapping configuration matches                               | 独立 `if` により `statusBarItem.refresh()` と `dataSource.generateGitCommandFormats()` が**両方**1回ずつ呼ばれる（旧 `else if` では refresh のみ） | L50-53。L6 の中核挙動 |
 | TC-030  | 監視対象4キーすべてが `true`                                                                 | Boundary - all keys match                                                  | `refresh()` / `generateGitCommandFormats()` / `maxDepthOfRepoSearchChanged()` / `registerGitPath()` の4ハンドラすべてが1回ずつ呼ばれる             | L50-57                |
 | TC-031  | `showStatusBarItem` が `true` で `statusBarItem.refresh` が `Error("refresh failed")` を送出 | Exception - handler failure propagates                                     | リスナが同じ `Error("refresh failed")` を送出し、後続の独立 `if`（`dateType` 等）は例外伝播により評価されない                                      | L50-51                |
+
+## S8: activate() 非同期化と初回 git path 解決の待機
+
+> Origin: Feature 045 (defensive-fixes) (light-spec-plan)
+> Added: 2026-07-19
+> Status: active
+> Supersedes: -
+> Signature: `export async function activate(context: vscode.ExtensionContext): Promise<void>`
+> Target Path: `src/extension.ts:10-61`（現行実装位置。修正後に更新）
+
+`activate()` を async 化し、初回 `dataSource.registerGitPath()` の resolve 完了を await してから `AvatarManager` / `RepoManager` 等の依存 manager を構築する修正。resolver 完了前に `RepoManager` が Git command を開始しないことを保証する（[1] の activation 境界）。`git.path` 設定変更時の再解決呼び出し（TC-027）は既存 S7 の観点を維持する。
+
+| Case ID | Input / Precondition                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                            | Notes                      |
+| ------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| TC-032  | `dataSource.registerGitPath` が resolve する Promise を返すモックで `activate(context)` を await    | Normal - 解決後の依存構築                                                  | `registerGitPath()` の resolve 後に `RepoManager` / `AvatarManager` のコンストラクタが呼ばれ（call order 検証）、`activate` の戻り Promise が resolve する | 初回解決の await           |
+| TC-033  | `dataSource.registerGitPath` が pending（未解決）の Promise を返す状態で `activate(context)` を呼ぶ | Boundary - 解決前は依存未構築                                              | マイクロタスク flush 後も `RepoManager` コンストラクタの呼び出しが 0 回である（resolver 完了前に Git command を開始する manager が構築されない）           | 解決待ちのブロッキング検証 |
+
+## S9: DiffDocProvider / AvatarManager の subscriptions 登録
+
+> Origin: Feature 045 (defensive-fixes) (light-spec-plan)
+> Added: 2026-07-19
+> Status: active
+> Supersedes: -
+> Signature: `activate()` 内の provider 生成・登録処理
+> Target Path: `src/extension.ts:45-48`（現行 provider 登録位置。修正後に更新）
+
+`DiffDocProvider` インスタンスを変数に保持し、provider 本体と `registerTextDocumentContentProvider` が返す登録解除 Disposable の両方を `context.subscriptions` へ登録する。`AvatarManager` も subscriptions へ登録する（[12][13] の extension 側）。manager 内部の dispose 分岐は各 owner（`src/diffDocProvider-test.md` / `src/avatarManager-test.md`）の責務。
+
+| Case ID | Input / Precondition                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                     | Notes                                |
+| ------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| TC-034  | `activate(context)` 完了後の `context.subscriptions`           | Normal - provider 本体の登録                                               | subscriptions に生成された `DiffDocProvider` インスタンスそのもの（同一参照の厳密一致）が含まれる                   | 登録解除 Disposable だけの登録は不可 |
+| TC-035  | 同上                                                           | Normal - 登録解除 Disposable の登録                                        | `registerTextDocumentContentProvider` が返した Disposable が provider 本体とは別要素として subscriptions に含まれる | 両方の登録                           |
+| TC-036  | 同上                                                           | Normal - AvatarManager の登録                                              | subscriptions に `AvatarManager` インスタンス（同一参照の厳密一致）が含まれる                                       | -                                    |
+| TC-037  | `activate` 完了後、subscriptions の全要素の `dispose()` を実行 | Normal - dispose 伝播                                                      | `DiffDocProvider.dispose()` と `AvatarManager.dispose()` が各1回呼ばれる                                            | deactivate 相当での解放              |
+
+### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S8〜S9）
+
+| 失敗源                                                  | 対応ケースまたは除外理由                                                                    |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| activation が git path 解決を待たない（配列クラッシュ） | TC-032、TC-033                                                                              |
+| resolver 完了前の Git command 開始                      | TC-033                                                                                      |
+| provider 本体の登録漏れ（購読リーク）                   | TC-034、TC-037                                                                              |
+| 登録解除 Disposable の登録漏れ                          | TC-035                                                                                      |
+| AvatarManager の登録漏れ（timer リーク）                | TC-036、TC-037                                                                              |
+| activation 中の依存初期化失敗                           | excluded(既存 S1 TC-002〜TC-005 が External 失敗経路を担保済み。本変更で分岐を追加しない)   |
+| resolver の reject                                      | excluded(resolver は最終フォールバック `git` を返し reject しない契約。gitExecutable owner) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(S8〜S9 の対象は初期化順序と登録の契約であり、入力検証分岐が存在しない)
+- Exception: excluded(新規 throw 分岐なし。既存の例外伝播は S1 TC-002〜TC-005 で担保済み)
+- External: excluded(vscode API 失敗は既存 S1 の External ケースで担保済み。本変更で失敗モードを追加しない)
+- Boundary: TC-033
+- Type: excluded(登録要素の型は TypeScript コンパイル時に保証され、実行時の型分岐が存在しない)
+
+数値・空値境界（0 / minimum / maximum / +/-1 / empty / NULL）は、本セクションの対象が初期化順序と subscriptions 構成の契約であり仕様上意味を持たないため対象外とする（意味のある境界は「解決前」の TC-033 で充足）。
+
+**失敗系/正常系比（煙感知器）**: 正常系5件（TC-032、TC-034〜TC-037）、失敗系1件（TC-033）。比0.2 と低いためインベントリを再導出したが、本変更の失敗源（await 漏れ・登録漏れ・dispose 未伝播）はいずれも「正常契約の存在検証」で検出される退行であり、独立した失敗分岐は「解決前」（TC-033）のみである。activation 失敗系は既存 S1 の External 4件が担保していることを確認した。

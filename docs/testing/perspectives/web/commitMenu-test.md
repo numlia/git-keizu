@@ -181,3 +181,42 @@ cherry-pick / revert の merge parent 選択 dialog に渡す option を共通 h
 | TC-045  | parentHashes 1 件が commitLookup 未登録                                              | Boundary - missing commitLookup entry                                      | 該当 option name が `<abbrevHash>` のみ（message 部分なし、`: ` 接尾辞なし）                                                                                  | lookup 欠落時の plain 化  |
 | TC-046  | parent message に `<img onerror=alert(1)>`、`</option><script>` などの危険文字を含む | Boundary - hostile parent message                                          | cherry-pick の `showFormDialog`、revert の `showSelectDialog` 双方の options 配列に message が plain text のまま渡され、HTML エスケープ済み文字列にはならない | helper は escape しない   |
 | TC-047  | cherry-pick と revert で同じ parentHashes / commits / commitLookup を渡す            | Normal - helper reuse                                                      | 両経路の option 配列が deep-equal で一致する                                                                                                                  | 共通 helper 経由を確認    |
+
+## S11: Cherry Pick / Revert の root commit 分岐（parentHashes.length <= 1）
+
+> Origin: Feature 045 (defensive-fixes) (light-spec-plan)
+> Added: 2026-07-19
+> Status: active
+> Supersedes: -
+> Signature: `buildCommitContextMenuItems()` 内 Cherry Pick / Revert の onClick 分岐
+> Target Path: `web/commitMenu.ts:190, 247`
+
+Cherry Pick / Revert の通常コミット判定を `parentHashes.length === 1` から `parentHashes.length <= 1` へ変更する修正。親のないルートコミット（`length === 0`）が merge 分岐へ入り、`buildMergeParentOptions([])` による選択肢ゼロの `<select>` が描画される [9] を解消する。2親以上の merge parent option 生成は変更しない。
+
+| Case ID | Input / Precondition                                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                | Notes                           |
+| ------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| TC-048  | `parentHashes = []`（root commit）で Cherry Pick の onClick を実行し、確定送信 | Boundary - root commit の通常フォーム（cherry pick）                       | `showFormDialog` が checkbox 2件のみ（`select` 要素なし）で呼ばれ、送信される `RequestCherrypickCommit` の `parentIndex` が `0` になる         | 空 select が描画されない        |
+| TC-049  | `parentHashes = []`（root commit）で Revert の onClick を実行し、確定送信      | Boundary - root commit の確認ダイアログ（revert）                          | `showConfirmationDialog` が呼ばれ（`select` を含む form dialog は呼ばれない）、送信される `RequestRevertCommit` の `parentIndex` が `0` になる | `parseInt("") = NaN` 送信の解消 |
+| TC-050  | `parentHashes` 2件のマージコミットで Cherry Pick の onClick を実行             | Normal - merge 分岐の維持                                                  | `buildMergeParentOptions` 由来の options 2件を持つ `select` + checkbox 2件で `showFormDialog` が呼ばれ、選択値が `parentIndex` に反映される    | 2親以上の既存経路の退行なし     |
+
+### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S11）
+
+| 失敗源                                           | 対応ケースまたは除外理由                                                                 |
+| ------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| root commit で空の親選択 `<select>` が描画される | TC-048（cherry pick）、TC-049（revert）                                                  |
+| `parseInt("", 10) = NaN` の `parentIndex` 送信   | TC-048、TC-049（`parentIndex` が `0` であることを検証）                                  |
+| merge commit の parentIndex 選択の喪失（NO-GO）  | TC-050                                                                                   |
+| 拡張ホスト側の `Invalid parent index.` 検証      | excluded(host 側の `Number.isInteger` 検証は既存挙動で `src/dataSource.ts` owner の責務) |
+| 1親の通常コミット分岐                            | excluded(既存 S3 TC-016 / S10 で担保済み。`length === 1` の挙動は本変更で不変)           |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(本変更は分岐条件の境界のみで、入力検証分岐を追加しない)
+- Exception: excluded(throw 経路が存在しない)
+- External: excluded(外部依存なし。sendMessage はモックで観測)
+- Boundary: TC-048、TC-049
+- Type: excluded(`parentHashes` は `string[]` 型で TypeScript コンパイル時に保証される)
+
+数値境界のうち本変更に意味があるのは `parentHashes.length` の `0`（TC-048/TC-049）・`1`（既存 S3/S10 で担保）・`2`（TC-050）であり、maximum / +/-1 のその他の値は同一分岐のため対象外とする。
+
+**失敗系/正常系比（煙感知器）**: 正常系1件（TC-050)、失敗系2件（TC-048、TC-049）、比2.0。
