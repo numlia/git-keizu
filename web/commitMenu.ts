@@ -187,7 +187,7 @@ export function buildCommitContextMenuItems(
           )
         }
       ];
-      if (parentHashes.length === 1) {
+      if (parentHashes.length <= 1) {
         showFormDialog(
           t(
             "Are you sure you want to cherry pick commit {0}?",
@@ -244,7 +244,7 @@ export function buildCommitContextMenuItems(
   const revertItem: ContextMenuItem = {
     title: `${t("Revert")}${ELLIPSIS}`,
     onClick: () => {
-      if (parentHashes.length === 1) {
+      if (parentHashes.length <= 1) {
         showConfirmationDialog(
           t("Are you sure you want to revert commit {0}?", `<b><i>${abbrevCommit(hash)}</i></b>`),
           () => {

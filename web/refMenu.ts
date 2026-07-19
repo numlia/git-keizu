@@ -413,7 +413,7 @@ export function buildRefContextMenuItems(
                 [
                   {
                     type: "checkbox",
-                    name: t("Also delete branch {0} (git branch -d)", `'${escapeHtml(refName)}'`),
+                    name: t("Also delete branch {0} (git branch -d)", `'${refName}'`),
                     value: viewState.dialogDefaults.removeWorktree.deleteBranch,
                     info: t("Uses safe delete — unmerged branches will not be deleted.")
                   }
