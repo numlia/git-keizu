@@ -3,7 +3,8 @@ import {
   showCheckboxDialog,
   showConfirmationDialog,
   showFormDialog,
-  showRefInputDialog
+  showRefInputDialog,
+  showSelectDialog
 } from "./dialogs";
 import { t } from "./i18n";
 import {
@@ -33,6 +34,39 @@ export function parseRemoteRef(refName: string): ParsedRemoteRef {
     remoteName: refName.substring(0, slashIndex),
     branchName: refName.substring(slashIndex + 1)
   };
+}
+
+/**
+ * `ResponsePush` carries no repository path, so the repository of the push that
+ * is awaiting a remote selection is kept here between the two request phases.
+ */
+let pendingPushRepo = "";
+
+export function getPendingPushRepo(): string {
+  return pendingPushRepo;
+}
+
+export function showPushRemoteDialog(
+  repo: string,
+  operationId: string,
+  remotes: string[],
+  defaultRemote: string
+): void {
+  showSelectDialog(
+    t("push.selectRemote"),
+    defaultRemote,
+    remotes.map((remoteName) => ({ name: remoteName, value: remoteName })),
+    t("push.selectRemoteAction"),
+    (selectedRemote) => {
+      sendMessage({
+        command: "push",
+        repo: repo,
+        operationId: operationId,
+        selectedRemote: selectedRemote
+      });
+    },
+    null
+  );
 }
 
 function buildMergeBranchMenuItem(repo: string, refName: string): ContextMenuItem {
@@ -458,7 +492,13 @@ export function buildRefContextMenuItems(
               t("Are you sure you want to push {0}?", `<b><i>${escapeHtml(refName)}</i></b>`),
               () => {
                 recordRecentAction(repo, "ref.push");
-                sendMessage({ command: "push", repo: repo });
+                pendingPushRepo = repo;
+                sendMessage({
+                  command: "push",
+                  repo: repo,
+                  operationId: crypto.randomUUID(),
+                  selectedRemote: null
+                });
               },
               null
             );
