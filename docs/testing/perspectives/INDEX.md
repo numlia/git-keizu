@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-08-03T23:34:36+09:00
+> Auto-generated: 2026-08-04T00:58:38+09:00
 > Total sources: 41
 > Total physical files: 64
-> Total sections: 453
-> Total cases: 2282
+> Total sections: 455
+> Total cases: 2284
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -17,7 +17,7 @@
 | `src/config.ts`             | single-file  | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md`             | 1      | 14       | 79    | 2026-05-02   |
 | `src/config.ts`             | sharded      | `src/config-test/INDEX.md`                                                   | 4      | 17       | 95    | 2026-07-19   |
 | `src/dataSource.ts`         | single-file  | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md`     | 1      | 25       | 149   | 2026-04-04   |
-| `src/dataSource.ts`         | sharded      | `src/dataSource-test/INDEX.md`                                               | 6      | 39       | 225   | 2026-08-03   |
+| `src/dataSource.ts`         | sharded      | `src/dataSource-test/INDEX.md`                                               | 6      | 40       | 226   | 2026-08-04   |
 | `src/diffDocProvider.ts`    | single-file  | `src/diffDocProvider-test.md`                                                | 1      | 7        | 33    | 2026-07-04   |
 | `src/extension.ts`          | single-file  | `src/extension-test.md`                                                      | 1      | 8        | 30    | 2026-07-19   |
 | `src/extensionState.ts`     | single-file  | `src/extensionState-test.md`                                                 | 1      | 14       | 42    | 2026-07-04   |
@@ -47,7 +47,7 @@
 | `web/main.ts`               | sharded      | `web/main-test/INDEX.md`                                                     | 9      | 44       | 253   | 2026-07-19   |
 | `web/messageHandler.ts`     | single-file  | `web/messageHandler-test.md`                                                 | 1      | 12       | 41    | 2026-08-03   |
 | `web/refMenu.ts`            | single-file  | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`           | 1      | 14       | 74    | 2026-07-19   |
-| `web/refMenu.ts`            | sharded      | `web/refMenu-test/INDEX.md`                                                  | 3      | 15       | 83    | 2026-08-03   |
+| `web/refMenu.ts`            | sharded      | `web/refMenu-test/INDEX.md`                                                  | 3      | 16       | 84    | 2026-08-04   |
 | `web/stashMenu.ts`          | single-file  | `web/stashMenu-test.md`                                                      | 1      | 8        | 30    | 2026-04-30   |
 | `web/uncommittedMenu.ts`    | single-file  | `web/uncommittedMenu-test.md`                                                | 1      | 1        | 3     | 2026-03-09   |
 | `web/utils.ts`              | single-file  | `web/utils-test.md`                                                          | 1      | 4        | 19    | 2026-03-27   |

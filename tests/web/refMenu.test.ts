@@ -44,6 +44,7 @@ import {
 import {
   buildRefContextMenuItems,
   checkoutBranchAction,
+  getPendingPushRepo,
   parseRemoteRef,
   showPushRemoteDialog
 } from "../../web/refMenu";
@@ -2103,5 +2104,35 @@ describe("Push operation id and remote selection dialog", () => {
 
     // Then: the recent action stays recorded only at confirmation time
     expect(recordRecentAction).toHaveBeenCalledTimes(0);
+  });
+});
+
+// S18: getPendingPushRepo() 二段階 Push の repository 引き継ぎ
+// @see docs/testing/perspectives/web/refMenu-test/01-branch-actions-01.md
+describe("pending push repository handover", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // A repository other than REPO, so a stale value left by an earlier push cannot satisfy this test.
+  const OTHER_REPO = "/test/other-repo";
+
+  it("hands the confirmed repository to the second push request (TC-090)", () => {
+    // Case: TC-090
+    // Given: the Push menu item of the current branch opens its confirmation dialog
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(OTHER_REPO, "main", sourceElem, false, "main");
+    const pushItem = findMenuItem(menu, "Push");
+    expect(pushItem).toBeDefined();
+    pushItem!.onClick();
+
+    // When: the confirmation is approved and the real module is asked for the pending repository
+    vi.mocked(showConfirmationDialog).mock.calls[0][1]();
+    const pendingRepo = getPendingPushRepo();
+
+    // Then: it matches the repository of the initial request instead of another repository
+    const initialRequest = vi.mocked(sendMessage).mock.calls[0][0] as { repo: string };
+    expect(pendingRepo).toBe(OTHER_REPO);
+    expect(pendingRepo).toBe(initialRequest.repo);
   });
 });

@@ -2,12 +2,12 @@
 
 > Source: `src/dataSource.ts`
 > Storage Mode: sharded
-> Generated: 2026-08-03T00:00:00Z
+> Generated: 2026-08-04T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 6
-> Total Sections: 44
-> Total Cases: 265
+> Total Sections: 45
+> Total Cases: 266
 
 ## Shards
 
@@ -15,7 +15,7 @@
 | --------------------------- | ------------------ | -------- | ----- | ------------ |
 | 01-history-diff-01.md       | history-diff       | 11       | 83    | 2026-07-04   |
 | 02-branch-worktree-01.md    | branch-worktree    | 12       | 66    | 2026-07-04   |
-| 02-branch-worktree-02.md    | branch-worktree    | 4        | 35    | 2026-08-03   |
+| 02-branch-worktree-02.md    | branch-worktree    | 5        | 36    | 2026-08-04   |
 | 03-author-watch-paths-01.md | author-watch-paths | 8        | 38    | 2026-07-04   |
 | 04-spawn-refname-diff-01.md | spawn-refname-diff | 8        | 40    | 2026-07-19   |
 | 05-git-path-01.md           | git-path           | 1        | 3     | 2026-07-19   |

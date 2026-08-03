@@ -134,3 +134,42 @@ Push 先を `origin` 固定から現在の upstream 優先へ変える解決ロ�
 - Type: excluded(実行時の型分岐を持たず、引数型は TypeScript が保証する。型契約は `src/types-test.md` S3 の責務)
 
 **失敗系/正常系比（煙感知器）**: 正常系12件（TC-234、TC-236、TC-241、TC-243、TC-244、TC-250、TC-254、TC-256、TC-261、TC-262、TC-263、TC-264）、失敗系23件（残り）。比は約 1.9:1 で、失敗源インベントリの各行に対応ケースまたは除外理由が付いている。
+
+## S45: readUpstreamTarget() upstream merge 設定の形式検証
+
+> Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
+> Added: 2026-08-04
+> Status: active
+> Supersedes: -
+> Signature: `preparePush(repo: string): Promise<PushPreparation>`（private `readUpstreamTarget()` 経由）
+> Target Path: `src/dataSource.ts`（`readUpstreamTarget()` の `REFS_HEADS_PREFIX` 判定）
+> Test File: `tests/src/dataSource.test.ts`
+
+Task 6 の coverage 分析で、`branch.<name>.merge` が `refs/heads/` 以外で始まるときに upstream 扱いを取りやめる分岐（`src/dataSource.ts:1017-1018`）へ既存 case のどれからも到達していないことが判明したため additive に追加する。S42 の TC-249 が通るのは同関数でも後段の `isSafeRemoteName()` / `isValidRefName()` guard（同 1021 行）で、merge ref の prefix 判定は経由しない。upstream として解釈できない設定を Push 先へ昇格させず、利用者選択（`selectRemote`）へ落とすことを固定する。remote/ref 名の形式判定そのものは `src/refValidation-test.md` S1、phase 判断は `src/gitGraphView-test/01-message-routing-03.md` S28 の責務。
+
+| Case ID | Input / Precondition                                                                                                                                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                     | Notes                                 |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| TC-266  | `branch --show-current` が `"main"`、`branch.main.remote` が `"origin"`（safe）、`branch.main.merge` が `"refs/remotes/origin/main"`（`refs/heads/` 始まりでない）、`git remote` が `"origin\n"` | Validation - upstream merge ref の形式不正                                 | `{ kind: "selectRemote", remotes: ["origin"] }` を返す（`kind: "upstream"` にならない）。`config --get branch.main.merge` の query が 1 回、`git remote` の query が 1 回実行される | remote 名が safe でも昇格させない分岐 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 047 追補分（S45）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                                                                     |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 入力検証 × merge ref の形式不正                       | TC-266                                                                                                                       |
+| 入力検証 × unsafe remote 名 / 不正 upstream branch 名 | excluded(後段 guard の分岐で S42 TC-249 が担保)                                                                              |
+| 各分岐の negative 側（正しい `refs/heads/` 始まり）   | excluded(S42 TC-243 が upstream 昇格を担保)                                                                                  |
+| 外部依存の失敗（config / remote query の失敗）        | excluded(S42 TC-247、TC-248 が担保)                                                                                          |
+| 境界値（merge 設定が空文字）                          | excluded(空文字も `refs/heads/` 始まりでないため TC-266 と同一分岐へ入る。upstream 未設定時の空 stdout は S42 TC-244 が担保) |
+| 境界値（0 / minimum / maximum / +/-1 / NULL）         | excluded(Git 設定値は文字列のみで数値境界を持たない)                                                                         |
+| 例外送出                                              | excluded(戻り値で表現し throw 経路を持たない)                                                                                |
+| 不正な型・フォーマット                                | excluded(引数型は TypeScript が保証する。型契約は `src/types-test.md` S3 の責務)                                             |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-266
+- Exception: excluded(throw 経路が存在しない)
+- External: excluded(query 失敗は S42 TC-247、TC-248 の責務)
+- Boundary: excluded(数値境界がなく、空文字 merge 設定は TC-266 と同一分岐)
+- Type: excluded(型契約は `src/types-test.md` S3 の責務)
+
+**失敗系/正常系比（煙感知器）**: 正常系0件、失敗系1件（TC-266）。本セクションは既存 S42 が取りこぼした拒否分岐 1 本だけを対象とする追補のため、正常系0件はインベントリ欠落ではないことを確認した（正常系の upstream 昇格は S42 TC-243 が担保）。

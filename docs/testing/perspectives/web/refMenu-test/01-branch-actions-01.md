@@ -176,3 +176,43 @@ Push 確認の確定時に `crypto.randomUUID()` で `operationId` を 1 回生�
 - Type: excluded(型契約は `src/types-test.md` S3 の責務)
 
 **失敗系/正常系比（煙感知器）**: 正常系5件（TC-081、TC-082、TC-084、TC-085、TC-088）、失敗系4件（TC-083、TC-086、TC-087、TC-089）。件数が近いためインベントリを再導出したが、本セクションの失敗源は cancel 経路・自動確定・二重記録・ID 取り違えに限られ、Git 実行と型の失敗源はいずれも他 owner（S28 / S12 / `src/types-test.md` S3）へ割り当て済みであることを確認した。
+
+## S18: getPendingPushRepo() 二段階 Push の repository 引き継ぎ
+
+> Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
+> Added: 2026-08-04
+> Status: active
+> Supersedes: -
+> Signature: `getPendingPushRepo(): string`
+> Target Path: `web/refMenu.ts`（module 内 `pendingPushRepo` と `getPendingPushRepo()`）
+> Test File: `tests/web/refMenu.test.ts`
+
+`ResponsePush` は repository path を持たないため、初回 Request の repository を module 内 `pendingPushRepo` に保持し `getPendingPushRepo()` で取り出す設計（Task 5 の実装上の逸脱）。`web/messageHandler-test.md` S12 TC-040 はこの関数を mock で置換するので、「Push 確認確定 → repository 保持 → 取り出し」の配線自体はどの既存 case からも検証されていない。ここが壊れると 2 通目の Push Request が別 repository 宛に送られるため、mock ではなく実 module の配線を固定する。初回 Request の payload と operationId は S17、選択後 Request の委譲は `web/messageHandler-test.md` S12 の責務。
+
+| Case ID | Input / Precondition                                                                                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                               | Notes                             |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| TC-090  | repo = `/test/other-repo`（他 case が使う `/test/repo` とは別の値）の HEAD menu で `Push` を選択し確認ダイアログを承認したあと、実 module の `getPendingPushRepo()` を呼ぶ | Normal - repository の引き継ぎ                                             | 戻り値が `/test/other-repo` であり、同じ確定で送られた初回 Request の `repo` field と一致する（他 case が残した module state では成立しない） | mock ではなく実 module の配線検証 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 047 追補分（S18）
+
+| 失敗源                                        | 対応ケースまたは除外理由                                                                                                                     |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| 二段階 Push 間で repository を取り違える      | TC-090                                                                                                                                       |
+| cancel 時に repository が更新される           | excluded(保持は確認確定 callback 内の同一分岐で、cancel 経路で callback が発火しないことは S17 TC-083 が call count 0 で担保)                |
+| 連続 Push で古い repository が残る            | excluded(確定ごとに無条件で上書きする単一分岐であり、TC-090 と同一経路。operationId 側の連続操作は S17 TC-088 が担保)                        |
+| 境界値（未 Push 時の初期値が空文字）          | excluded(module state を共有する他 case の実行順に依存し観測を安定させられない。空 repository の Request は host 側の repo guard が拒否する) |
+| 境界値（0 / minimum / maximum / +/-1 / NULL） | excluded(値は repository path 文字列のみで数値境界を持たない)                                                                                |
+| 外部依存の失敗                                | excluded(webview 内の module state 参照のみで外部依存を持たない)                                                                             |
+| 例外送出                                      | excluded(getter に throw 経路が存在しない)                                                                                                   |
+| 不正な型・フォーマット                        | excluded(戻り値は `string` で型分岐を持たない)                                                                                               |
+| 未登録・unsafe な remote への Push            | excluded(membership と形式の再検証は `src/gitGraphView-test/01-message-routing-03.md` S28 TC-116 / TC-119 の責務)                            |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(getter に検証分岐が存在しない。取り違えの検出は TC-090 の値一致検証に含まれる)
+- Exception: excluded(throw 経路が存在しない)
+- External: excluded(外部依存なし)
+- Boundary: excluded(数値境界がなく、初期値の観測は実行順依存のため除外)
+- Type: excluded(型契約は `src/types-test.md` S3 の責務)
+
+**失敗系/正常系比（煙感知器）**: 正常系1件（TC-090）、失敗系0件。本セクションは既存 case が mock で置換していた配線 1 本だけを対象とする追補で、cancel・連続操作・membership 再検証といった失敗源はいずれも S17 / S28 へ割り当て済みであることを確認した。

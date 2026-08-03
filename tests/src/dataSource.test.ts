@@ -2041,6 +2041,30 @@ describe("preparePush", () => {
     expect(result).toEqual({ kind: "error", status: "fatal: not a git repository" });
   });
 
+  // S45: readUpstreamTarget() upstream merge 設定の形式検証
+  // @see docs/testing/perspectives/src/dataSource-test/02-branch-worktree-02.md
+  it("never treats a merge ref outside refs/heads/ as a push target (TC-266)", async () => {
+    // Case: TC-266
+    // Given: the upstream remote is safe but the merge ref is not a local branch ref
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "main\n" } },
+      { matches: isConfigGet("branch.main.remote"), spec: { stdout: "origin\n" } },
+      {
+        matches: isConfigGet("branch.main.merge"),
+        spec: { stdout: "refs/remotes/origin/main\n" }
+      },
+      { matches: isSubcommand("remote"), spec: { stdout: "origin\n" } }
+    ]);
+
+    // When: preparePush is called
+    const result = await ds.preparePush(REPO);
+
+    // Then: the setting is not promoted to an upstream target and selection is requested
+    expect(result).toEqual({ kind: "selectRemote", remotes: ["origin"] });
+    expect(spawnedArgs()).toContainEqual(["config", "--get", "branch.main.merge"]);
+    expect(spawnedArgsFor("remote")).toEqual([["remote"]]);
+  });
+
   it("never treats an unsafe upstream remote as a push target (TC-249)", async () => {
     // Case: TC-249
     // Given: the configured upstream remote name looks like an option
