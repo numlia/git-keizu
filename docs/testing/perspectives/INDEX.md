@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-07-19T10:05:55+09:00
+> Auto-generated: 2026-08-03T20:29:12+09:00
 > Total sources: 39
 > Total physical files: 58
-> Total sections: 429
-> Total cases: 2088
+> Total sections: 430
+> Total cases: 2104
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -12,7 +12,7 @@
 | --------------------------- | ------------ | ---------------------------------------------------------------------------- | ------ | -------- | ----- | ------------ |
 | `l10n/web/web.l10n.en.json` | single-file  | `l10n/web/web.l10n.en.json-test.md`                                          | 1      | 1        | 2     | 2026-07-19   |
 | `l10n/web/web.l10n.ja.json` | single-file  | `l10n/web/web.l10n.ja.json-test.md`                                          | 1      | 2        | 4     | 2026-07-19   |
-| `package.json`              | single-file  | `package.json-test.md`                                                       | 1      | 1        | 6     | 2026-05-17   |
+| `package.json`              | single-file  | `package.json-test.md`                                                       | 1      | 2        | 22    | 2026-08-03   |
 | `src/avatarManager.ts`      | single-file  | `src/avatarManager-test.md`                                                  | 1      | 25       | 101   | 2026-07-19   |
 | `src/config.ts`             | single-file  | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md`             | 1      | 14       | 79    | 2026-05-02   |
 | `src/config.ts`             | sharded      | `src/config-test/INDEX.md`                                                   | 4      | 17       | 95    | 2026-07-19   |
@@ -104,6 +104,7 @@
 | Feature 040 (settings-and-copy-polish) (light-spec-plan)              | `l10n/web/web.l10n.ja.json-test.md`, `package.json-test.md`, `src/config-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `web/commitMenu-test.md`, `web/main-test/INDEX.md`                                                                                                                                                                                                                                                                |
 | Feature 041 (refresh-contention-and-dialog-escape) (light-spec-plan)  | `web/commitMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md`                                                                                                                                                                                                                                                                                                                                                                    |
 | Feature 045 (defensive-fixes) (light-spec-plan)                       | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/avatarManager-test.md`, `src/config-test/INDEX.md`, `src/dataSource-test/INDEX.md`, `src/extension-test.md`, `src/gitExecutable-test.md`, `src/gitGraphView-test/INDEX.md`, `src/repoManager-test.md`, `src/types-test.md`, `web/commitMenu-test.md`, `web/findWidget-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test.md`, `web/refMenu-test.md` |
+| Feature 046 (dev-dependency-security-update) (light-spec-plan)        | `package.json-test.md`                                                                                                                                                                                                                                                                                                                                                                                                                       |
 | light-spec-plan notes/features/042/spec.md                            | `src/avatarManager-test.md`                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | notes/features/044/memo-対応プラン.md                                 | `web/dialogs-test.md`                                                                                                                                                                                                                                                                                                                                                                                                                        |
 | test-plan                                                             | `web/stashMenu-test.md`                                                                                                                                                                                                                                                                                                                                                                                                                      |
