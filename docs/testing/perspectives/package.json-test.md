@@ -83,12 +83,13 @@
 - Boundary: TC-012
 - Type: excluded(上表のとおり型入力が存在しない)
 
-**失敗系/正常系比（煙感知器）**: 正常系9件（TC-007、TC-008、TC-013〜TC-018、TC-020）、失敗系7件（TC-009〜TC-012、TC-019、TC-021、TC-022）、比0.78。失敗系が正常系を下回るためインベントリを再導出したが、上表のとおり全失敗源が対応ケースまたは除外理由で充足されている。品質・ビルド・パッケージの受け入れコマンドを1 case = 1 commandで分離する構造上、正常系が6件多くなることが比の要因であり、比率合わせのためのケース追加・削除は行わない。
+**失敗系/正常系比（煙感知器）**: 正常系9件（TC-007、TC-008、TC-013〜TC-018、TC-020）、失敗系7件（TC-009〜TC-012、TC-019、TC-021、TC-022）、比0.78。失敗系が正常系を下回るためインベントリを再導出したが、上表のとおり全失敗源が対応ケースまたは除外理由で充足されている。正常系9件のうち、品質・ビルド・パッケージの受け入れコマンドを1 case = 1 commandで分離した6件（TC-013〜TC-018）が比に影響しており、比率合わせのためのケース追加・削除は行わない。
 
 ### Feature 046 実行証跡
 
 **実行日時**: 2026-08-03 20:38〜20:41 JST（2026-08-03T11:41:24Z）
 **実行環境**: Linux (WSL2)、pnpm 10.29.3（`npx --yes pnpm@10.29.3`経由）、Node.js実行はプロジェクト既定
+**実行ハーネス差異**: 対応プランは`codex`を指定したが、実装は`claude-code`のサブエージェント機構で実行した。checkpointのwait roundはCodex presetの480秒を使用しており、`execution.harness: claude-code`と待機presetの出典が一致していない。成果物・検証結果への影響はなく、本項を計画からの実行手段の逸脱記録とする。
 **検証コミット**: `7716d04`（`chore: update vulnerable development dependencies`）、比較基点`ebb48c8`
 **作業ブランチ**: `chore/046-dev-dependency-security-update`
 
@@ -108,7 +109,7 @@ INDEXジェネレーターは`| TC-`で始まる表行をケース定義とし�
 - **TC-016**: `npx --yes pnpm@10.29.3 run test:ci`、終了コード0。`RUN v4.1.10` / `Test Files 41 passed (41)` / `Tests 1633 passed (1633)`で失敗0件。プロジェクト全体の回帰として実行した。
 - **TC-017**: `npx --yes pnpm@10.29.3 run compile`、終了コード0。`out/extension.js 57.6kb`と`out/web.min.js 94.7kb`を生成。
 - **TC-018**: `npx --yes pnpm@10.29.3 run package`、終了コード0。`DONE Packaged: /home/numlia/work/ai/git-keizu/git-keizu-0.8.2.vsix (25 files, 147.58 KB)`。
-- **TC-019**: `npx --yes pnpm@10.29.3 exec vsce ls`、終了コード0。収録は23パス（`package.json`系、`README.md`、`LICENSE`、`resources/`、`out/`、`media/`、`l10n/`）で、`node_modules/`・`src/`・`web/`・`tests/`・`docs/`・`notes/`のヒットは0件。
+- **TC-019**: `npx --yes pnpm@10.29.3 exec vsce ls`、終了コード0。収録は23パス（`package.json`系、`README.md`、`LICENSE`、`resources/`、`out/`、`media/`、`l10n/`）で、`node_modules/`・`src/`・`web/`・`tests/`・`docs/`・`notes/`のヒットは0件。TC-018のVSIX内25ファイルとの差分2件は、VSIXコンテナ側のメタデータ`extension.vsixmanifest`と`[Content_Types].xml`であり、`vsce ls`の拡張コンテンツ列挙対象外である。
 - **TC-020**: 生成VSIX`/home/numlia/work/ai/git-keizu/git-keizu-0.8.2.vsix`をVS Codeへインストールし、Gitリポジトリを開いて拡張を起動。**確認OK**（確認日2026-08-03、ユーザーによる手動確認）。Gitグラフがコミット履歴を描画し、コミット選択でコミット詳細（コミットのファイル内容）が表示されることを確認した。自動化できないため本ケースはユーザーの手動確認で受け入れる。
 - **TC-021**: `npx --yes pnpm@10.29.3 audit --audit-level=low`（残件詳細の取得）、終了コード1（Lowを検出したため）。残件は次項の1件のみで、Critical・High・Moderateは0件。Lowだけが残るため完了を妨げない。
 - **TC-022**: TC-009でHigh以上が0件のため、解消不能時の停止分岐は発生しなかった。`pnpm.overrides`・強制更新・`audit --fix --force`はいずれも未使用である。
