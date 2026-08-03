@@ -177,6 +177,23 @@ export type RepoCommitOrdering = CommitOrdering | "default";
 export type GitResetMode = "soft" | "mixed" | "hard";
 export type GitFileChangeType = "A" | "M" | "D" | "R";
 
+/* Checkout / Push Result Types */
+
+export type CheckoutBranchResult =
+  | { kind: "branchExists" }
+  | { kind: "invalidRef" }
+  | { kind: "completed"; status: GitCommandStatus };
+
+export interface PushTarget {
+  remoteName: string;
+  branchName: string;
+}
+
+export type PushPreparation =
+  | { kind: "upstream"; target: PushTarget }
+  | { kind: "selectRemote"; remotes: string[] }
+  | { kind: "error"; status: string };
+
 /* Named Constants */
 
 export const UNCOMMITTED_CHANGES_HASH = "*";
@@ -203,10 +220,10 @@ export interface RequestCheckoutBranch {
   branchName: string;
   remoteBranch: string | null;
 }
-export interface ResponseCheckoutBranch {
-  command: "checkoutBranch";
-  status: GitCommandStatus;
-}
+export type ResponseCheckoutBranch =
+  | { command: "checkoutBranch"; kind: "branchExists" }
+  | { command: "checkoutBranch"; kind: "invalidRef" }
+  | { command: "checkoutBranch"; kind: "completed"; status: GitCommandStatus };
 
 export interface RequestCheckoutCommit {
   command: "checkoutCommit";
@@ -624,11 +641,19 @@ export interface ResponsePull {
 export interface RequestPush {
   command: "push";
   repo: string;
+  operationId: string;
+  selectedRemote: string | null;
 }
-export interface ResponsePush {
-  command: "push";
-  status: GitCommandStatus;
-}
+export type ResponsePush =
+  | {
+      command: "push";
+      operationId: string;
+      phase: "selectRemote";
+      remotes: string[];
+      defaultRemote: string;
+    }
+  | { command: "push"; operationId: string; phase: "noRemotes" }
+  | { command: "push"; operationId: string; phase: "completed"; status: GitCommandStatus };
 
 export interface RequestResetUncommitted {
   command: "resetUncommitted";
