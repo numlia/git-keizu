@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-08-03T20:29:12+09:00
+> Auto-generated: 2026-08-03T23:00:49+09:00
 > Total sources: 39
 > Total physical files: 58
 > Total sections: 430
-> Total cases: 2104
+> Total cases: 2106
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -24,7 +24,7 @@
 | `src/gitExecutable.ts`      | single-file  | `src/gitExecutable-test.md`                                                  | 1      | 1        | 6     | 2026-07-19   |
 | `src/gitGraphView.ts`       | single-file  | `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md` | 1      | 17       | 60    | 2026-03-20   |
 | `src/gitGraphView.ts`       | sharded      | `src/gitGraphView-test/INDEX.md`                                             | 5      | 28       | 100   | 2026-07-19   |
-| `src/i18n.ts`               | single-file  | `src/i18n-test.md`                                                           | 1      | 1        | 6     | 2026-05-03   |
+| `src/i18n.ts`               | single-file  | `src/i18n-test.md`                                                           | 1      | 1        | 8     | 2026-08-03   |
 | `src/repoFileWatcher.ts`    | single-file  | `src/repoFileWatcher-test.md`                                                | 1      | 10       | 60    | 2026-07-04   |
 | `src/repoManager.ts`        | single-file  | `src/repoManager-test.md`                                                    | 1      | 19       | 108   | 2026-07-19   |
 | `src/statusBarItem.ts`      | single-file  | `src/statusBarItem-test.md`                                                  | 1      | 3        | 13    | 2026-03-22   |
