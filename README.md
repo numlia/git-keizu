@@ -178,6 +178,8 @@ The codebase has been modernized from its 2019 origins: async/await throughout, 
 
 Bug reports and feedback via [GitHub Issues](https://github.com/numlia/git-keizu/issues) are welcome. This is a personal project maintained in spare time — responses and fixes are not guaranteed, but reports are appreciated.
 
+Pull requests are welcome as well. Fork the repository and open a pull request against `main`. CI runs `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test:ci`, so please confirm those pass locally first. For anything larger than a small fix, opening an issue first helps avoid wasted effort.
+
 ## Acknowledgements
 
 A big thank you to the original author, [mhutchie](https://github.com/mhutchie), for creating this amazing extension.
