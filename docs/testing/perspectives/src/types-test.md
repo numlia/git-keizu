@@ -173,3 +173,39 @@ checkout の結果を `kind` で、Push の応答を `phase` で narrowing で�
 - Type: TC-026〜TC-042
 
 **失敗系/正常系比（煙感知器）**: 正常系0件、失敗系17件（TC-026〜TC-042）。S2・S3 と同じく本セクションの対象は型契約のみで正常実行経路を持たないため、正常系0件はインベントリ欠落ではないことを確認した。
+
+## S5: PushTarget の local / upstream branch 分離
+
+> Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
+> Added: 2026-08-04
+> Status: active
+> Supersedes: -
+> Signature: `PushTarget`
+> Target Path: `src/types.ts`（`PushTarget`）
+> Test File: `tests/src/types.test.ts`
+
+upstream 設定済み Push で現在のローカル branch と upstream 側 branch の名前が異なる場合に備え、`PushTarget` が `localBranchName` と `upstreamBranchName` を別 field として必須保持する型契約を固定する。実行時の refspec と Git state は `src/dataSource-test/02-branch-worktree-02.md` S42 / S43、host の引き渡しは `src/gitGraphView-test/01-message-routing-03.md` S31 の責務。
+
+| Case ID | Input / Precondition                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                         | Notes                  |
+| ------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------- |
+| TC-043  | local `feature/local` / upstream `main` の `PushTarget`、および各 branch field を欠落させた object literal | Type - Push 元・Push 先の必須 field                                        | 別名を持つ target は代入でき、`localBranchName` / `upstreamBranchName` のどちらを欠いても型エラーになる | refspec 両側の型的担保 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 047 別名 upstream 修正分（S5）
+
+| 失敗源                                      | 対応ケースまたは除外理由                                                                        |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Push 元と Push 先を単一 branch 名へ縮退する | TC-043                                                                                          |
+| 必須 field の欠落                           | TC-043                                                                                          |
+| runtime の refspec 構築・Git 実行           | excluded(`src/dataSource-test/02-branch-worktree-02.md` S43 TC-254 / TC-261 の責務)             |
+| 外部依存の失敗                              | excluded(型定義のみで外部依存なし)                                                              |
+| 境界値（empty / 不正 ref）                  | excluded(実行時 validation は `src/dataSource-test/02-branch-worktree-02.md` S43 TC-259 の責務) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(型定義のみで実行時 validation 分岐なし)
+- Exception: excluded(型定義のみで throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: excluded(不正 ref は runtime owner の責務)
+- Type: TC-043
+
+**失敗系/正常系比（煙感知器）**: 正常系0件、失敗系1件（TC-043）。本セクションは必須 field の型契約のみを対象とするため、正常系0件はインベントリ欠落ではない。

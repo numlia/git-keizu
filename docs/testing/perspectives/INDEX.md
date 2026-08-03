@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-08-04T01:34:50+09:00
+> Auto-generated: 2026-08-04T07:20:11+09:00
 > Total sources: 41
 > Total physical files: 64
-> Total sections: 455
-> Total cases: 2286
+> Total sections: 456
+> Total cases: 2287
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -29,7 +29,7 @@
 | `src/repoFileWatcher.ts`    | single-file  | `src/repoFileWatcher-test.md`                                                | 1      | 10       | 60    | 2026-07-04   |
 | `src/repoManager.ts`        | single-file  | `src/repoManager-test.md`                                                    | 1      | 19       | 108   | 2026-07-19   |
 | `src/statusBarItem.ts`      | single-file  | `src/statusBarItem-test.md`                                                  | 1      | 3        | 13    | 2026-03-22   |
-| `src/types.ts`              | single-file  | `src/types-test.md`                                                          | 1      | 3        | 26    | 2026-08-04   |
+| `src/types.ts`              | single-file  | `src/types-test.md`                                                          | 1      | 4        | 27    | 2026-08-04   |
 | `src/utils.ts`              | single-file  | `src/utils-test.md`                                                          | 1      | 5        | 15    | 2026-07-04   |
 | `src/worktree.ts`           | single-file  | `src/worktree-test.md`                                                       | 1      | 1        | 11    | 2026-03-12   |
 | `web/branchLabels.ts`       | single-file  | `web/branchLabels-test.md`                                                   | 1      | 1        | 17    | 2026-03-21   |
