@@ -84,3 +84,76 @@
 - Type: excluded(上表のとおり型入力が存在しない)
 
 **失敗系/正常系比（煙感知器）**: 正常系9件（TC-007、TC-008、TC-013〜TC-018、TC-020）、失敗系7件（TC-009〜TC-012、TC-019、TC-021、TC-022）、比0.78。失敗系が正常系を下回るためインベントリを再導出したが、上表のとおり全失敗源が対応ケースまたは除外理由で充足されている。品質・ビルド・パッケージの受け入れコマンドを1 case = 1 commandで分離する構造上、正常系が6件多くなることが比の要因であり、比率合わせのためのケース追加・削除は行わない。
+
+### Feature 046 実行証跡
+
+**実行日時**: 2026-08-03 20:38〜20:41 JST（2026-08-03T11:41:24Z）
+**実行環境**: Linux (WSL2)、pnpm 10.29.3（`npx --yes pnpm@10.29.3`経由）、Node.js実行はプロジェクト既定
+**検証コミット**: `7716d04`（`chore: update vulnerable development dependencies`）、比較基点`ebb48c8`
+**作業ブランチ**: `chore/046-dev-dependency-security-update`
+
+#### ケース別の実行結果
+
+INDEXジェネレーターは`| TC-`で始まる表行をケース定義として集計するため、実行証跡は表ではなくリストで記録する。これにより本セクションのケース数は上のケース定義表の16件のままとなる。
+
+- **TC-007**: `git diff ebb48c8..HEAD -- package.json`、終了コード0。差分は`devDependencies`の3項目のみ（`@vscode/vsce`が`^3.7.1`から`^3.9.2`、`vite` `^7.3.6`を新規追加、`vitest`が`^4.0.18`から`^4.1.10`）。`dependencies`・scripts・contributes・enginesに差分なし。
+- **TC-008**: `npx --yes pnpm@10.29.3 install --frozen-lockfile`、終了コード0。`Lockfile is up to date, resolution step is skipped`が出力され、manifestとlockの不整合エラーなし。
+- **TC-009**: `npx --yes pnpm@10.29.3 audit --audit-level=high`、終了コード0。`1 vulnerabilities found` / `Severity: 1 low`。Critical 0件、High 0件、Moderate 0件。
+- **TC-010**: `npx --yes pnpm@10.29.3 audit --prod --audit-level=low`、終了コード0。`No known vulnerabilities found`。
+- **TC-011**: `npx --yes pnpm@10.29.3 why vitest vite rollup @vscode/vsce undici flatted markdown-it js-yaml postcss minimatch`、終了コード0。全経路が更新後の解決のみで、旧脆弱解決（Vitest 4.0.18、Vite 7.3.1、Rollup 4.58.0、Undici 7.22.0）およびminimatch 3系の経路は0件。
+- **TC-012**: `npx --yes pnpm@10.29.3 list vite --depth Infinity`、終了コード0。Vite参照は3件すべて7.3.6（直接依存、`@vitest/mocker`のpeer、`vitest`のpeer）で、8系0件。
+- **TC-013**: `npx --yes pnpm@10.29.3 run format`、終了コード0。`All matched files use the correct format.`（175ファイル）。
+- **TC-014**: `npx --yes pnpm@10.29.3 run lint`、終了コード0。`Found 0 warnings and 0 errors.`（78ファイル、97ルール）。
+- **TC-015**: `npx --yes pnpm@10.29.3 run typecheck`、終了コード0。`tsc -p ./src --noEmit && tsc -p ./web --noEmit`が無出力で完了。
+- **TC-016**: `npx --yes pnpm@10.29.3 run test:ci`、終了コード0。`RUN v4.1.10` / `Test Files 41 passed (41)` / `Tests 1633 passed (1633)`で失敗0件。プロジェクト全体の回帰として実行した。
+- **TC-017**: `npx --yes pnpm@10.29.3 run compile`、終了コード0。`out/extension.js 57.6kb`と`out/web.min.js 94.7kb`を生成。
+- **TC-018**: `npx --yes pnpm@10.29.3 run package`、終了コード0。`DONE Packaged: /home/numlia/work/ai/git-keizu/git-keizu-0.8.2.vsix (25 files, 147.58 KB)`。
+- **TC-019**: `npx --yes pnpm@10.29.3 exec vsce ls`、終了コード0。収録は23パス（`package.json`系、`README.md`、`LICENSE`、`resources/`、`out/`、`media/`、`l10n/`）で、`node_modules/`・`src/`・`web/`・`tests/`・`docs/`・`notes/`のヒットは0件。
+- **TC-020**: 生成VSIX`/home/numlia/work/ai/git-keizu/git-keizu-0.8.2.vsix`をVS Codeへインストールし、Gitリポジトリを開いて拡張を起動。**確認OK**（確認日2026-08-03、ユーザーによる手動確認）。Gitグラフがコミット履歴を描画し、コミット選択でコミット詳細（コミットのファイル内容）が表示されることを確認した。自動化できないため本ケースはユーザーの手動確認で受け入れる。
+- **TC-021**: `npx --yes pnpm@10.29.3 audit --audit-level=low`（残件詳細の取得）、終了コード1（Lowを検出したため）。残件は次項の1件のみで、Critical・High・Moderateは0件。Lowだけが残るため完了を妨げない。
+- **TC-022**: TC-009でHigh以上が0件のため、解消不能時の停止分岐は発生しなかった。`pnpm.overrides`・強制更新・`audit --fix --force`はいずれも未使用である。
+
+#### 監査結果の集計と残件（TC-009 / TC-010 / TC-021）
+
+- 全依存監査: Critical 0件、High 0件、Moderate 0件、Low 1件（合計1件）
+- production依存監査: 既知脆弱性0件
+
+| severity | パッケージ | アドバイザリID                                                           | 脆弱バージョン     | 修正版     | 依存経路    |
+| -------- | ---------- | ------------------------------------------------------------------------ | ------------------ | ---------- | ----------- |
+| low      | `esbuild`  | [GHSA-g7r4-m6w7-qqqr](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr) | `>=0.27.3 <0.28.1` | `>=0.28.1` | `.>esbuild` |
+
+概要はWindowsで開発サーバーを起動した場合の任意ファイル読み取りである。本プロジェクトはesbuildをバンドラーとしてのみ使用し開発サーバーを起動しないため、対応プラン§7のとおり本対応の範囲外とする。
+
+#### 主要な解決バージョン
+
+`vitest` 4.1.10、`vite` 7.3.6、`rollup` 4.62.4、`@vscode/vsce` 3.9.2、`undici` 7.29.0、`flatted` 3.4.4、`js-yaml` 4.3.1、`markdown-it` 14.3.0、`postcss` 8.5.25、`minimatch` 10.2.6（3系経路は消滅）。
+
+#### 成果物
+
+- VSIX: `/home/numlia/work/ai/git-keizu/git-keizu-0.8.2.vsix`（25ファイル、147.58 KB）
+- ビルド成果物: `out/extension.js`、`out/web.min.js`
+- いずれも`.gitignore`によりコミット対象外である。
+
+#### 固定値Vitestテストを追加しない理由と代替検証
+
+依存監査の結果はnpmレジストリ上のアドバイザリという外部データに依存し、新規アドバイザリの公開や既存アドバイザリの更新で同一ロックファイルでも結果が変わる。件数やアドバイザリIDを固定値としてVitestへ埋め込むと、コード変更がないまま失敗する不安定なテストになり、逆に固定値の更新作業がレビューの形骸化を招く。そのため本セクションは固定値テストを持たず、次の代替手段で検証する。
+
+- 依存契約（TC-007）: `git diff`によるmanifest差分の直接確認
+- 再現可能性（TC-008）: `pnpm install --frozen-lockfile`の終了コード
+- 監査と依存経路（TC-009〜TC-012、TC-021、TC-022）: `pnpm audit` / `pnpm why` / `pnpm list`をその時点のレジストリに対して実行し、結果を本証跡へ記録
+- 互換性（TC-013〜TC-018）: 既存のpackage scriptsによる品質チェック、プロジェクト全体の回帰テスト、ビルド、VSIX作成
+- 収録物と表示（TC-019、TC-020）: `vsce ls`の出力確認とVS Code上での手動確認
+
+再検証が必要な場合は上記コマンド群を同じ順序で再実行し、本証跡との差分を確認する。
+
+#### テストコード規約の適用可否
+
+本タスクではVitestテストを追加しないため、`docs/test-supplement.md`の`// Case:` / `// Given:` / `// When:` / `// Then:`コメント規約、例外assert、mock assertはいずれも非該当である。各Case IDの追跡性は、上のケース別実行結果がCase IDとコマンド・終了コード・主要出力を対応付けることで担保する。
+
+#### INDEX再生成の確認
+
+`python3 ~/.claude/skills/rebuild-test-perspectives-index/scripts/rebuild_index.py .`を再実行し、root集計430 sections・2104 cases、`package.json` 2 sections・22 cases、Feature 046のReverse Lookup行が維持されることを確認した。証跡本文はINDEXの集計対象外である。
+
+証跡を表形式で書いた初回の再生成では`package.json`が22 casesから38 casesへ増加した。ジェネレーターは`| TC-`で始まる表行をケース定義として数えるため、証跡表の16行がケースとして重複計上されたものである。証跡をリスト形式へ変更して再生成し、22 casesへ戻ることを確認した。以後、本セクションへ証跡を追記する際も表形式を使わない。
+
+再生成後の`INDEX.md`と現在のコミット内容の差分は、生成タイムスタンプ行と表パディングの整形ドリフトだけで、集計値・Forward Lookup・Reverse Lookupの内容に差分はない。そのため`INDEX.md`は再コミットせずTask 1の生成結果を維持する。
