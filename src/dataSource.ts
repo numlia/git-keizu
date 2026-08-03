@@ -3,7 +3,9 @@ import * as path from "node:path";
 
 import { getConfig } from "./config";
 import { DEFAULT_GIT_PATH, resolveGitExecutable } from "./gitExecutable";
+import { isSafeRemoteName, isValidRefName } from "./refValidation";
 import {
+  CheckoutBranchResult,
   CommitOrdering,
   GitCommandStatus,
   GitCommit,
@@ -15,6 +17,8 @@ import {
   GitResetMode,
   GitStash,
   GitUnsavedChanges,
+  PushPreparation,
+  PushTarget,
   UNCOMMITTED_CHANGES_HASH,
   VALID_UNCOMMITTED_RESET_MODES,
   WorktreeMap
@@ -82,7 +86,19 @@ function isValidGitRef(ref: string): boolean {
 
 const INVALID_COMMIT_HASH_MESSAGE = "Invalid commit hash.";
 const INVALID_REF_NAME_MESSAGE = "Invalid ref name.";
+const INVALID_REMOTE_NAME_MESSAGE = "Invalid remote name.";
+const GIT_QUERY_FAILED_MESSAGE = "Git command failed.";
+const REFS_HEADS_PREFIX = "refs/heads/";
 const OPTION_ARG_PREFIX = "-";
+
+/**
+ * Result of a read-only Git query that has to tell "the query ran and produced
+ * this output" apart from "the query itself failed", so that a failure is never
+ * mistaken for an empty result.
+ */
+type GitQueryResult = { kind: "ok"; stdout: string } | { kind: "error"; status: string };
+
+type RemoteNamesResult = { kind: "ok"; remotes: string[] } | { kind: "error"; status: string };
 
 function isRefNameSafe(refName: string): boolean {
   return !refName.startsWith(OPTION_ARG_PREFIX);
@@ -716,11 +732,41 @@ export class DataSource {
     return this.runGitCommandSpawn(["branch", branchName, commitHash], repo);
   }
 
-  public checkoutBranch(repo: string, branchName: string, remoteBranch: string | null) {
-    if (remoteBranch === null) {
-      return this.runGitCommandSpawn(["checkout", branchName], repo);
+  public async checkoutBranch(
+    repo: string,
+    branchName: string,
+    remoteBranch: string | null
+  ): Promise<CheckoutBranchResult> {
+    if (!isValidRefName(branchName)) {
+      return { kind: "invalidRef" };
     }
-    return this.runGitCommandSpawn(["checkout", "-B", branchName, remoteBranch], repo);
+    if (remoteBranch === null) {
+      return {
+        kind: "completed",
+        status: await this.runGitCommandSpawn(["checkout", branchName], repo)
+      };
+    }
+    if (!isValidRefName(remoteBranch)) {
+      return { kind: "invalidRef" };
+    }
+
+    // A local branch of the same name would be moved onto the remote commit, so check for it
+    // before creating anything and leave the existing branch to the caller.
+    const existingBranch = await this.runGitQuery(["branch", "--list", branchName], repo);
+    if (existingBranch.kind === "error") {
+      return { kind: "completed", status: existingBranch.status };
+    }
+    if (existingBranch.stdout.trim() !== "") {
+      return { kind: "branchExists" };
+    }
+
+    return {
+      kind: "completed",
+      status: await this.runGitCommandSpawn(
+        ["checkout", "--track", "-b", branchName, remoteBranch],
+        repo
+      )
+    };
   }
 
   public checkoutCommit(repo: string, commitHash: string) {
@@ -913,8 +959,82 @@ export class DataSource {
     return this.runGitCommandSpawn(["pull"], repo);
   }
 
-  public push(repo: string) {
-    return this.runGitCommandSpawn(["push", "--set-upstream", "origin", "HEAD"], repo);
+  public async preparePush(repo: string): Promise<PushPreparation> {
+    const currentBranch = await this.runGitQuery(["branch", "--show-current"], repo);
+    if (currentBranch.kind === "error") {
+      return { kind: "error", status: currentBranch.status };
+    }
+
+    // An empty current branch means a detached HEAD, which has no upstream to read.
+    const branchName = currentBranch.stdout.split(eolRegex)[0] ?? "";
+    if (branchName !== "") {
+      const target = await this.readUpstreamTarget(repo, branchName);
+      if (target !== null) {
+        return { kind: "upstream", target };
+      }
+    }
+
+    const remotes = await this.queryRemoteNames(repo);
+    if (remotes.kind === "error") {
+      return { kind: "error", status: remotes.status };
+    }
+    return { kind: "selectRemote", remotes: remotes.remotes };
+  }
+
+  public async getRemotes(repo: string): Promise<string[] | null> {
+    const remotes = await this.queryRemoteNames(repo);
+    return remotes.kind === "ok" ? remotes.remotes : null;
+  }
+
+  public pushToUpstream(repo: string, target: PushTarget): Promise<GitCommandStatus> {
+    if (!isSafeRemoteName(target.remoteName)) {
+      return Promise.resolve(INVALID_REMOTE_NAME_MESSAGE);
+    }
+    if (!isValidRefName(target.branchName)) {
+      return Promise.resolve(INVALID_REF_NAME_MESSAGE);
+    }
+    return this.runGitCommandSpawn(["push", target.remoteName, target.branchName], repo);
+  }
+
+  public pushWithUpstream(repo: string, remoteName: string): Promise<GitCommandStatus> {
+    if (!isSafeRemoteName(remoteName)) {
+      return Promise.resolve(INVALID_REMOTE_NAME_MESSAGE);
+    }
+    return this.runGitCommandSpawn(["push", "--set-upstream", remoteName, "HEAD"], repo);
+  }
+
+  private async readUpstreamTarget(repo: string, branchName: string): Promise<PushTarget | null> {
+    const [remote, merge] = await Promise.all([
+      this.runGitQuery(["config", "--get", `branch.${branchName}.remote`], repo),
+      this.runGitQuery(["config", "--get", `branch.${branchName}.merge`], repo)
+    ]);
+    if (remote.kind === "error" || merge.kind === "error") {
+      return null;
+    }
+
+    const remoteName = remote.stdout.split(eolRegex)[0] ?? "";
+    const mergeRef = merge.stdout.split(eolRegex)[0] ?? "";
+    if (!mergeRef.startsWith(REFS_HEADS_PREFIX)) {
+      return null;
+    }
+    const upstreamBranch = mergeRef.substring(REFS_HEADS_PREFIX.length);
+    if (!isSafeRemoteName(remoteName) || !isValidRefName(upstreamBranch)) {
+      return null;
+    }
+    return { remoteName, branchName: upstreamBranch };
+  }
+
+  private async queryRemoteNames(repo: string): Promise<RemoteNamesResult> {
+    const result = await this.runGitQuery(["remote"], repo);
+    if (result.kind === "error") {
+      return { kind: "error", status: result.status };
+    }
+    const remotes = result.stdout
+      .split(eolRegex)
+      .map((line) => line.trim())
+      .filter((line) => line !== "" && isSafeRemoteName(line))
+      .sort();
+    return { kind: "ok", remotes };
   }
 
   public fetch(repo: string) {
@@ -1206,6 +1326,41 @@ export class DataSource {
           if (lines[lines.length - 1] === "") lines.pop();
           resolve(lines.join("\n"));
         }
+      });
+    });
+  }
+
+  private runGitQuery(args: string[], repo: string) {
+    return new Promise<GitQueryResult>((resolve) => {
+      const stdoutChunks: Buffer[] = [];
+      const stderrChunks: Buffer[] = [];
+      let err = false;
+      const cmd = cp.spawn(this.gitPath, args, {
+        cwd: repo,
+        env: { ...process.env, LC_ALL: "C" }
+      });
+      cmd.stdout.on("data", (d: string | Buffer) => {
+        stdoutChunks.push(Buffer.from(d));
+      });
+      cmd.stderr.on("data", (d: string | Buffer) => {
+        stderrChunks.push(Buffer.from(d));
+      });
+      cmd.on("error", (e: Error) => {
+        resolve({ kind: "error", status: e.message.split(eolRegex).join("\n") });
+        err = true;
+      });
+      cmd.on("close", (code: number | null) => {
+        if (err) return;
+        const stdout = Buffer.concat(stdoutChunks).toString();
+        if (code === 0) {
+          resolve({ kind: "ok", stdout });
+          return;
+        }
+        const stderr = Buffer.concat(stderrChunks).toString();
+        const lines = (stderr !== "" ? stderr : stdout).split(eolRegex);
+        if (lines[lines.length - 1] === "") lines.pop();
+        const message = lines.join("\n");
+        resolve({ kind: "error", status: message !== "" ? message : GIT_QUERY_FAILED_MESSAGE });
       });
     });
   }
