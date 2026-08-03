@@ -9,10 +9,16 @@ vi.mock("../../web/fileTree", () => ({
   generateGitFileTree: vi.fn()
 }));
 
+vi.mock("../../web/refMenu", () => ({
+  showPushRemoteDialog: vi.fn(),
+  getPendingPushRepo: vi.fn(() => "/path/to/repo")
+}));
+
 import type { GitCommitDetails, ResponseMessage } from "../../src/types";
 import { showErrorDialog } from "../../web/dialogs";
 import { generateGitFileTree } from "../../web/fileTree";
 import { type GitKeizuViewAPI, handleMessage } from "../../web/messageHandler";
+import { showPushRemoteDialog } from "../../web/refMenu";
 
 function createMockGitKeizuView(): GitKeizuViewAPI {
   return {
@@ -29,6 +35,8 @@ function createMockGitKeizuView(): GitKeizuViewAPI {
   };
 }
 
+// S13: pull レスポンス処理の維持
+// @see docs/testing/perspectives/web/messageHandler-test.md
 describe("handleMessage pull response", () => {
   let gitKeizu: GitKeizuViewAPI;
 
@@ -37,7 +45,8 @@ describe("handleMessage pull response", () => {
     gitKeizu = createMockGitKeizuView();
   });
 
-  it("calls refresh on pull success (TC-001)", () => {
+  it("calls refresh on pull success (TC-044)", () => {
+    // Case: TC-044
     // Given: A pull success response (status = null)
     const msg: ResponseMessage = { command: "pull", status: null };
 
@@ -50,17 +59,17 @@ describe("handleMessage pull response", () => {
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
-  it("shows error dialog on pull failure (TC-003)", () => {
+  it("shows error dialog on pull failure (TC-045)", () => {
+    // Case: TC-045
     // Given: A pull error response (status = error message string)
-    const errorMsg = "error: Your local changes would be overwritten by merge.";
-    const msg: ResponseMessage = { command: "pull", status: errorMsg };
+    const msg: ResponseMessage = { command: "pull", status: "CONFLICT" };
 
     // When: handleMessage is called with the error response
     handleMessage(msg, gitKeizu);
 
     // Then: showErrorDialog is called with "Unable to Pull" and the git error message
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
-    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Pull", errorMsg, null);
+    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Pull", "CONFLICT", null);
     expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 });
@@ -101,6 +110,89 @@ describe("refreshOrError soft refresh argument (S2)", () => {
   });
 });
 
+// S12: checkout kind と Push phase の表示・委譲
+// @see docs/testing/perspectives/web/messageHandler-test.md
+describe("handleMessage checkoutBranch response", () => {
+  let gitKeizu: GitKeizuViewAPI;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitKeizu = createMockGitKeizuView();
+  });
+
+  it("shows the dedicated reason for an existing branch (TC-036)", () => {
+    // Case: TC-036
+    // Given: the host refused the checkout because the branch already exists
+    const msg: ResponseMessage = { command: "checkoutBranch", kind: "branchExists" };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the localized reason is shown and the graph is not refreshed
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(
+      "Unable to Checkout Branch",
+      "A branch with this name already exists.",
+      null
+    );
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("shows the dedicated reason for an invalid ref (TC-037)", () => {
+    // Case: TC-037
+    // Given: the host refused the checkout because the ref name is invalid
+    const msg: ResponseMessage = { command: "checkoutBranch", kind: "invalidRef" };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the localized reason is shown and the graph is not refreshed
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(
+      "Unable to Checkout Branch",
+      "The branch name is not a valid Git reference name.",
+      null
+    );
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("refreshes the graph on a successful checkout (TC-038)", () => {
+    // Case: TC-038
+    // Given: the checkout completed without a git error
+    const msg: ResponseMessage = { command: "checkoutBranch", kind: "completed", status: null };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: a soft refresh happens and no dialog is shown
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
+    expect(showErrorDialog).not.toHaveBeenCalled();
+  });
+
+  it("shows the git message when the checkout failed (TC-039)", () => {
+    // Case: TC-039
+    // Given: the checkout completed with a git error
+    const msg: ResponseMessage = {
+      command: "checkoutBranch",
+      kind: "completed",
+      status: "fatal: pathspec"
+    };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the git message is shown and the graph is not refreshed
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(
+      "Unable to Checkout Branch",
+      "fatal: pathspec",
+      null
+    );
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+});
+
 describe("handleMessage push response", () => {
   let gitKeizu: GitKeizuViewAPI;
 
@@ -109,30 +201,85 @@ describe("handleMessage push response", () => {
     gitKeizu = createMockGitKeizuView();
   });
 
-  it("calls refresh on push success (TC-002)", () => {
-    // Given: A push success response (status = null)
-    const msg: ResponseMessage = { command: "push", status: null };
+  it("delegates the selectRemote phase to the remote selection dialog (TC-040)", () => {
+    // Case: TC-040
+    // Given: the host asks the user to choose a remote
+    const msg: ResponseMessage = {
+      command: "push",
+      operationId: "op-1",
+      phase: "selectRemote",
+      remotes: ["origin", "upstream"],
+      defaultRemote: "origin"
+    };
 
-    // When: handleMessage is called with the success response
+    // When: handleMessage is called
     handleMessage(msg, gitKeizu);
 
-    // Then: gitKeizu.refresh(false) is called for a soft refresh
+    // Then: the response values are forwarded unmodified and nothing else happens
+    expect(showPushRemoteDialog).toHaveBeenCalledTimes(1);
+    expect(showPushRemoteDialog).toHaveBeenCalledWith(
+      "/path/to/repo",
+      "op-1",
+      ["origin", "upstream"],
+      "origin"
+    );
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+    expect(showErrorDialog).not.toHaveBeenCalled();
+  });
+
+  it("shows the dedicated reason when no remote is registered (TC-041)", () => {
+    // Case: TC-041
+    // Given: the host reports that the repository has no remotes
+    const msg: ResponseMessage = { command: "push", operationId: "op-1", phase: "noRemotes" };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the localized reason is shown and no dialog is opened
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(
+      "Unable to Push",
+      "This repository has no remotes configured.",
+      null
+    );
+    expect(showPushRemoteDialog).not.toHaveBeenCalled();
+  });
+
+  it("refreshes the graph on a successful push (TC-042)", () => {
+    // Case: TC-042
+    // Given: the push completed without a git error
+    const msg: ResponseMessage = {
+      command: "push",
+      operationId: "op-1",
+      phase: "completed",
+      status: null
+    };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: a soft refresh happens and no dialog is shown
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
     expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
-  it("shows error dialog on push failure (TC-004)", () => {
-    // Given: A push error response (status = error message string)
-    const errorMsg = "error: failed to push some refs to 'origin'";
-    const msg: ResponseMessage = { command: "push", status: errorMsg };
+  it("shows the git message when the push failed (TC-043)", () => {
+    // Case: TC-043
+    // Given: the push completed with a git error
+    const msg: ResponseMessage = {
+      command: "push",
+      operationId: "op-1",
+      phase: "completed",
+      status: "fatal: rejected"
+    };
 
-    // When: handleMessage is called with the error response
+    // When: handleMessage is called
     handleMessage(msg, gitKeizu);
 
-    // Then: showErrorDialog is called with "Unable to Push" and the git error message
+    // Then: the existing Push error title is kept and the graph is not refreshed
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
-    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Push", errorMsg, null);
+    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Push", "fatal: rejected", null);
     expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 });

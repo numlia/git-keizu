@@ -155,6 +155,13 @@ import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 
 const TEST_REPO = "/test/repo";
 
+/** Pick out the responses of a single command from every message posted to the webview. */
+function sentMessages(command: string): { command: string }[] {
+  return mocks.postMessage.mock.calls
+    .map((call) => call[0] as { command: string })
+    .filter((message) => message.command === command);
+}
+
 describe("GitKeizuView stash message routing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -620,9 +627,10 @@ describe("GitKeizuView viewDiff with compareWithHash", () => {
   });
 });
 
-describe("GitKeizuView pull/push message routing", () => {
+// S30: pull メッセージルーティングの維持
+// @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md
+describe("GitKeizuView pull message routing", () => {
   const pullMock = vi.fn();
-  const pushMock = vi.fn();
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -631,7 +639,6 @@ describe("GitKeizuView pull/push message routing", () => {
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     pullMock.mockResolvedValue(null);
-    pushMock.mockResolvedValue(null);
 
     const mockDataSource = {
       applyStash: mocks.applyStash,
@@ -642,8 +649,7 @@ describe("GitKeizuView pull/push message routing", () => {
       resetUncommitted: mocks.resetUncommitted,
       cleanUntrackedFiles: mocks.cleanUntrackedFiles,
       getCommitComparison: mocks.getCommitComparison,
-      pull: pullMock,
-      push: pushMock
+      pull: pullMock
     } as unknown as DataSource;
 
     const mockExtensionState = {
@@ -680,7 +686,8 @@ describe("GitKeizuView pull/push message routing", () => {
     GitKeizuView.currentPanel = undefined;
   });
 
-  it("routes pull message to DataSource.pull and returns ResponsePull (TC-013)", async () => {
+  it("routes pull message to DataSource.pull and returns ResponsePull (TC-132)", async () => {
+    // Case: TC-132
     // Given: GitKeizuView instance with mocked DataSource
     // When: RequestPull message is received
     await mocks.messageHandler.current!({
@@ -688,30 +695,417 @@ describe("GitKeizuView pull/push message routing", () => {
       repo: TEST_REPO
     });
 
-    // Then: DataSource.pull is called with correct repo and ResponsePull is sent
+    // Then: DataSource.pull is called with correct repo and one ResponsePull is sent
     expect(pullMock).toHaveBeenCalledTimes(1);
     expect(pullMock).toHaveBeenCalledWith(TEST_REPO);
-    expect(mocks.postMessage).toHaveBeenCalledWith({
-      command: "pull",
-      status: null
-    });
+    expect(sentMessages("pull")).toEqual([{ command: "pull", status: null }]);
+  });
+});
+
+// S28: 二段階 Push の phase orchestration
+// @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md
+describe("GitKeizuView two-phase push orchestration", () => {
+  const preparePushMock = vi.fn();
+  const getRemotesMock = vi.fn();
+  const pushToUpstreamMock = vi.fn();
+  const pushWithUpstreamMock = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitKeizuView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    pushToUpstreamMock.mockResolvedValue(null);
+    pushWithUpstreamMock.mockResolvedValue(null);
+
+    const mockDataSource = {
+      preparePush: preparePushMock,
+      getRemotes: getRemotesMock,
+      pushToUpstream: pushToUpstreamMock,
+      pushWithUpstream: pushWithUpstreamMock
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
   });
 
-  it("routes push message to DataSource.push and returns ResponsePush (TC-014)", async () => {
-    // Given: GitKeizuView instance with mocked DataSource
-    // When: RequestPush message is received
-    await mocks.messageHandler.current!({
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  function sendInitialPush(operationId = "op-1") {
+    return mocks.messageHandler.current!({
       command: "push",
-      repo: TEST_REPO
+      repo: TEST_REPO,
+      operationId,
+      selectedRemote: null
+    });
+  }
+
+  function sendSelectedPush(selectedRemote: string, operationId = "op-1") {
+    return mocks.messageHandler.current!({
+      command: "push",
+      repo: TEST_REPO,
+      operationId,
+      selectedRemote
+    });
+  }
+
+  it("pushes to the configured upstream without asking for a remote (TC-110)", async () => {
+    // Case: TC-110
+    // Given: preparePush resolves an upstream target
+    preparePushMock.mockResolvedValue({
+      kind: "upstream",
+      target: { remoteName: "upstream", branchName: "main" }
     });
 
-    // Then: DataSource.push is called with correct repo and ResponsePush is sent
-    expect(pushMock).toHaveBeenCalledTimes(1);
-    expect(pushMock).toHaveBeenCalledWith(TEST_REPO);
-    expect(mocks.postMessage).toHaveBeenCalledWith({
-      command: "push",
-      status: null
+    // When: the initial push request is handled
+    await sendInitialPush();
+
+    // Then: the push runs immediately and only a completed response is sent
+    expect(pushToUpstreamMock).toHaveBeenCalledTimes(1);
+    expect(pushToUpstreamMock).toHaveBeenCalledWith(TEST_REPO, {
+      remoteName: "upstream",
+      branchName: "main"
     });
+    expect(sentMessages("push")).toEqual([
+      { command: "push", operationId: "op-1", phase: "completed", status: null }
+    ]);
+  });
+
+  it("asks for a remote instead of pushing when no upstream is configured (TC-111)", async () => {
+    // Case: TC-111
+    // Given: preparePush returns the registered remotes
+    preparePushMock.mockResolvedValue({ kind: "selectRemote", remotes: ["origin", "upstream"] });
+
+    // When: the initial push request is handled
+    await sendInitialPush();
+
+    // Then: a selection response is sent and nothing is pushed
+    expect(sentMessages("push")).toEqual([
+      {
+        command: "push",
+        operationId: "op-1",
+        phase: "selectRemote",
+        remotes: ["origin", "upstream"],
+        defaultRemote: "origin"
+      }
+    ]);
+    expect(pushToUpstreamMock).toHaveBeenCalledTimes(0);
+    expect(pushWithUpstreamMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("defaults to the first remote when origin is not registered (TC-112)", async () => {
+    // Case: TC-112
+    // Given: preparePush returns remotes that do not include origin
+    preparePushMock.mockResolvedValue({ kind: "selectRemote", remotes: ["alpha", "zeta"] });
+
+    // When: the initial push request is handled
+    await sendInitialPush();
+
+    // Then: the ascending first entry becomes the default
+    expect(sentMessages("push")).toEqual([
+      {
+        command: "push",
+        operationId: "op-1",
+        phase: "selectRemote",
+        remotes: ["alpha", "zeta"],
+        defaultRemote: "alpha"
+      }
+    ]);
+  });
+
+  it("sends the noRemotes phase for an empty remote list (TC-113)", async () => {
+    // Case: TC-113
+    // Given: preparePush returns no remotes
+    preparePushMock.mockResolvedValue({ kind: "selectRemote", remotes: [] });
+
+    // When: the initial push request is handled
+    await sendInitialPush();
+
+    // Then: the dedicated phase is sent and nothing is pushed
+    expect(sentMessages("push")).toEqual([
+      { command: "push", operationId: "op-1", phase: "noRemotes" }
+    ]);
+    expect(pushToUpstreamMock).toHaveBeenCalledTimes(0);
+    expect(pushWithUpstreamMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("maps a preparation error onto the completed phase (TC-114)", async () => {
+    // Case: TC-114
+    // Given: preparePush fails to read the repository
+    preparePushMock.mockResolvedValue({ kind: "error", status: "fatal: remote fail" });
+
+    // When: the initial push request is handled
+    await sendInitialPush();
+
+    // Then: the error is reported as a completed status, not as a selection
+    expect(sentMessages("push")).toEqual([
+      { command: "push", operationId: "op-1", phase: "completed", status: "fatal: remote fail" }
+    ]);
+  });
+
+  it("pushes to the selected remote after re-checking the remote list (TC-115)", async () => {
+    // Case: TC-115
+    // Given: the selected remote is still registered
+    getRemotesMock.mockResolvedValue(["origin", "upstream"]);
+
+    // When: the follow-up push request is handled
+    await sendSelectedPush("origin");
+
+    // Then: the push runs once and the completed response carries the same operation id
+    expect(pushWithUpstreamMock).toHaveBeenCalledTimes(1);
+    expect(pushWithUpstreamMock).toHaveBeenCalledWith(TEST_REPO, "origin");
+    expect(sentMessages("push")).toEqual([
+      { command: "push", operationId: "op-1", phase: "completed", status: null }
+    ]);
+  });
+
+  it("refuses a remote that is not in the current list (TC-116)", async () => {
+    // Case: TC-116
+    // Given: the selected remote is absent from the re-queried list
+    getRemotesMock.mockResolvedValue(["origin"]);
+
+    // When: the follow-up push request is handled
+    await sendSelectedPush("evil");
+
+    // Then: nothing is pushed and a non-null status is reported
+    expect(pushWithUpstreamMock).toHaveBeenCalledTimes(0);
+    const responses = sentMessages("push") as { phase: string; status: string | null }[];
+    expect(responses).toHaveLength(1);
+    expect(responses[0].phase).toBe("completed");
+    expect(responses[0].status).toBe("The selected remote is not registered in this repository.");
+  });
+
+  it("refuses to push when the remote list cannot be read (TC-117)", async () => {
+    // Case: TC-117
+    // Given: the remote lookup fails
+    getRemotesMock.mockResolvedValue(null);
+
+    // When: the follow-up push request is handled
+    await sendSelectedPush("origin");
+
+    // Then: nothing is pushed and a non-null status is reported
+    expect(pushWithUpstreamMock).toHaveBeenCalledTimes(0);
+    const responses = sentMessages("push") as { phase: string; status: string | null }[];
+    expect(responses).toHaveLength(1);
+    expect(responses[0].phase).toBe("completed");
+    expect(responses[0].status).toBe("Unable to read the remotes of this repository.");
+  });
+
+  it("refuses to push when the re-queried remote list is empty (TC-118)", async () => {
+    // Case: TC-118
+    // Given: the repository no longer has any remote
+    getRemotesMock.mockResolvedValue([]);
+
+    // When: the follow-up push request is handled
+    await sendSelectedPush("origin");
+
+    // Then: nothing is pushed and a non-null status is reported
+    expect(pushWithUpstreamMock).toHaveBeenCalledTimes(0);
+    const responses = sentMessages("push") as { phase: string; status: string | null }[];
+    expect(responses).toHaveLength(1);
+    expect(responses[0].phase).toBe("completed");
+    expect(responses[0].status).toBe("The selected remote is not registered in this repository.");
+  });
+
+  it("refuses an unsafe remote name before re-querying (TC-119)", async () => {
+    // Case: TC-119
+    // Given: the selected remote name looks like a git option
+    getRemotesMock.mockResolvedValue(["origin"]);
+
+    // When: the follow-up push request is handled
+    await sendSelectedPush("-evil");
+
+    // Then: nothing is pushed and a non-null status is reported
+    expect(pushWithUpstreamMock).toHaveBeenCalledTimes(0);
+    const responses = sentMessages("push") as { phase: string; status: string | null }[];
+    expect(responses).toHaveLength(1);
+    expect(responses[0].phase).toBe("completed");
+    expect(responses[0].status).toBe("Invalid remote name.");
+  });
+
+  it("keeps each response correlated with its own operation id (TC-120)", async () => {
+    // Case: TC-120
+    // Given: two consecutive operations that take different branches
+    preparePushMock
+      .mockResolvedValueOnce({ kind: "selectRemote", remotes: ["origin"] })
+      .mockResolvedValueOnce({
+        kind: "upstream",
+        target: { remoteName: "origin", branchName: "main" }
+      });
+
+    // When: both initial requests are handled in order
+    await sendInitialPush("op-1");
+    await sendInitialPush("op-2");
+
+    // Then: no shared state overwrites the correlation ids
+    expect(sentMessages("push")).toEqual([
+      {
+        command: "push",
+        operationId: "op-1",
+        phase: "selectRemote",
+        remotes: ["origin"],
+        defaultRemote: "origin"
+      },
+      { command: "push", operationId: "op-2", phase: "completed", status: null }
+    ]);
+  });
+
+  it("passes a failing push status through to the webview (TC-121)", async () => {
+    // Case: TC-121
+    // Given: the push itself is rejected by git
+    getRemotesMock.mockResolvedValue(["origin"]);
+    pushWithUpstreamMock.mockResolvedValue("fatal: rejected");
+
+    // When: the follow-up push request is handled
+    await sendSelectedPush("origin");
+
+    // Then: the git error is reported unchanged
+    expect(sentMessages("push")).toEqual([
+      { command: "push", operationId: "op-1", phase: "completed", status: "fatal: rejected" }
+    ]);
+  });
+});
+
+// S29: checkout 結果の Response 写像
+// @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md
+describe("GitKeizuView checkoutBranch response mapping", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitKeizuView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+
+    const mockDataSource = {
+      checkoutBranch: mocks.checkoutBranch
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  function sendCheckoutBranch() {
+    return mocks.messageHandler.current!({
+      command: "checkoutBranch",
+      repo: TEST_REPO,
+      branchName: "feature/x",
+      remoteBranch: "origin/feature/x"
+    });
+  }
+
+  it("forwards the branchExists kind without a status field (TC-122)", async () => {
+    // Case: TC-122
+    // Given: DataSource refuses to move an existing branch
+    mocks.checkoutBranch.mockResolvedValue({ kind: "branchExists" });
+
+    // When: the checkoutBranch message is handled
+    await sendCheckoutBranch();
+
+    // Then: the response carries only the kind
+    expect(sentMessages("checkoutBranch")).toEqual([
+      { command: "checkoutBranch", kind: "branchExists" }
+    ]);
+  });
+
+  it("forwards the invalidRef kind (TC-123)", async () => {
+    // Case: TC-123
+    // Given: DataSource rejects the ref name
+    mocks.checkoutBranch.mockResolvedValue({ kind: "invalidRef" });
+
+    // When: the checkoutBranch message is handled
+    await sendCheckoutBranch();
+
+    // Then: the response carries only the kind
+    expect(sentMessages("checkoutBranch")).toEqual([
+      { command: "checkoutBranch", kind: "invalidRef" }
+    ]);
+  });
+
+  it("forwards a successful checkout (TC-124)", async () => {
+    // Case: TC-124
+    // Given: DataSource reports a successful checkout
+    mocks.checkoutBranch.mockResolvedValue({ kind: "completed", status: null });
+
+    // When: the checkoutBranch message is handled
+    await sendCheckoutBranch();
+
+    // Then: the completed kind is sent with a null status
+    expect(sentMessages("checkoutBranch")).toEqual([
+      { command: "checkoutBranch", kind: "completed", status: null }
+    ]);
+  });
+
+  it("forwards a failing checkout with its git message (TC-125)", async () => {
+    // Case: TC-125
+    // Given: DataSource reports a git failure
+    mocks.checkoutBranch.mockResolvedValue({ kind: "completed", status: "fatal: pathspec" });
+
+    // When: the checkoutBranch message is handled
+    await sendCheckoutBranch();
+
+    // Then: the git message is preserved in the response
+    expect(sentMessages("checkoutBranch")).toEqual([
+      { command: "checkoutBranch", kind: "completed", status: "fatal: pathspec" }
+    ]);
   });
 });
 
@@ -1521,7 +1915,9 @@ describe("GitKeizuView loadCommits authorFilter (S10)", () => {
   });
 });
 
-describe("GitKeizuView createBranch + checkout orchestration (S11)", () => {
+// S29: createBranch オーケストレーション
+// @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md
+describe("GitKeizuView createBranch + checkout orchestration", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
@@ -1529,7 +1925,7 @@ describe("GitKeizuView createBranch + checkout orchestration (S11)", () => {
 
     mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
     mocks.createBranch.mockResolvedValue(null);
-    mocks.checkoutBranch.mockResolvedValue(null);
+    mocks.checkoutBranch.mockResolvedValue({ kind: "completed", status: null });
 
     const mockDataSource = {
       applyStash: mocks.applyStash,
@@ -1582,9 +1978,11 @@ describe("GitKeizuView createBranch + checkout orchestration (S11)", () => {
     GitKeizuView.currentPanel = undefined;
   });
 
-  it("calls checkoutBranch after successful createBranch when checkout=true (TC-031)", async () => {
-    // Given: createBranch succeeds
+  it("returns partial success when the created branch fails to check out (TC-126)", async () => {
+    // Case: TC-126
+    // Given: createBranch succeeds and the local checkout reports a git failure
     mocks.createBranch.mockResolvedValue(null);
+    mocks.checkoutBranch.mockResolvedValue({ kind: "completed", status: "fatal: pathspec" });
 
     // When: createBranch message with checkout=true is received
     await mocks.messageHandler.current!({
@@ -1595,17 +1993,41 @@ describe("GitKeizuView createBranch + checkout orchestration (S11)", () => {
       checkout: true
     });
 
-    // Then: checkoutBranch is called with branchName
-    expect(mocks.createBranch).toHaveBeenCalledTimes(1);
-    expect(mocks.createBranch).toHaveBeenCalledWith(TEST_REPO, "feature/x", "abc123");
+    // Then: the existing partial success message is preserved
+    expect(sentMessages("createBranch")).toEqual([
+      {
+        command: "createBranch",
+        status: "Branch 'feature/x' was created, but checkout failed: fatal: pathspec"
+      }
+    ]);
+  });
+
+  it("checks out the created branch and reports full success (TC-127)", async () => {
+    // Case: TC-127
+    // Given: both createBranch and the local checkout succeed
+    mocks.createBranch.mockResolvedValue(null);
+    mocks.checkoutBranch.mockResolvedValue({ kind: "completed", status: null });
+
+    // When: createBranch message with checkout=true is received
+    await mocks.messageHandler.current!({
+      command: "createBranch",
+      repo: TEST_REPO,
+      branchName: "feature/x",
+      commitHash: "abc123",
+      checkout: true
+    });
+
+    // Then: the local checkout is requested once and the response reports success
     expect(mocks.checkoutBranch).toHaveBeenCalledTimes(1);
     expect(mocks.checkoutBranch).toHaveBeenCalledWith(TEST_REPO, "feature/x", null);
+    expect(sentMessages("createBranch")).toEqual([{ command: "createBranch", status: null }]);
   });
 
-  it("returns status null on full success (createBranch + checkoutBranch) (TC-032)", async () => {
-    // Given: both createBranch and checkoutBranch succeed
+  it("describes a non-completed checkout kind in the partial success message (TC-128)", async () => {
+    // Case: TC-128
+    // Given: createBranch succeeds but the checkout is refused before running git
     mocks.createBranch.mockResolvedValue(null);
-    mocks.checkoutBranch.mockResolvedValue(null);
+    mocks.checkoutBranch.mockResolvedValue({ kind: "invalidRef" });
 
     // When: createBranch message with checkout=true is received
     await mocks.messageHandler.current!({
@@ -1616,35 +2038,15 @@ describe("GitKeizuView createBranch + checkout orchestration (S11)", () => {
       checkout: true
     });
 
-    // Then: status is null (complete success)
-    expect(mocks.postMessage).toHaveBeenCalledWith({
-      command: "createBranch",
-      status: null
-    });
+    // Then: the message describes the refusal instead of undefined or a raw kind value
+    const responses = sentMessages("createBranch") as { status: string | null }[];
+    expect(responses).toHaveLength(1);
+    expect(responses[0].status).toBe(
+      "Branch 'feature/x' was created, but checkout failed: Invalid ref name."
+    );
   });
 
-  it("returns partial success message when createBranch succeeds but checkoutBranch fails (TC-033)", async () => {
-    // Given: createBranch succeeds, checkoutBranch fails
-    mocks.createBranch.mockResolvedValue(null);
-    mocks.checkoutBranch.mockResolvedValue("checkout error");
-
-    // When: createBranch message with checkout=true is received
-    await mocks.messageHandler.current!({
-      command: "createBranch",
-      repo: TEST_REPO,
-      branchName: "feature/x",
-      commitHash: "abc123",
-      checkout: true
-    });
-
-    // Then: status contains partial success message
-    expect(mocks.postMessage).toHaveBeenCalledWith({
-      command: "createBranch",
-      status: "Branch 'feature/x' was created, but checkout failed: checkout error"
-    });
-  });
-
-  it("does not call checkoutBranch when checkout=false (TC-034)", async () => {
+  it("does not call checkoutBranch when checkout=false (TC-129)", async () => {
     // Given: createBranch succeeds
     mocks.createBranch.mockResolvedValue(null);
 
@@ -1665,7 +2067,7 @@ describe("GitKeizuView createBranch + checkout orchestration (S11)", () => {
     });
   });
 
-  it("returns error and skips checkout when createBranch fails (TC-035)", async () => {
+  it("returns error and skips checkout when createBranch fails (TC-130)", async () => {
     // Given: createBranch fails
     const errorMsg = "branch already exists";
     mocks.createBranch.mockResolvedValue(errorMsg);
@@ -1687,7 +2089,7 @@ describe("GitKeizuView createBranch + checkout orchestration (S11)", () => {
     });
   });
 
-  it("does not call checkoutBranch when checkout is undefined - legacy compat (TC-036)", async () => {
+  it("does not call checkoutBranch when checkout is undefined - legacy compat (TC-131)", async () => {
     // Given: createBranch succeeds
     mocks.createBranch.mockResolvedValue(null);
 
