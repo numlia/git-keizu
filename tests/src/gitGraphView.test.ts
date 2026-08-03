@@ -702,9 +702,10 @@ describe("GitKeizuView pull message routing", () => {
   });
 });
 
-// S28: 二段階 Push の phase orchestration
+// S31: 二段階 Push の phase orchestration（Response への repo 同梱）
 // @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md
 describe("GitKeizuView two-phase push orchestration", () => {
+  const OTHER_REPO = "/test/other-repo";
   const preparePushMock = vi.fn();
   const getRemotesMock = vi.fn();
   const pushToUpstreamMock = vi.fn();
@@ -715,7 +716,7 @@ describe("GitKeizuView two-phase push orchestration", () => {
     mocks.messageHandler.current = null;
     GitKeizuView.currentPanel = undefined;
 
-    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo", [OTHER_REPO]: "Other Repo" });
     pushToUpstreamMock.mockResolvedValue(null);
     pushWithUpstreamMock.mockResolvedValue(null);
 
@@ -760,10 +761,10 @@ describe("GitKeizuView two-phase push orchestration", () => {
     GitKeizuView.currentPanel = undefined;
   });
 
-  function sendInitialPush(operationId = "op-1") {
+  function sendInitialPush(operationId = "op-1", repo = TEST_REPO) {
     return mocks.messageHandler.current!({
       command: "push",
-      repo: TEST_REPO,
+      repo,
       operationId,
       selectedRemote: null
     });
@@ -778,8 +779,8 @@ describe("GitKeizuView two-phase push orchestration", () => {
     });
   }
 
-  it("pushes to the configured upstream without asking for a remote (TC-110)", async () => {
-    // Case: TC-110
+  it("pushes to the configured upstream without asking for a remote (TC-133)", async () => {
+    // Case: TC-133
     // Given: preparePush resolves an upstream target
     preparePushMock.mockResolvedValue({
       kind: "upstream",
@@ -789,29 +790,36 @@ describe("GitKeizuView two-phase push orchestration", () => {
     // When: the initial push request is handled
     await sendInitialPush();
 
-    // Then: the push runs immediately and only a completed response is sent
+    // Then: the push runs immediately and only a completed response carrying the repo is sent
     expect(pushToUpstreamMock).toHaveBeenCalledTimes(1);
     expect(pushToUpstreamMock).toHaveBeenCalledWith(TEST_REPO, {
       remoteName: "upstream",
       branchName: "main"
     });
     expect(sentMessages("push")).toEqual([
-      { command: "push", operationId: "op-1", phase: "completed", status: null }
+      {
+        command: "push",
+        repo: TEST_REPO,
+        operationId: "op-1",
+        phase: "completed",
+        status: null
+      }
     ]);
   });
 
-  it("asks for a remote instead of pushing when no upstream is configured (TC-111)", async () => {
-    // Case: TC-111
+  it("asks for a remote instead of pushing when no upstream is configured (TC-134)", async () => {
+    // Case: TC-134
     // Given: preparePush returns the registered remotes
     preparePushMock.mockResolvedValue({ kind: "selectRemote", remotes: ["origin", "upstream"] });
 
     // When: the initial push request is handled
     await sendInitialPush();
 
-    // Then: a selection response is sent and nothing is pushed
+    // Then: a selection response carrying the repo is sent and nothing is pushed
     expect(sentMessages("push")).toEqual([
       {
         command: "push",
+        repo: TEST_REPO,
         operationId: "op-1",
         phase: "selectRemote",
         remotes: ["origin", "upstream"],
@@ -822,8 +830,8 @@ describe("GitKeizuView two-phase push orchestration", () => {
     expect(pushWithUpstreamMock).toHaveBeenCalledTimes(0);
   });
 
-  it("defaults to the first remote when origin is not registered (TC-112)", async () => {
-    // Case: TC-112
+  it("defaults to the first remote when origin is not registered (TC-135)", async () => {
+    // Case: TC-135
     // Given: preparePush returns remotes that do not include origin
     preparePushMock.mockResolvedValue({ kind: "selectRemote", remotes: ["alpha", "zeta"] });
 
@@ -834,6 +842,7 @@ describe("GitKeizuView two-phase push orchestration", () => {
     expect(sentMessages("push")).toEqual([
       {
         command: "push",
+        repo: TEST_REPO,
         operationId: "op-1",
         phase: "selectRemote",
         remotes: ["alpha", "zeta"],
@@ -842,24 +851,24 @@ describe("GitKeizuView two-phase push orchestration", () => {
     ]);
   });
 
-  it("sends the noRemotes phase for an empty remote list (TC-113)", async () => {
-    // Case: TC-113
+  it("sends the noRemotes phase for an empty remote list (TC-136)", async () => {
+    // Case: TC-136
     // Given: preparePush returns no remotes
     preparePushMock.mockResolvedValue({ kind: "selectRemote", remotes: [] });
 
     // When: the initial push request is handled
     await sendInitialPush();
 
-    // Then: the dedicated phase is sent and nothing is pushed
+    // Then: the dedicated phase carrying the repo is sent and nothing is pushed
     expect(sentMessages("push")).toEqual([
-      { command: "push", operationId: "op-1", phase: "noRemotes" }
+      { command: "push", repo: TEST_REPO, operationId: "op-1", phase: "noRemotes" }
     ]);
     expect(pushToUpstreamMock).toHaveBeenCalledTimes(0);
     expect(pushWithUpstreamMock).toHaveBeenCalledTimes(0);
   });
 
-  it("maps a preparation error onto the completed phase (TC-114)", async () => {
-    // Case: TC-114
+  it("maps a preparation error onto the completed phase (TC-137)", async () => {
+    // Case: TC-137
     // Given: preparePush fails to read the repository
     preparePushMock.mockResolvedValue({ kind: "error", status: "fatal: remote fail" });
 
@@ -868,28 +877,40 @@ describe("GitKeizuView two-phase push orchestration", () => {
 
     // Then: the error is reported as a completed status, not as a selection
     expect(sentMessages("push")).toEqual([
-      { command: "push", operationId: "op-1", phase: "completed", status: "fatal: remote fail" }
+      {
+        command: "push",
+        repo: TEST_REPO,
+        operationId: "op-1",
+        phase: "completed",
+        status: "fatal: remote fail"
+      }
     ]);
   });
 
-  it("pushes to the selected remote after re-checking the remote list (TC-115)", async () => {
-    // Case: TC-115
+  it("pushes to the selected remote after re-checking the remote list (TC-138)", async () => {
+    // Case: TC-138
     // Given: the selected remote is still registered
     getRemotesMock.mockResolvedValue(["origin", "upstream"]);
 
     // When: the follow-up push request is handled
     await sendSelectedPush("origin");
 
-    // Then: the push runs once and the completed response carries the same operation id
+    // Then: the push runs once and the completed response carries the same repo and operation id
     expect(pushWithUpstreamMock).toHaveBeenCalledTimes(1);
     expect(pushWithUpstreamMock).toHaveBeenCalledWith(TEST_REPO, "origin");
     expect(sentMessages("push")).toEqual([
-      { command: "push", operationId: "op-1", phase: "completed", status: null }
+      {
+        command: "push",
+        repo: TEST_REPO,
+        operationId: "op-1",
+        phase: "completed",
+        status: null
+      }
     ]);
   });
 
-  it("refuses a remote that is not in the current list (TC-116)", async () => {
-    // Case: TC-116
+  it("refuses a remote that is not in the current list (TC-139)", async () => {
+    // Case: TC-139
     // Given: the selected remote is absent from the re-queried list
     getRemotesMock.mockResolvedValue(["origin"]);
 
@@ -904,8 +925,8 @@ describe("GitKeizuView two-phase push orchestration", () => {
     expect(responses[0].status).toBe("The selected remote is not registered in this repository.");
   });
 
-  it("refuses to push when the remote list cannot be read (TC-117)", async () => {
-    // Case: TC-117
+  it("refuses to push when the remote list cannot be read (TC-140)", async () => {
+    // Case: TC-140
     // Given: the remote lookup fails
     getRemotesMock.mockResolvedValue(null);
 
@@ -920,8 +941,8 @@ describe("GitKeizuView two-phase push orchestration", () => {
     expect(responses[0].status).toBe("Unable to read the remotes of this repository.");
   });
 
-  it("refuses to push when the re-queried remote list is empty (TC-118)", async () => {
-    // Case: TC-118
+  it("refuses to push when the re-queried remote list is empty (TC-141)", async () => {
+    // Case: TC-141
     // Given: the repository no longer has any remote
     getRemotesMock.mockResolvedValue([]);
 
@@ -936,8 +957,8 @@ describe("GitKeizuView two-phase push orchestration", () => {
     expect(responses[0].status).toBe("The selected remote is not registered in this repository.");
   });
 
-  it("refuses an unsafe remote name before re-querying (TC-119)", async () => {
-    // Case: TC-119
+  it("refuses an unsafe remote name before re-querying (TC-142)", async () => {
+    // Case: TC-142
     // Given: the selected remote name looks like a git option
     getRemotesMock.mockResolvedValue(["origin"]);
 
@@ -952,9 +973,9 @@ describe("GitKeizuView two-phase push orchestration", () => {
     expect(responses[0].status).toBe("Invalid remote name.");
   });
 
-  it("keeps each response correlated with its own operation id (TC-120)", async () => {
-    // Case: TC-120
-    // Given: two consecutive operations that take different branches
+  it("keeps each response correlated with its own operation id (TC-143)", async () => {
+    // Case: TC-143
+    // Given: two consecutive operations on the same repository that take different branches
     preparePushMock
       .mockResolvedValueOnce({ kind: "selectRemote", remotes: ["origin"] })
       .mockResolvedValueOnce({
@@ -967,20 +988,14 @@ describe("GitKeizuView two-phase push orchestration", () => {
     await sendInitialPush("op-2");
 
     // Then: no shared state overwrites the correlation ids
-    expect(sentMessages("push")).toEqual([
-      {
-        command: "push",
-        operationId: "op-1",
-        phase: "selectRemote",
-        remotes: ["origin"],
-        defaultRemote: "origin"
-      },
-      { command: "push", operationId: "op-2", phase: "completed", status: null }
-    ]);
+    const operationIds = (sentMessages("push") as { operationId: string }[]).map(
+      (response) => response.operationId
+    );
+    expect(operationIds).toEqual(["op-1", "op-2"]);
   });
 
-  it("passes a failing push status through to the webview (TC-121)", async () => {
-    // Case: TC-121
+  it("passes a failing push status through to the webview (TC-144)", async () => {
+    // Case: TC-144
     // Given: the push itself is rejected by git
     getRemotesMock.mockResolvedValue(["origin"]);
     pushWithUpstreamMock.mockResolvedValue("fatal: rejected");
@@ -988,10 +1003,35 @@ describe("GitKeizuView two-phase push orchestration", () => {
     // When: the follow-up push request is handled
     await sendSelectedPush("origin");
 
-    // Then: the git error is reported unchanged
+    // Then: the git error is reported unchanged alongside the repo
     expect(sentMessages("push")).toEqual([
-      { command: "push", operationId: "op-1", phase: "completed", status: "fatal: rejected" }
+      {
+        command: "push",
+        repo: TEST_REPO,
+        operationId: "op-1",
+        phase: "completed",
+        status: "fatal: rejected"
+      }
     ]);
+  });
+
+  it("keeps each response correlated with its own repository (TC-145)", async () => {
+    // Case: TC-145
+    // Given: two consecutive operations on different repositories that take different branches
+    preparePushMock
+      .mockResolvedValueOnce({ kind: "selectRemote", remotes: ["origin"] })
+      .mockResolvedValueOnce({
+        kind: "upstream",
+        target: { remoteName: "origin", branchName: "main" }
+      });
+
+    // When: the requests of both repositories are handled in order
+    await sendInitialPush("op-1", TEST_REPO);
+    await sendInitialPush("op-2", OTHER_REPO);
+
+    // Then: no shared state overwrites the repository of either response
+    const repos = (sentMessages("push") as { repo: string }[]).map((response) => response.repo);
+    expect(repos).toEqual([TEST_REPO, OTHER_REPO]);
   });
 });
 

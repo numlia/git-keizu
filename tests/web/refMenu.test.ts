@@ -44,7 +44,6 @@ import {
 import {
   buildRefContextMenuItems,
   checkoutBranchAction,
-  getPendingPushRepo,
   parseRemoteRef,
   showPushRemoteDialog
 } from "../../web/refMenu";
@@ -2107,32 +2106,38 @@ describe("Push operation id and remote selection dialog", () => {
   });
 });
 
-// S18: getPendingPushRepo() 二段階 Push の repository 引き継ぎ
+// S19: showPushRemoteDialog() の repository 引数を 2 通目 Request へ引き継ぐ
 // @see docs/testing/perspectives/web/refMenu-test/01-branch-actions-01.md
-describe("pending push repository handover", () => {
+describe("push remote dialog repository handover", () => {
+  const OTHER_REPO = "/test/other-repo";
+
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  // A repository other than REPO, so a stale value left by an earlier push cannot satisfy this test.
-  const OTHER_REPO = "/test/other-repo";
+  it("sends each dialog's own repository on confirmation (TC-091)", () => {
+    // Case: TC-091
+    // Given: two selection dialogs opened for different repositories
+    showPushRemoteDialog(REPO, "op-1", ["origin"], "origin");
+    showPushRemoteDialog(OTHER_REPO, "op-2", ["origin"], "origin");
 
-  it("hands the confirmed repository to the second push request (TC-090)", () => {
-    // Case: TC-090
-    // Given: the Push menu item of the current branch opens its confirmation dialog
-    const sourceElem = createMockElement(["head"]);
-    const menu = buildRefContextMenuItems(OTHER_REPO, "main", sourceElem, false, "main");
-    const pushItem = findMenuItem(menu, "Push");
-    expect(pushItem).toBeDefined();
-    pushItem!.onClick();
+    // When: both callbacks are confirmed in order
+    vi.mocked(showSelectDialog).mock.calls[0][4]("origin");
+    vi.mocked(showSelectDialog).mock.calls[1][4]("origin");
 
-    // When: the confirmation is approved and the real module is asked for the pending repository
-    vi.mocked(showConfirmationDialog).mock.calls[0][1]();
-    const pendingRepo = getPendingPushRepo();
-
-    // Then: it matches the repository of the initial request instead of another repository
-    const initialRequest = vi.mocked(sendMessage).mock.calls[0][0] as { repo: string };
-    expect(pendingRepo).toBe(OTHER_REPO);
-    expect(pendingRepo).toBe(initialRequest.repo);
+    // Then: neither request adopts the repository or operation id of the other dialog
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(sendMessage).toHaveBeenNthCalledWith(1, {
+      command: "push",
+      repo: REPO,
+      operationId: "op-1",
+      selectedRemote: "origin"
+    });
+    expect(sendMessage).toHaveBeenNthCalledWith(2, {
+      command: "push",
+      repo: OTHER_REPO,
+      operationId: "op-2",
+      selectedRemote: "origin"
+    });
   });
 });

@@ -746,16 +746,15 @@ export class GitKeizuView {
     const preparation = await this.dataSource.preparePush(repo);
     switch (preparation.kind) {
       case "upstream":
-        return {
-          command: "push",
+        return completedPush(
+          repo,
           operationId,
-          phase: "completed",
-          status: await this.dataSource.pushToUpstream(repo, preparation.target)
-        };
+          await this.dataSource.pushToUpstream(repo, preparation.target)
+        );
       case "selectRemote":
-        return buildRemoteSelectionResponse(operationId, preparation.remotes);
+        return buildRemoteSelectionResponse(repo, operationId, preparation.remotes);
       case "error":
-        return { command: "push", operationId, phase: "completed", status: preparation.status };
+        return completedPush(repo, operationId, preparation.status);
     }
   }
 
@@ -767,16 +766,20 @@ export class GitKeizuView {
     selectedRemote: string
   ): Promise<ResponsePush> {
     if (!isSafeRemoteName(selectedRemote)) {
-      return completedPush(operationId, INVALID_REMOTE_NAME_MESSAGE);
+      return completedPush(repo, operationId, INVALID_REMOTE_NAME_MESSAGE);
     }
     const remotes = await this.dataSource.getRemotes(repo);
     if (remotes === null) {
-      return completedPush(operationId, REMOTE_LOOKUP_FAILED_MESSAGE);
+      return completedPush(repo, operationId, REMOTE_LOOKUP_FAILED_MESSAGE);
     }
     if (!remotes.includes(selectedRemote)) {
-      return completedPush(operationId, UNREGISTERED_REMOTE_MESSAGE);
+      return completedPush(repo, operationId, UNREGISTERED_REMOTE_MESSAGE);
     }
-    return completedPush(operationId, await this.dataSource.pushWithUpstream(repo, selectedRemote));
+    return completedPush(
+      repo,
+      operationId,
+      await this.dataSource.pushWithUpstream(repo, selectedRemote)
+    );
   }
 
   private async deleteRemoteBranches(
@@ -897,13 +900,18 @@ function describeCheckoutResult(result: CheckoutBranchResult): GitCommandStatus 
   }
 }
 
-function buildRemoteSelectionResponse(operationId: string, remotes: string[]): ResponsePush {
+function buildRemoteSelectionResponse(
+  repo: string,
+  operationId: string,
+  remotes: string[]
+): ResponsePush {
   const [firstRemote] = remotes;
   if (firstRemote === undefined) {
-    return { command: "push", operationId, phase: "noRemotes" };
+    return { command: "push", repo, operationId, phase: "noRemotes" };
   }
   return {
     command: "push",
+    repo,
     operationId,
     phase: "selectRemote",
     remotes,
@@ -911,8 +919,8 @@ function buildRemoteSelectionResponse(operationId: string, remotes: string[]): R
   };
 }
 
-function completedPush(operationId: string, status: GitCommandStatus): ResponsePush {
-  return { command: "push", operationId, phase: "completed", status };
+function completedPush(repo: string, operationId: string, status: GitCommandStatus): ResponsePush {
+  return { command: "push", repo, operationId, phase: "completed", status };
 }
 
 function getNonce() {

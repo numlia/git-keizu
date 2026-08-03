@@ -113,11 +113,11 @@ describe("worktree open/reveal response status requirement", () => {
   });
 });
 
-// S3: checkout 結果と二段階 Push の型契約
+// S4: checkout 結果と二段階 Push の型契約（Response への repo 必須化）
 // @see docs/testing/perspectives/src/types-test.md
 describe("CheckoutBranchResult discriminated union", () => {
-  it("accepts the branchExists variant without a status field (TC-010)", () => {
-    // Case: TC-010
+  it("accepts the branchExists variant without a status field (TC-026)", () => {
+    // Case: TC-026
     // Given: the branchExists variant of the checkout result
     const result: CheckoutBranchResult = { kind: "branchExists" };
 
@@ -130,8 +130,8 @@ describe("CheckoutBranchResult discriminated union", () => {
     }
   });
 
-  it("accepts the invalidRef variant (TC-011)", () => {
-    // Case: TC-011
+  it("accepts the invalidRef variant (TC-027)", () => {
+    // Case: TC-027
     // Given: the invalidRef variant of the checkout result
     const result: CheckoutBranchResult = { kind: "invalidRef" };
 
@@ -140,8 +140,8 @@ describe("CheckoutBranchResult discriminated union", () => {
     expect(result.kind).toBe("invalidRef");
   });
 
-  it("accepts the completed variant and exposes status after narrowing (TC-012)", () => {
-    // Case: TC-012
+  it("accepts the completed variant and exposes status after narrowing (TC-028)", () => {
+    // Case: TC-028
     // Given: the completed variant with a null status
     const result: CheckoutBranchResult = { kind: "completed", status: null };
 
@@ -153,8 +153,8 @@ describe("CheckoutBranchResult discriminated union", () => {
     }
   });
 
-  it("requires status on the completed variant (TC-013)", () => {
-    // Case: TC-013
+  it("requires status on the completed variant (TC-029)", () => {
+    // Case: TC-029
     // Given: a completed literal without the mandatory status field
     // @ts-expect-error status is mandatory on the completed variant
     const missingStatus: CheckoutBranchResult = { kind: "completed" };
@@ -164,8 +164,8 @@ describe("CheckoutBranchResult discriminated union", () => {
     expect(missingStatus.kind).toBe("completed");
   });
 
-  it("rejects a kind outside the union (TC-014)", () => {
-    // Case: TC-014
+  it("rejects a kind outside the union (TC-030)", () => {
+    // Case: TC-030
     // Given: a literal using a kind that is not part of the union
     // @ts-expect-error "unknown" is not a member of CheckoutBranchResult
     const unknownKind: CheckoutBranchResult = { kind: "unknown" };
@@ -177,8 +177,8 @@ describe("CheckoutBranchResult discriminated union", () => {
 });
 
 describe("RequestPush two-phase contract", () => {
-  it("accepts the initial request with a null selectedRemote (TC-015)", () => {
-    // Case: TC-015
+  it("accepts the initial request with a null selectedRemote (TC-031)", () => {
+    // Case: TC-031
     // Given: the first request of a push operation
     const request: RequestPush = {
       command: "push",
@@ -193,8 +193,8 @@ describe("RequestPush two-phase contract", () => {
     expect(request.selectedRemote).toBeNull();
   });
 
-  it("accepts the follow-up request carrying the selected remote (TC-016)", () => {
-    // Case: TC-016
+  it("accepts the follow-up request carrying the selected remote (TC-032)", () => {
+    // Case: TC-032
     // Given: the second request of the same push operation
     const request: RequestPush = {
       command: "push",
@@ -209,8 +209,8 @@ describe("RequestPush two-phase contract", () => {
     expect(request.selectedRemote).toBe("origin");
   });
 
-  it("requires operationId on the request (TC-017)", () => {
-    // Case: TC-017
+  it("requires operationId on the request (TC-033)", () => {
+    // Case: TC-033
     // Given: a request literal without the correlation id
     // @ts-expect-error operationId is mandatory on RequestPush
     const missingOperationId: RequestPush = {
@@ -224,8 +224,8 @@ describe("RequestPush two-phase contract", () => {
     expect(missingOperationId.command).toBe("push");
   });
 
-  it("requires selectedRemote on the request (TC-018)", () => {
-    // Case: TC-018
+  it("requires selectedRemote on the request (TC-034)", () => {
+    // Case: TC-034
     // Given: a request literal without the selection field
     // @ts-expect-error selectedRemote is mandatory and must not be optional
     const missingSelectedRemote: RequestPush = {
@@ -241,11 +241,12 @@ describe("RequestPush two-phase contract", () => {
 });
 
 describe("ResponsePush phase union", () => {
-  it("accepts the selectRemote variant and exposes its fields after narrowing (TC-019)", () => {
-    // Case: TC-019
+  it("accepts the selectRemote variant and exposes its fields after narrowing (TC-035)", () => {
+    // Case: TC-035
     // Given: the selectRemote phase response
     const response: ResponsePush = {
       command: "push",
+      repo: "/r",
       operationId: "op-1",
       phase: "selectRemote",
       remotes: ["origin"],
@@ -253,19 +254,21 @@ describe("ResponsePush phase union", () => {
     };
 
     // When: the value is narrowed by phase
-    // Then: remotes and defaultRemote are reachable
+    // Then: repo, remotes and defaultRemote are reachable
     expect(response.phase).toBe("selectRemote");
     if (response.phase === "selectRemote") {
+      expect(response.repo).toBe("/r");
       expect(response.remotes).toEqual(["origin"]);
       expect(response.defaultRemote).toBe("origin");
     }
   });
 
-  it("accepts the noRemotes variant without phase-specific fields (TC-020)", () => {
-    // Case: TC-020
+  it("accepts the noRemotes variant without phase-specific fields (TC-036)", () => {
+    // Case: TC-036
     // Given: the noRemotes phase response
     const response: ResponsePush = {
       command: "push",
+      repo: "/r",
       operationId: "op-1",
       phase: "noRemotes"
     };
@@ -279,11 +282,12 @@ describe("ResponsePush phase union", () => {
     }
   });
 
-  it("accepts the completed variant and exposes status after narrowing (TC-021)", () => {
-    // Case: TC-021
+  it("accepts the completed variant and exposes status after narrowing (TC-037)", () => {
+    // Case: TC-037
     // Given: the completed phase response
     const response: ResponsePush = {
       command: "push",
+      repo: "/r",
       operationId: "op-1",
       phase: "completed",
       status: null
@@ -297,12 +301,13 @@ describe("ResponsePush phase union", () => {
     }
   });
 
-  it("requires status on the completed variant (TC-022)", () => {
-    // Case: TC-022
+  it("requires status on the completed variant (TC-038)", () => {
+    // Case: TC-038
     // Given: a completed response literal without status
     // @ts-expect-error status is mandatory on the completed variant
     const missingStatus: ResponsePush = {
       command: "push",
+      repo: "/r",
       operationId: "op-1",
       phase: "completed"
     };
@@ -312,12 +317,13 @@ describe("ResponsePush phase union", () => {
     expect(missingStatus.phase).toBe("completed");
   });
 
-  it("requires defaultRemote on the selectRemote variant (TC-023)", () => {
-    // Case: TC-023
+  it("requires defaultRemote on the selectRemote variant (TC-039)", () => {
+    // Case: TC-039
     // Given: a selectRemote response literal without defaultRemote
     // @ts-expect-error defaultRemote is mandatory on the selectRemote variant
     const missingDefaultRemote: ResponsePush = {
       command: "push",
+      repo: "/r",
       operationId: "op-1",
       phase: "selectRemote",
       remotes: ["origin"]
@@ -328,20 +334,26 @@ describe("ResponsePush phase union", () => {
     expect(missingDefaultRemote.phase).toBe("selectRemote");
   });
 
-  it("requires operationId on every response variant (TC-024)", () => {
-    // Case: TC-024
+  it("requires operationId on every response variant (TC-040)", () => {
+    // Case: TC-040
     // Given: one literal per phase, each missing the correlation id
     // @ts-expect-error operationId is mandatory on the selectRemote variant
     const selectRemote: ResponsePush = {
       command: "push",
+      repo: "/r",
       phase: "selectRemote",
       remotes: ["origin"],
       defaultRemote: "origin"
     };
     // @ts-expect-error operationId is mandatory on the noRemotes variant
-    const noRemotes: ResponsePush = { command: "push", phase: "noRemotes" };
+    const noRemotes: ResponsePush = { command: "push", repo: "/r", phase: "noRemotes" };
     // @ts-expect-error operationId is mandatory on the completed variant
-    const completed: ResponsePush = { command: "push", phase: "completed", status: null };
+    const completed: ResponsePush = {
+      command: "push",
+      repo: "/r",
+      phase: "completed",
+      status: null
+    };
 
     // When: the literals are inspected at runtime
     // Then: all three phases are represented without a correlation id
@@ -350,8 +362,36 @@ describe("ResponsePush phase union", () => {
     expect(completed.phase).toBe("completed");
   });
 
-  it("narrows exhaustively on phase (TC-025)", () => {
-    // Case: TC-025
+  it("requires repo on every response variant (TC-041)", () => {
+    // Case: TC-041
+    // Given: one literal per phase, each missing the repository path
+    // @ts-expect-error repo is mandatory on the selectRemote variant
+    const selectRemote: ResponsePush = {
+      command: "push",
+      operationId: "op-1",
+      phase: "selectRemote",
+      remotes: ["origin"],
+      defaultRemote: "origin"
+    };
+    // @ts-expect-error repo is mandatory on the noRemotes variant
+    const noRemotes: ResponsePush = { command: "push", operationId: "op-1", phase: "noRemotes" };
+    // @ts-expect-error repo is mandatory on the completed variant
+    const completed: ResponsePush = {
+      command: "push",
+      operationId: "op-1",
+      phase: "completed",
+      status: null
+    };
+
+    // When: the literals are inspected at runtime
+    // Then: all three phases are represented without a repository path
+    expect(selectRemote.phase).toBe("selectRemote");
+    expect(noRemotes.phase).toBe("noRemotes");
+    expect(completed.phase).toBe("completed");
+  });
+
+  it("narrows exhaustively on phase (TC-042)", () => {
+    // Case: TC-042
     // Given: a switch that handles all three phases and asserts the rest is never
     function describePhase(response: ResponsePush): string {
       switch (response.phase) {
@@ -373,17 +413,24 @@ describe("ResponsePush phase union", () => {
     expect(
       describePhase({
         command: "push",
+        repo: "/r",
         operationId: "op-1",
         phase: "selectRemote",
         remotes: ["origin"],
         defaultRemote: "origin"
       })
     ).toBe("origin");
-    expect(describePhase({ command: "push", operationId: "op-1", phase: "noRemotes" })).toBe(
-      "none"
-    );
     expect(
-      describePhase({ command: "push", operationId: "op-1", phase: "completed", status: null })
+      describePhase({ command: "push", repo: "/r", operationId: "op-1", phase: "noRemotes" })
+    ).toBe("none");
+    expect(
+      describePhase({
+        command: "push",
+        repo: "/r",
+        operationId: "op-1",
+        phase: "completed",
+        status: null
+      })
     ).toBe("ok");
   });
 });

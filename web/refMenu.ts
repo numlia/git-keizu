@@ -36,16 +36,6 @@ export function parseRemoteRef(refName: string): ParsedRemoteRef {
   };
 }
 
-/**
- * `ResponsePush` carries no repository path, so the repository of the push that
- * is awaiting a remote selection is kept here between the two request phases.
- */
-let pendingPushRepo = "";
-
-export function getPendingPushRepo(): string {
-  return pendingPushRepo;
-}
-
 export function showPushRemoteDialog(
   repo: string,
   operationId: string,
@@ -492,7 +482,6 @@ export function buildRefContextMenuItems(
               t("Are you sure you want to push {0}?", `<b><i>${escapeHtml(refName)}</i></b>`),
               () => {
                 recordRecentAction(repo, "ref.push");
-                pendingPushRepo = repo;
                 sendMessage({
                   command: "push",
                   repo: repo,

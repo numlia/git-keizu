@@ -9,7 +9,7 @@ import type {
 import { hideDialog, showErrorDialog } from "./dialogs";
 import { generateGitFileTree } from "./fileTree";
 import { t } from "./i18n";
-import { getPendingPushRepo, showPushRemoteDialog } from "./refMenu";
+import { showPushRemoteDialog } from "./refMenu";
 import { refreshGraphOrDisplayError } from "./utils";
 
 export interface GitKeizuViewAPI {
@@ -163,12 +163,7 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
     case "push":
       switch (msg.phase) {
         case "selectRemote":
-          showPushRemoteDialog(
-            getPendingPushRepo(),
-            msg.operationId,
-            msg.remotes,
-            msg.defaultRemote
-          );
+          showPushRemoteDialog(msg.repo, msg.operationId, msg.remotes, msg.defaultRemote);
           break;
         case "noRemotes":
           showErrorDialog(t("error.push"), t("error.pushNoRemotes"), null);

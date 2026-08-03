@@ -647,13 +647,20 @@ export interface RequestPush {
 export type ResponsePush =
   | {
       command: "push";
+      repo: string;
       operationId: string;
       phase: "selectRemote";
       remotes: string[];
       defaultRemote: string;
     }
-  | { command: "push"; operationId: string; phase: "noRemotes" }
-  | { command: "push"; operationId: string; phase: "completed"; status: GitCommandStatus };
+  | { command: "push"; repo: string; operationId: string; phase: "noRemotes" }
+  | {
+      command: "push";
+      repo: string;
+      operationId: string;
+      phase: "completed";
+      status: GitCommandStatus;
+    };
 
 export interface RequestResetUncommitted {
   command: "resetUncommitted";
