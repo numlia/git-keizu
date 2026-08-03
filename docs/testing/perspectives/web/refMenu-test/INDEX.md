@@ -6,14 +6,14 @@
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 3
-> Total Sections: 16
-> Total Cases: 84
+> Total Sections: 17
+> Total Cases: 85
 
 ## Shards
 
 | Shard File                           | Responsibility              | Sections | Cases | Last Updated |
 | ------------------------------------ | --------------------------- | -------- | ----- | ------------ |
-| 01-branch-actions-01.md              | branch-actions              | 9        | 42    | 2026-08-04   |
+| 01-branch-actions-01.md              | branch-actions              | 10       | 43    | 2026-08-04   |
 | 02-worktree-actions-01.md            | worktree-actions            | 4        | 21    | 2026-07-19   |
 | 03-context-menu-recent-actions-01.md | context-menu-recent-actions | 3        | 21    | 2026-05-09   |
 

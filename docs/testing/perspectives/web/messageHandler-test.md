@@ -210,8 +210,9 @@
 
 > Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
 > Added: 2026-08-03
-> Status: active
+> Status: superseded
 > Supersedes: S1
+> Superseded By: S14
 > Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void`（`case "checkoutBranch"` / `case "push"`）
 > Target Path: `web/messageHandler.ts`（handleMessage switch。実装後に行範囲へ更新）
 > Test File: `tests/web/messageHandler.test.ts`
@@ -273,3 +274,56 @@
 - Type: excluded(型契約は `src/types-test.md` S3 の責務)
 
 **失敗系/正常系比（煙感知器）**: 正常系4件（TC-038、TC-040、TC-042、TC-044）、失敗系6件（TC-036、TC-037、TC-039、TC-041、TC-043、TC-045）。比は 1.5:1 である。
+
+## S14: checkout kind と Push phase の表示・委譲（Response の repo を使用）
+
+> Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
+> Added: 2026-08-04
+> Status: active
+> Supersedes: S12
+> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void`（`case "checkoutBranch"` / `case "push"`）
+> Target Path: `web/messageHandler.ts`（handleMessage switch）
+> Test File: `tests/web/messageHandler.test.ts`
+
+`ResponsePush` へ `repo` が必須追加されたことに伴い、`selectRemote` phase の委譲先へ渡す repository を `web/refMenu.ts` の module state（`getPendingPushRepo()`）ではなく `msg.repo` から取る変更。S12 は `getPendingPushRepo()` 由来の repository を期待引数としていたため supersede する。checkout の 3 kind と Push の残り 2 phase は挙動が変わらないが、section をライフサイクルの単位とする規約に従い本セクションへ引き継ぐ。翻訳キーの存在は l10n owner（`l10n/web/web.l10n.en.json-test.md` S2 / `web.l10n.ja.json-test.md` S3）、dialog の中身は `web/refMenu-test/01-branch-actions-01.md` S17 / S19 の責務。
+
+| Case ID | Input / Precondition                                                                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                       | Notes                        |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| TC-046  | `{ command: "checkoutBranch", kind: "branchExists" }`                                                                                               | Validation - 既存 branch の表示                                            | `showErrorDialog` が `(t("error.checkoutBranch"), t("error.checkoutBranchExists"), null)` で 1 回呼ばれ、`gitKeizu.refresh` は呼ばれない                                                              | S12/TC-036 の引き継ぎ        |
+| TC-047  | `{ command: "checkoutBranch", kind: "invalidRef" }`                                                                                                 | Validation - 不正 ref の表示                                               | `showErrorDialog` が `(t("error.checkoutBranch"), t("error.checkoutInvalidRef"), null)` で 1 回呼ばれ、`gitKeizu.refresh` は呼ばれない                                                                | S12/TC-037 の引き継ぎ        |
+| TC-048  | `{ command: "checkoutBranch", kind: "completed", status: null }`                                                                                    | Normal - checkout 成功                                                     | `gitKeizu.refresh(false)` が 1 回呼ばれ、`showErrorDialog` は呼ばれない                                                                                                                               | S12/TC-038 の引き継ぎ        |
+| TC-049  | `{ command: "checkoutBranch", kind: "completed", status: "fatal: pathspec" }`                                                                       | Exception - checkout 失敗                                                  | `showErrorDialog` が `(t("error.checkoutBranch"), "fatal: pathspec", null)` で 1 回呼ばれ、`gitKeizu.refresh` は呼ばれない                                                                            | S12/TC-039 の引き継ぎ        |
+| TC-050  | `{ command: "push", repo: "/response/repo", operationId: "op-1", phase: "selectRemote", remotes: ["origin", "upstream"], defaultRemote: "origin" }` | Normal - 選択の委譲                                                        | `showPushRemoteDialog` が `("/response/repo", "op-1", ["origin", "upstream"], "origin")` で 1 回呼ばれる。第1引数が Response の `repo` と一致し、`gitKeizu.refresh` と `showErrorDialog` は呼ばれない | module state を参照しない    |
+| TC-051  | `{ command: "push", repo: "/r", operationId: "op-1", phase: "noRemotes" }`                                                                          | Validation - remote 未登録の表示                                           | `showErrorDialog` が `(t("error.push"), t("error.pushNoRemotes"), null)` で 1 回呼ばれ、`showPushRemoteDialog` は呼ばれない                                                                           | S12/TC-041 の引き継ぎ        |
+| TC-052  | `{ command: "push", repo: "/r", operationId: "op-1", phase: "completed", status: null }`                                                            | Normal - Push 成功                                                         | `gitKeizu.refresh(false)` が 1 回呼ばれ、`showErrorDialog` は呼ばれない                                                                                                                               | S12/TC-042 の引き継ぎ        |
+| TC-053  | `{ command: "push", repo: "/r", operationId: "op-1", phase: "completed", status: "fatal: rejected" }`                                               | Exception - Push 失敗                                                      | `showErrorDialog` が `(t("error.push"), "fatal: rejected", null)` で 1 回呼ばれ、`gitKeizu.refresh` は呼ばれない                                                                                      | 既存 Push error title の維持 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 047 P3 修正分（S14）
+
+| 失敗源                                                        | 対応ケースまたは除外理由                                                                                                                              |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 委譲先へ別 repository を渡す（module state の混入）           | TC-050（Response の `repo` と第1引数の一致を assert し、他の値が混ざらないことを固定）                                                                |
+| guard 拒否の表示漏れ（branchExists / invalidRef / noRemotes） | TC-046、TC-047、TC-051                                                                                                                                |
+| raw 英語 status をそのまま表示する（locale 別 reason の欠落） | TC-046、TC-047、TC-051                                                                                                                                |
+| Git 失敗の握り潰し（checkout / Push）                         | TC-049、TC-053                                                                                                                                        |
+| 失敗時に refresh してしまう                                   | TC-046、TC-047、TC-049、TC-053                                                                                                                        |
+| phase / kind の取り違え（委譲先の誤り）                       | TC-050、TC-051、TC-052                                                                                                                                |
+| 各分岐の negative 側（成功時に error を出さない）             | TC-048、TC-052                                                                                                                                        |
+| 選択肢・default の加工（host Response との不一致）            | TC-050                                                                                                                                                |
+| 境界値（`remotes` が空配列）                                  | excluded(空一覧は host が `noRemotes` phase として送るため `selectRemote` の空配列は到達しない。`noRemotes` は TC-051 で検証)                         |
+| 境界値（0 / minimum / maximum / +/-1 / NULL）                 | excluded(payload は文字列・配列のみで数値境界を持たない。`status: null` は成功契約値として TC-048 / TC-052 で検証)                                    |
+| 外部依存の失敗                                                | excluded(外部依存なし。応答メッセージはテスト側で直接構築する)                                                                                        |
+| 翻訳キーの欠落                                                | excluded(`l10n/web/web.l10n.en.json-test.md` S2 と `web.l10n.ja.json-test.md` S3 で担保)                                                              |
+| 不正な型・フォーマット（`repo` 欠落を含む）                   | excluded(応答型は `src/types-test.md` S4 TC-041 の型契約と TypeScript コンパイルで保証される)                                                         |
+| operationId の欠落・取り違え                                  | excluded(handler は operationId を dialog へ素通しするだけで判断に使わない。相関の担保は `src/gitGraphView-test/01-message-routing-03.md` S31 の責務) |
+| pull 応答処理の巻き込み変更                                   | excluded(S13 TC-044 / TC-045 が挙動不変を担保)                                                                                                        |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-046、TC-047、TC-051
+- Exception: TC-049、TC-053
+- External: excluded(外部依存なし)
+- Boundary: excluded(数値境界がなく、空一覧は `noRemotes` phase として TC-051 で検証済み)
+- Type: excluded(型契約は `src/types-test.md` S4 の責務)
+
+**失敗系/正常系比（煙感知器）**: 正常系3件（TC-048、TC-050、TC-052）、失敗系5件（TC-046、TC-047、TC-049、TC-051、TC-053）。比は約 1.7:1 である。

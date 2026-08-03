@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-08-04T00:58:38+09:00
+> Auto-generated: 2026-08-04T01:34:50+09:00
 > Total sources: 41
 > Total physical files: 64
 > Total sections: 455
-> Total cases: 2284
+> Total cases: 2286
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -23,13 +23,13 @@
 | `src/extensionState.ts`     | single-file  | `src/extensionState-test.md`                                                 | 1      | 14       | 42    | 2026-07-04   |
 | `src/gitExecutable.ts`      | single-file  | `src/gitExecutable-test.md`                                                  | 1      | 1        | 6     | 2026-07-19   |
 | `src/gitGraphView.ts`       | single-file  | `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md` | 1      | 17       | 60    | 2026-03-20   |
-| `src/gitGraphView.ts`       | sharded      | `src/gitGraphView-test/INDEX.md`                                             | 6      | 29       | 115   | 2026-08-03   |
+| `src/gitGraphView.ts`       | sharded      | `src/gitGraphView-test/INDEX.md`                                             | 6      | 29       | 116   | 2026-08-04   |
 | `src/i18n.ts`               | single-file  | `src/i18n-test.md`                                                           | 1      | 1        | 8     | 2026-08-03   |
 | `src/refValidation.ts`      | single-file  | `src/refValidation-test.md`                                                  | 1      | 1        | 19    | 2026-08-03   |
 | `src/repoFileWatcher.ts`    | single-file  | `src/repoFileWatcher-test.md`                                                | 1      | 10       | 60    | 2026-07-04   |
 | `src/repoManager.ts`        | single-file  | `src/repoManager-test.md`                                                    | 1      | 19       | 108   | 2026-07-19   |
 | `src/statusBarItem.ts`      | single-file  | `src/statusBarItem-test.md`                                                  | 1      | 3        | 13    | 2026-03-22   |
-| `src/types.ts`              | single-file  | `src/types-test.md`                                                          | 1      | 3        | 25    | 2026-08-03   |
+| `src/types.ts`              | single-file  | `src/types-test.md`                                                          | 1      | 3        | 26    | 2026-08-04   |
 | `src/utils.ts`              | single-file  | `src/utils-test.md`                                                          | 1      | 5        | 15    | 2026-07-04   |
 | `src/worktree.ts`           | single-file  | `src/worktree-test.md`                                                       | 1      | 1        | 11    | 2026-03-12   |
 | `web/branchLabels.ts`       | single-file  | `web/branchLabels-test.md`                                                   | 1      | 1        | 17    | 2026-03-21   |
@@ -45,7 +45,7 @@
 | `web/i18n.ts`               | single-file  | `web/i18n-test.md`                                                           | 1      | 1        | 5     | 2026-05-03   |
 | `web/main.ts`               | single-file  | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md`                 | 1      | 35       | 201   | 2026-03-12   |
 | `web/main.ts`               | sharded      | `web/main-test/INDEX.md`                                                     | 9      | 44       | 253   | 2026-07-19   |
-| `web/messageHandler.ts`     | single-file  | `web/messageHandler-test.md`                                                 | 1      | 12       | 41    | 2026-08-03   |
+| `web/messageHandler.ts`     | single-file  | `web/messageHandler-test.md`                                                 | 1      | 12       | 41    | 2026-08-04   |
 | `web/refMenu.ts`            | single-file  | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`           | 1      | 14       | 74    | 2026-07-19   |
 | `web/refMenu.ts`            | sharded      | `web/refMenu-test/INDEX.md`                                                  | 3      | 16       | 84    | 2026-08-04   |
 | `web/stashMenu.ts`          | single-file  | `web/stashMenu-test.md`                                                      | 1      | 8        | 30    | 2026-04-30   |

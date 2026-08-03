@@ -2,12 +2,12 @@
 
 > Source: `src/gitGraphView.ts`
 > Storage Mode: sharded
-> Generated: 2026-08-03T00:00:00Z
+> Generated: 2026-08-04T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 6
-> Total Sections: 33
-> Total Cases: 132
+> Total Sections: 34
+> Total Cases: 145
 
 ## Shards
 
@@ -15,7 +15,7 @@
 | ------------------------------------ | --------------------------- | -------- | ----- | ------------ |
 | 01-message-routing-01.md             | message-routing             | 12       | 38    | 2026-07-04   |
 | 01-message-routing-02.md             | message-routing             | 1        | 7     | 2026-07-04   |
-| 01-message-routing-03.md             | message-routing             | 3        | 23    | 2026-08-03   |
+| 01-message-routing-03.md             | message-routing             | 4        | 36    | 2026-08-04   |
 | 02-state-lifecycle-01.md             | state-lifecycle             | 10       | 33    | 2026-07-19   |
 | 03-worktree-actions-01.md            | worktree-actions            | 5        | 28    | 2026-07-19   |
 | 04-context-menu-recent-actions-01.md | context-menu-recent-actions | 2        | 3     | 2026-05-10   |

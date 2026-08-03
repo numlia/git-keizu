@@ -10,8 +10,9 @@
 
 > Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
 > Added: 2026-08-03
-> Status: active
+> Status: superseded
 > Supersedes: S5
+> Superseded By: S31
 > Signature: `case "push"` の routing（`RequestPush { repo, operationId, selectedRemote }` → `ResponsePush { operationId, phase }`）
 > Target Path: `src/gitGraphView.ts`（`handleMessage` switch の `case "push"`。実装後に行範囲へ更新）
 > Test File: `tests/src/gitGraphView.test.ts`
@@ -102,3 +103,59 @@
 - Type: excluded(型契約は `src/types-test.md` S3 の責務。host 側は値の routing のみを検証する)
 
 **失敗系/正常系比（煙感知器）**: 正常系8件（TC-110、TC-111、TC-115、TC-120、TC-124、TC-127、TC-129、TC-132）、失敗系15件（残り）。比は約 1.9:1 である。
+
+## S31: 二段階 Push の phase orchestration（Response への repo 同梱）
+
+> Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
+> Added: 2026-08-04
+> Status: active
+> Supersedes: S28
+> Signature: `case "push"` の routing（`RequestPush { repo, operationId, selectedRemote }` → `ResponsePush { repo, operationId, phase }`）
+> Target Path: `src/gitGraphView.ts`（`handleMessage` switch の `case "push"` と `resolvePush()` 以下の private method）
+> Test File: `tests/src/gitGraphView.test.ts`
+
+`ResponsePush` の全 variant へ `repo` が必須追加されたことに伴い、host が Request の `repo` を `operationId` と同じ引数渡しで全 Response へ載せる変更。S28 は `repo` を含まない Response payload を期待結果としていたため supersede する。phase 判断・membership 再検証・Push 呼び出しの規則は S28 から変わらないが、section をライフサイクルの単位とする規約に従い本セクションへ引き継ぐ。あわせて、異なる repository の連続 operation で各 Response が自分の `repo` を保持することを TC-145 で固定する。Git args と解決規則は `src/dataSource-test/02-branch-worktree-02.md` S42 / S43、webview 側の表示と選択 UI は `web/messageHandler-test.md` S14 / `web/refMenu-test/01-branch-actions-01.md` S17 / S19 の責務。
+
+| Case ID | Input / Precondition                                                                                                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                         | Notes                               |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| TC-133  | `{ repo: "/test/repo", operationId: "op-1", selectedRemote: null }`、`preparePush()` が `{ kind: "upstream", target: { remoteName: "upstream", branchName: "main" } }` | Normal - upstream 即 Push                                                  | `pushToUpstream(repo, { remoteName: "upstream", branchName: "main" })` が 1 回呼ばれ、`sendMessage` が `{ command: "push", repo: "/test/repo", operationId: "op-1", phase: "completed", status: null }` で 1 回呼ばれる | S28/TC-110 の引き継ぎ ＋ repo 同梱  |
+| TC-134  | 初回 Request、`preparePush()` が `{ kind: "selectRemote", remotes: ["origin", "upstream"] }`                                                                           | Normal - 選択要求                                                          | `sendMessage` が `{ command: "push", repo: "/test/repo", operationId: "op-1", phase: "selectRemote", remotes: ["origin", "upstream"], defaultRemote: "origin" }` で 1 回呼ばれ、Push 系メソッドの call count が 0       | S28/TC-111 の引き継ぎ ＋ repo 同梱  |
+| TC-135  | 初回 Request、`preparePush()` が `{ kind: "selectRemote", remotes: ["alpha", "zeta"] }`（`origin` を含まない）                                                         | Boundary - default 解決（origin 不在）                                     | Response の `defaultRemote` が `"alpha"`（昇順先頭）、`remotes` が `["alpha", "zeta"]` である                                                                                                                           | S28/TC-112 の引き継ぎ               |
+| TC-136  | 初回 Request、`preparePush()` が `{ kind: "selectRemote", remotes: [] }`                                                                                               | Boundary - remote 0 件                                                     | `sendMessage` が `{ command: "push", repo: "/test/repo", operationId: "op-1", phase: "noRemotes" }` で 1 回呼ばれ、Push 系メソッドの call count が 0                                                                    | S28/TC-113 の引き継ぎ ＋ repo 同梱  |
+| TC-137  | 初回 Request、`preparePush()` が `{ kind: "error", status: "fatal: remote fail" }`                                                                                     | Exception - 解決失敗                                                       | `sendMessage` が `{ command: "push", repo: "/test/repo", operationId: "op-1", phase: "completed", status: "fatal: remote fail" }` で呼ばれる（`selectRemote` / `noRemotes` ではない）                                   | S28/TC-114 の引き継ぎ ＋ repo 同梱  |
+| TC-138  | `{ operationId: "op-1", selectedRemote: "origin" }`、`getRemotes()` が `["origin", "upstream"]`                                                                        | Normal - 選択確定後の Push                                                 | `pushWithUpstream(repo, "origin")` が 1 回呼ばれ、`sendMessage` が `{ command: "push", repo: "/test/repo", operationId: "op-1", phase: "completed", status: null }` で呼ばれる                                          | S28/TC-115 の引き継ぎ ＋ repo 同梱  |
+| TC-139  | `{ selectedRemote: "evil" }`、`getRemotes()` が `["origin"]`（一覧に含まれない）                                                                                       | Validation - membership 再検証                                             | `pushWithUpstream` の call count が 0。Response が `phase: "completed"` かつ `status !== null` である                                                                                                                   | S28/TC-116 の引き継ぎ               |
+| TC-140  | `{ selectedRemote: "origin" }`、`getRemotes()` が `null`（取得失敗）                                                                                                   | External - remote 取得失敗                                                 | `pushWithUpstream` の call count が 0。Response が `phase: "completed"` かつ `status !== null` である                                                                                                                   | S28/TC-117 の引き継ぎ               |
+| TC-141  | `{ selectedRemote: "origin" }`、`getRemotes()` が `[]`                                                                                                                 | Boundary - 再取得時の空一覧                                                | `pushWithUpstream` の call count が 0。Response が `phase: "completed"` かつ `status !== null` である                                                                                                                   | S28/TC-118 の引き継ぎ               |
+| TC-142  | `{ selectedRemote: "-evil" }`（unsafe 名）、`getRemotes()` が `["origin"]`                                                                                             | Validation - unsafe remote 名                                              | `pushWithUpstream` の call count が 0。Response が `phase: "completed"` かつ `status !== null` である                                                                                                                   | S28/TC-119 の引き継ぎ               |
+| TC-143  | 同一 repository で `operationId: "op-1"`（`selectRemote` へ分岐）の直後に `operationId: "op-2"`（`upstream` へ分岐）を処理                                             | Normal - operationId の相関                                                | 1 通目の Response の `operationId` が `"op-1"`、2 通目が `"op-2"` であり、共有 state による上書きが起きない                                                                                                             | S28/TC-120 の引き継ぎ               |
+| TC-144  | `{ selectedRemote: "origin" }`、`getRemotes()` が `["origin"]`、`pushWithUpstream()` が `"fatal: rejected"` を返す                                                     | Exception - Push 失敗の伝達                                                | Response が `{ phase: "completed", repo: "/test/repo", operationId: "op-1", status: "fatal: rejected" }` である                                                                                                         | S28/TC-121 の引き継ぎ ＋ repo 同梱  |
+| TC-145  | repo `/test/repo`（`selectRemote` へ分岐）と repo `/test/other-repo`（`upstream` へ分岐）の Request を連続して処理                                                     | Normal - repository の相関                                                 | 1 通目の Response の `repo` が `"/test/repo"`、2 通目が `"/test/other-repo"` であり、共有 state による上書きが起きない                                                                                                  | repo も引数渡しであることの直接検証 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 047 P3 修正分（S31）
+
+| 失敗源                                                                    | 対応ケースまたは除外理由                                                                                                                 |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Response の `repo` 欠落・取り違え（共有 state 化）                        | TC-133、TC-134、TC-136、TC-137、TC-138、TC-144、TC-145                                                                                   |
+| 入力検証 × 選択 remote の未登録（membership 不一致）                      | TC-139                                                                                                                                   |
+| 入力検証 × 選択 remote の unsafe 名                                       | TC-142                                                                                                                                   |
+| 外部依存の失敗 × `preparePush()` の error                                 | TC-137                                                                                                                                   |
+| 外部依存の失敗 × `getRemotes()` の取得失敗                                | TC-140                                                                                                                                   |
+| 外部依存の失敗 × Push の失敗                                              | TC-144                                                                                                                                   |
+| 各分岐の negative 側（upstream あり / 選択後 Push）                       | TC-133、TC-138                                                                                                                           |
+| 境界値（remote 0 件、default 解決対象に origin が無い、再取得時の空一覧） | TC-135、TC-136、TC-141                                                                                                                   |
+| 境界値（0 / minimum / maximum / +/-1 / NULL）                             | excluded(payload は文字列と配列のみで数値境界を持たない。`selectedRemote: null` は初回 Request の識別子として TC-133〜TC-137 で検証済み) |
+| out-of-order / 連続 operation の取り違え（operationId / repository）      | TC-143、TC-145                                                                                                                           |
+| 利用者確認前の自動 Push（origin の暗黙選択）                              | TC-134（選択要求時に Push 系 call count 0 を検証）                                                                                       |
+| 不正な型・フォーマット                                                    | excluded(`RequestPush` / `ResponsePush` の必須 field と narrowing は `src/types-test.md` S4 TC-031〜TC-042 の責務)                       |
+| checkout 写像・pull routing・watcher mute/unmute への波及                 | excluded(本変更は `case "push"` の payload に限定し、S29 / S30 と `02-state-lifecycle-01.md` の既存 owner 観点で担保)                    |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-139、TC-142
+- Exception: TC-137、TC-144
+- External: TC-140
+- Boundary: TC-135、TC-136、TC-141
+- Type: excluded(型契約は `src/types-test.md` S4 の責務。host 側は値の routing のみを検証する)
+
+**失敗系/正常系比（煙感知器）**: 正常系5件（TC-133、TC-134、TC-138、TC-143、TC-145）、失敗系8件（TC-135、TC-136、TC-137、TC-139、TC-140、TC-141、TC-142、TC-144）。比は 1.6:1 で、S28 と同じ分岐構成へ repo 相関の1件を加えた結果である。

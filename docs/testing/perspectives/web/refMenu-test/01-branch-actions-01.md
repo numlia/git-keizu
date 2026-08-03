@@ -181,8 +181,9 @@ Push 確認の確定時に `crypto.randomUUID()` で `operationId` を 1 回生�
 
 > Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
 > Added: 2026-08-04
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S19
 > Signature: `getPendingPushRepo(): string`
 > Target Path: `web/refMenu.ts`（module 内 `pendingPushRepo` と `getPendingPushRepo()`）
 > Test File: `tests/web/refMenu.test.ts`
@@ -216,3 +217,42 @@ Push 確認の確定時に `crypto.randomUUID()` で `operationId` を 1 回生�
 - Type: excluded(型契約は `src/types-test.md` S3 の責務)
 
 **失敗系/正常系比（煙感知器）**: 正常系1件（TC-090）、失敗系0件。本セクションは既存 case が mock で置換していた配線 1 本だけを対象とする追補で、cancel・連続操作・membership 再検証といった失敗源はいずれも S17 / S28 へ割り当て済みであることを確認した。
+
+## S19: showPushRemoteDialog() の repository 引数を 2 通目 Request へ引き継ぐ
+
+> Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
+> Added: 2026-08-04
+> Status: active
+> Supersedes: S18
+> Signature: `showPushRemoteDialog(repo: string, operationId: string, remotes: string[], defaultRemote: string): void`
+> Target Path: `web/refMenu.ts`（`showPushRemoteDialog()` の select dialog callback）
+> Test File: `tests/web/refMenu.test.ts`
+
+`ResponsePush` へ `repo` が必須追加され、module 内 `pendingPushRepo` と `getPendingPushRepo()` が撤去されたことに伴う置き換え観点。S18 は撤去された `getPendingPushRepo()` の配線を対象としていたため supersede する。repository は host Response から `web/messageHandler.ts` を経て引数として渡るだけになるので、module state が介在しないこと——すなわち異なる repository の dialog を続けて開いても各 callback が自分の引数を送ること——を実 module で固定する。単一 dialog の callback payload は S17 TC-085、委譲元が `msg.repo` を渡すことは `web/messageHandler-test.md` S14 TC-050 の責務。
+
+| Case ID | Input / Precondition                                                                                                                                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                       | Notes                       |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| TC-091  | `showPushRemoteDialog("/test/repo", "op-1", ["origin"], "origin")` の直後に `showPushRemoteDialog("/test/other-repo", "op-2", ["origin"], "origin")` を呼び、両方の callback を確定させる | Normal - repository の引き継ぎ                                             | 2 通の `sendMessage` の `repo` がそれぞれ `"/test/repo"` と `"/test/other-repo"` であり、後から開いた dialog が先の repository を上書きしない（`operationId` も対応する値を保持する） | module state 撤去の直接検証 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 047 P3 修正分（S19）
+
+| 失敗源                                        | 対応ケースまたは除外理由                                                                                                           |
+| --------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| 連続する dialog 間で repository を取り違える  | TC-091                                                                                                                             |
+| 委譲元が別 repository を渡す                  | excluded(`web/messageHandler-test.md` S14 TC-050 が `msg.repo` の受け渡しを担保)                                                   |
+| 単一 dialog の callback payload の誤り        | excluded(S17 TC-085 が `repo` / `operationId` / `selectedRemote` を担保)                                                           |
+| cancel 時の送信                               | excluded(S17 TC-086、TC-087 が call count 0 を担保)                                                                                |
+| 境界値（0 / minimum / maximum / +/-1 / NULL） | excluded(引数は文字列と配列のみで数値境界を持たない)                                                                               |
+| 境界値（空 repository 文字列）                | excluded(`repo` は host Response 由来の必須 field で、空値は `src/types-test.md` S4 TC-041 の型必須化と host の repo guard が防ぐ) |
+| 外部依存の失敗・例外送出                      | excluded(webview 内の関数呼び出しのみで外部依存も throw 経路も持たない)                                                            |
+| 不正な型・フォーマット                        | excluded(型契約は `src/types-test.md` S4 の責務)                                                                                   |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(dialog 側に検証分岐がなく、取り違えの検出は TC-091 の値一致検証に含まれる)
+- Exception: excluded(throw 経路が存在しない)
+- External: excluded(外部依存なし)
+- Boundary: excluded(数値境界がなく、cancel と選択肢1件は S17 TC-086 / TC-087 が担保)
+- Type: excluded(型契約は `src/types-test.md` S4 の責務)
+
+**失敗系/正常系比（煙感知器）**: 正常系1件（TC-091）、失敗系0件。本セクションは撤去された module state の置き換え配線 1 本だけを対象とする追補で、cancel・自動確定・型の失敗源はいずれも S17 と `src/types-test.md` S4 へ割り当て済みであることを確認した。
