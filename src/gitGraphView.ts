@@ -9,20 +9,30 @@ import { DataSource } from "./dataSource";
 import { encodeDiffDocUri } from "./diffDocProvider";
 import { ExtensionState } from "./extensionState";
 import { getLocale, loadWebviewMessages, t as hostT } from "./i18n";
+import { isSafeRemoteName } from "./refValidation";
 import { RepoFileWatcher } from "./repoFileWatcher";
 import { RepoManager } from "./repoManager";
 import {
+  type CheckoutBranchResult,
   type GitCommandStatus,
   GitFileChangeType,
   GitKeizuViewState,
   GitRepoSet,
   RequestMessage,
+  type RequestPush,
   ResponseMessage,
+  type ResponsePush,
   UNCOMMITTED_CHANGES_HASH
 } from "./types";
 import { abbrevCommit, copyToClipboard, getPathFromUri, openFile } from "./utils";
 
 const CSS_COLOR_VAR_PREFIX = "--git-keizu-color";
+const DEFAULT_PUSH_REMOTE = "origin";
+const INVALID_REF_NAME_MESSAGE = "Invalid ref name.";
+const BRANCH_ALREADY_EXISTS_MESSAGE = "A branch with this name already exists.";
+const INVALID_REMOTE_NAME_MESSAGE = "Invalid remote name.";
+const REMOTE_LOOKUP_FAILED_MESSAGE = "Unable to read the remotes of this repository.";
+const UNREGISTERED_REMOTE_MESSAGE = "The selected remote is not registered in this repository.";
 
 export class GitKeizuView {
   public static currentPanel: GitKeizuView | undefined;
@@ -174,16 +184,23 @@ export class GitKeizuView {
             case "fetchAvatar":
               this.avatarManager.fetchAvatarImage(msg.email, msg.repo, msg.commits);
               break;
-            case "checkoutBranch":
-              this.sendMessage({
-                command: "checkoutBranch",
-                status: await this.dataSource.checkoutBranch(
-                  msg.repo,
-                  msg.branchName,
-                  msg.remoteBranch
-                )
-              });
+            case "checkoutBranch": {
+              const checkoutResult = await this.dataSource.checkoutBranch(
+                msg.repo,
+                msg.branchName,
+                msg.remoteBranch
+              );
+              this.sendMessage(
+                checkoutResult.kind === "completed"
+                  ? {
+                      command: "checkoutBranch",
+                      kind: "completed",
+                      status: checkoutResult.status
+                    }
+                  : { command: "checkoutBranch", kind: checkoutResult.kind }
+              );
               break;
+            }
             case "checkoutCommit":
               this.sendMessage({
                 command: "checkoutCommit",
@@ -243,10 +260,8 @@ export class GitKeizuView {
               );
               let status: GitCommandStatus = createStatus;
               if (createStatus === null && msg.checkout) {
-                const checkoutStatus = await this.dataSource.checkoutBranch(
-                  msg.repo,
-                  msg.branchName,
-                  null
+                const checkoutStatus = describeCheckoutResult(
+                  await this.dataSource.checkoutBranch(msg.repo, msg.branchName, null)
                 );
                 if (checkoutStatus !== null) {
                   status = `Branch '${msg.branchName}' was created, but checkout failed: ${checkoutStatus}`;
@@ -366,10 +381,7 @@ export class GitKeizuView {
               });
               break;
             case "push":
-              this.sendMessage({
-                command: "push",
-                status: await this.dataSource.push(msg.repo)
-              });
+              this.sendMessage(await this.resolvePush(msg));
               break;
             case "pushTag":
               this.sendMessage({
@@ -722,6 +734,51 @@ export class GitKeizuView {
     });
   }
 
+  private async resolvePush(msg: RequestPush): Promise<ResponsePush> {
+    const selectedRemote = msg.selectedRemote;
+    if (selectedRemote === null) {
+      return this.preparePushResponse(msg.repo, msg.operationId);
+    }
+    return this.pushToSelectedRemote(msg.repo, msg.operationId, selectedRemote);
+  }
+
+  private async preparePushResponse(repo: string, operationId: string): Promise<ResponsePush> {
+    const preparation = await this.dataSource.preparePush(repo);
+    switch (preparation.kind) {
+      case "upstream":
+        return {
+          command: "push",
+          operationId,
+          phase: "completed",
+          status: await this.dataSource.pushToUpstream(repo, preparation.target)
+        };
+      case "selectRemote":
+        return buildRemoteSelectionResponse(operationId, preparation.remotes);
+      case "error":
+        return { command: "push", operationId, phase: "completed", status: preparation.status };
+    }
+  }
+
+  // The selected remote comes back from the webview, so it is re-checked against the
+  // current `git remote` output before it can reach a push command.
+  private async pushToSelectedRemote(
+    repo: string,
+    operationId: string,
+    selectedRemote: string
+  ): Promise<ResponsePush> {
+    if (!isSafeRemoteName(selectedRemote)) {
+      return completedPush(operationId, INVALID_REMOTE_NAME_MESSAGE);
+    }
+    const remotes = await this.dataSource.getRemotes(repo);
+    if (remotes === null) {
+      return completedPush(operationId, REMOTE_LOOKUP_FAILED_MESSAGE);
+    }
+    if (!remotes.includes(selectedRemote)) {
+      return completedPush(operationId, UNREGISTERED_REMOTE_MESSAGE);
+    }
+    return completedPush(operationId, await this.dataSource.pushWithUpstream(repo, selectedRemote));
+  }
+
   private async deleteRemoteBranches(
     repo: string,
     branchName: string,
@@ -827,6 +884,35 @@ export class GitKeizuView {
       return false;
     }
   }
+}
+
+function describeCheckoutResult(result: CheckoutBranchResult): GitCommandStatus {
+  switch (result.kind) {
+    case "completed":
+      return result.status;
+    case "branchExists":
+      return BRANCH_ALREADY_EXISTS_MESSAGE;
+    case "invalidRef":
+      return INVALID_REF_NAME_MESSAGE;
+  }
+}
+
+function buildRemoteSelectionResponse(operationId: string, remotes: string[]): ResponsePush {
+  const [firstRemote] = remotes;
+  if (firstRemote === undefined) {
+    return { command: "push", operationId, phase: "noRemotes" };
+  }
+  return {
+    command: "push",
+    operationId,
+    phase: "selectRemote",
+    remotes,
+    defaultRemote: remotes.includes(DEFAULT_PUSH_REMOTE) ? DEFAULT_PUSH_REMOTE : firstRemote
+  };
+}
+
+function completedPush(operationId: string, status: GitCommandStatus): ResponsePush {
+  return { command: "push", operationId, phase: "completed", status };
 }
 
 function getNonce() {
