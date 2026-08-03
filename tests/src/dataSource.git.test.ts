@@ -158,25 +158,38 @@ describe("push against a real repository", () => {
     await fs.rm(fixture.root, { recursive: true, force: true });
   });
 
-  it("pushes only to the non-origin upstream remote (TC-261)", async () => {
+  it("pushes the current local branch to a differently named non-origin upstream (TC-261)", async () => {
     // Case: TC-261
-    // Given: main tracks the upstream remote while origin is registered but untouched
+    // Given: feature/local tracks upstream/main while origin is registered but untouched
     const { repo, originBare, upstreamBare } = fixture;
-    git(repo, ["config", `branch.${MAIN_BRANCH}.remote`, "upstream"]);
-    git(repo, ["config", `branch.${MAIN_BRANCH}.merge`, `refs/heads/${MAIN_BRANCH}`]);
+    const localBranch = "feature/local";
+    git(repo, ["checkout", "-b", localBranch]);
+    git(repo, ["commit", "--allow-empty", "-m", "c2"]);
+    git(repo, ["config", `branch.${localBranch}.remote`, "upstream"]);
+    git(repo, ["config", `branch.${localBranch}.merge`, `refs/heads/${MAIN_BRANCH}`]);
     const originRefsBefore = listRefs(originBare);
 
-    // When: the resolved upstream target is pushed
-    const status = await ds.pushToUpstream(repo, {
-      remoteName: "upstream",
-      branchName: MAIN_BRANCH
+    // When: the current branch and differently named upstream are resolved and pushed
+    const preparation = await ds.preparePush(repo);
+    expect(preparation).toEqual({
+      kind: "upstream",
+      target: {
+        remoteName: "upstream",
+        localBranchName: localBranch,
+        upstreamBranchName: MAIN_BRANCH
+      }
     });
+    if (preparation.kind !== "upstream") {
+      throw new Error("Expected an upstream push target.");
+    }
+    const status = await ds.pushToUpstream(repo, preparation.target);
 
-    // Then: only the upstream repository receives the branch
+    // Then: the local feature commit updates upstream/main and origin remains untouched
     expect(status).toBeNull();
     expect(git(upstreamBare, ["rev-parse", `refs/heads/${MAIN_BRANCH}`])).toBe(
       git(repo, ["rev-parse", "HEAD"])
     );
+    expect(git(upstreamBare, ["branch", "--list", localBranch])).toBe("");
     expect(listRefs(originBare)).toBe(originRefsBefore);
   });
 

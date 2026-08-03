@@ -186,7 +186,8 @@ export type CheckoutBranchResult =
 
 export interface PushTarget {
   remoteName: string;
-  branchName: string;
+  localBranchName: string;
+  upstreamBranchName: string;
 }
 
 export type PushPreparation =

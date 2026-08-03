@@ -784,7 +784,11 @@ describe("GitKeizuView two-phase push orchestration", () => {
     // Given: preparePush resolves an upstream target
     preparePushMock.mockResolvedValue({
       kind: "upstream",
-      target: { remoteName: "upstream", branchName: "main" }
+      target: {
+        remoteName: "upstream",
+        localBranchName: "feature/local",
+        upstreamBranchName: "main"
+      }
     });
 
     // When: the initial push request is handled
@@ -794,7 +798,8 @@ describe("GitKeizuView two-phase push orchestration", () => {
     expect(pushToUpstreamMock).toHaveBeenCalledTimes(1);
     expect(pushToUpstreamMock).toHaveBeenCalledWith(TEST_REPO, {
       remoteName: "upstream",
-      branchName: "main"
+      localBranchName: "feature/local",
+      upstreamBranchName: "main"
     });
     expect(sentMessages("push")).toEqual([
       {
@@ -980,7 +985,11 @@ describe("GitKeizuView two-phase push orchestration", () => {
       .mockResolvedValueOnce({ kind: "selectRemote", remotes: ["origin"] })
       .mockResolvedValueOnce({
         kind: "upstream",
-        target: { remoteName: "origin", branchName: "main" }
+        target: {
+          remoteName: "origin",
+          localBranchName: "main",
+          upstreamBranchName: "main"
+        }
       });
 
     // When: both initial requests are handled in order
@@ -1022,7 +1031,11 @@ describe("GitKeizuView two-phase push orchestration", () => {
       .mockResolvedValueOnce({ kind: "selectRemote", remotes: ["origin"] })
       .mockResolvedValueOnce({
         kind: "upstream",
-        target: { remoteName: "origin", branchName: "main" }
+        target: {
+          remoteName: "origin",
+          localBranchName: "main",
+          upstreamBranchName: "main"
+        }
       });
 
     // When: the requests of both repositories are handled in order

@@ -90,6 +90,7 @@ const INVALID_REMOTE_NAME_MESSAGE = "Invalid remote name.";
 const GIT_QUERY_FAILED_MESSAGE = "Git command failed.";
 const REFS_HEADS_PREFIX = "refs/heads/";
 const OPTION_ARG_PREFIX = "-";
+const PUSH_REFSPEC_SEPARATOR = ":";
 
 /**
  * Result of a read-only Git query that has to tell "the query ran and produced
@@ -990,10 +991,13 @@ export class DataSource {
     if (!isSafeRemoteName(target.remoteName)) {
       return Promise.resolve(INVALID_REMOTE_NAME_MESSAGE);
     }
-    if (!isValidRefName(target.branchName)) {
+    if (!isValidRefName(target.localBranchName) || !isValidRefName(target.upstreamBranchName)) {
       return Promise.resolve(INVALID_REF_NAME_MESSAGE);
     }
-    return this.runGitCommandSpawn(["push", target.remoteName, target.branchName], repo);
+    const refspec = [target.localBranchName, target.upstreamBranchName].join(
+      PUSH_REFSPEC_SEPARATOR
+    );
+    return this.runGitCommandSpawn(["push", target.remoteName, refspec], repo);
   }
 
   public pushWithUpstream(repo: string, remoteName: string): Promise<GitCommandStatus> {
@@ -1021,7 +1025,11 @@ export class DataSource {
     if (!isSafeRemoteName(remoteName) || !isValidRefName(upstreamBranch)) {
       return null;
     }
-    return { remoteName, branchName: upstreamBranch };
+    return {
+      remoteName,
+      localBranchName: branchName,
+      upstreamBranchName: upstreamBranch
+    };
   }
 
   private async queryRemoteNames(repo: string): Promise<RemoteNamesResult> {

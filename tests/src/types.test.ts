@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CheckoutBranchResult,
+  PushTarget,
   RequestPush,
   ResponseOpenWorktreeInNewWindow,
   ResponsePush,
@@ -432,5 +433,33 @@ describe("ResponsePush phase union", () => {
         status: null
       })
     ).toBe("ok");
+  });
+});
+
+// S5: PushTarget の local / upstream branch 分離
+// @see docs/testing/perspectives/src/types-test.md
+describe("PushTarget branch contract", () => {
+  it("requires distinct local and upstream branch names (TC-043)", () => {
+    // Case: TC-043
+    // Given: a valid target whose local and upstream branch names differ
+    const target: PushTarget = {
+      remoteName: "origin",
+      localBranchName: "feature/local",
+      upstreamBranchName: "main"
+    };
+    // @ts-expect-error localBranchName is mandatory
+    const missingLocal: PushTarget = { remoteName: "origin", upstreamBranchName: "main" };
+    // @ts-expect-error upstreamBranchName is mandatory
+    const missingUpstream: PushTarget = {
+      remoteName: "origin",
+      localBranchName: "feature/local"
+    };
+
+    // When: the target is inspected
+    // Then: both sides of the push refspec remain independently available
+    expect(target.localBranchName).toBe("feature/local");
+    expect(target.upstreamBranchName).toBe("main");
+    expect(missingLocal.localBranchName).toBeUndefined();
+    expect(missingUpstream.upstreamBranchName).toBeUndefined();
   });
 });

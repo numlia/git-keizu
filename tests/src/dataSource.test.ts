@@ -1940,11 +1940,11 @@ describe("preparePush", () => {
 
   it("returns the configured upstream target (TC-243)", async () => {
     // Case: TC-243
-    // Given: main tracks upstream/main
+    // Given: feature/local tracks upstream/main
     setupSpawnRoutes([
-      { matches: isSubcommand("branch"), spec: { stdout: "main\n" } },
-      { matches: isConfigGet("branch.main.remote"), spec: { stdout: "upstream\n" } },
-      { matches: isConfigGet("branch.main.merge"), spec: { stdout: "refs/heads/main\n" } }
+      { matches: isSubcommand("branch"), spec: { stdout: "feature/local\n" } },
+      { matches: isConfigGet("branch.feature/local.remote"), spec: { stdout: "upstream\n" } },
+      { matches: isConfigGet("branch.feature/local.merge"), spec: { stdout: "refs/heads/main\n" } }
     ]);
 
     // When: preparePush is called
@@ -1953,7 +1953,11 @@ describe("preparePush", () => {
     // Then: the non-origin upstream is returned as the push target
     expect(result).toEqual({
       kind: "upstream",
-      target: { remoteName: "upstream", branchName: "main" }
+      target: {
+        remoteName: "upstream",
+        localBranchName: "feature/local",
+        upstreamBranchName: "main"
+      }
     });
   });
 
@@ -2163,17 +2167,25 @@ describe("push commands", () => {
     vi.restoreAllMocks();
   });
 
-  it("pushes explicitly to the upstream remote and branch (TC-254)", async () => {
+  it("pushes the local branch explicitly to a differently named upstream branch (TC-254)", async () => {
     // Case: TC-254
     // Given: git succeeds
     setupSpawnRoutes([{ matches: isSubcommand("push"), spec: {} }]);
 
     // When: pushToUpstream is called with the resolved target
-    const result = await ds.pushToUpstream(REPO, { remoteName: "upstream", branchName: "main" });
+    const result = await ds.pushToUpstream(REPO, {
+      remoteName: "upstream",
+      localBranchName: "feature/local",
+      upstreamBranchName: "main"
+    });
 
-    // Then: the remote and branch are named explicitly, with no --set-upstream or HEAD
+    // Then: the local source and upstream destination are explicit in the refspec
     expect(cp.spawn).toHaveBeenCalledTimes(1);
-    expect(cp.spawn).toHaveBeenCalledWith("git", ["push", "upstream", "main"], SPAWN_OPTS);
+    expect(cp.spawn).toHaveBeenCalledWith(
+      "git",
+      ["push", "upstream", "feature/local:main"],
+      SPAWN_OPTS
+    );
     expect(spawnedArgs()[0]).not.toContain("--set-upstream");
     expect(spawnedArgs()[0]).not.toContain("HEAD");
     expect(result).toBeNull();
@@ -2187,7 +2199,11 @@ describe("push commands", () => {
     ]);
 
     // When: pushToUpstream is called
-    const result = await ds.pushToUpstream(REPO, { remoteName: "upstream", branchName: "main" });
+    const result = await ds.pushToUpstream(REPO, {
+      remoteName: "upstream",
+      localBranchName: "main",
+      upstreamBranchName: "main"
+    });
 
     // Then: the git error message is returned
     expect(result).toBe("fatal: rejected");
@@ -2231,27 +2247,38 @@ describe("push commands", () => {
     setupSpawnRoutes([]);
 
     // When: pushToUpstream is called
-    const result = await ds.pushToUpstream(REPO, { remoteName: "-evil", branchName: "main" });
+    const result = await ds.pushToUpstream(REPO, {
+      remoteName: "-evil",
+      localBranchName: "main",
+      upstreamBranchName: "main"
+    });
 
     // Then: no git process starts and the rejection message is returned
     expect(cp.spawn).toHaveBeenCalledTimes(0);
     expect(result).toBe("Invalid remote name.");
   });
 
-  it("guards an invalid branch name before spawning git (TC-259)", async () => {
+  it("guards invalid local and upstream branch names before spawning git (TC-259)", async () => {
     // Case: TC-259
     // Given: a branch name containing a revision range
     setupSpawnRoutes([]);
 
     // When: pushToUpstream is called
-    const result = await ds.pushToUpstream(REPO, {
+    const invalidLocalResult = await ds.pushToUpstream(REPO, {
       remoteName: "origin",
-      branchName: "feature..x"
+      localBranchName: "feature..local",
+      upstreamBranchName: "main"
+    });
+    const invalidUpstreamResult = await ds.pushToUpstream(REPO, {
+      remoteName: "origin",
+      localBranchName: "feature/local",
+      upstreamBranchName: "feature..upstream"
     });
 
-    // Then: no git process starts and the rejection message is returned
+    // Then: neither invalid side reaches git and both return the ref-name error
     expect(cp.spawn).toHaveBeenCalledTimes(0);
-    expect(result).toBe("Invalid ref name.");
+    expect(invalidLocalResult).toBe("Invalid ref name.");
+    expect(invalidUpstreamResult).toBe("Invalid ref name.");
   });
 
   it("guards an empty remote name before spawning git (TC-260)", async () => {
