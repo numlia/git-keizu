@@ -61,18 +61,20 @@ describe("src i18n helper", () => {
     expect(mocks.l10nT).toHaveBeenCalledWith("Hello {0}", "Git Keizu");
   });
 
-  it("TC-004: loads the locale-specific webview dictionary", async () => {
-    // Given: locale is ja and the ja dictionary exists
+  it("TC-004: prefers locale-specific values over English for shared keys", async () => {
+    // Given: locale is ja and both dictionaries define the same key
     mocks.language = "ja-JP";
     mocks.readFile.mockResolvedValueOnce('{"hello":"こんにちは"}');
+    mocks.readFile.mockResolvedValueOnce('{"hello":"Hello"}');
 
     // When: webview messages are loaded
     const result = await loadWebviewMessages("/ext");
 
-    // Then: locale-specific messages are returned
+    // Then: the locale-specific value wins over the English base
     expect(result).toEqual({ hello: "こんにちは" });
-    expect(mocks.readFile).toHaveBeenCalledTimes(1);
+    expect(mocks.readFile).toHaveBeenCalledTimes(2);
     expect(String(mocks.readFile.mock.calls[0][0])).toContain("web.l10n.ja.json");
+    expect(String(mocks.readFile.mock.calls[1][0])).toContain("web.l10n.en.json");
   });
 
   it("TC-005: falls back to English when locale dictionary is missing", async () => {
@@ -100,5 +102,32 @@ describe("src i18n helper", () => {
 
     // Then: the loader degrades to an empty dictionary
     expect(result).toEqual({});
+  });
+
+  it("TC-007: fills keys missing from the locale dictionary with English", async () => {
+    // Given: the ja dictionary covers only part of the English key set
+    mocks.language = "ja";
+    mocks.readFile.mockResolvedValueOnce('{"hello":"こんにちは"}');
+    mocks.readFile.mockResolvedValueOnce('{"hello":"Hello","bye":"Bye"}');
+
+    // When: webview messages are loaded
+    const result = await loadWebviewMessages("/ext");
+
+    // Then: the untranslated key resolves to English instead of the raw key
+    expect(result).toEqual({ hello: "こんにちは", bye: "Bye" });
+  });
+
+  it("TC-008: reads only the English dictionary when locale is en", async () => {
+    // Given: locale is en
+    mocks.language = "en";
+    mocks.readFile.mockResolvedValueOnce('{"hello":"Hello"}');
+
+    // When: webview messages are loaded
+    const result = await loadWebviewMessages("/ext");
+
+    // Then: the English dictionary is read once with no redundant second read
+    expect(result).toEqual({ hello: "Hello" });
+    expect(mocks.readFile).toHaveBeenCalledTimes(1);
+    expect(String(mocks.readFile.mock.calls[0][0])).toContain("web.l10n.en.json");
   });
 });

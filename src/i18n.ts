@@ -5,6 +5,8 @@ import * as vscode from "vscode";
 
 export type GitKeizuLocale = "en" | "ja";
 
+const FALLBACK_LOCALE: GitKeizuLocale = "en";
+
 export function getLocale(): GitKeizuLocale {
   return vscode.env.language === "ja" || vscode.env.language.startsWith("ja-") ? "ja" : "en";
 }
@@ -16,12 +18,13 @@ export function t(message: string, ...args: (string | number | boolean)[]): stri
 export async function loadWebviewMessages(extensionPath: string): Promise<Record<string, string>> {
   const locale = getLocale();
   const localeMessages = await readWebviewMessages(extensionPath, locale);
-  if (localeMessages !== null) {
-    return localeMessages;
+  if (locale === FALLBACK_LOCALE) {
+    return localeMessages ?? {};
   }
 
-  const englishMessages = await readWebviewMessages(extensionPath, "en");
-  return englishMessages ?? {};
+  const englishMessages = await readWebviewMessages(extensionPath, FALLBACK_LOCALE);
+  // Keys absent from the locale dictionary would otherwise render as raw keys in the webview.
+  return { ...englishMessages, ...localeMessages };
 }
 
 async function readWebviewMessages(
