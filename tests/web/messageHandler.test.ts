@@ -52,9 +52,9 @@ describe("handleMessage pull response", () => {
     // When: handleMessage is called with the success response
     handleMessage(msg, gitKeizu);
 
-    // Then: gitKeizu.refresh(false) is called for a soft refresh
+    // Then: gitKeizu.refresh("soft") is called
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -81,16 +81,16 @@ describe("refreshOrError soft refresh argument (S2)", () => {
     gitKeizu = createMockGitKeizuView();
   });
 
-  it("calls refresh(false) for soft refresh on deleteBranch success (TC-005)", () => {
+  it('calls refresh("soft") on deleteBranch success (TC-005)', () => {
     // Given: A deleteBranch success response (status = null) routed through refreshOrError
     const msg: ResponseMessage = { command: "deleteBranch", status: null };
 
     // When: handleMessage is called with the success response
     handleMessage(msg, gitKeizu);
 
-    // Then: gitKeizu.refresh(false) is called (hard=false means soft refresh)
+    // Then: the soft refresh mode is requested
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -163,9 +163,9 @@ describe("handleMessage checkoutBranch response", () => {
     // When: handleMessage is called
     handleMessage(msg, gitKeizu);
 
-    // Then: a soft refresh happens and no dialog is shown
+    // Then: forceRender redraws the active marker without hard-refresh UI side effects
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("forceRender");
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -266,7 +266,7 @@ describe("handleMessage push response", () => {
 
     // Then: a soft refresh happens and no dialog is shown
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -336,9 +336,9 @@ describe("handleMessage deleteRemoteBranch/rebaseBranch response (S4)", () => {
     // When: handleMessage is called with the success response
     handleMessage(msg, gitKeizu);
 
-    // Then: gitKeizu.refresh(false) is called for a soft refresh
+    // Then: the soft refresh mode is requested
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -363,9 +363,9 @@ describe("handleMessage deleteRemoteBranch/rebaseBranch response (S4)", () => {
     // When: handleMessage is called with the success response
     handleMessage(msg, gitKeizu);
 
-    // Then: gitKeizu.refresh(false) is called for a soft refresh
+    // Then: the soft refresh mode is requested
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -452,9 +452,9 @@ describe("handleMessage createWorktree/removeWorktree/openTerminal response (S6)
     // When: handleMessage is called with the success response
     handleMessage(msg, gitKeizu);
 
-    // Then: gitKeizu.refresh(false) is called for a soft refresh
+    // Then: the soft refresh mode is requested
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -479,9 +479,9 @@ describe("handleMessage createWorktree/removeWorktree/openTerminal response (S6)
     // When: handleMessage is called with the success response
     handleMessage(msg, gitKeizu);
 
-    // Then: gitKeizu.refresh(false) is called for a soft refresh
+    // Then: the soft refresh mode is requested
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -531,7 +531,7 @@ describe("handleMessage removeWorktree branch deletion result (S7)", () => {
 
     // Then: Graph refreshes, no error dialog
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -548,7 +548,7 @@ describe("handleMessage removeWorktree branch deletion result (S7)", () => {
 
     // Then: Graph refreshes, no error dialog
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
@@ -566,7 +566,7 @@ describe("handleMessage removeWorktree branch deletion result (S7)", () => {
 
     // Then: Graph refreshes AND branch deletion error dialog is shown
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.refresh).toHaveBeenCalledWith(false);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith("Unable to Delete Branch", branchError, null);
   });

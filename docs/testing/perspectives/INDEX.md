@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-08-04T07:20:11+09:00
+> Auto-generated: 2026-08-04T09:26:10+09:00
 > Total sources: 41
 > Total physical files: 64
-> Total sections: 456
-> Total cases: 2287
+> Total sections: 457
+> Total cases: 2294
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -44,7 +44,7 @@
 | `web/graph.ts`              | single-file  | `web/graph-test.md`                                                          | 1      | 18       | 64    | 2026-07-04   |
 | `web/i18n.ts`               | single-file  | `web/i18n-test.md`                                                           | 1      | 1        | 5     | 2026-05-03   |
 | `web/main.ts`               | single-file  | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md`                 | 1      | 35       | 201   | 2026-03-12   |
-| `web/main.ts`               | sharded      | `web/main-test/INDEX.md`                                                     | 9      | 44       | 253   | 2026-07-19   |
+| `web/main.ts`               | sharded      | `web/main-test/INDEX.md`                                                     | 9      | 45       | 260   | 2026-08-04   |
 | `web/messageHandler.ts`     | single-file  | `web/messageHandler-test.md`                                                 | 1      | 12       | 41    | 2026-08-04   |
 | `web/refMenu.ts`            | single-file  | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`           | 1      | 14       | 74    | 2026-07-19   |
 | `web/refMenu.ts`            | sharded      | `web/refMenu-test/INDEX.md`                                                  | 3      | 16       | 84    | 2026-08-04   |
@@ -149,3 +149,4 @@
 | フェーズ3 修正 L5 (diff-nul-delimited-parse)                           | `src/dataSource-test/INDEX.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | フェーズ3 修正 L6 (config-change-independent-if)                       | `src/extension-test.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
 | フェーズ3 修正 L8 (avatar-storage-init-await)                          | `src/extensionState-test.md`, `src/gitGraphView-test/INDEX.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| 回帰修正 (checkout-active-branch-force-render)                         | `web/main-test/INDEX.md`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |

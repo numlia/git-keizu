@@ -12,6 +12,8 @@ import { t } from "./i18n";
 import { showPushRemoteDialog } from "./refMenu";
 import { refreshGraphOrDisplayError } from "./utils";
 
+export type RefreshMode = "soft" | "forceRender" | "hard";
+
 export interface GitKeizuViewAPI {
   hideCommitDetails(): void;
   showCommitDetails(commitDetails: GitCommitDetails, fileTree: GitFolder): void;
@@ -27,7 +29,7 @@ export interface GitKeizuViewAPI {
     worktrees?: WorktreeMap
   ): void;
   loadRepos(repos: GitRepoSet, lastActiveRepo: string | null): void;
-  refresh(hard: boolean): void;
+  refresh(mode: RefreshMode): void;
   selectRepo(repo: string): void;
   setShowRecentActions(showRecentActions: boolean): void;
 }
@@ -52,7 +54,12 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
           showErrorDialog(t("error.checkoutBranch"), t("error.checkoutInvalidRef"), null);
           break;
         case "completed":
-          refreshOrError(gitKeizu, msg.status, t("error.checkoutBranch"));
+          refreshGraphOrDisplayError(
+            msg.status,
+            t("error.checkoutBranch"),
+            () => gitKeizu.refresh("forceRender"),
+            showErrorDialog
+          );
           break;
       }
       break;
@@ -184,7 +191,7 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       if (msg.status !== null) {
         showErrorDialog(t("error.removeWorktree"), msg.status, null);
       } else {
-        gitKeizu.refresh(false);
+        gitKeizu.refresh("soft");
         if (typeof msg.branchStatus === "string") {
           showErrorDialog(t("error.deleteBranch"), msg.branchStatus, null);
         }
@@ -194,7 +201,7 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       refreshOrError(gitKeizu, msg.status, t("error.renameBranch"));
       break;
     case "refresh":
-      gitKeizu.refresh(false);
+      gitKeizu.refresh("soft");
       break;
     case "resetToCommit":
       refreshOrError(gitKeizu, msg.status, t("error.resetToCommit"));
@@ -223,5 +230,5 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
 }
 
 function refreshOrError(gitKeizu: GitKeizuViewAPI, status: string | null, errorMessage: string) {
-  refreshGraphOrDisplayError(status, errorMessage, () => gitKeizu.refresh(false), showErrorDialog);
+  refreshGraphOrDisplayError(status, errorMessage, () => gitKeizu.refresh("soft"), showErrorDialog);
 }

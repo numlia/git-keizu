@@ -6258,6 +6258,249 @@ describe("request queue / refresh contention (S40)", () => {
 });
 
 /* ------------------------------------------------------------------ */
+/* S47: checkout completion force-renders the active branch            */
+/* ------------------------------------------------------------------ */
+
+describe("checkout completion active branch refresh (S47)", () => {
+  const CHECKOUT_BRANCHES = ["main", "feature/checkout"];
+  const CHECKOUT_COMMITS: GitCommitNode[] = [
+    {
+      hash: COMMIT_HASH_1,
+      parentHashes: [],
+      author: "Alice",
+      email: "alice@test.com",
+      date: 1700000000,
+      message: "Shared branch tip",
+      refs: CHECKOUT_BRANCHES.map((name) => ({ hash: COMMIT_HASH_1, name, type: "head" })),
+      stash: null
+    },
+    {
+      hash: COMMIT_HASH_2,
+      parentHashes: [],
+      author: "Bob",
+      email: "bob@test.com",
+      date: 1699999000,
+      message: "Shared ancestor",
+      refs: [],
+      stash: null
+    }
+  ];
+
+  let liveVscode: typeof vscode;
+
+  function postedCommands(filter: string): Record<string, unknown>[] {
+    return vi
+      .mocked(liveVscode.postMessage)
+      .mock.calls.map((call) => call[0] as Record<string, unknown>)
+      .filter((message) => message.command === filter);
+  }
+
+  function dispatchCheckoutBranches(hard: boolean): void {
+    dispatchMessage({
+      command: "loadBranches",
+      branches: CHECKOUT_BRANCHES,
+      head: "feature/checkout",
+      hard,
+      isRepo: true
+    });
+  }
+
+  function dispatchCheckoutCommits(
+    hard: boolean,
+    commits: GitCommitNode[] = CHECKOUT_COMMITS
+  ): void {
+    dispatchMessage({
+      command: "loadCommits",
+      commits,
+      head: commits[0]?.hash ?? null,
+      moreCommitsAvailable: false,
+      hard
+    });
+  }
+
+  function completeCheckoutRefresh(commits: GitCommitNode[] = CHECKOUT_COMMITS): void {
+    dispatchMessage({ command: "checkoutBranch", kind: "completed", status: null });
+    const branchRequest = postedCommands("loadBranches")[0];
+    dispatchCheckoutBranches(branchRequest.hard as boolean);
+    const commitRequest = postedCommands("loadCommits")[0];
+    dispatchCheckoutCommits(commitRequest.hard as boolean, commits);
+  }
+
+  function activeBranchName(): string | undefined {
+    return document.querySelector<HTMLElement>(".gitRef.head.active")?.dataset.name;
+  }
+
+  function makeActiveMarkerStale(): void {
+    document
+      .querySelector<HTMLElement>('.gitRef.head[data-name="feature/checkout"]')!
+      .classList.remove("active");
+    document.querySelector<HTMLElement>('.gitRef.head[data-name="main"]')!.classList.add("active");
+    expect(activeBranchName()).toBe("main");
+  }
+
+  beforeEach(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    capturedBranchCallback = null;
+    capturedAuthorCallback = null;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    liveVscode = utilsMod.vscode;
+    vi.mocked(liveVscode.getState).mockReturnValueOnce(null);
+
+    const branchLabelsMod = await import("../../web/branchLabels");
+    vi.mocked(branchLabelsMod.getBranchLabels).mockImplementation((refs) => ({
+      heads: refs
+        .filter((ref) => ref.type === "head")
+        .map((ref) => ({ name: ref.name, remotes: [] })),
+      remotes: [],
+      tags: []
+    }));
+
+    await import("../../web/main");
+    dispatchCheckoutBranches(false);
+    dispatchCheckoutCommits(true);
+    expect(activeBranchName()).toBe("feature/checkout");
+    makeActiveMarkerStale();
+    vi.clearAllMocks();
+  });
+
+  // Case: TC-270
+  it("force-renders the active branch without showing a loading screen (TC-270)", () => {
+    // Given: Git state already reflects the checkout, but the DOM still marks the old branch active
+    // When: checkout completion requests a refresh
+    dispatchMessage({ command: "checkoutBranch", kind: "completed", status: null });
+    const branchRequest = postedCommands("loadBranches")[0];
+
+    // Then: the current graph remains visible while the forced response is pending
+    expect(document.getElementById("loadingHeader")).toBeNull();
+    expect(document.querySelector(".commit")).not.toBeNull();
+
+    // When: identical Git data is returned
+    dispatchCheckoutBranches(branchRequest.hard as boolean);
+    const commitRequest = postedCommands("loadCommits")[0];
+    dispatchCheckoutCommits(commitRequest.hard as boolean);
+
+    // Then: the graph is forcibly rendered without a manual reload or hard-refresh loading state
+    expect(activeBranchName()).toBe("feature/checkout");
+    expect(branchRequest.hard).toBe(true);
+    expect(commitRequest.hard).toBe(true);
+    expect(document.getElementById("loadingHeader")).toBeNull();
+  });
+
+  // Case: TC-271
+  it("preserves forceRender while a soft branch load is in flight (TC-271)", () => {
+    // Given: a passive soft refresh is waiting for its loadBranches response
+    dispatchMessage({ command: "pull", status: null });
+    expect(postedCommands("loadBranches")).toHaveLength(1);
+
+    // When: checkout completes during the in-flight load and the first response arrives
+    dispatchMessage({ command: "checkoutBranch", kind: "completed", status: null });
+    expect(postedCommands("loadBranches")).toHaveLength(1);
+    dispatchCheckoutBranches(false);
+
+    // Then: the queued checkout refresh is sent as hard=true
+    const branchRequests = postedCommands("loadBranches");
+    expect(branchRequests).toHaveLength(2);
+    const queuedBranchRequest = branchRequests[1];
+    dispatchCheckoutBranches(queuedBranchRequest.hard as boolean);
+
+    // Complete the original soft commit load, then the queued checkout commit load
+    dispatchCheckoutCommits(false);
+    const commitRequests = postedCommands("loadCommits");
+    expect(commitRequests).toHaveLength(2);
+    const queuedCommitRequest = commitRequests[1];
+    dispatchCheckoutCommits(queuedCommitRequest.hard as boolean);
+
+    expect(activeBranchName()).toBe("feature/checkout");
+    expect(queuedBranchRequest.hard).toBe(true);
+    expect(queuedCommitRequest.hard).toBe(true);
+  });
+
+  // Case: TC-272
+  it("preserves an expanded commit that remains in the checkout graph (TC-272)", () => {
+    // Given: a commit that is present in the checkout result is expanded
+    expandCommit(COMMIT_HASH_1);
+    expect(document.getElementById("commitDetails")).not.toBeNull();
+
+    // When: checkout force-renders the same commit set
+    completeCheckoutRefresh();
+
+    // Then: the details remain expanded without a loading screen
+    expect(document.getElementById("commitDetails")).not.toBeNull();
+    expect(
+      document.querySelector(`[data-hash="${COMMIT_HASH_1}"].commitDetailsOpen`)
+    ).not.toBeNull();
+    expect(document.getElementById("loadingHeader")).toBeNull();
+  });
+
+  // Case: TC-273
+  it("closes an expanded commit that is absent from the checkout graph (TC-273)", () => {
+    // Given: a commit is expanded before checkout
+    expandCommit(COMMIT_HASH_2);
+    expect(document.getElementById("commitDetails")).not.toBeNull();
+
+    // When: checkout returns a graph that no longer contains the expanded commit
+    completeCheckoutRefresh([CHECKOUT_COMMITS[0]]);
+
+    // Then: the stale details are closed
+    expect(document.getElementById("commitDetails")).toBeNull();
+  });
+
+  // Case: TC-274
+  it("preserves comparison details when both commits remain in the checkout graph (TC-274)", () => {
+    // Given: both commits in the current graph are being compared
+    expandCommitWithCompare(COMMIT_HASH_1, COMMIT_HASH_2);
+    expect(document.querySelector(`[data-hash="${COMMIT_HASH_2}"].compareTarget`)).not.toBeNull();
+
+    // When: checkout force-renders a graph containing both commits
+    completeCheckoutRefresh();
+
+    // Then: the comparison remains expanded
+    expect(document.getElementById("commitDetails")).not.toBeNull();
+    expect(document.querySelector(`[data-hash="${COMMIT_HASH_2}"].compareTarget`)).not.toBeNull();
+  });
+
+  // Case: TC-275
+  it.each([
+    ["base", [CHECKOUT_COMMITS[1]]],
+    ["target", [CHECKOUT_COMMITS[0]]]
+  ])(
+    "closes comparison details when the %s commit is absent from the checkout graph (TC-275)",
+    (_missingCommit, remainingCommits) => {
+      // Given: two commits are being compared
+      expandCommitWithCompare(COMMIT_HASH_1, COMMIT_HASH_2);
+      expect(document.getElementById("commitDetails")).not.toBeNull();
+
+      // When: checkout returns a graph containing only the other commit
+      completeCheckoutRefresh(remainingCommits);
+
+      // Then: the entire comparison is closed instead of showing stale diff details
+      expect(document.getElementById("commitDetails")).toBeNull();
+    }
+  );
+
+  // Case: TC-276
+  it("keeps the existing hard-refresh loading and expanded-state reset behavior (TC-276)", () => {
+    // Given: a commit is expanded
+    expandCommit(COMMIT_HASH_1);
+    expect(document.getElementById("commitDetails")).not.toBeNull();
+
+    // When: the manual hard refresh button is clicked
+    document
+      .getElementById("refreshBtn")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Then: hard refresh closes the details and shows loading immediately
+    expect(document.getElementById("commitDetails")).toBeNull();
+    expect(document.getElementById("loadingHeader")).not.toBeNull();
+    expect(postedCommands("loadBranches")[0].hard).toBe(true);
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /* S43: loadAvatar raw email matching                                 */
 /* ------------------------------------------------------------------ */
 
