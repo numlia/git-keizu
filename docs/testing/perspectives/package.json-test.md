@@ -158,3 +158,70 @@ INDEXジェネレーターは`| TC-`で始まる表行をケース定義とし�
 証跡を表形式で書いた初回の再生成では`package.json`が22 casesから38 casesへ増加した。ジェネレーターは`| TC-`で始まる表行をケース定義として数えるため、証跡表の16行がケースとして重複計上されたものである。証跡をリスト形式へ変更して再生成し、22 casesへ戻ることを確認した。以後、本セクションへ証跡を追記する際も表形式を使わない。
 
 再生成後の`INDEX.md`と現在のコミット内容の差分は、生成タイムスタンプ行と表パディングの整形ドリフトだけで、集計値・Forward Lookup・Reverse Lookupの内容に差分はない。そのため`INDEX.md`は再コミットせずTask 1の生成結果を維持する。
+
+## S3: pnpm 10.34.5 セキュリティ更新 (Feature 050)
+
+> Origin: Feature 050 (pnpm-security-update) (light-spec-plan)
+> Added: 2026-08-04
+> Status: active
+> Supersedes: -
+> Signature: `package.json#packageManager+scripts.vscode:prepublish`
+> Target Path: `package.json` (`packageManager`, `scripts.vscode:prepublish`)
+> Test File: なし（コマンド / 外部 CI 受け入れ）
+
+pnpm本体の既知脆弱性を解消し、`packageManager`とCorepack / npx消費経路が10.34.5へ一致する契約を検証する。Advisory Database、npmレジストリ、main CIは外部状態で変動するため固定値のVitestテストは持たず、各ケースをコマンド、scoped diff、またはCI実行証跡で受け入れる。
+
+### 失敗源インベントリ（include-or-justify）
+
+| 失敗源 | 対応ケースまたは除外理由 |
+| ------- | ------------------------ |
+| `packageManager`または`vscode:prepublish`のversion pin不一致 | TC-023、TC-024 |
+| 対象現行箇所への10.29.3残存 | TC-025、TC-026 |
+| npmレジストリまたはAdvisory APIのHTTP・JSON parse・rate-limit error | TC-027、TC-029 |
+| pnpm 10.34.5に対する新しいadvisory | TC-028、TC-029 |
+| frozen lock incompatibility | TC-030 |
+| project全依存またはproduction依存のaudit failure | TC-031、TC-032 |
+| format / lint / typecheck / 全体回帰の失敗 | TC-033、TC-034、TC-035、TC-036 |
+| nested pnpm consumerのversion不一致 | TC-024、TC-027、TC-037 |
+| prepublishまたはcompile後のbundle欠落 | TC-037、TC-038 |
+| VSIX package failure | TC-039 |
+| VSIXへの不要ファイル混入 | TC-040 |
+| 指定二項目・二文書・S3 / INDEX以外へのscope creep | TC-041 |
+| S1 / S2、TC-001〜TC-022、Feature 046 historical evidenceの改変 | TC-042 |
+| main CIのpnpm version不一致、既存`lint` job失敗、run URL欠落 | TC-043 |
+| 数値入力境界（0 / minimum / maximum / +/-1 / 空 / NULL） | excluded(package manager versionとcommand acceptanceは数値入力を受け取らない。意味のある境界はadvisory件数0→1をTC-028 / TC-029、version 10.29.3→10.34.5をTC-023〜TC-027、main CI pending→successをTC-043で検証する) |
+| 型不正・フォーマット不正 | excluded(package manager versionと受け入れコマンドへtype inputを渡す仕様がなく、manifest / JSON / API形式の不正は各consumerまたはTC-029のverification failureとして検出する) |
+
+| Case ID | Input / Precondition | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result | Notes |
+| ------- | -------------------- | -------------------------------------------------------------------------- | --------------- | ----- |
+| TC-023 | `package.json`の`packageManager`を読み込む | Normal - package manager pin | 値が文字列`pnpm@10.34.5`と完全一致する | 10.29.3から10.34.5へのversion境界 |
+| TC-024 | `package.json`の`scripts.vscode:prepublish`を読み込む | Normal - nested npx pin | 値が文字列`npx --yes pnpm@10.34.5 run compile`と完全一致する | extension package経路のpnpmを固定 |
+| TC-025 | `CLAUDE.md`と`docs/development/directory-structure.md`の現行pnpm案内を検索する | Normal - current documentation sync | 両文書の現行version表記が10.34.5で一致し、対象現行行の不一致が0件である | Feature 046の履歴証跡は対象外 |
+| TC-026 | 対象現行箇所とFeature 046履歴に対し10.29.3の残存箇所を分類する | Validation - stale current version rejection | 対象現行箇所の10.29.3が0件で、許容残存は`package.json-test.md`のFeature 046履歴だけとしてpath / section / 理由付きで列挙される | repository全体置換は禁止 |
+| TC-027 | `npx --yes pnpm@10.34.5 --version`を実行する | External - npm registry resolution | 終了コード0で、標準出力が`10.34.5`と完全一致する | HTTPまたはregistry failureは受け入れ不可 |
+| TC-028 | GitHub Advisory Database APIへ`ecosystem=npm&affects=pnpm@10.34.5`で問い合わせる | External - pnpm advisory lookup | HTTP成功後のtop-level JSONが配列で、`jq length`が0を返す | project dependency auditとは別契約 |
+| TC-029 | Advisory API検証がHigh / Critical該当、HTTP error、JSON parse error、またはrate-limit errorを返す | Exception - advisory verification blocked | エラーを0件へ変換せずcheckpoint statusが`blocked`となり、blocking reasonに該当advisoryまたはAPI失敗種別が記録される | 別version、pnpm 11、ignoreへ無断変更しない |
+| TC-030 | pnpm 10.34.5で`install --frozen-lockfile`を実行する | Normal - frozen install acceptance | 終了コード0で、実行前後の`pnpm-lock.yaml`と`pnpm-workspace.yaml`のdiffが0件である | manifestとlockの互換性を確認 |
+| TC-031 | pnpm 10.34.5で`audit --audit-level=high`を実行する | External - full dependency audit | 終了コード0で、Critical件数とHigh件数がそれぞれ0である | pnpm本体advisoryの代替にしない |
+| TC-032 | pnpm 10.34.5で`audit --prod --audit-level=low`を実行する | External - production dependency audit | 終了コード0で、既知脆弱性の報告件数が0である | production依存を別に確認 |
+| TC-033 | pnpm 10.34.5で`run format`を実行する | Normal - format acceptance | 終了コード0で、format不一致ファイルが0件と報告される | `oxfmt --check` |
+| TC-034 | pnpm 10.34.5で`run lint`を実行する | Normal - lint acceptance | 終了コード0で、warning 0件・error 0件と報告される | `oxlint` |
+| TC-035 | pnpm 10.34.5で`run typecheck`を実行する | Normal - typecheck acceptance | 終了コード0で、`src/`と`web/`のTypeScript errorが0件である | 両tsconfigを確認 |
+| TC-036 | pnpm 10.34.5で`run test:ci`を実行する | Normal - full regression acceptance | 終了コード0で、failed test files 0件・failed tests 0件と報告される | プロジェクト全体を1回以上実行 |
+| TC-037 | pnpm 10.34.5で`run vscode:prepublish`を実行する | Normal - prepublish acceptance | 終了コード0で、`out/extension.js`と`out/web.min.js`が存在する | script内のnpx pin消費経路を確認 |
+| TC-038 | pnpm 10.34.5で`run compile`を実行する | Normal - compile acceptance | 終了コード0で、`out/extension.js`と`out/web.min.js`が存在する | 二つのbundle生成を確認 |
+| TC-039 | pnpm 10.34.5で`run package`を実行する | Normal - package acceptance | 終了コード0で、プロジェクトルートに`.vsix`成果物が1件以上存在する | 生成pathを実行証跡へ記録 |
+| TC-040 | pnpm 10.34.5で`exec vsce ls`を実行する | Validation - VSIX content exclusion | 出力中の`node_modules/`、`src/`、`web/`、`tests/`、`docs/`、`notes/`配下pathが各0件である | `.vscodeignore`の除外を維持 |
+| TC-041 | Task 1〜3のscoped diffを比較基点から確認する | Validation - scope boundary | 差分が`package.json`の指定二項目、二文書、S3 / INDEXだけで、lock / workspace / CI / dependency / app code / testsのscope外差分が0件である | Task順序ごとに許可差分を照合 |
+| TC-042 | S3追加前baselineと現在の`package.json-test.md`をsection単位で比較する | Validation - historical evidence immutability | S1 / S2、TC-001〜TC-022、Feature 046の10.29.3実行証跡がbyte-equivalentで、差分が0 byteである | S3だけをadditiveに追記 |
+| TC-043 | Feature 050 merge commitを含むmain CI runを確認する | Boundary - post-merge completion gate | CI run URLが記録され、logのpnpm versionが10.34.5、既存`lint` job conclusionが`success`となるまでFeature 050完了とFeature 048着手が保留される | branch上では`pending(post-merge gate)` |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-026、TC-040、TC-041、TC-042
+- Exception: TC-029
+- External: TC-027、TC-028、TC-031、TC-032
+- Boundary: TC-043（advisory 0→1はTC-028 / TC-029、version 10.29.3→10.34.5はTC-023〜TC-027でも充足）
+- Type: excluded(上表のとおりtype inputが存在せず、形式不正はconsumerまたはTC-029で検出する)
+
+**失敗系/正常系比（煙感知器）**: 正常系11件（TC-023〜TC-025、TC-030、TC-033〜TC-039）、失敗系10件（TC-026〜TC-029、TC-031、TC-032、TC-040〜TC-043）、比0.91。同数近辺のためインベントリを再導出したが、上表の全失敗源にCase IDまたは除外理由がある。品質・回帰・build・packageを1 case = 1 commandで分けた正常系が比に影響しており、比率合わせのためのcase追加・削除は行わない。
