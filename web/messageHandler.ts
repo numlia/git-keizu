@@ -9,7 +9,10 @@ import type {
 import { hideDialog, showErrorDialog } from "./dialogs";
 import { generateGitFileTree } from "./fileTree";
 import { t } from "./i18n";
+import { showPushRemoteDialog } from "./refMenu";
 import { refreshGraphOrDisplayError } from "./utils";
+
+export type RefreshMode = "soft" | "forceRender" | "hard";
 
 export interface GitKeizuViewAPI {
   hideCommitDetails(): void;
@@ -26,7 +29,7 @@ export interface GitKeizuViewAPI {
     worktrees?: WorktreeMap
   ): void;
   loadRepos(repos: GitRepoSet, lastActiveRepo: string | null): void;
-  refresh(hard: boolean): void;
+  refresh(mode: RefreshMode): void;
   selectRepo(repo: string): void;
   setShowRecentActions(showRecentActions: boolean): void;
 }
@@ -43,7 +46,22 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       refreshOrError(gitKeizu, msg.status, t("error.branchFromStash"));
       break;
     case "checkoutBranch":
-      refreshOrError(gitKeizu, msg.status, t("error.checkoutBranch"));
+      switch (msg.kind) {
+        case "branchExists":
+          showErrorDialog(t("error.checkoutBranch"), t("error.checkoutBranchExists"), null);
+          break;
+        case "invalidRef":
+          showErrorDialog(t("error.checkoutBranch"), t("error.checkoutInvalidRef"), null);
+          break;
+        case "completed":
+          refreshGraphOrDisplayError(
+            msg.status,
+            t("error.checkoutBranch"),
+            () => gitKeizu.refresh("forceRender"),
+            showErrorDialog
+          );
+          break;
+      }
       break;
     case "checkoutCommit":
       refreshOrError(gitKeizu, msg.status, t("error.checkoutCommit"));
@@ -150,7 +168,17 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       refreshOrError(gitKeizu, msg.status, t("error.pull"));
       break;
     case "push":
-      refreshOrError(gitKeizu, msg.status, t("error.push"));
+      switch (msg.phase) {
+        case "selectRemote":
+          showPushRemoteDialog(msg.repo, msg.operationId, msg.remotes, msg.defaultRemote);
+          break;
+        case "noRemotes":
+          showErrorDialog(t("error.push"), t("error.pushNoRemotes"), null);
+          break;
+        case "completed":
+          refreshOrError(gitKeizu, msg.status, t("error.push"));
+          break;
+      }
       break;
     case "pushStash":
       refreshOrError(gitKeizu, msg.status, t("error.pushStash"));
@@ -163,7 +191,7 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       if (msg.status !== null) {
         showErrorDialog(t("error.removeWorktree"), msg.status, null);
       } else {
-        gitKeizu.refresh(false);
+        gitKeizu.refresh("soft");
         if (typeof msg.branchStatus === "string") {
           showErrorDialog(t("error.deleteBranch"), msg.branchStatus, null);
         }
@@ -173,7 +201,7 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       refreshOrError(gitKeizu, msg.status, t("error.renameBranch"));
       break;
     case "refresh":
-      gitKeizu.refresh(false);
+      gitKeizu.refresh("soft");
       break;
     case "resetToCommit":
       refreshOrError(gitKeizu, msg.status, t("error.resetToCommit"));
@@ -202,5 +230,5 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
 }
 
 function refreshOrError(gitKeizu: GitKeizuViewAPI, status: string | null, errorMessage: string) {
-  refreshGraphOrDisplayError(status, errorMessage, () => gitKeizu.refresh(false), showErrorDialog);
+  refreshGraphOrDisplayError(status, errorMessage, () => gitKeizu.refresh("soft"), showErrorDialog);
 }

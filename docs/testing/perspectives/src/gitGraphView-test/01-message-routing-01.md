@@ -70,8 +70,9 @@
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 3.3
 > Added: 2026-02-25
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S28
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -130,8 +131,9 @@
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S29
 
 **テスト対象パス**: `src/gitGraphView.ts:223-228`
 

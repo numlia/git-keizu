@@ -6,6 +6,7 @@ vi.mock("../../web/dialogs", () => ({
   showConfirmationDialog: vi.fn(),
   showCheckboxDialog: vi.fn(),
   showFormDialog: vi.fn(),
+  showSelectDialog: vi.fn(),
   showActionRunningDialog: vi.fn()
 }));
 
@@ -37,9 +38,15 @@ import {
   showCheckboxDialog,
   showConfirmationDialog,
   showFormDialog,
-  showRefInputDialog
+  showRefInputDialog,
+  showSelectDialog
 } from "../../web/dialogs";
-import { buildRefContextMenuItems, checkoutBranchAction, parseRemoteRef } from "../../web/refMenu";
+import {
+  buildRefContextMenuItems,
+  checkoutBranchAction,
+  parseRemoteRef,
+  showPushRemoteDialog
+} from "../../web/refMenu";
 import { escapeHtml, getRepoName, sanitizeBranchNameForPath, sendMessage } from "../../web/utils";
 
 function createMockElement(classes: string[]): HTMLElement {
@@ -1921,5 +1928,216 @@ describe("removeWorktree checkbox raw name (S16)", () => {
     expect(label!.textContent).not.toContain("&amp;");
     expect(label!.textContent).not.toContain("&#x2F;");
     actualDialogs.hideDialog();
+  });
+});
+
+// S17: Push の operationId 生成と remote 選択ダイアログ
+// @see docs/testing/perspectives/web/refMenu-test/01-branch-actions-01.md
+describe("Push operation id and remote selection dialog", () => {
+  // crypto.randomUUID() is typed as a dashed template literal, so the stub value is widened once here.
+  const OPERATION_ID = "op-1" as ReturnType<typeof crypto.randomUUID>;
+  const SECOND_OPERATION_ID = "op-2" as ReturnType<typeof crypto.randomUUID>;
+  const SELECT_REMOTE_MESSAGE = "Select the remote to push to:";
+  const SELECT_REMOTE_ACTION = "Push";
+
+  let randomUUIDSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    randomUUIDSpy = vi.spyOn(crypto, "randomUUID").mockReturnValue(OPERATION_ID);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  function clickPushItem(): void {
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(REPO, "main", sourceElem, false, "main");
+    const pushItem = findMenuItem(menu, "Push");
+    expect(pushItem).toBeDefined();
+    pushItem!.onClick();
+  }
+
+  function confirmPush(): void {
+    clickPushItem();
+    const confirmCallback = vi.mocked(showConfirmationDialog).mock.calls[0][1];
+    confirmCallback();
+  }
+
+  function selectRemote(value: string, callIndex = 0): void {
+    const actioned = vi.mocked(showSelectDialog).mock.calls[callIndex][4];
+    actioned(value);
+  }
+
+  it("sends the initial request with a generated operation id (TC-081)", () => {
+    // Case: TC-081
+    // Given: the Push confirmation dialog is approved
+    // When: the confirmation callback runs
+    confirmPush();
+
+    // Then: one operation id is generated and one request without a selection is sent
+    expect(randomUUIDSpy).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "push",
+      repo: REPO,
+      operationId: "op-1",
+      selectedRemote: null
+    });
+  });
+
+  it("records the recent action before sending the request (TC-082)", () => {
+    // Case: TC-082
+    // Given: the Push confirmation dialog is approved
+    // When: the confirmation callback runs
+    confirmPush();
+
+    // Then: the recent action is recorded once and ahead of the request
+    expect(recordRecentAction).toHaveBeenCalledTimes(1);
+    expect(recordRecentAction).toHaveBeenCalledWith(REPO, "ref.push");
+    expect(vi.mocked(recordRecentAction).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(sendMessage).mock.invocationCallOrder[0]
+    );
+  });
+
+  it("sends nothing when the Push confirmation is cancelled (TC-083)", () => {
+    // Case: TC-083
+    // Given: the Push menu item opens the confirmation dialog
+    // When: the confirmation callback is never invoked
+    clickPushItem();
+
+    // Then: no id is generated, nothing is recorded and nothing is sent
+    expect(randomUUIDSpy).toHaveBeenCalledTimes(0);
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
+    expect(sendMessage).toHaveBeenCalledTimes(0);
+  });
+
+  it("builds the selection dialog from the host response (TC-084)", () => {
+    // Case: TC-084
+    // Given: the host offered two remotes with upstream as the default
+    // When: showPushRemoteDialog is called
+    showPushRemoteDialog(REPO, "op-1", ["origin", "upstream"], "upstream");
+
+    // Then: the existing select dialog receives the options and default unchanged
+    expect(showSelectDialog).toHaveBeenCalledTimes(1);
+    expect(showSelectDialog).toHaveBeenCalledWith(
+      SELECT_REMOTE_MESSAGE,
+      "upstream",
+      [
+        { name: "origin", value: "origin" },
+        { name: "upstream", value: "upstream" }
+      ],
+      SELECT_REMOTE_ACTION,
+      expect.any(Function),
+      null
+    );
+  });
+
+  it("sends the follow-up request with the selected remote (TC-085)", () => {
+    // Case: TC-085
+    // Given: the remote selection dialog is open
+    showPushRemoteDialog(REPO, "op-1", ["origin", "upstream"], "upstream");
+
+    // When: the user confirms upstream
+    selectRemote("upstream");
+
+    // Then: one request is sent with the same operation id and the selected remote
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "push",
+      repo: REPO,
+      operationId: "op-1",
+      selectedRemote: "upstream"
+    });
+  });
+
+  it("sends nothing when the remote selection is cancelled (TC-086)", () => {
+    // Case: TC-086
+    // Given: the remote selection dialog is open
+    showPushRemoteDialog(REPO, "op-1", ["origin", "upstream"], "upstream");
+
+    // When: the selection callback is never invoked
+    // Then: no follow-up request is sent
+    expect(sendMessage).toHaveBeenCalledTimes(0);
+  });
+
+  it("does not auto-confirm a single option (TC-087)", () => {
+    // Case: TC-087
+    // Given: only one remote is offered
+    // When: showPushRemoteDialog is called without firing the callback
+    showPushRemoteDialog(REPO, "op-1", ["origin"], "origin");
+
+    // Then: showing the default alone sends nothing
+    expect(showSelectDialog).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledTimes(0);
+  });
+
+  it("carries the operation id of the dialog that was confirmed (TC-088)", () => {
+    // Case: TC-088
+    // Given: two selection dialogs were opened for consecutive operations
+    randomUUIDSpy.mockReturnValue(SECOND_OPERATION_ID);
+    showPushRemoteDialog(REPO, "op-1", ["origin"], "origin");
+    showPushRemoteDialog(REPO, "op-2", ["origin"], "origin");
+
+    // When: the second dialog is confirmed
+    selectRemote("origin", 1);
+
+    // Then: the request carries the second operation id, not the first
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "push",
+      repo: REPO,
+      operationId: "op-2",
+      selectedRemote: "origin"
+    });
+  });
+
+  it("does not record the recent action again on selection (TC-089)", () => {
+    // Case: TC-089
+    // Given: the remote selection dialog is open
+    showPushRemoteDialog(REPO, "op-1", ["origin"], "origin");
+
+    // When: the user confirms the selection
+    selectRemote("origin");
+
+    // Then: the recent action stays recorded only at confirmation time
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
+  });
+});
+
+// S19: showPushRemoteDialog() の repository 引数を 2 通目 Request へ引き継ぐ
+// @see docs/testing/perspectives/web/refMenu-test/01-branch-actions-01.md
+describe("push remote dialog repository handover", () => {
+  const OTHER_REPO = "/test/other-repo";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends each dialog's own repository on confirmation (TC-091)", () => {
+    // Case: TC-091
+    // Given: two selection dialogs opened for different repositories
+    showPushRemoteDialog(REPO, "op-1", ["origin"], "origin");
+    showPushRemoteDialog(OTHER_REPO, "op-2", ["origin"], "origin");
+
+    // When: both callbacks are confirmed in order
+    vi.mocked(showSelectDialog).mock.calls[0][4]("origin");
+    vi.mocked(showSelectDialog).mock.calls[1][4]("origin");
+
+    // Then: neither request adopts the repository or operation id of the other dialog
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(sendMessage).toHaveBeenNthCalledWith(1, {
+      command: "push",
+      repo: REPO,
+      operationId: "op-1",
+      selectedRemote: "origin"
+    });
+    expect(sendMessage).toHaveBeenNthCalledWith(2, {
+      command: "push",
+      repo: OTHER_REPO,
+      operationId: "op-2",
+      selectedRemote: "origin"
+    });
   });
 });

@@ -10,8 +10,9 @@
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 2.2
 > Added: 2026-02-25
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S41
 
 **シグネチャ**: `checkoutBranch(repo: string, branchName: string, remoteBranch: string | null): Promise<GitCommandStatus>`
 **テスト対象パス**: `src/dataSource.ts`
@@ -26,8 +27,9 @@
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 3.3
 > Added: 2026-02-25
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S43
 
 **テスト対象パス**: `src/dataSource.ts`
 

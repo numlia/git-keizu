@@ -168,3 +168,182 @@ describe("worktree open/reveal error l10n keys (Feature 045)", () => {
     expect(value.length).toBeGreaterThan(0);
   });
 });
+
+// S2 (en) / S3 (ja): 安全な checkout と Push 先選択の翻訳キー (Feature 047)
+// @see docs/testing/perspectives/l10n/web/web.l10n.en.json-test.md
+// @see docs/testing/perspectives/l10n/web/web.l10n.ja.json-test.md
+describe("safe checkout and push selection l10n keys (Feature 047)", () => {
+  const ADDED_KEYS = [
+    "error.checkoutBranchExists",
+    "error.checkoutInvalidRef",
+    "error.pushNoRemotes",
+    "push.selectRemote",
+    "push.selectRemoteAction"
+  ];
+
+  function loadBundle(fileName: string): Record<string, string> {
+    const jsonPath = resolve(process.cwd(), `l10n/web/${fileName}`);
+    return JSON.parse(readFileSync(jsonPath, "utf-8"));
+  }
+
+  function missingKeys(bundle: Record<string, string>): string[] {
+    return ADDED_KEYS.filter((key) => bundle[key] === undefined);
+  }
+
+  it("English bundle has a non-empty branch-exists reason (en l10n TC-003)", () => {
+    // Case: TC-003 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const messages = loadBundle("web.l10n.en.json");
+
+    // When: looking up the branch-exists reason
+    const value = messages["error.checkoutBranchExists"];
+
+    // Then: the key exists with a non-empty English string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("English bundle has a non-empty invalid-ref reason (en l10n TC-004)", () => {
+    // Case: TC-004 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const messages = loadBundle("web.l10n.en.json");
+
+    // When: looking up the invalid-ref reason
+    const value = messages["error.checkoutInvalidRef"];
+
+    // Then: the key exists with a non-empty English string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("English bundle has a non-empty no-remotes reason (en l10n TC-005)", () => {
+    // Case: TC-005 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const messages = loadBundle("web.l10n.en.json");
+
+    // When: looking up the no-remotes reason
+    const value = messages["error.pushNoRemotes"];
+
+    // Then: the key exists with a non-empty English string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("English bundle has a non-empty remote selection prompt (en l10n TC-006)", () => {
+    // Case: TC-006 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const messages = loadBundle("web.l10n.en.json");
+
+    // When: looking up the selection prompt
+    const value = messages["push.selectRemote"];
+
+    // Then: the key exists with a non-empty English string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("English bundle has a non-empty remote selection action label (en l10n TC-007)", () => {
+    // Case: TC-007 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const messages = loadBundle("web.l10n.en.json");
+
+    // When: looking up the selection action label
+    const value = messages["push.selectRemoteAction"];
+
+    // Then: the key exists with a non-empty English string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("Japanese bundle is missing none of the added keys (en l10n TC-008)", () => {
+    // Case: TC-008 (l10n/web/web.l10n.en.json-test.md)
+    // Given: both l10n bundles on disk
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When: the added key set is compared against the Japanese bundle
+    const missing = missingKeys(japanese);
+
+    // Then: no key was added to English only
+    expect(missing).toEqual([]);
+  });
+
+  it("Japanese bundle has a non-empty branch-exists reason (ja l10n TC-005)", () => {
+    // Case: TC-005 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const messages = loadBundle("web.l10n.ja.json");
+
+    // When: looking up the branch-exists reason
+    const value = messages["error.checkoutBranchExists"];
+
+    // Then: the key exists with a non-empty Japanese string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("Japanese bundle has a non-empty invalid-ref reason (ja l10n TC-006)", () => {
+    // Case: TC-006 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const messages = loadBundle("web.l10n.ja.json");
+
+    // When: looking up the invalid-ref reason
+    const value = messages["error.checkoutInvalidRef"];
+
+    // Then: the key exists with a non-empty Japanese string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("Japanese bundle has a non-empty no-remotes reason (ja l10n TC-007)", () => {
+    // Case: TC-007 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const messages = loadBundle("web.l10n.ja.json");
+
+    // When: looking up the no-remotes reason
+    const value = messages["error.pushNoRemotes"];
+
+    // Then: the key exists with a non-empty Japanese string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("Japanese bundle has a non-empty remote selection prompt (ja l10n TC-008)", () => {
+    // Case: TC-008 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const messages = loadBundle("web.l10n.ja.json");
+
+    // When: looking up the selection prompt
+    const value = messages["push.selectRemote"];
+
+    // Then: the key exists with a non-empty Japanese string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("Japanese bundle has a non-empty remote selection action label (ja l10n TC-009)", () => {
+    // Case: TC-009 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const messages = loadBundle("web.l10n.ja.json");
+
+    // When: looking up the selection action label
+    const value = messages["push.selectRemoteAction"];
+
+    // Then: the key exists with a non-empty Japanese string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("English bundle is complete and Japanese values are translated (ja l10n TC-010)", () => {
+    // Case: TC-010 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: both l10n bundles on disk
+    const english = loadBundle("web.l10n.en.json");
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When: the added key set is compared against English and against the raw keys
+    const missing = missingKeys(english);
+    const untranslated = ADDED_KEYS.filter((key) => japanese[key] === key);
+
+    // Then: no key was added to Japanese only and no value fell back to the raw key
+    expect(missing).toEqual([]);
+    expect(untranslated).toEqual([]);
+  });
+});

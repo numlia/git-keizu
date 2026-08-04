@@ -57,3 +57,155 @@ worktree の Open/Reveal 応答型の `status?`（optional）を必須の `statu
 - Type: TC-008、TC-009
 
 **失敗系/正常系比（煙感知器）**: 正常系0件、失敗系2件（TC-008、TC-009）。本セクションの対象は型契約のみで正常実行経路を持たないため、正常系0件はインベントリ欠落ではないことを確認した。
+
+## S3: checkout 結果と二段階 Push の型契約
+
+> Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
+> Added: 2026-08-03
+> Status: superseded
+> Supersedes: -
+> Superseded By: S4
+> Signature: `CheckoutBranchResult` / `ResponseCheckoutBranch` / `PushTarget` / `PushPreparation` / `RequestPush` / `ResponsePush`
+> Target Path: `src/types.ts`（checkout 結果 union と Push protocol。実装後に行範囲へ更新）
+> Test File: `tests/src/types.test.ts`
+
+checkout の結果を `kind` で、Push の応答を `phase` で narrowing できる discriminated union として固定する型契約の観点。`RequestPush` は `operationId` と `selectedRemote` を必須にし、`ResponsePush` の 3 variant はいずれも `operationId` を必須にする。runtime の分岐は各 owner（`src/dataSource-test/02-branch-worktree-02.md` / `src/gitGraphView-test/01-message-routing-03.md` / `web/messageHandler-test.md`）の責務で、本セクションは `@ts-expect-error` と代入可否だけを検証する。
+
+| Case ID | Input / Precondition                                                                                                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                           | Notes                       |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| TC-010  | `{ kind: "branchExists" }` を `CheckoutBranchResult` へ代入                                                                              | Type - branchExists variant                                                | 代入がコンパイルでき、`kind` で narrowing した分岐で `status` へアクセスすると型エラーになる（`@ts-expect-error` が有効） | status を持たない variant   |
+| TC-011  | `{ kind: "invalidRef" }` を `CheckoutBranchResult` へ代入                                                                                | Type - invalidRef variant                                                  | 代入がコンパイルできる                                                                                                    | -                           |
+| TC-012  | `{ kind: "completed", status: null }` を `CheckoutBranchResult` へ代入                                                                   | Type - completed variant                                                   | 代入がコンパイルでき、`kind === "completed"` で narrowing した分岐で `status` へアクセスできる                            | `GitCommandStatus`          |
+| TC-013  | `{ kind: "completed" }`（`status` 欠落）を代入                                                                                           | Type - completed の必須 field                                              | `@ts-expect-error` が有効（型エラーになる）                                                                               | completed だけ status 必須  |
+| TC-014  | `{ kind: "unknown" }` を代入                                                                                                             | Type - 未知の kind                                                         | `@ts-expect-error` が有効（型エラーになる）                                                                               | union 外の値                |
+| TC-015  | `{ command: "push", repo: "/r", operationId: "op-1", selectedRemote: null }` を `RequestPush` へ代入                                     | Type - 初回 Request                                                        | 代入がコンパイルできる                                                                                                    | 選択前の Request            |
+| TC-016  | `{ command: "push", repo: "/r", operationId: "op-1", selectedRemote: "origin" }` を `RequestPush` へ代入                                 | Type - 選択後 Request                                                      | 代入がコンパイルできる                                                                                                    | 2 通目の Request            |
+| TC-017  | `RequestPush` から `operationId` を欠落させた object literal                                                                             | Type - operationId 必須（Request）                                         | `@ts-expect-error` が有効（型エラーになる）                                                                               | 相関 ID の欠落防止          |
+| TC-018  | `RequestPush` から `selectedRemote` を欠落させた object literal                                                                          | Type - selectedRemote 必須                                                 | `@ts-expect-error` が有効（型エラーになる）                                                                               | optional にしない           |
+| TC-019  | `{ command: "push", operationId: "op-1", phase: "selectRemote", remotes: ["origin"], defaultRemote: "origin" }` を `ResponsePush` へ代入 | Type - selectRemote variant                                                | 代入がコンパイルでき、`phase` で narrowing した分岐で `remotes` と `defaultRemote` へアクセスできる                       | -                           |
+| TC-020  | `{ command: "push", operationId: "op-1", phase: "noRemotes" }` を `ResponsePush` へ代入                                                  | Type - noRemotes variant                                                   | 代入がコンパイルでき、narrowing 後に `remotes` へアクセスすると型エラーになる（`@ts-expect-error` が有効）                | phase 固有 field の分離     |
+| TC-021  | `{ command: "push", operationId: "op-1", phase: "completed", status: null }` を `ResponsePush` へ代入                                    | Type - completed variant                                                   | 代入がコンパイルでき、narrowing 後に `status` へアクセスできる                                                            | -                           |
+| TC-022  | completed variant から `status` を欠落させた object literal                                                                              | Type - completed の必須 field                                              | `@ts-expect-error` が有効（型エラーになる）                                                                               | -                           |
+| TC-023  | selectRemote variant から `defaultRemote` を欠落させた object literal                                                                    | Type - selectRemote の必須 field                                           | `@ts-expect-error` が有効（型エラーになる）                                                                               | -                           |
+| TC-024  | 3 variant それぞれから `operationId` を欠落させた object literal                                                                         | Type - operationId 必須（全 Response variant）                             | 3 つとも `@ts-expect-error` が有効（型エラーになる）                                                                      | 全 variant 共通の必須 field |
+| TC-025  | `switch (response.phase)` で `selectRemote` / `noRemotes` / `completed` の 3 case を網羅する                                             | Type - exhaustive narrowing                                                | `default` 節で残余値を `never` 型の変数へ代入してもコンパイルできる（列挙漏れがない）                                     | phase による網羅性          |
+
+### 失敗源インベントリ（include-or-justify）— Feature 047 追加分（S3）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                                                                                                                             |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 必須 field の欠落（`operationId`）                    | TC-017、TC-024                                                                                                                                                                       |
+| 必須 field の欠落（phase / kind 固有 field）          | TC-013、TC-022、TC-023                                                                                                                                                               |
+| optional 化による phase 推測の余地                    | TC-018、TC-020                                                                                                                                                                       |
+| union 外の値の受理                                    | TC-014                                                                                                                                                                               |
+| variant の取り違え（narrowing できない型設計）        | TC-010、TC-012、TC-019、TC-020、TC-021、TC-025                                                                                                                                       |
+| 各分岐の negative 側（有効な literal が拒否される）   | TC-011、TC-015、TC-016                                                                                                                                                               |
+| runtime の値送出・分岐の誤り                          | excluded(実行時の挙動は `src/dataSource-test/02-branch-worktree-02.md` S41〜S43、`src/gitGraphView-test/01-message-routing-03.md` S28〜S29、`web/messageHandler-test.md` S12 の責務) |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL） | excluded(型エイリアス定義のみで数値境界を持たない。`selectedRemote: null` と `status: null` の代入可否は TC-015 / TC-021 に含めて検証)                                               |
+| 外部依存の失敗                                        | excluded(外部依存なし)                                                                                                                                                               |
+| 例外送出                                              | excluded(型定義のみで throw 経路が存在しない)                                                                                                                                        |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(型エイリアス定義のみで実行時の検証分岐が存在しない)
+- Exception: excluded(同上。throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: excluded(型定義に数値・空値境界が存在しない。`null` の代入可否は TC-015 / TC-021 に含めて検証)
+- Type: TC-010〜TC-025
+
+**失敗系/正常系比（煙感知器）**: 正常系0件、失敗系16件（TC-010〜TC-025）。S2 と同じく本セクションの対象は型契約のみで正常実行経路を持たないため、正常系0件はインベントリ欠落ではないことを確認した。
+
+## S4: checkout 結果と二段階 Push の型契約（Response への repo 必須化）
+
+> Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
+> Added: 2026-08-04
+> Status: active
+> Supersedes: S3
+> Signature: `CheckoutBranchResult` / `ResponseCheckoutBranch` / `RequestPush` / `ResponsePush`
+> Target Path: `src/types.ts`（checkout 結果 union と Push protocol）
+> Test File: `tests/src/types.test.ts`
+
+`ResponsePush` の 3 variant すべてへ `repo: string` を必須追加し、webview 側が module state（`pendingPushRepo`）で repository を持ち回る設計を型で不要にする変更。S3 は `repo` を持たない Response literal が代入できることを期待結果としていたため supersede する。checkout 結果と `RequestPush` の契約は S3 から変更がないが、section をライフサイクルの単位とする規約に従い、現行契約を 1 セクションで表せるよう本セクションへ引き継ぐ。runtime の分岐は各 owner（`src/gitGraphView-test/01-message-routing-03.md` S31、`web/messageHandler-test.md` S14、`web/refMenu-test/01-branch-actions-01.md` S17 / S19）の責務で、本セクションは `@ts-expect-error` と代入可否だけを検証する。
+
+| Case ID | Input / Precondition                                                                                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                           | Notes                            |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| TC-026  | `{ kind: "branchExists" }` を `CheckoutBranchResult` へ代入                                                                                          | Type - branchExists variant                                                | 代入がコンパイルでき、`kind` で narrowing した分岐で `status` へアクセスすると型エラーになる（`@ts-expect-error` が有効） | S3/TC-010 の引き継ぎ（契約不変） |
+| TC-027  | `{ kind: "invalidRef" }` を `CheckoutBranchResult` へ代入                                                                                            | Type - invalidRef variant                                                  | 代入がコンパイルできる                                                                                                    | S3/TC-011 の引き継ぎ             |
+| TC-028  | `{ kind: "completed", status: null }` を `CheckoutBranchResult` へ代入                                                                               | Type - completed variant                                                   | 代入がコンパイルでき、`kind === "completed"` で narrowing した分岐で `status` へアクセスできる                            | S3/TC-012 の引き継ぎ             |
+| TC-029  | `{ kind: "completed" }`（`status` 欠落）を代入                                                                                                       | Type - completed の必須 field                                              | `@ts-expect-error` が有効（型エラーになる）                                                                               | S3/TC-013 の引き継ぎ             |
+| TC-030  | `{ kind: "unknown" }` を代入                                                                                                                         | Type - 未知の kind                                                         | `@ts-expect-error` が有効（型エラーになる）                                                                               | S3/TC-014 の引き継ぎ             |
+| TC-031  | `{ command: "push", repo: "/r", operationId: "op-1", selectedRemote: null }` を `RequestPush` へ代入                                                 | Type - 初回 Request                                                        | 代入がコンパイルできる                                                                                                    | S3/TC-015 の引き継ぎ             |
+| TC-032  | `{ command: "push", repo: "/r", operationId: "op-1", selectedRemote: "origin" }` を `RequestPush` へ代入                                             | Type - 選択後 Request                                                      | 代入がコンパイルできる                                                                                                    | S3/TC-016 の引き継ぎ             |
+| TC-033  | `RequestPush` から `operationId` を欠落させた object literal                                                                                         | Type - operationId 必須（Request）                                         | `@ts-expect-error` が有効（型エラーになる）                                                                               | S3/TC-017 の引き継ぎ             |
+| TC-034  | `RequestPush` から `selectedRemote` を欠落させた object literal                                                                                      | Type - selectedRemote 必須                                                 | `@ts-expect-error` が有効（型エラーになる）                                                                               | S3/TC-018 の引き継ぎ             |
+| TC-035  | `{ command: "push", repo: "/r", operationId: "op-1", phase: "selectRemote", remotes: ["origin"], defaultRemote: "origin" }` を `ResponsePush` へ代入 | Type - selectRemote variant                                                | 代入がコンパイルでき、`phase` で narrowing した分岐で `repo` / `remotes` / `defaultRemote` へアクセスできる               | repo 追加後の正常代入            |
+| TC-036  | `{ command: "push", repo: "/r", operationId: "op-1", phase: "noRemotes" }` を `ResponsePush` へ代入                                                  | Type - noRemotes variant                                                   | 代入がコンパイルでき、narrowing 後に `remotes` へアクセスすると型エラーになる（`@ts-expect-error` が有効）                | phase 固有 field の分離          |
+| TC-037  | `{ command: "push", repo: "/r", operationId: "op-1", phase: "completed", status: null }` を `ResponsePush` へ代入                                    | Type - completed variant                                                   | 代入がコンパイルでき、narrowing 後に `status` へアクセスできる                                                            | -                                |
+| TC-038  | completed variant から `status` を欠落させた object literal                                                                                          | Type - completed の必須 field                                              | `@ts-expect-error` が有効（型エラーになる）                                                                               | -                                |
+| TC-039  | selectRemote variant から `defaultRemote` を欠落させた object literal                                                                                | Type - selectRemote の必須 field                                           | `@ts-expect-error` が有効（型エラーになる）                                                                               | -                                |
+| TC-040  | 3 variant それぞれから `operationId` を欠落させた object literal                                                                                     | Type - operationId 必須（全 Response variant）                             | 3 つとも `@ts-expect-error` が有効（型エラーになる）                                                                      | 全 variant 共通の必須 field      |
+| TC-041  | 3 variant それぞれから `repo` を欠落させた object literal                                                                                            | Type - repo 必須（全 Response variant）                                    | 3 つとも `@ts-expect-error` が有効（型エラーになる）                                                                      | module state 廃止の型的な担保    |
+| TC-042  | `switch (response.phase)` で `selectRemote` / `noRemotes` / `completed` の 3 case を網羅する                                                         | Type - exhaustive narrowing                                                | `default` 節で残余値を `never` 型の変数へ代入してもコンパイルできる（列挙漏れがない）                                     | S3/TC-025 の引き継ぎ             |
+
+### 失敗源インベントリ（include-or-justify）— Feature 047 P3 修正分（S4）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                                                                                                                                                    |
+| ----------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 必須 field の欠落（`repo`）                           | TC-041                                                                                                                                                                                                      |
+| 必須 field の欠落（`operationId`）                    | TC-033、TC-040                                                                                                                                                                                              |
+| 必須 field の欠落（phase / kind 固有 field）          | TC-029、TC-038、TC-039                                                                                                                                                                                      |
+| optional 化による phase 推測の余地                    | TC-034、TC-036                                                                                                                                                                                              |
+| union 外の値の受理                                    | TC-030                                                                                                                                                                                                      |
+| variant の取り違え（narrowing できない型設計）        | TC-026、TC-028、TC-035、TC-036、TC-037、TC-042                                                                                                                                                              |
+| 各分岐の negative 側（有効な literal が拒否される）   | TC-027、TC-031、TC-032、TC-035                                                                                                                                                                              |
+| repository を module state で持ち回る設計への逆戻り   | TC-041（型で `repo` を強制するため、Response 受信側が別経路から repository を得る必要がなくなる。実行時の配線は `web/messageHandler-test.md` S14 と `web/refMenu-test/01-branch-actions-01.md` S19 の責務） |
+| runtime の値送出・分岐の誤り                          | excluded(実行時の挙動は `src/gitGraphView-test/01-message-routing-03.md` S31、`web/messageHandler-test.md` S14 の責務)                                                                                      |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL） | excluded(型エイリアス定義のみで数値境界を持たない。`selectedRemote: null` と `status: null` の代入可否は TC-031 / TC-037 に含めて検証)                                                                      |
+| 外部依存の失敗                                        | excluded(外部依存なし)                                                                                                                                                                                      |
+| 例外送出                                              | excluded(型定義のみで throw 経路が存在しない)                                                                                                                                                               |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(型エイリアス定義のみで実行時の検証分岐が存在しない)
+- Exception: excluded(同上。throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: excluded(型定義に数値・空値境界が存在しない。`null` の代入可否は TC-031 / TC-037 に含めて検証)
+- Type: TC-026〜TC-042
+
+**失敗系/正常系比（煙感知器）**: 正常系0件、失敗系17件（TC-026〜TC-042）。S2・S3 と同じく本セクションの対象は型契約のみで正常実行経路を持たないため、正常系0件はインベントリ欠落ではないことを確認した。
+
+## S5: PushTarget の local / upstream branch 分離
+
+> Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
+> Added: 2026-08-04
+> Status: active
+> Supersedes: -
+> Signature: `PushTarget`
+> Target Path: `src/types.ts`（`PushTarget`）
+> Test File: `tests/src/types.test.ts`
+
+upstream 設定済み Push で現在のローカル branch と upstream 側 branch の名前が異なる場合に備え、`PushTarget` が `localBranchName` と `upstreamBranchName` を別 field として必須保持する型契約を固定する。実行時の refspec と Git state は `src/dataSource-test/02-branch-worktree-02.md` S42 / S43、host の引き渡しは `src/gitGraphView-test/01-message-routing-03.md` S31 の責務。
+
+| Case ID | Input / Precondition                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                         | Notes                  |
+| ------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ---------------------- |
+| TC-043  | local `feature/local` / upstream `main` の `PushTarget`、および各 branch field を欠落させた object literal | Type - Push 元・Push 先の必須 field                                        | 別名を持つ target は代入でき、`localBranchName` / `upstreamBranchName` のどちらを欠いても型エラーになる | refspec 両側の型的担保 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 047 別名 upstream 修正分（S5）
+
+| 失敗源                                      | 対応ケースまたは除外理由                                                                        |
+| ------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Push 元と Push 先を単一 branch 名へ縮退する | TC-043                                                                                          |
+| 必須 field の欠落                           | TC-043                                                                                          |
+| runtime の refspec 構築・Git 実行           | excluded(`src/dataSource-test/02-branch-worktree-02.md` S43 TC-254 / TC-261 の責務)             |
+| 外部依存の失敗                              | excluded(型定義のみで外部依存なし)                                                              |
+| 境界値（empty / 不正 ref）                  | excluded(実行時 validation は `src/dataSource-test/02-branch-worktree-02.md` S43 TC-259 の責務) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(型定義のみで実行時 validation 分岐なし)
+- Exception: excluded(型定義のみで throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: excluded(不正 ref は runtime owner の責務)
+- Type: TC-043
+
+**失敗系/正常系比（煙感知器）**: 正常系0件、失敗系1件（TC-043）。本セクションは必須 field の型契約のみを対象とするため、正常系0件はインベントリ欠落ではない。

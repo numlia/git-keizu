@@ -1639,6 +1639,53 @@ describe("getUncommittedDetails", () => {
   });
 });
 
+interface GitProcessSpec {
+  stdout?: string;
+  stderr?: string;
+  exitCode?: number;
+}
+
+interface SpawnRoute {
+  matches: (args: string[]) => boolean;
+  spec: GitProcessSpec;
+}
+
+/**
+ * Route each mocked git invocation by its argument list, so a test can give the
+ * read-only query and the mutating command different outcomes and still assert
+ * which of them actually ran.
+ */
+function setupSpawnRoutes(routes: SpawnRoute[]) {
+  const mock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+  mock.mockImplementation((_command: unknown, args: unknown) => {
+    const argArray = args as string[];
+    const route = routes.find((candidate) => candidate.matches(argArray));
+    if (route === undefined) {
+      throw new Error(`unexpected git invocation: ${argArray.join(" ")}`);
+    }
+    return createCommandMockProcess(route.spec);
+  });
+}
+
+function spawnedArgs(): string[][] {
+  const mock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+  return mock.mock.calls.map((call) => call[1] as string[]);
+}
+
+function spawnedArgsFor(subcommand: string): string[][] {
+  return spawnedArgs().filter((args) => args[0] === subcommand);
+}
+
+function isSubcommand(subcommand: string) {
+  return (args: string[]) => args[0] === subcommand;
+}
+
+function isConfigGet(configKey: string) {
+  return (args: string[]) => args[0] === "config" && args[2] === configKey;
+}
+
+// S41: checkoutBranch() リモート checkout の安全化
+// @see docs/testing/perspectives/src/dataSource-test/02-branch-worktree-02.md
 describe("checkoutBranch", () => {
   let ds: DataSource;
 
@@ -1651,60 +1698,174 @@ describe("checkoutBranch", () => {
     vi.restoreAllMocks();
   });
 
-  it("uses -B flag when checking out remote branch (TC-068)", async () => {
-    // Given: A remote branch "origin/feature/x" and local branch name "feature/x"
-    const mock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
-    mock.mockImplementation(() => createMockProcess("", 0));
+  it("rejects an invalid local ref without spawning git (TC-231)", async () => {
+    // Case: TC-231
+    // Given: a local branch name git would read as an option
+    setupSpawnRoutes([]);
 
-    // When: checkoutBranch is called with a remote branch
-    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature/x");
+    // When: checkoutBranch is called for a remote branch
+    const result = await ds.checkoutBranch(REPO, "-delete", "origin/main");
 
-    // Then: git is spawned with -B flag (uppercase) for force-create
-    expect(mock).toHaveBeenCalledTimes(1);
-    const args = mock.mock.calls[0][1];
-    expect(args).toEqual(["checkout", "-B", "feature/x", "origin/feature/x"]);
-    expect(result).toBeNull();
+    // Then: the invalid ref is reported and no git process is started
+    expect(result).toEqual({ kind: "invalidRef" });
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
   });
 
-  it("does not use -B flag when checking out local branch (TC-069)", async () => {
-    // Given: A local branch "main" with remoteBranch = null
-    const mock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
-    mock.mockImplementation(() => createMockProcess("", 0));
+  it("rejects an invalid remote ref without spawning git (TC-232)", async () => {
+    // Case: TC-232
+    // Given: a valid local name but a remote ref containing a revision range
+    setupSpawnRoutes([]);
 
-    // When: checkoutBranch is called with remoteBranch = null
+    // When: checkoutBranch is called
+    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature..x");
+
+    // Then: the invalid ref is reported and no git process is started
+    expect(result).toEqual({ kind: "invalidRef" });
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+  });
+
+  it("rejects an empty branch name on the local path without spawning git (TC-233)", async () => {
+    // Case: TC-233
+    // Given: an empty branch name and no remote branch
+    setupSpawnRoutes([]);
+
+    // When: checkoutBranch is called
+    const result = await ds.checkoutBranch(REPO, "", null);
+
+    // Then: the invalid ref is reported and no git process is started
+    expect(result).toEqual({ kind: "invalidRef" });
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+  });
+
+  it("checks out a local branch with the plain checkout args (TC-234)", async () => {
+    // Case: TC-234
+    // Given: git succeeds for the local checkout
+    setupSpawnRoutes([{ matches: isSubcommand("checkout"), spec: {} }]);
+
+    // When: checkoutBranch is called without a remote branch
     const result = await ds.checkoutBranch(REPO, "main", null);
 
-    // Then: git is spawned with just "checkout main" (no -B flag)
-    expect(mock).toHaveBeenCalledTimes(1);
-    const args = mock.mock.calls[0][1];
-    expect(args).toEqual(["checkout", "main"]);
-    expect(result).toBeNull();
+    // Then: exactly one checkout runs with the unchanged local args
+    expect(cp.spawn).toHaveBeenCalledTimes(1);
+    expect(cp.spawn).toHaveBeenCalledWith("git", ["checkout", "main"], SPAWN_OPTS);
+    expect(result).toEqual({ kind: "completed", status: null });
   });
 
-  it("returns error message when git fails for invalid branch name (TC-070)", async () => {
-    // Given: git spawn returns non-zero exit code with stderr message
-    const mock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
-    mock.mockImplementation(() => {
-      const stdoutEmitter = new EventEmitter();
-      const stderrEmitter = new EventEmitter();
-      const proc = new EventEmitter();
-      Object.assign(proc, { stdout: stdoutEmitter, stderr: stderrEmitter });
+  it("reports an existing branch without running checkout (TC-235)", async () => {
+    // Case: TC-235
+    // Given: the read-only existence query finds refs/heads/feature/x
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "  feature/x\n" } },
+      { matches: isSubcommand("checkout"), spec: {} }
+    ]);
 
-      queueMicrotask(() => {
-        stderrEmitter.emit("data", "fatal: 'origin/invalid..branch' is not a valid branch name\n");
-        proc.emit("close", 128);
-      });
-      return proc as unknown as cp.ChildProcess;
+    // When: checkoutBranch is called for the same name from a remote branch
+    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature/x");
+
+    // Then: only the existence query runs and the existing branch is reported
+    expect(result).toEqual({ kind: "branchExists" });
+    expect(cp.spawn).toHaveBeenCalledTimes(1);
+    expect(cp.spawn).toHaveBeenCalledWith("git", ["branch", "--list", "feature/x"], SPAWN_OPTS);
+    expect(spawnedArgsFor("checkout")).toEqual([]);
+  });
+
+  it("creates a tracking branch for an unused name (TC-236)", async () => {
+    // Case: TC-236
+    // Given: the existence query finds nothing and checkout succeeds
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "" } },
+      { matches: isSubcommand("checkout"), spec: {} }
+    ]);
+
+    // When: checkoutBranch is called for a remote branch
+    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature/x");
+
+    // Then: checkout runs once with --track -b and never with -B
+    expect(spawnedArgsFor("checkout")).toEqual([
+      ["checkout", "--track", "-b", "feature/x", "origin/feature/x"]
+    ]);
+    expect(cp.spawn).toHaveBeenCalledWith(
+      "git",
+      ["checkout", "--track", "-b", "feature/x", "origin/feature/x"],
+      SPAWN_OPTS
+    );
+    expect(result).toEqual({ kind: "completed", status: null });
+  });
+
+  it("keeps the existence query failure detail instead of reporting branchExists (TC-237)", async () => {
+    // Case: TC-237
+    // Given: the existence query itself fails
+    setupSpawnRoutes([
+      {
+        matches: isSubcommand("branch"),
+        spec: { stderr: "fatal: not a git repository\n", exitCode: 128 }
+      },
+      { matches: isSubcommand("checkout"), spec: {} }
+    ]);
+
+    // When: checkoutBranch is called for a remote branch
+    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature/x");
+
+    // Then: the query error is surfaced and checkout never runs
+    expect(result).toEqual({ kind: "completed", status: "fatal: not a git repository" });
+    expect(spawnedArgsFor("checkout")).toEqual([]);
+  });
+
+  it("keeps the existence query spawn error detail instead of reporting branchExists (TC-237)", async () => {
+    // Case: TC-237 (spawn error input of the same case)
+    // Given: the existence query cannot be spawned at all
+    const mock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
+    mock.mockImplementation((_command: unknown, args: unknown) => {
+      const argArray = args as string[];
+      if (argArray[0] !== "branch") {
+        throw new Error(`unexpected git invocation: ${argArray.join(" ")}`);
+      }
+      return createCommandMockProcess({ emitError: true });
     });
 
-    // When: checkoutBranch is called with an invalid remote branch
-    const result = await ds.checkoutBranch(REPO, "invalid..branch", "origin/invalid..branch");
+    // When: checkoutBranch is called for a remote branch
+    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature/x");
 
-    // Then: Error message string from git stderr is returned
-    expect(result).toBe("fatal: 'origin/invalid..branch' is not a valid branch name");
+    // Then: the spawn error is surfaced and checkout never runs
+    expect(result).toEqual({ kind: "completed", status: "spawn error" });
+    expect(spawnedArgsFor("checkout")).toEqual([]);
+  });
+
+  it("surfaces a failing remote checkout (TC-238)", async () => {
+    // Case: TC-238
+    // Given: the name is unused but the tracking checkout fails
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "" } },
+      {
+        matches: isSubcommand("checkout"),
+        spec: { stderr: "fatal: invalid reference\n", exitCode: 128 }
+      }
+    ]);
+
+    // When: checkoutBranch is called for a remote branch
+    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature/x");
+
+    // Then: the git error message is preserved
+    expect(result).toEqual({ kind: "completed", status: "fatal: invalid reference" });
+  });
+
+  it("surfaces a failing local checkout (TC-239)", async () => {
+    // Case: TC-239
+    // Given: the local checkout fails
+    setupSpawnRoutes([
+      { matches: isSubcommand("checkout"), spec: { stderr: "error: pathspec\n", exitCode: 1 } }
+    ]);
+
+    // When: checkoutBranch is called without a remote branch
+    const result = await ds.checkoutBranch(REPO, "main", null);
+
+    // Then: the git error message is preserved
+    expect(result).toEqual({ kind: "completed", status: "error: pathspec" });
   });
 });
 
+// S44: pull() 既存挙動の維持
+// @see docs/testing/perspectives/src/dataSource-test/02-branch-worktree-02.md
 describe("pull command", () => {
   let ds: DataSource;
   const spawnMock = vi.mocked(cp.spawn);
@@ -1718,19 +1879,20 @@ describe("pull command", () => {
     vi.restoreAllMocks();
   });
 
-  it("pull passes correct args: ['pull'] (TC-071)", async () => {
+  it("pull passes correct args: ['pull'] (TC-263)", async () => {
     // Given: DataSource instance
     spawnMock.mockImplementation(() => createCommandMockProcess());
 
     // When: pull(repo) is called
     const result = await ds.pull(REPO);
 
-    // Then: spawn is called with ["pull"] and correct cwd
+    // Then: spawn is called exactly once with ["pull"] and correct cwd
+    expect(spawnMock).toHaveBeenCalledTimes(1);
     expect(spawnMock).toHaveBeenCalledWith("git", ["pull"], SPAWN_OPTS);
     expect(result).toBeNull();
   });
 
-  it("pull returns null on success (TC-072)", async () => {
+  it("pull returns null on success (TC-264)", async () => {
     // Given: spawn completes successfully (exit code 0)
     spawnMock.mockImplementation(() =>
       createCommandMockProcess({ stdout: "Already up to date.\n" })
@@ -1743,11 +1905,11 @@ describe("pull command", () => {
     expect(result).toBeNull();
   });
 
-  it("pull returns error message on merge conflict (TC-073)", async () => {
-    // Given: spawn outputs error on stderr with non-zero exit
+  it("pull returns error message on merge conflict (TC-265)", async () => {
+    // Given: spawn outputs a merge conflict on stderr with non-zero exit
     spawnMock.mockImplementation(() =>
       createCommandMockProcess({
-        stderr: "error: Your local changes would be overwritten by merge.\n",
+        stderr: "CONFLICT (content): Merge conflict\n",
         exitCode: 1
       })
     );
@@ -1755,15 +1917,17 @@ describe("pull command", () => {
     // When: pull is executed
     const result = await ds.pull(REPO);
 
-    // Then: Error message string is returned (not null)
-    expect(result).not.toBeNull();
-    expect(result).toContain("Your local changes would be overwritten by merge");
+    // Then: the git conflict message is returned verbatim
+    expect(result).toBe("CONFLICT (content): Merge conflict");
   });
 });
 
-describe("push command", () => {
+const UPSTREAM_QUERY_FAILURE: GitProcessSpec = { exitCode: 1 };
+
+// S42: preparePush() / getRemotes() Push 先の解決
+// @see docs/testing/perspectives/src/dataSource-test/02-branch-worktree-02.md
+describe("preparePush", () => {
   let ds: DataSource;
-  const spawnMock = vi.mocked(cp.spawn);
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -1774,15 +1938,288 @@ describe("push command", () => {
     vi.restoreAllMocks();
   });
 
-  it("push passes correct args: ['push', '--set-upstream', 'origin', 'HEAD'] (TC-074)", async () => {
-    // Given: DataSource instance
-    spawnMock.mockImplementation(() => createCommandMockProcess());
+  it("returns the configured upstream target (TC-243)", async () => {
+    // Case: TC-243
+    // Given: feature/local tracks upstream/main
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "feature/local\n" } },
+      { matches: isConfigGet("branch.feature/local.remote"), spec: { stdout: "upstream\n" } },
+      { matches: isConfigGet("branch.feature/local.merge"), spec: { stdout: "refs/heads/main\n" } }
+    ]);
 
-    // When: push(repo) is called
-    const result = await ds.push(REPO);
+    // When: preparePush is called
+    const result = await ds.preparePush(REPO);
 
-    // Then: spawn is called with --set-upstream args and correct cwd
-    expect(spawnMock).toHaveBeenCalledWith(
+    // Then: the non-origin upstream is returned as the push target
+    expect(result).toEqual({
+      kind: "upstream",
+      target: {
+        remoteName: "upstream",
+        localBranchName: "feature/local",
+        upstreamBranchName: "main"
+      }
+    });
+  });
+
+  it("falls back to a sorted remote list when no upstream is configured (TC-244)", async () => {
+    // Case: TC-244
+    // Given: a current branch without upstream configuration and two remotes
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "main\n" } },
+      { matches: isSubcommand("config"), spec: UPSTREAM_QUERY_FAILURE },
+      { matches: isSubcommand("remote"), spec: { stdout: "upstream\norigin\n" } }
+    ]);
+
+    // When: preparePush is called
+    const result = await ds.preparePush(REPO);
+
+    // Then: the remotes are offered for selection in ascending order
+    expect(result).toEqual({ kind: "selectRemote", remotes: ["origin", "upstream"] });
+  });
+
+  it("treats an empty current branch as a detached HEAD (TC-245)", async () => {
+    // Case: TC-245
+    // Given: branch --show-current prints nothing
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "" } },
+      { matches: isSubcommand("remote"), spec: { stdout: "origin\n" } }
+    ]);
+
+    // When: preparePush is called
+    const result = await ds.preparePush(REPO);
+
+    // Then: the remotes are offered and no upstream configuration is read
+    expect(result).toEqual({ kind: "selectRemote", remotes: ["origin"] });
+    expect(spawnedArgsFor("config")).toEqual([]);
+  });
+
+  it("returns an empty remote list rather than an error (TC-246)", async () => {
+    // Case: TC-246
+    // Given: no upstream and no registered remotes
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "main\n" } },
+      { matches: isSubcommand("config"), spec: UPSTREAM_QUERY_FAILURE },
+      { matches: isSubcommand("remote"), spec: { stdout: "" } }
+    ]);
+
+    // When: preparePush is called
+    const result = await ds.preparePush(REPO);
+
+    // Then: the empty list is reported as a selection, not as an error
+    expect(result).toEqual({ kind: "selectRemote", remotes: [] });
+  });
+
+  it("returns an error when the remote lookup fails (TC-247)", async () => {
+    // Case: TC-247
+    // Given: git remote exits non-zero
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "main\n" } },
+      { matches: isSubcommand("config"), spec: UPSTREAM_QUERY_FAILURE },
+      {
+        matches: isSubcommand("remote"),
+        spec: { stderr: "fatal: remote fail\n", exitCode: 128 }
+      }
+    ]);
+
+    // When: preparePush is called
+    const result = await ds.preparePush(REPO);
+
+    // Then: the failure is reported with its message instead of an empty selection
+    expect(result).toEqual({ kind: "error", status: "fatal: remote fail" });
+  });
+
+  it("returns an error when the current branch lookup fails (TC-248)", async () => {
+    // Case: TC-248
+    // Given: branch --show-current exits non-zero
+    setupSpawnRoutes([
+      {
+        matches: isSubcommand("branch"),
+        spec: { stderr: "fatal: not a git repository\n", exitCode: 128 }
+      }
+    ]);
+
+    // When: preparePush is called
+    const result = await ds.preparePush(REPO);
+
+    // Then: the failure is reported instead of being treated as a detached HEAD
+    expect(result).toEqual({ kind: "error", status: "fatal: not a git repository" });
+  });
+
+  // S45: readUpstreamTarget() upstream merge 設定の形式検証
+  // @see docs/testing/perspectives/src/dataSource-test/02-branch-worktree-02.md
+  it("never treats a merge ref outside refs/heads/ as a push target (TC-266)", async () => {
+    // Case: TC-266
+    // Given: the upstream remote is safe but the merge ref is not a local branch ref
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "main\n" } },
+      { matches: isConfigGet("branch.main.remote"), spec: { stdout: "origin\n" } },
+      {
+        matches: isConfigGet("branch.main.merge"),
+        spec: { stdout: "refs/remotes/origin/main\n" }
+      },
+      { matches: isSubcommand("remote"), spec: { stdout: "origin\n" } }
+    ]);
+
+    // When: preparePush is called
+    const result = await ds.preparePush(REPO);
+
+    // Then: the setting is not promoted to an upstream target and selection is requested
+    expect(result).toEqual({ kind: "selectRemote", remotes: ["origin"] });
+    expect(spawnedArgs()).toContainEqual(["config", "--get", "branch.main.merge"]);
+    expect(spawnedArgsFor("remote")).toEqual([["remote"]]);
+  });
+
+  it("never treats an unsafe upstream remote as a push target (TC-249)", async () => {
+    // Case: TC-249
+    // Given: the configured upstream remote name looks like an option
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "main\n" } },
+      { matches: isConfigGet("branch.main.remote"), spec: { stdout: "-evil\n" } },
+      { matches: isConfigGet("branch.main.merge"), spec: { stdout: "refs/heads/main\n" } },
+      { matches: isSubcommand("remote"), spec: { stdout: "origin\n" } }
+    ]);
+
+    // When: preparePush is called
+    const result = await ds.preparePush(REPO);
+
+    // Then: selection is requested and the unsafe name is absent from the result
+    expect(result).toEqual({ kind: "selectRemote", remotes: ["origin"] });
+  });
+});
+
+describe("getRemotes", () => {
+  let ds: DataSource;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("returns the remote names in ascending order (TC-250)", async () => {
+    // Case: TC-250
+    // Given: git remote prints two names out of order
+    setupSpawnRoutes([{ matches: isSubcommand("remote"), spec: { stdout: "upstream\norigin\n" } }]);
+
+    // When: getRemotes is called
+    const result = await ds.getRemotes(REPO);
+
+    // Then: the names come back sorted
+    expect(result).toEqual(["origin", "upstream"]);
+  });
+
+  it("returns an empty array when no remote is registered (TC-251)", async () => {
+    // Case: TC-251
+    // Given: git remote prints nothing
+    setupSpawnRoutes([{ matches: isSubcommand("remote"), spec: { stdout: "" } }]);
+
+    // When: getRemotes is called
+    const result = await ds.getRemotes(REPO);
+
+    // Then: an empty array is returned rather than null
+    expect(result).toEqual([]);
+  });
+
+  it("returns null when the remote lookup fails (TC-252)", async () => {
+    // Case: TC-252
+    // Given: git remote exits non-zero
+    setupSpawnRoutes([
+      {
+        matches: isSubcommand("remote"),
+        spec: { stderr: "fatal: not a git repository\n", exitCode: 128 }
+      }
+    ]);
+
+    // When: getRemotes is called
+    const result = await ds.getRemotes(REPO);
+
+    // Then: null distinguishes the failure from an empty list
+    expect(result).toBeNull();
+  });
+
+  it("drops unsafe remote names from the successful result (TC-253)", async () => {
+    // Case: TC-253
+    // Given: git remote prints a name that looks like an option
+    setupSpawnRoutes([{ matches: isSubcommand("remote"), spec: { stdout: "origin\n-evil\n" } }]);
+
+    // When: getRemotes is called
+    const result = await ds.getRemotes(REPO);
+
+    // Then: only the safe name is returned
+    expect(result).toEqual(["origin"]);
+  });
+});
+
+// S43: pushToUpstream() / pushWithUpstream() 明示 Push の実行
+// @see docs/testing/perspectives/src/dataSource-test/02-branch-worktree-02.md
+describe("push commands", () => {
+  let ds: DataSource;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("pushes the local branch explicitly to a differently named upstream branch (TC-254)", async () => {
+    // Case: TC-254
+    // Given: git succeeds
+    setupSpawnRoutes([{ matches: isSubcommand("push"), spec: {} }]);
+
+    // When: pushToUpstream is called with the resolved target
+    const result = await ds.pushToUpstream(REPO, {
+      remoteName: "upstream",
+      localBranchName: "feature/local",
+      upstreamBranchName: "main"
+    });
+
+    // Then: the local source and upstream destination are explicit in the refspec
+    expect(cp.spawn).toHaveBeenCalledTimes(1);
+    expect(cp.spawn).toHaveBeenCalledWith(
+      "git",
+      ["push", "upstream", "feature/local:main"],
+      SPAWN_OPTS
+    );
+    expect(spawnedArgs()[0]).not.toContain("--set-upstream");
+    expect(spawnedArgs()[0]).not.toContain("HEAD");
+    expect(result).toBeNull();
+  });
+
+  it("surfaces a failing upstream push (TC-255)", async () => {
+    // Case: TC-255
+    // Given: git rejects the push
+    setupSpawnRoutes([
+      { matches: isSubcommand("push"), spec: { stderr: "fatal: rejected\n", exitCode: 1 } }
+    ]);
+
+    // When: pushToUpstream is called
+    const result = await ds.pushToUpstream(REPO, {
+      remoteName: "upstream",
+      localBranchName: "main",
+      upstreamBranchName: "main"
+    });
+
+    // Then: the git error message is returned
+    expect(result).toBe("fatal: rejected");
+  });
+
+  it("registers the upstream when pushing to a selected remote (TC-256)", async () => {
+    // Case: TC-256
+    // Given: git succeeds
+    setupSpawnRoutes([{ matches: isSubcommand("push"), spec: {} }]);
+
+    // When: pushWithUpstream is called with the selected remote
+    const result = await ds.pushWithUpstream(REPO, "origin");
+
+    // Then: --set-upstream is used exactly once with the selected remote
+    expect(cp.spawn).toHaveBeenCalledTimes(1);
+    expect(cp.spawn).toHaveBeenCalledWith(
       "git",
       ["push", "--set-upstream", "origin", "HEAD"],
       SPAWN_OPTS
@@ -1790,51 +2227,71 @@ describe("push command", () => {
     expect(result).toBeNull();
   });
 
-  it("push returns null on success (TC-075)", async () => {
-    // Given: spawn completes successfully (exit code 0)
-    spawnMock.mockImplementation(() =>
-      createCommandMockProcess({ stdout: "Everything up-to-date\n" })
-    );
+  it("surfaces a failing upstream-registering push (TC-257)", async () => {
+    // Case: TC-257
+    // Given: git rejects the push
+    setupSpawnRoutes([
+      { matches: isSubcommand("push"), spec: { stderr: "fatal: no such remote\n", exitCode: 128 } }
+    ]);
 
-    // When: push(repo) is called
-    const result = await ds.push(REPO);
+    // When: pushWithUpstream is called
+    const result = await ds.pushWithUpstream(REPO, "origin");
 
-    // Then: null is returned (GitCommandStatus success)
-    expect(result).toBeNull();
+    // Then: the git error message is returned
+    expect(result).toBe("fatal: no such remote");
   });
 
-  it("push returns error message on rejection (TC-076)", async () => {
-    // Given: spawn outputs error on stderr with non-zero exit
-    spawnMock.mockImplementation(() =>
-      createCommandMockProcess({
-        stderr: "error: failed to push some refs to 'origin'\n",
-        exitCode: 1
-      })
-    );
+  it("guards an unsafe remote name before spawning git (TC-258)", async () => {
+    // Case: TC-258
+    // Given: a remote name git would read as an option
+    setupSpawnRoutes([]);
 
-    // When: push is executed
-    const result = await ds.push(REPO);
+    // When: pushToUpstream is called
+    const result = await ds.pushToUpstream(REPO, {
+      remoteName: "-evil",
+      localBranchName: "main",
+      upstreamBranchName: "main"
+    });
 
-    // Then: Error message string is returned (not null)
-    expect(result).not.toBeNull();
-    expect(result).toContain("failed to push some refs");
+    // Then: no git process starts and the rejection message is returned
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+    expect(result).toBe("Invalid remote name.");
   });
 
-  it("push returns error message when upstream is not set (TC-077)", async () => {
-    // Given: spawn outputs upstream error on stderr with non-zero exit
-    spawnMock.mockImplementation(() =>
-      createCommandMockProcess({
-        stderr: "fatal: The current branch feature has no upstream branch.\n",
-        exitCode: 128
-      })
-    );
+  it("guards invalid local and upstream branch names before spawning git (TC-259)", async () => {
+    // Case: TC-259
+    // Given: a branch name containing a revision range
+    setupSpawnRoutes([]);
 
-    // When: push is executed
-    const result = await ds.push(REPO);
+    // When: pushToUpstream is called
+    const invalidLocalResult = await ds.pushToUpstream(REPO, {
+      remoteName: "origin",
+      localBranchName: "feature..local",
+      upstreamBranchName: "main"
+    });
+    const invalidUpstreamResult = await ds.pushToUpstream(REPO, {
+      remoteName: "origin",
+      localBranchName: "feature/local",
+      upstreamBranchName: "feature..upstream"
+    });
 
-    // Then: Error message about no upstream branch is returned
-    expect(result).not.toBeNull();
-    expect(result).toContain("has no upstream branch");
+    // Then: neither invalid side reaches git and both return the ref-name error
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+    expect(invalidLocalResult).toBe("Invalid ref name.");
+    expect(invalidUpstreamResult).toBe("Invalid ref name.");
+  });
+
+  it("guards an empty remote name before spawning git (TC-260)", async () => {
+    // Case: TC-260
+    // Given: an empty selected remote name
+    setupSpawnRoutes([]);
+
+    // When: pushWithUpstream is called
+    const result = await ds.pushWithUpstream(REPO, "");
+
+    // Then: no git process starts and the rejection message is returned
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+    expect(result).toBe("Invalid remote name.");
   });
 });
 

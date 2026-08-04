@@ -19,7 +19,7 @@ import {
 import { findCommitElemWithId, FindWidget, getCommitElems } from "./findWidget";
 import { Graph } from "./graph";
 import { t } from "./i18n";
-import { handleMessage } from "./messageHandler";
+import { handleMessage, type RefreshMode } from "./messageHandler";
 import { buildRefContextMenuItems, checkoutBranchAction } from "./refMenu";
 import { buildStashContextMenuItems } from "./stashMenu";
 import { buildUncommittedContextMenuItems } from "./uncommittedMenu";
@@ -84,7 +84,7 @@ function getFileViewToggle(mode: FileViewType): { icon: string; title: string } 
 }
 
 type PendingCommitLoad = {
-  hard: boolean;
+  forceRender: boolean;
   callbacks: ((changes: boolean) => void)[];
 };
 
@@ -142,7 +142,7 @@ class GitKeizuView {
 
   private loadBranchesCallback: ((changes: boolean, isRepo: boolean) => void) | null = null;
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
-  private pendingLoadBranchesAndCommitsHard: boolean | null = null;
+  private pendingLoadBranchesAndCommitsForceRender: boolean | null = null;
   private pendingLoadCommits: PendingCommitLoad | null = null;
   private worktrees: GG.WorktreeMap = {};
 
@@ -173,7 +173,7 @@ class GitKeizuView {
       this.expandedCommit = null;
       this.selectedBranches = [];
       this.saveState();
-      this.refresh(true);
+      this.refresh("hard");
     });
     this.branchDropdown = new Dropdown(
       "branchSelect",
@@ -209,13 +209,13 @@ class GitKeizuView {
     this.showRemoteBranchesElem.addEventListener("change", () => {
       this.showRemoteBranches = this.showRemoteBranchesElem.checked;
       this.saveState();
-      this.refresh(true);
+      this.refresh("hard");
     });
     this.scrollShadowElem = <HTMLInputElement>document.getElementById("scrollShadow")!;
     const refreshBtnElem = document.getElementById("refreshBtn")!;
     refreshBtnElem.innerHTML = svgIcons.refresh;
     refreshBtnElem.addEventListener("click", () => {
-      this.refresh(true);
+      this.refresh("hard");
     });
     const fetchBtnElem = document.getElementById("fetchBtn")!;
     fetchBtnElem.innerHTML = svgIcons.fetch;
@@ -336,7 +336,7 @@ class GitKeizuView {
     this.repoDropdown.setOptions(options, this.currentRepo);
 
     if (changedRepo) {
-      this.refresh(true);
+      this.refresh("hard");
       return true;
     }
     return false;
@@ -354,7 +354,7 @@ class GitKeizuView {
       return { name: comps[comps.length - 1], value: path };
     });
     this.repoDropdown.setOptions(options, this.currentRepo);
-    this.refresh(true);
+    this.refresh("hard");
   }
 
   private getCurrentRepoRecentActions(): GG.RecentActionId[] {
@@ -364,7 +364,7 @@ class GitKeizuView {
   public loadBranches(
     branchOptions: string[],
     branchHead: string | null,
-    hard: boolean,
+    forceRender: boolean,
     isRepo: boolean
   ) {
     if (!isRepo) {
@@ -372,7 +372,7 @@ class GitKeizuView {
       return;
     }
     if (
-      !hard &&
+      !forceRender &&
       arraysEqual(this.gitBranches, branchOptions, (a, b) => a === b) &&
       this.gitBranchHead === branchHead
     ) {
@@ -422,12 +422,12 @@ class GitKeizuView {
     commits: GG.GitCommitNode[],
     commitHead: string | null,
     moreAvailable: boolean,
-    hard: boolean,
+    forceRender: boolean,
     authors?: string[],
     worktrees?: GG.WorktreeMap
   ) {
     if (
-      !hard &&
+      !forceRender &&
       this.moreCommitsAvailable === moreAvailable &&
       this.commitHead === commitHead &&
       worktreeMapsEqual(this.worktrees, worktrees ?? {}) &&
@@ -458,12 +458,9 @@ class GitKeizuView {
     this.saveState();
 
     let i: number,
-      expandedCommitVisible = false,
       avatarsNeeded: { [email: string]: string[] } = {};
     for (i = 0; i < this.commits.length; i++) {
       this.commitLookup[this.commits[i].hash] = i;
-      if (this.expandedCommit !== null && this.expandedCommit.hash === this.commits[i].hash)
-        expandedCommitVisible = true;
       if (
         this.config.fetchAvatars &&
         typeof this.avatars[this.commits[i].email] !== "string" &&
@@ -479,6 +476,11 @@ class GitKeizuView {
 
     this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup);
 
+    const expandedCommitVisible =
+      this.expandedCommit !== null &&
+      typeof this.commitLookup[this.expandedCommit.hash] === "number" &&
+      (this.expandedCommit.compareWithHash === null ||
+        typeof this.commitLookup[this.expandedCommit.compareWithHash] === "number");
     if (this.expandedCommit !== null && !expandedCommitVisible) {
       this.expandedCommit = null;
       this.saveState();
@@ -519,20 +521,20 @@ class GitKeizuView {
   }
 
   /* Refresh */
-  public refresh(hard: boolean) {
-    if (hard) {
+  public refresh(mode: RefreshMode) {
+    if (mode === "hard") {
       if (this.expandedCommit !== null) {
         this.expandedCommit = null;
         this.saveState();
       }
       this.renderShowLoading();
     }
-    this.requestLoadBranchesAndCommits(hard);
+    this.requestLoadBranchesAndCommits(mode !== "soft");
   }
 
   /* Requests */
   private requestLoadBranches(
-    hard: boolean,
+    forceRender: boolean,
     loadedCallback: (changes: boolean, isRepo: boolean) => void
   ) {
     this.loadBranchesCallback = loadedCallback;
@@ -540,12 +542,12 @@ class GitKeizuView {
       command: "loadBranches",
       repo: this.currentRepo!,
       showRemoteBranches: this.showRemoteBranches,
-      hard: hard
+      hard: forceRender
     });
   }
-  private requestLoadCommits(hard: boolean, loadedCallback: (changes: boolean) => void) {
+  private requestLoadCommits(forceRender: boolean, loadedCallback: (changes: boolean) => void) {
     if (this.loadCommitsCallback !== null) {
-      this.queueLoadCommits(hard, loadedCallback);
+      this.queueLoadCommits(forceRender, loadedCallback);
       return;
     }
     this.loadCommitsCallback = loadedCallback;
@@ -555,7 +557,7 @@ class GitKeizuView {
       branches: this.selectedBranches,
       maxCommits: normalizeCommitLoadCount(this.maxCommits, this.config.initialLoadCommits),
       showRemoteBranches: this.showRemoteBranches,
-      hard: hard,
+      hard: forceRender,
       authors: this.selectedAuthors,
       commitOrdering: this.getEffectiveCommitOrdering()
     });
@@ -567,15 +569,15 @@ class GitKeizuView {
     }
     return this.commitOrdering;
   }
-  private requestLoadBranchesAndCommits(hard: boolean) {
+  private requestLoadBranchesAndCommits(forceRender: boolean) {
     if (this.loadBranchesCallback !== null) {
-      this.queueLoadBranchesAndCommits(hard);
+      this.queueLoadBranchesAndCommits(forceRender);
       return;
     }
-    this.requestLoadBranches(hard, (branchChanges: boolean, isRepo: boolean) => {
+    this.requestLoadBranches(forceRender, (branchChanges: boolean, isRepo: boolean) => {
       if (isRepo) {
-        this.requestLoadCommits(hard || branchChanges, (commitChanges: boolean) => {
-          if (!hard && (branchChanges || commitChanges)) {
+        this.requestLoadCommits(forceRender || branchChanges, (commitChanges: boolean) => {
+          if (branchChanges || commitChanges) {
             if (isDialogActive()) hideDialog();
             if (isContextMenuActive()) hideContextMenu();
           }
@@ -585,32 +587,33 @@ class GitKeizuView {
       }
     });
   }
-  private queueLoadBranchesAndCommits(hard: boolean) {
-    if (this.pendingLoadBranchesAndCommitsHard === null) {
-      this.pendingLoadBranchesAndCommitsHard = hard;
+  private queueLoadBranchesAndCommits(forceRender: boolean) {
+    if (this.pendingLoadBranchesAndCommitsForceRender === null) {
+      this.pendingLoadBranchesAndCommitsForceRender = forceRender;
       return;
     }
-    this.pendingLoadBranchesAndCommitsHard = this.pendingLoadBranchesAndCommitsHard || hard;
+    this.pendingLoadBranchesAndCommitsForceRender =
+      this.pendingLoadBranchesAndCommitsForceRender || forceRender;
   }
   private flushPendingLoadBranchesAndCommits() {
-    if (this.pendingLoadBranchesAndCommitsHard === null) return;
-    const hard = this.pendingLoadBranchesAndCommitsHard;
-    this.pendingLoadBranchesAndCommitsHard = null;
-    this.requestLoadBranchesAndCommits(hard);
+    if (this.pendingLoadBranchesAndCommitsForceRender === null) return;
+    const forceRender = this.pendingLoadBranchesAndCommitsForceRender;
+    this.pendingLoadBranchesAndCommitsForceRender = null;
+    this.requestLoadBranchesAndCommits(forceRender);
   }
-  private queueLoadCommits(hard: boolean, loadedCallback: (changes: boolean) => void) {
+  private queueLoadCommits(forceRender: boolean, loadedCallback: (changes: boolean) => void) {
     if (this.pendingLoadCommits === null) {
-      this.pendingLoadCommits = { hard, callbacks: [loadedCallback] };
+      this.pendingLoadCommits = { forceRender, callbacks: [loadedCallback] };
       return;
     }
-    this.pendingLoadCommits.hard = this.pendingLoadCommits.hard || hard;
+    this.pendingLoadCommits.forceRender = this.pendingLoadCommits.forceRender || forceRender;
     this.pendingLoadCommits.callbacks.push(loadedCallback);
   }
   private flushPendingLoadCommits() {
     if (this.pendingLoadCommits === null) return;
     const pending = this.pendingLoadCommits;
     this.pendingLoadCommits = null;
-    this.requestLoadCommits(pending.hard, (changes: boolean) => {
+    this.requestLoadCommits(pending.forceRender, (changes: boolean) => {
       for (const cb of pending.callbacks) {
         cb(changes);
       }
@@ -1287,7 +1290,7 @@ class GitKeizuView {
       this.findWidget.show(true);
     } else if (key === keybindings.refresh) {
       e.preventDefault();
-      this.refresh(true);
+      this.refresh("hard");
     } else if (key === keybindings.scrollToHead) {
       e.preventDefault();
       if (this.commitHead !== null && typeof this.commitLookup[this.commitHead] === "number") {

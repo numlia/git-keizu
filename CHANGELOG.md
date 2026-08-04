@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-08-04
+
+This release makes remote branch checkout and Push safe: Git Keizu no longer moves existing branch references or rewrites upstream tracking as a side effect of these two actions.
+
+### Fixed
+
+- **Remote branch checkout no longer repoints an existing local branch**: Checking out a remote branch and entering a local branch name that already exists previously moved that branch's reference to the remote commit (via `git checkout -B`), which could leave commits that only existed on the branch hard to reach. Checkout is now a strictly safe creation: if the entered name is already taken, a message says the branch already exists and nothing is changed; only unused names create a branch (`git checkout --track -b`). Tracking is set explicitly, so the new branch follows its remote branch even when `branch.autoSetupMerge` is disabled.
+- **Push no longer rewrites the upstream to `origin`**: Pushing the current branch previously always ran `git push --set-upstream origin HEAD`, silently switching branches that tracked a different remote over to `origin`. When an upstream is configured, the push now explicitly targets that remote and branch (`git push <remote> <local-branch>:<upstream-branch>`), so only the current branch is pushed — regardless of the `push.default` setting or a local/upstream name mismatch — and the tracking configuration is left untouched.
+- **Branch and remote names are validated before git runs**: The extension host now validates the local branch name and remote tracking ref for checkout, and the selected remote name for Push, before any git command is spawned — invalid input (such as names starting with `-`) is rejected with an error and can never be interpreted as a git option.
+- **Graph redraws reliably after a checkout, without a jarring reload**: Completing a checkout now always redraws the graph so the checked-out branch highlight is updated immediately — previously the redraw could be skipped when the commit data looked unchanged, leaving the old branch marked as current. The redraw happens in place without flashing the loading screen, and an open commit details panel or 2-commit comparison stays open as long as its commits are still in the graph (it closes only when a commit is no longer present). The redraw is also preserved when the checkout completes while another load is in flight.
+
+### Added
+
+- **Remote selection when pushing without an upstream**: If the current branch has no upstream (including detached HEAD), a dialog now lists the repository's registered remotes in alphabetical order, with `origin` preselected when present, and runs `git push --set-upstream` only after you confirm a choice. Repositories whose only remotes are not named `origin` can now push, which previously failed. Cancelling the dialog runs no git command and changes no configuration, and if the repository has no remotes at all, a message says so instead of attempting the push.
+
 ## [0.8.2] - 2026-07-19
 
 This release fixes 15 defects confirmed in a follow-up audit of the extension host and webview (1 high, 3 medium, 11 low), covering activation robustness, error reporting, keyboard handling, git output parsing, resource lifecycles, and webview state.
@@ -474,7 +489,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.8.2...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.8.3...HEAD
+[0.8.3]: https://github.com/numlia/git-keizu/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/numlia/git-keizu/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/numlia/git-keizu/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/numlia/git-keizu/compare/v0.7.9...v0.8.0
