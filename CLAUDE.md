@@ -9,11 +9,11 @@ Git Keizu (系図) — A VS Code extension for visualizing Git history as an int
 ## Commands
 
 ```bash
-# Package manager: pnpm 10.29.3
+# Package manager: pnpm 10.34.5
 # Run via npx (no global pnpm available):
-#   npx --yes pnpm@10.29.3 run <script>
-#   npx --yes pnpm@10.29.3 exec <command>
-npx --yes pnpm@10.29.3 install   # install dependencies
+#   npx --yes pnpm@10.34.5 run <script>
+#   npx --yes pnpm@10.34.5 exec <command>
+npx --yes pnpm@10.34.5 install   # install dependencies
 
 # Quality checks (CI runs these in order)
 pnpm run format          # oxfmt --check
