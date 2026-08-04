@@ -52,7 +52,7 @@
   "main": "./out/extension.js",
   "scripts": {
     "typecheck": "tsc -p ./src --noEmit && tsc -p ./web --noEmit",
-    "vscode:prepublish": "npx --yes pnpm@10.29.3 run compile",
+    "vscode:prepublish": "npx --yes pnpm@10.34.5 run compile",
     "clean": "rm -rf out",
     "copy-codicons": "cp node_modules/@vscode/codicons/dist/codicon.css media/codicon.css && cp node_modules/@vscode/codicons/dist/codicon.ttf media/codicon.ttf",
     "compile": "pnpm run clean && pnpm run copy-codicons && pnpm run compile-src && pnpm run compile-web",
@@ -367,5 +367,5 @@
   "engines": {
     "vscode": "^1.74.0"
   },
-  "packageManager": "pnpm@10.29.3"
+  "packageManager": "pnpm@10.34.5"
 }

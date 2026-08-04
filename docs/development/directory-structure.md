@@ -7,7 +7,7 @@ This document describes the overall directory layout of the Git Keizu project.
 Git Keizu is a VS Code extension composed of two independent TypeScript projects (Node.js backend + Browser frontend). No database is used.
 
 - **Build tool**: esbuild (bundles `src/` and `web/` separately)
-- **Package manager**: pnpm 10.29.3
+- **Package manager**: pnpm 10.34.5
 - **Testing**: Vitest
 - **Linting/Formatting**: oxlint + oxfmt
 
