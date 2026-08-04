@@ -80,3 +80,71 @@ CIの依存監査、Dependabot Version Update、Dependabot alerts、Security Upd
 | TC-023  | 実装前後のactive rulesetをread-onlyで取得する                                                    | Validation - ruleset preservation                                          | deletionとnon-fast-forward禁止を含む前後snapshotが厳密一致し、ruleset変更operationのcall countが0である                                                                          | Target: GitHub ruleset API。取得不能なら未検証                                      |
 | TC-024  | `.github/workflows/ci.yaml`のusesとdiffを検査する                                                | Validation - dependency-review exclusion                                   | `actions/dependency-review-action`を含むstepが0件で、新規workflow fileも0件である                                                                                                | Target: `.github/**`。未要求actionを追加しない                                      |
 | TC-025  | 変更前後のCI workflowをYAML parseして非audit契約を比較する                                       | Normal - existing CI contract preservation                                 | main pushとmain向けPR trigger、`ubuntu-latest`、Node.js 22、Corepack、`pnpm install`、Format/Lint/Typecheck/Test stepのkey/valueと相対順が厳密一致する                           | Target: `.github/workflows/ci.yaml`。追加した2 step以外を維持                       |
+
+### Feature 048 branch実行証跡
+
+- 実行日時: 2026-08-04T20:29:51+09:00
+- 環境: Linux 5.15.153.1-microsoft-standard-WSL2 x86_64、Node.js v24.13.0、pnpm 10.34.5
+- 検証対象commit: `c3e6ed02d3e6fea2c515b46db0b90b6358a008ed`
+- 比較基点: `db07fa36848d2366d939e1b1eaca2bfb20c67bab`
+
+#### ケース別結果
+
+- TC-001: pass。origin/mainがFeature 050 commit `db07fa3`を含み、main CI run
+  `https://github.com/numlia/git-keizu/actions/runs/30902311288`は`completed/success`、pnpm
+  10.34.5、lint 0 warnings / 0 errorsであることをTask 1で確認した。
+- TC-002: pass。`Audit all dependencies` / `pnpm audit --audit-level=high`の完全一致stepは1件。
+- TC-003: pass。`Audit production dependencies` / `pnpm audit --prod --audit-level=low`の完全一致stepは1件。
+- TC-004: pass。lint jobのstep indexはInstall dependencies=3、全依存audit=4、production
+  audit=5、Format check=6で、要求された連続順序と一致した。
+- TC-005: pass。2 audit stepの`continue-on-error`、run文字列のignore option、workflow内のadvisory除外設定は各0件。
+- TC-006: pass（代替検証）。registry障害の意図的注入は外部サービスを破壊的に操作するため実施せず、audit
+  stepにfail-open設定がなく、GitHub Actionsの既定動作で非zero step後の後続stepが実行されない構成を静的確認した。実際のregistry障害時はworkflow URLとstep / job conclusionを保存する。
+- TC-007: pass。`updates[0]`は変更前と同一のgithub-actions / `/` / monthlyで、その他のkey/value差分は0件。
+- TC-008: pass。`updates[1]`はnpm / `/` / weeklyと完全一致し、同条件の要素は1件。
+- TC-009: pass。npm要素のkeyは`package-ecosystem`、`directory`、`schedule`のみで、禁止customizationは0件。
+- TC-010: pending(post-merge)。検証対象commitがorigin/mainに未反映であり、default branchのDependabot
+  parseと直近update job URLはマージ後に確認する。
+- TC-011: pending(post-merge)。origin/main反映前のためalerts PUTは実行していない。
+- TC-012: pending(post-merge)。alerts PUT未実行のため、非204時のSecurity Updates call抑止はマージ後のoperationで確認する。
+- TC-013: pending(post-merge)。alerts 204を先に得る順序gateを満たすまでSecurity Updates PUTは実行しない。
+- TC-014: pending(post-merge)。Security Updates PUT未実行のため、部分成功時のno rollbackと再試行対象はマージ後に確認する。
+- TC-015: pending(post-merge)。enable operation未実行のため、vulnerability-alerts GETの204確認はマージ後に行う。
+- TC-016: pending(post-merge)。enable operation未実行のため、automated-security-fixes GETのboolean型と値はマージ後に確認する。
+- TC-017: pass。`npx --yes pnpm@10.34.5 run format`はexit 0、185 filesすべてformat一致。
+- TC-018: pass。`npx --yes pnpm@10.34.5 run lint`はexit 0、81 filesでwarning 0件、error 0件。
+- TC-019: pass。`npx --yes pnpm@10.34.5 run typecheck`はexit 0、`tsc -p ./src --noEmit`と`tsc -p ./web --noEmit`が完了。
+- TC-020: pass。`npx --yes pnpm@10.34.5 run test:ci`はexit 0、43 test files / 1751 testsがpassし、failureは0件。
+- TC-021: pass。`git diff --name-only db07fa3..HEAD -- package.json pnpm-lock.yaml src web tests`の出力は0件。
+- TC-022: pass。事前仕様snapshotのRequired status checksなしに対し、read-only APIはHTTP 404
+  `Required status checks not enabled`を返した。設定変更operationは0回。
+- TC-023: pass。事前仕様snapshotと現在APIはいずれもactive ruleset 1件、ruleは`deletion`と
+  `non_fast_forward`だけである。ruleset id 13085290の`updated_at`は2026-02-22T12:11:35.496+09:00でFeature 048開始前、設定変更operationは0回。
+- TC-024: pass。`actions/dependency-review-action`を含むstepと、比較基点からの新規workflow fileは各0件。
+- TC-025: pass。現在workflowから2 audit stepだけを除いたYAML構造は比較基点と完全一致し、trigger、runtime、Corepack、`pnpm install`、quality stepのkey/valueと相対順に差分は0件。
+
+#### コマンド実行結果
+
+- `npx --yes pnpm@10.34.5 audit --audit-level=high`: exit 0。主要出力はlow 1件で、High / Criticalは0件。
+- `npx --yes pnpm@10.34.5 audit --prod --audit-level=low`: exit 0。`No known vulnerabilities found`。
+- `npx --yes pnpm@10.34.5 run format`: exit 0。`All matched files use the correct format.`。
+- `npx --yes pnpm@10.34.5 run lint`: exit 0。warning 0件、error 0件。
+- `npx --yes pnpm@10.34.5 run typecheck`: exit 0。src / webの両tsconfigが完了。
+- `npx --yes pnpm@10.34.5 run test:ci`: exit 0。43 test files、1751 testsがpass。
+- `git diff --check`: exit 0、出力なし。
+
+#### scoped diffとpost-merge gate
+
+比較基点からの差分は`.github/workflows/ci.yaml`、`.github/dependabot.yml`、本観点表、派生INDEXだけである。`package.json`、`pnpm-lock.yaml`、`src/**`、`web/**`、`tests/**`の差分は0件である。検証対象commitはorigin/mainの祖先ではないため、TC-010〜TC-016はpost-merge pendingとする。これらはFeature 048の完了条件を満たしたものとして扱わず、origin/main反映後にDependabot job、alerts PUT、Security Updates PUT、最終GETを規定順序で実行し、URL、HTTP status、responseを保存する。
+
+#### 自動test fileを追加しない理由
+
+対象はYAMLの宣言、npm registryのadvisory、GitHubのdefault branch parseとrepository settingsという外部state、およびcommand acceptanceである。これらを固定値Vitestへ写しても実際のregistry、workflow、Dependabot job、REST responseを検証できないため、自動test fileは追加しない。代替としてYAML parse、scoped diff、exact commandのexit / 主要出力、read-only API response、post-merge operationの証跡で各Case IDを追跡する。テストコードを追加しないため、Given / When / Thenコメント、mock assertion、coverage計測は非該当である。
+
+#### Completion Checklist自己点検
+
+active sectionはS1のみで、TC-001〜TC-025の欠番・重複はない。全Case IDと具体的なExpected Resultをbranch pass、代替検証、またはTC-010〜TC-016のpost-merge pendingへ対応付けた。失敗源インベントリの全項目とValidation / Exception / External / Boundary / Typeの全カテゴリにはCase IDまたは除外理由があり、正常11件・失敗14件、比1.27を維持する。1 case = 1 branch、境界値の除外理由、外部failureの代替検証理由を確認した。固定値test非追加の理由とpost-merge pendingを明記し、観点漏れは検出していない。
+
+#### INDEX再生成確認
+
+`python3 ~/.claude/skills/rebuild-test-perspectives-index/scripts/rebuild_index.py . --check`はexit 0で、INDEXはup to dateだった。集計は42 sources、65 physical files、459 active sections、2340 active cases、Feature 048のforward lookupは1 section / 25 casesで、証跡追記前から不変である。証跡はケース定義tableではなくlist形式のため集計対象にならず、INDEXに差分がないので再生成による対象file追加は行わない。
