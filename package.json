@@ -69,7 +69,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.19.11",
-    "@types/vscode": "~1.74.0",
+    "@types/vscode": "~1.125.0",
     "@vitest/coverage-v8": "4.1.10",
     "@vscode/codicons": "^0.0.45",
     "@vscode/vsce": "^3.9.2",
