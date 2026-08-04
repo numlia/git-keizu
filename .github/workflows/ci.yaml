@@ -32,6 +32,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
+      - name: Audit all dependencies
+        run: pnpm audit --audit-level=high
+
+      - name: Audit production dependencies
+        run: pnpm audit --prod --audit-level=low
+
       - name: Format check
         run: pnpm run format
 

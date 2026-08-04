@@ -1,15 +1,16 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-08-04T18:20:45+09:00
-> Total sources: 41
-> Total physical files: 64
-> Total sections: 458
-> Total cases: 2315
+> Auto-generated: 2026-08-04T19:56:02+09:00
+> Total sources: 42
+> Total physical files: 65
+> Total sections: 459
+> Total cases: 2340
 
 ## Source File -> Perspectives (Forward Lookup)
 
 | Source File | Storage Mode | Perspectives Entry | Shards | Sections | Cases | Last Updated |
 |-------------|--------------|--------------------|--------|----------|-------|--------------|
+| `Dependency automation operational contract` | single-file | `dependency-automation-test.md` | 1 | 1 | 25 | 2026-08-04 |
 | `l10n/web/web.l10n.en.json` | single-file | `l10n/web/web.l10n.en.json-test.md` | 1 | 2 | 8 | 2026-08-03 |
 | `l10n/web/web.l10n.ja.json` | single-file | `l10n/web/web.l10n.ja.json-test.md` | 1 | 3 | 10 | 2026-08-03 |
 | `package.json` | single-file | `package.json-test.md` | 1 | 3 | 43 | 2026-08-04 |
@@ -108,6 +109,7 @@
 | Feature 045 (defensive-fixes) (light-spec-plan) | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/avatarManager-test.md`, `src/config-test/INDEX.md`, `src/dataSource-test/INDEX.md`, `src/extension-test.md`, `src/gitExecutable-test.md`, `src/gitGraphView-test/INDEX.md`, `src/repoManager-test.md`, `src/types-test.md`, `web/commitMenu-test.md`, `web/findWidget-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test.md`, `web/refMenu-test/INDEX.md` |
 | Feature 046 (dev-dependency-security-update) (light-spec-plan) | `package.json-test.md` |
 | Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/refValidation-test.md`, `src/types-test.md`, `web/messageHandler-test.md`, `web/refMenu-test/INDEX.md` |
+| Feature 048 (dependency-automation) (light-spec-plan) | `dependency-automation-test.md` |
 | Feature 050 (pnpm-security-update) (light-spec-plan) | `package.json-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
