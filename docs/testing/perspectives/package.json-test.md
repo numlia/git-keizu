@@ -225,3 +225,41 @@ pnpm本体の既知脆弱性を解消し、`packageManager`とCorepack / npx消�
 - Type: excluded(上表のとおりtype inputが存在せず、形式不正はconsumerまたはTC-029で検出する)
 
 **失敗系/正常系比（煙感知器）**: 正常系11件（TC-023〜TC-025、TC-030、TC-033〜TC-039）、失敗系10件（TC-026〜TC-029、TC-031、TC-032、TC-040〜TC-043）、比0.91。同数近辺のためインベントリを再導出したが、上表の全失敗源にCase IDまたは除外理由がある。品質・回帰・build・packageを1 case = 1 commandで分けた正常系が比に影響しており、比率合わせのためのcase追加・削除は行わない。
+
+### Feature 050 branch実行証跡
+
+**実行日時**: 2026-08-04T18:55:41+09:00
+
+**実行環境**: Linux 5.15.153.1-microsoft-standard-WSL2 x86_64、Node.js v24.13.0、pnpm 10.34.5（`npx --yes pnpm@10.34.5`経由）
+
+#### ケース別の実行結果
+
+- **TC-023**: `jq -e '.packageManager == "pnpm@10.34.5"' package.json`相当のexact-value検証、終了コード0。`packageManager`は`pnpm@10.34.5`。
+- **TC-024**: `jq -e '.scripts["vscode:prepublish"] == "npx --yes pnpm@10.34.5 run compile"' package.json`相当のexact-value検証、終了コード0。入れ子のpnpm pinも10.34.5。
+- **TC-025**: `rg -n '10\\.29\\.3|10\\.34\\.5' package.json CLAUDE.md docs/development/directory-structure.md docs/testing/perspectives/package.json-test.md`、終了コード0。`package.json`の2箇所、`CLAUDE.md`の4箇所、directory guideの1箇所が現行10.34.5。
+- **TC-026**: `rg -n '10\\.29\\.3' package.json CLAUDE.md docs/development/directory-structure.md`の反転検証、終了コード0、対象現行箇所のヒット0件。許容残存は`docs/testing/perspectives/package.json-test.md`のS2「Feature 046 実行証跡」（旧versionで実行した履歴）とS3の失敗源・境界・不変性記述（10.29.3から10.34.5への変更契約）だけであり、いずれも現行version案内ではない。
+- **TC-027**: `npx --yes pnpm@10.34.5 --version`、終了コード0、標準出力`10.34.5`。読み取り専用sandboxのnpm cacheで発生したEROFSは同一コマンドを通常環境で再実行して切り分け、registry resolutionの成功を確認した。
+- **TC-028**: GitHub Advisory APIを`curl -fsSL`で`/tmp/git-keizu-pnpm-10.34.5-advisories.json`へ保存し、`file`、`jq -e 'type == "array"'`、`jq -e 'length == 0'`を順次実行。すべて終了コード0、JSON配列、advisory count 0。
+- **TC-029**: TC-028のHTTP・JSON・件数検証を`curl -f`と`jq -e`の独立コマンドで実行し、すべて終了コード0。HTTP error、parse error、rate-limit応答、またはadvisoryを0件へ変換するfallbackは使っておらず、blocked条件は発生しなかった。
+- **TC-030**: `npx --yes pnpm@10.34.5 install --frozen-lockfile`、終了コード0。`Lockfile is up to date, resolution step is skipped`、pnpm v10.34.5。実行後の`pnpm-lock.yaml`と`pnpm-workspace.yaml`のworking-tree diffは0。
+- **TC-031**: `npx --yes pnpm@10.34.5 audit --audit-level=high`、終了コード0。Critical 0件、High 0件。失敗閾値未満のLowが1件。
+- **TC-032**: `npx --yes pnpm@10.34.5 audit --prod --audit-level=low`、終了コード0。`No known vulnerabilities found`。
+- **TC-033**: `npx --yes pnpm@10.34.5 run format`、終了コード0。`All matched files use the correct format.`、184ファイル。
+- **TC-034**: `npx --yes pnpm@10.34.5 run lint`、終了コード0。81ファイル、97 rules、warning 0件、error 0件。
+- **TC-035**: `npx --yes pnpm@10.34.5 run typecheck`、終了コード0。`tsc -p ./src --noEmit && tsc -p ./web --noEmit`がTypeScript error 0件で完了。
+- **TC-036**: `npx --yes pnpm@10.34.5 run test:ci`、終了コード0。Vitest v4.1.10、Test Files 43 passed、Tests 1751 passed、失敗0件。
+- **TC-037**: `npx --yes pnpm@10.34.5 run vscode:prepublish`、終了コード0。script内で`npx --yes pnpm@10.34.5 run compile`を実行し、`out/extension.js`（63,371 bytes）と`out/web.min.js`（97,876 bytes）を生成。
+- **TC-038**: `npx --yes pnpm@10.34.5 run compile`、終了コード0。`out/extension.js`と`out/web.min.js`を再生成し、両pathの存在を確認。
+- **TC-039**: `npx --yes pnpm@10.34.5 run package`、終了コード0。`/home/numlia/work/ai/git-keizu/git-keizu-0.8.3.vsix`（25 files、149.42 KB）を生成。
+- **TC-040**: `npx --yes pnpm@10.34.5 exec vsce ls`、終了コード0。`node_modules/`、`src/`、`web/`、`tests/`、`docs/`、`notes/`配下の収録pathは合計0件。
+- **TC-041**: `git diff --exit-code 14625d024981376cadaf91584f371bf14cb03f58..HEAD -- pnpm-lock.yaml pnpm-workspace.yaml .github/workflows/ci.yaml src web tests`、終了コード0。baseからの変更は`.oxfmtrc.jsonc`、`package.json`、`CLAUDE.md`、directory guide、S3、生成INDEXの6ファイルだけで、dependency、lock、workspace、CI、`src/`、`web/`、`tests/`の差分は0。user-authorized corrective commit `1185370`はcanonical generated INDEXをformatter対象外にする`.oxfmtrc.jsonc`の1行とS3表の整形だけであり、INDEX generator、format script、dependency、app code、testsは変更していない。
+- **TC-042**: base版`package.json-test.md`全160行と現行ファイルのS3追加前160行をSHA-256比較し、双方`13f1e5604c1532fcafb0792914e37f4ba43b4a3ee1e5fdff310e06156df7a5b4`。S1 / S2、TC-001〜TC-022、Feature 046実行証跡はbyte-equivalent。
+- **TC-043**: `pending(post-merge gate)`。Feature 050 merge commitを含むmain CI run URL、pnpm 10.34.5 usage log、既存`lint` job successが揃うまでFeature 050完了とFeature 048着手を保留する。
+
+#### 成果物とcommit対象
+
+生成物は`out/extension.js`、`out/web.min.js`、`git-keizu-0.8.3.vsix`、外部応答は`/tmp/git-keizu-pnpm-10.34.5-advisories.json`と`/tmp/git-keizu-pnpm-dist-tags.json`。いずれもTask 3のcommit対象外で、branch evidenceとして変更するのは本ファイルだけである。
+
+#### 固定値Vitestテストを追加しない理由
+
+Advisory Database、npm registry、main CIは外部状態で変動し、frozen install、audit、build、package、VSIX内容はcommand acceptanceそのものが契約である。固定値Vitestでは外部障害を誤って成功扱いするか実装と同じ定数を再確認するだけになるため追加せず、`curl -f`、`jq -e`、pnpm command、scoped diff、post-merge CI evidenceで検証する。したがって`// Case:`、Given / When / Then、exception / mock assertionは非該当とする。
