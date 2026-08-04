@@ -180,6 +180,8 @@ Bug reports and feedback via [GitHub Issues](https://github.com/numlia/git-keizu
 
 Pull requests are welcome as well. Fork the repository and open a pull request against `main`. CI runs `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test:ci`, so please confirm those pass locally first. For anything larger than a small fix, opening an issue first helps avoid wasted effort.
 
+Supported build environments are **Linux, macOS, and WSL**. The build scripts rely on Unix shell commands (such as `rm` and `cp`), so building on a native Windows shell is not supported — on Windows, please develop inside WSL.
+
 ## Acknowledgements
 
 A big thank you to the original author, [mhutchie](https://github.com/mhutchie), for creating this amazing extension.
