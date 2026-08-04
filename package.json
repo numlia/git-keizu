@@ -73,7 +73,7 @@
     "@vitest/coverage-v8": "4.1.10",
     "@vscode/codicons": "^0.0.45",
     "@vscode/vsce": "^3.9.2",
-    "esbuild": "^0.27.3",
+    "esbuild": "^0.28.1",
     "eslint-plugin-simple-import-sort": "^12.1.1",
     "jsdom": "^28.1.0",
     "oxfmt": "^0.33.0",
