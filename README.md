@@ -8,7 +8,7 @@
 
 [![](https://img.shields.io/github/license/numlia/git-keizu)](https://github.com/numlia/git-keizu?tab=MIT-1-ov-file)
 [![GitHub release](https://img.shields.io/github/v/release/numlia/git-keizu)](https://github.com/numlia/git-keizu/releases)
-[![vscode installs](https://img.shields.io/visual-studio-marketplace/i/numlia-vs.git-keizu?label=install)](https://marketplace.visualstudio.com/items?itemName=numlia-vs.git-keizu)
+[![vscode installs](https://badgen.net/vs-marketplace/i/numlia-vs.git-keizu?label=install)](https://marketplace.visualstudio.com/items?itemName=numlia-vs.git-keizu)
 [![open-vsx downloads](https://img.shields.io/open-vsx/dt/numlia-vs/git-keizu?label=open-vsx)](https://open-vsx.org/extension/numlia-vs/git-keizu)
 
 **Git Keizu** is a fast, focused **git history graph**. View all your branches, commits, stashes, and tags in one interactive visual graph — and perform git actions (checkout, merge, rebase, cherry-pick, stash) and manage git worktrees directly from it, without ever opening a terminal.
