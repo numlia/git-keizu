@@ -93,6 +93,7 @@
   "error.checkoutBranch": "ブランチをチェックアウトできません",
   "error.checkoutBranchExists": "同じ名前のブランチが既に存在します。",
   "error.checkoutInvalidRef": "ブランチ名が Git の参照名として無効です。",
+  "error.checkoutRemoteNotFound": "選択したリモートはこのリポジトリに登録されていません。",
   "error.checkoutCommit": "コミットをチェックアウトできません",
   "error.cherrypickCommit": "コミットをチェリーピックできません",
   "error.cleanUntrackedFiles": "未追跡ファイルをクリーンできません",
@@ -234,5 +235,6 @@
   "Are you sure you want to push {0}?": "{0} をプッシュしますか?",
   "Tag Name": "タグ名",
   "Branch Name": "ブランチ名",
-  "Enter the name of the new branch you would like to create when checking out {0}:": "{0} をチェックアウトするときに作成する新しいブランチ名を入力してください:"
+  "Enter the name of the new branch you would like to create when checking out {0}:": "{0} をチェックアウトするときに作成する新しいブランチ名を入力してください:",
+  "Enter the local branch name for checking out {0}. If a branch with the same name already exists, the selected remote branch will be pulled after checkout:": "{0} をチェックアウトするローカルブランチ名を入力してください。同名のブランチが既に存在する場合は、チェックアウト後に選択したリモートブランチを pull します:"
 }

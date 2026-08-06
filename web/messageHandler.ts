@@ -53,6 +53,13 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
         case "invalidRef":
           showErrorDialog(t("error.checkoutBranch"), t("error.checkoutInvalidRef"), null);
           break;
+        case "remoteNotFound":
+          showErrorDialog(t("error.checkoutBranch"), t("error.checkoutRemoteNotFound"), null);
+          break;
+        case "pullFailed":
+          gitKeizu.refresh("forceRender");
+          showErrorDialog(t("error.pull"), msg.status, null);
+          break;
         case "completed":
           refreshGraphOrDisplayError(
             msg.status,

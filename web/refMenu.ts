@@ -573,7 +573,7 @@ export function checkoutBranchAction(
     const defaultBranchName = parsed.branchName || refName;
     showRefInputDialog(
       t(
-        "Enter the name of the new branch you would like to create when checking out {0}:",
+        "Enter the local branch name for checking out {0}. If a branch with the same name already exists, the selected remote branch will be pulled after checkout:",
         `<b><i>${escapeHtml(refName)}</i></b>`
       ),
       defaultBranchName,
@@ -586,7 +586,7 @@ export function checkoutBranchAction(
           command: "checkoutBranch",
           repo: repo,
           branchName: newBranch,
-          remoteBranch: refName
+          remoteBranch: parsed
         });
       },
       null
