@@ -1048,7 +1048,7 @@ describe("GitKeizuView two-phase push orchestration", () => {
   });
 });
 
-// S29: checkout 結果の Response 写像
+// S32: checkout remote target の中継と 5 kind Response 写像
 // @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md
 describe("GitKeizuView checkoutBranch response mapping", () => {
   beforeEach(() => {
@@ -1100,13 +1100,32 @@ describe("GitKeizuView checkoutBranch response mapping", () => {
     return mocks.messageHandler.current!({
       command: "checkoutBranch",
       repo: TEST_REPO,
-      branchName: "feature/x",
-      remoteBranch: "origin/feature/x"
+      branchName: "main",
+      remoteBranch: { remoteName: "origin", branchName: "main" }
     });
   }
 
-  it("forwards the branchExists kind without a status field (TC-122)", async () => {
-    // Case: TC-122
+  it("forwards a structured target and completed response unchanged (TC-146)", async () => {
+    // Case: TC-146
+    // Given: DataSource succeeds for a structured origin/main target
+    mocks.checkoutBranch.mockResolvedValue({ kind: "completed", status: null });
+
+    // When: the checkoutBranch message is handled
+    await sendCheckoutBranch();
+
+    // Then: the request object and completed response are each forwarded once
+    expect(mocks.checkoutBranch).toHaveBeenCalledTimes(1);
+    expect(mocks.checkoutBranch).toHaveBeenCalledWith(TEST_REPO, "main", {
+      remoteName: "origin",
+      branchName: "main"
+    });
+    expect(sentMessages("checkoutBranch")).toEqual([
+      { command: "checkoutBranch", kind: "completed", status: null }
+    ]);
+  });
+
+  it("forwards the branchExists kind without a status field (TC-147)", async () => {
+    // Case: TC-147
     // Given: DataSource refuses to move an existing branch
     mocks.checkoutBranch.mockResolvedValue({ kind: "branchExists" });
 
@@ -1119,8 +1138,8 @@ describe("GitKeizuView checkoutBranch response mapping", () => {
     ]);
   });
 
-  it("forwards the invalidRef kind (TC-123)", async () => {
-    // Case: TC-123
+  it("forwards the invalidRef kind (TC-148)", async () => {
+    // Case: TC-148
     // Given: DataSource rejects the ref name
     mocks.checkoutBranch.mockResolvedValue({ kind: "invalidRef" });
 
@@ -1133,22 +1152,36 @@ describe("GitKeizuView checkoutBranch response mapping", () => {
     ]);
   });
 
-  it("forwards a successful checkout (TC-124)", async () => {
-    // Case: TC-124
-    // Given: DataSource reports a successful checkout
-    mocks.checkoutBranch.mockResolvedValue({ kind: "completed", status: null });
+  it("forwards the remoteNotFound kind without a status field (TC-149)", async () => {
+    // Case: TC-149
+    // Given: DataSource cannot find the selected remote
+    mocks.checkoutBranch.mockResolvedValue({ kind: "remoteNotFound" });
 
     // When: the checkoutBranch message is handled
     await sendCheckoutBranch();
 
-    // Then: the completed kind is sent with a null status
+    // Then: the response carries no status field
     expect(sentMessages("checkoutBranch")).toEqual([
-      { command: "checkoutBranch", kind: "completed", status: null }
+      { command: "checkoutBranch", kind: "remoteNotFound" }
     ]);
   });
 
-  it("forwards a failing checkout with its git message (TC-125)", async () => {
-    // Case: TC-125
+  it("forwards pullFailed with its status (TC-150)", async () => {
+    // Case: TC-150
+    // Given: checkout succeeds but DataSource reports a pull conflict
+    mocks.checkoutBranch.mockResolvedValue({ kind: "pullFailed", status: "CONFLICT" });
+
+    // When: the checkoutBranch message is handled
+    await sendCheckoutBranch();
+
+    // Then: pullFailed remains distinct and preserves its status
+    expect(sentMessages("checkoutBranch")).toEqual([
+      { command: "checkoutBranch", kind: "pullFailed", status: "CONFLICT" }
+    ]);
+  });
+
+  it("forwards a failing checkout with its git message (TC-151)", async () => {
+    // Case: TC-151
     // Given: DataSource reports a git failure
     mocks.checkoutBranch.mockResolvedValue({ kind: "completed", status: "fatal: pathspec" });
 
@@ -1968,7 +2001,7 @@ describe("GitKeizuView loadCommits authorFilter (S10)", () => {
   });
 });
 
-// S29: createBranch オーケストレーション
+// S32: createBranch オーケストレーション
 // @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md
 describe("GitKeizuView createBranch + checkout orchestration", () => {
   beforeEach(() => {
@@ -2031,8 +2064,8 @@ describe("GitKeizuView createBranch + checkout orchestration", () => {
     GitKeizuView.currentPanel = undefined;
   });
 
-  it("returns partial success when the created branch fails to check out (TC-126)", async () => {
-    // Case: TC-126
+  it("returns partial success when the created branch fails to check out (TC-152)", async () => {
+    // Case: TC-152
     // Given: createBranch succeeds and the local checkout reports a git failure
     mocks.createBranch.mockResolvedValue(null);
     mocks.checkoutBranch.mockResolvedValue({ kind: "completed", status: "fatal: pathspec" });
@@ -2055,8 +2088,8 @@ describe("GitKeizuView createBranch + checkout orchestration", () => {
     ]);
   });
 
-  it("checks out the created branch and reports full success (TC-127)", async () => {
-    // Case: TC-127
+  it("checks out the created branch and reports full success (TC-153)", async () => {
+    // Case: TC-153
     // Given: both createBranch and the local checkout succeed
     mocks.createBranch.mockResolvedValue(null);
     mocks.checkoutBranch.mockResolvedValue({ kind: "completed", status: null });
@@ -2076,8 +2109,8 @@ describe("GitKeizuView createBranch + checkout orchestration", () => {
     expect(sentMessages("createBranch")).toEqual([{ command: "createBranch", status: null }]);
   });
 
-  it("describes a non-completed checkout kind in the partial success message (TC-128)", async () => {
-    // Case: TC-128
+  it("describes a non-completed checkout kind in the partial success message (TC-154)", async () => {
+    // Case: TC-154
     // Given: createBranch succeeds but the checkout is refused before running git
     mocks.createBranch.mockResolvedValue(null);
     mocks.checkoutBranch.mockResolvedValue({ kind: "invalidRef" });
@@ -2099,7 +2132,8 @@ describe("GitKeizuView createBranch + checkout orchestration", () => {
     );
   });
 
-  it("does not call checkoutBranch when checkout=false (TC-129)", async () => {
+  it("does not call checkoutBranch when checkout=false (TC-155)", async () => {
+    // Case: TC-155
     // Given: createBranch succeeds
     mocks.createBranch.mockResolvedValue(null);
 
@@ -2120,9 +2154,10 @@ describe("GitKeizuView createBranch + checkout orchestration", () => {
     });
   });
 
-  it("returns error and skips checkout when createBranch fails (TC-130)", async () => {
+  it("returns error and skips checkout when createBranch fails (TC-156)", async () => {
+    // Case: TC-156
     // Given: createBranch fails
-    const errorMsg = "branch already exists";
+    const errorMsg = "fatal: branch exists";
     mocks.createBranch.mockResolvedValue(errorMsg);
 
     // When: createBranch message with checkout=true is received
@@ -2142,7 +2177,8 @@ describe("GitKeizuView createBranch + checkout orchestration", () => {
     });
   });
 
-  it("does not call checkoutBranch when checkout is undefined - legacy compat (TC-131)", async () => {
+  it("does not call checkoutBranch when checkout is undefined - legacy compat (TC-157)", async () => {
+    // Case: TC-157
     // Given: createBranch succeeds
     mocks.createBranch.mockResolvedValue(null);
 

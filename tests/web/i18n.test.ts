@@ -347,3 +347,111 @@ describe("safe checkout and push selection l10n keys (Feature 047)", () => {
     expect(untranslated).toEqual([]);
   });
 });
+
+// S3 (en) / S4 (ja): matching remote checkout and pull translations (Feature 051)
+// @see docs/testing/perspectives/l10n/web/web.l10n.en.json-test.md
+// @see docs/testing/perspectives/l10n/web/web.l10n.ja.json-test.md
+describe("matching remote checkout and pull l10n keys (Feature 051)", () => {
+  const PROMPT_KEY =
+    "Enter the local branch name for checking out {0}. If a branch with the same name already exists, the selected remote branch will be pulled after checkout:";
+  const REMOTE_NOT_FOUND_KEY = "error.checkoutRemoteNotFound";
+  const ADDED_KEYS = [PROMPT_KEY, REMOTE_NOT_FOUND_KEY];
+
+  function loadBundle(fileName: string): Record<string, string> {
+    const jsonPath = resolve(process.cwd(), `l10n/web/${fileName}`);
+    return JSON.parse(readFileSync(jsonPath, "utf-8"));
+  }
+
+  function placeholders(value: string): string[] {
+    return value.match(/\{\d+\}/g) ?? [];
+  }
+
+  it("English bundle has a non-empty checkout-and-pull prompt (en l10n TC-009)", () => {
+    // Case: TC-009 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English Feature 051 locale bundle
+    const english = loadBundle("web.l10n.en.json");
+
+    // When: the matching checkout-and-pull prompt is read
+    const value = english[PROMPT_KEY];
+
+    // Then: it is a non-empty English string containing exactly one {0} placeholder
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+    expect(placeholders(value)).toEqual(["{0}"]);
+  });
+
+  it("English bundle has a non-empty remote-not-found reason (en l10n TC-010)", () => {
+    // Case: TC-010 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English Feature 051 locale bundle
+    const english = loadBundle("web.l10n.en.json");
+
+    // When: the remote-not-found reason is read
+    const value = english[REMOTE_NOT_FOUND_KEY];
+
+    // Then: a non-empty English string is present
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("Japanese has the English key set and matching placeholders (en l10n TC-011)", () => {
+    // Case: TC-011 (l10n/web/web.l10n.en.json-test.md)
+    // Given: both Feature 051 locale bundles
+    const english = loadBundle("web.l10n.en.json");
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When: Japanese keys and prompt placeholders are compared with English
+    const missingInJapanese = ADDED_KEYS.filter((key) => japanese[key] === undefined);
+
+    // Then: no key is missing and both prompts contain only {0}
+    expect(missingInJapanese).toEqual([]);
+    expect(placeholders(english[PROMPT_KEY])).toEqual(["{0}"]);
+    expect(placeholders(japanese[PROMPT_KEY])).toEqual(["{0}"]);
+  });
+
+  it("Japanese prompt explains the selected remote branch pull (ja l10n TC-011)", () => {
+    // Case: TC-011 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese Feature 051 locale bundle
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When: the matching checkout-and-pull prompt is read
+    const value = japanese[PROMPT_KEY];
+
+    // Then: it is non-empty, names the selected remote branch and pull, and keeps one placeholder
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+    expect(value).toContain("選択したリモートブランチ");
+    expect(value).toContain("pull");
+    expect(placeholders(value)).toEqual(["{0}"]);
+  });
+
+  it("Japanese has a translated remote-not-found reason (ja l10n TC-012)", () => {
+    // Case: TC-012 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese Feature 051 locale bundle
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When: the remote-not-found reason is read
+    const value = japanese[REMOTE_NOT_FOUND_KEY];
+
+    // Then: it is non-empty and is not the raw key fallback
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+    expect(value).not.toBe(REMOTE_NOT_FOUND_KEY);
+  });
+
+  it("English has the Japanese key set and Japanese values are translated (ja l10n TC-013)", () => {
+    // Case: TC-013 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: both Feature 051 locale bundles
+    const english = loadBundle("web.l10n.en.json");
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When: English keys, placeholders, and Japanese raw fallbacks are compared
+    const missingInEnglish = ADDED_KEYS.filter((key) => english[key] === undefined);
+    const rawJapaneseValues = ADDED_KEYS.filter((key) => japanese[key] === key);
+
+    // Then: key and placeholder parity hold and neither Japanese value is a raw key
+    expect(missingInEnglish).toEqual([]);
+    expect(placeholders(english[PROMPT_KEY])).toEqual(["{0}"]);
+    expect(placeholders(japanese[PROMPT_KEY])).toEqual(["{0}"]);
+    expect(rawJapaneseValues).toEqual([]);
+  });
+});

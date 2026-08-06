@@ -1680,11 +1680,16 @@ function isSubcommand(subcommand: string) {
   return (args: string[]) => args[0] === subcommand;
 }
 
+function isExactArgs(expected: string[]) {
+  return (args: string[]) =>
+    args.length === expected.length && args.every((arg, i) => arg === expected[i]);
+}
+
 function isConfigGet(configKey: string) {
   return (args: string[]) => args[0] === "config" && args[2] === configKey;
 }
 
-// S41: checkoutBranch() リモート checkout の安全化
+// S46: checkoutBranch() 同名 remote checkout の checkout＋pull
 // @see docs/testing/perspectives/src/dataSource-test/02-branch-worktree-02.md
 describe("checkoutBranch", () => {
   let ds: DataSource;
@@ -1698,47 +1703,95 @@ describe("checkoutBranch", () => {
     vi.restoreAllMocks();
   });
 
-  it("rejects an invalid local ref without spawning git (TC-231)", async () => {
-    // Case: TC-231
+  it("rejects an invalid local ref without spawning git (TC-267)", async () => {
+    // Case: TC-267
     // Given: a local branch name git would read as an option
     setupSpawnRoutes([]);
 
     // When: checkoutBranch is called for a remote branch
-    const result = await ds.checkoutBranch(REPO, "-delete", "origin/main");
+    const result = await ds.checkoutBranch(REPO, "-delete", {
+      remoteName: "origin",
+      branchName: "main"
+    });
 
     // Then: the invalid ref is reported and no git process is started
     expect(result).toEqual({ kind: "invalidRef" });
     expect(cp.spawn).toHaveBeenCalledTimes(0);
   });
 
-  it("rejects an invalid remote ref without spawning git (TC-232)", async () => {
-    // Case: TC-232
-    // Given: a valid local name but a remote ref containing a revision range
+  it("rejects an empty local ref without spawning git (TC-268)", async () => {
+    // Case: TC-268
+    // Given: an empty local branch name
     setupSpawnRoutes([]);
 
-    // When: checkoutBranch is called
-    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature..x");
-
-    // Then: the invalid ref is reported and no git process is started
-    expect(result).toEqual({ kind: "invalidRef" });
-    expect(cp.spawn).toHaveBeenCalledTimes(0);
-  });
-
-  it("rejects an empty branch name on the local path without spawning git (TC-233)", async () => {
-    // Case: TC-233
-    // Given: an empty branch name and no remote branch
-    setupSpawnRoutes([]);
-
-    // When: checkoutBranch is called
+    // When: local checkout is requested
     const result = await ds.checkoutBranch(REPO, "", null);
 
-    // Then: the invalid ref is reported and no git process is started
+    // Then: the invalid local ref is reported before git starts
     expect(result).toEqual({ kind: "invalidRef" });
     expect(cp.spawn).toHaveBeenCalledTimes(0);
   });
 
-  it("checks out a local branch with the plain checkout args (TC-234)", async () => {
-    // Case: TC-234
+  it("rejects an unsafe remote name without spawning git (TC-269)", async () => {
+    // Case: TC-269
+    // Given: a remote name git would read as an option
+    setupSpawnRoutes([]);
+
+    // When: remote checkout is requested
+    const result = await ds.checkoutBranch(REPO, "main", {
+      remoteName: "-evil",
+      branchName: "main"
+    });
+
+    // Then: the invalid target is reported before any query
+    expect(result).toEqual({ kind: "invalidRef" });
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+  });
+
+  it("rejects an empty remote name without spawning git (TC-270)", async () => {
+    // Case: TC-270
+    // Given: an empty remote name
+    setupSpawnRoutes([]);
+
+    // When: remote checkout is requested
+    const result = await ds.checkoutBranch(REPO, "main", { remoteName: "", branchName: "main" });
+
+    // Then: the invalid target is reported before any query
+    expect(result).toEqual({ kind: "invalidRef" });
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+  });
+
+  it("rejects an invalid remote branch ref without spawning git (TC-271)", async () => {
+    // Case: TC-271
+    // Given: a remote branch containing a revision range
+    setupSpawnRoutes([]);
+
+    // When: remote checkout is requested
+    const result = await ds.checkoutBranch(REPO, "main", {
+      remoteName: "origin",
+      branchName: "main..x"
+    });
+
+    // Then: the invalid target is reported before any query
+    expect(result).toEqual({ kind: "invalidRef" });
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+  });
+
+  it("rejects an empty remote branch ref without spawning git (TC-272)", async () => {
+    // Case: TC-272
+    // Given: an empty remote branch name
+    setupSpawnRoutes([]);
+
+    // When: remote checkout is requested
+    const result = await ds.checkoutBranch(REPO, "main", { remoteName: "origin", branchName: "" });
+
+    // Then: the invalid target is reported before any query
+    expect(result).toEqual({ kind: "invalidRef" });
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+  });
+
+  it("checks out a local branch with the plain checkout args (TC-273)", async () => {
+    // Case: TC-273
     // Given: git succeeds for the local checkout
     setupSpawnRoutes([{ matches: isSubcommand("checkout"), spec: {} }]);
 
@@ -1751,26 +1804,24 @@ describe("checkoutBranch", () => {
     expect(result).toEqual({ kind: "completed", status: null });
   });
 
-  it("reports an existing branch without running checkout (TC-235)", async () => {
-    // Case: TC-235
-    // Given: the read-only existence query finds refs/heads/feature/x
+  it("surfaces a failing local checkout and skips pull (TC-274)", async () => {
+    // Case: TC-274
+    // Given: local checkout fails with a pathspec error
     setupSpawnRoutes([
-      { matches: isSubcommand("branch"), spec: { stdout: "  feature/x\n" } },
-      { matches: isSubcommand("checkout"), spec: {} }
+      { matches: isSubcommand("checkout"), spec: { stderr: "error: pathspec\n", exitCode: 1 } }
     ]);
 
-    // When: checkoutBranch is called for the same name from a remote branch
-    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature/x");
+    // When: local checkout is requested
+    const result = await ds.checkoutBranch(REPO, "main", null);
 
-    // Then: only the existence query runs and the existing branch is reported
-    expect(result).toEqual({ kind: "branchExists" });
+    // Then: the status is preserved and no pull is attempted
+    expect(result).toEqual({ kind: "completed", status: "error: pathspec" });
     expect(cp.spawn).toHaveBeenCalledTimes(1);
-    expect(cp.spawn).toHaveBeenCalledWith("git", ["branch", "--list", "feature/x"], SPAWN_OPTS);
-    expect(spawnedArgsFor("checkout")).toEqual([]);
+    expect(spawnedArgsFor("pull")).toEqual([]);
   });
 
-  it("creates a tracking branch for an unused name (TC-236)", async () => {
-    // Case: TC-236
+  it("creates a tracking branch for an unused name without querying remotes or pulling (TC-275)", async () => {
+    // Case: TC-275
     // Given: the existence query finds nothing and checkout succeeds
     setupSpawnRoutes([
       { matches: isSubcommand("branch"), spec: { stdout: "" } },
@@ -1778,61 +1829,28 @@ describe("checkoutBranch", () => {
     ]);
 
     // When: checkoutBranch is called for a remote branch
-    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature/x");
+    const result = await ds.checkoutBranch(REPO, "feature/new", {
+      remoteName: "origin",
+      branchName: "feature/new"
+    });
 
-    // Then: checkout runs once with --track -b and never with -B
+    // Then: only existence and tracking checkout run, with no remote query, pull, or -B
     expect(spawnedArgsFor("checkout")).toEqual([
-      ["checkout", "--track", "-b", "feature/x", "origin/feature/x"]
+      ["checkout", "--track", "-b", "feature/new", "origin/feature/new"]
     ]);
     expect(cp.spawn).toHaveBeenCalledWith(
       "git",
-      ["checkout", "--track", "-b", "feature/x", "origin/feature/x"],
+      ["checkout", "--track", "-b", "feature/new", "origin/feature/new"],
       SPAWN_OPTS
     );
+    expect(spawnedArgsFor("remote")).toEqual([]);
+    expect(spawnedArgsFor("pull")).toEqual([]);
+    expect(spawnedArgs().flat()).not.toContain("-B");
     expect(result).toEqual({ kind: "completed", status: null });
   });
 
-  it("keeps the existence query failure detail instead of reporting branchExists (TC-237)", async () => {
-    // Case: TC-237
-    // Given: the existence query itself fails
-    setupSpawnRoutes([
-      {
-        matches: isSubcommand("branch"),
-        spec: { stderr: "fatal: not a git repository\n", exitCode: 128 }
-      },
-      { matches: isSubcommand("checkout"), spec: {} }
-    ]);
-
-    // When: checkoutBranch is called for a remote branch
-    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature/x");
-
-    // Then: the query error is surfaced and checkout never runs
-    expect(result).toEqual({ kind: "completed", status: "fatal: not a git repository" });
-    expect(spawnedArgsFor("checkout")).toEqual([]);
-  });
-
-  it("keeps the existence query spawn error detail instead of reporting branchExists (TC-237)", async () => {
-    // Case: TC-237 (spawn error input of the same case)
-    // Given: the existence query cannot be spawned at all
-    const mock = cp.spawn as unknown as ReturnType<typeof vi.fn>;
-    mock.mockImplementation((_command: unknown, args: unknown) => {
-      const argArray = args as string[];
-      if (argArray[0] !== "branch") {
-        throw new Error(`unexpected git invocation: ${argArray.join(" ")}`);
-      }
-      return createCommandMockProcess({ emitError: true });
-    });
-
-    // When: checkoutBranch is called for a remote branch
-    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature/x");
-
-    // Then: the spawn error is surfaced and checkout never runs
-    expect(result).toEqual({ kind: "completed", status: "spawn error" });
-    expect(spawnedArgsFor("checkout")).toEqual([]);
-  });
-
-  it("surfaces a failing remote checkout (TC-238)", async () => {
-    // Case: TC-238
+  it("surfaces a failing tracking checkout without querying remotes or pulling (TC-276)", async () => {
+    // Case: TC-276
     // Given: the name is unused but the tracking checkout fails
     setupSpawnRoutes([
       { matches: isSubcommand("branch"), spec: { stdout: "" } },
@@ -1842,25 +1860,176 @@ describe("checkoutBranch", () => {
       }
     ]);
 
-    // When: checkoutBranch is called for a remote branch
-    const result = await ds.checkoutBranch(REPO, "feature/x", "origin/feature/x");
+    // When: remote checkout is requested
+    const result = await ds.checkoutBranch(REPO, "feature/new", {
+      remoteName: "origin",
+      branchName: "feature/new"
+    });
 
-    // Then: the git error message is preserved
+    // Then: the checkout error is preserved and later commands are skipped
     expect(result).toEqual({ kind: "completed", status: "fatal: invalid reference" });
+    expect(spawnedArgsFor("remote")).toEqual([]);
+    expect(spawnedArgsFor("pull")).toEqual([]);
   });
 
-  it("surfaces a failing local checkout (TC-239)", async () => {
-    // Case: TC-239
-    // Given: the local checkout fails
+  it("preserves a branch existence query failure and skips later git commands (TC-287)", async () => {
+    // Case: TC-287
+    // Given: the local branch existence query fails before it can determine whether main exists
     setupSpawnRoutes([
-      { matches: isSubcommand("checkout"), spec: { stderr: "error: pathspec\n", exitCode: 1 } }
+      {
+        matches: isExactArgs(["branch", "--list", "main"]),
+        spec: { stderr: "fatal: not a git repository\n", exitCode: 128 }
+      }
     ]);
 
-    // When: checkoutBranch is called without a remote branch
-    const result = await ds.checkoutBranch(REPO, "main", null);
+    // When: matching origin/main checkout is requested
+    const result = await ds.checkoutBranch(REPO, "main", {
+      remoteName: "origin",
+      branchName: "main"
+    });
 
-    // Then: the git error message is preserved
-    expect(result).toEqual({ kind: "completed", status: "error: pathspec" });
+    // Then: the query status is returned after the exact query and all later commands are skipped
+    expect(result).toEqual({ kind: "completed", status: "fatal: not a git repository" });
+    expect(cp.spawn).toHaveBeenCalledTimes(1);
+    expect(cp.spawn).toHaveBeenCalledWith("git", ["branch", "--list", "main"], SPAWN_OPTS);
+    expect(spawnedArgsFor("remote")).toEqual([]);
+    expect(spawnedArgsFor("checkout")).toEqual([]);
+    expect(spawnedArgsFor("pull")).toEqual([]);
+  });
+
+  it("rejects a differently named existing local branch before later git commands (TC-277)", async () => {
+    // Case: TC-277
+    // Given: the requested local name exists but differs from the remote branch name
+    setupSpawnRoutes([{ matches: isSubcommand("branch"), spec: { stdout: "  develop\n" } }]);
+
+    // When: origin/main is requested as existing local develop
+    const result = await ds.checkoutBranch(REPO, "develop", {
+      remoteName: "origin",
+      branchName: "main"
+    });
+
+    // Then: the mismatch is refused after only the existence query
+    expect(result).toEqual({ kind: "branchExists" });
+    expect(cp.spawn).toHaveBeenCalledTimes(1);
+    expect(spawnedArgsFor("remote")).toEqual([]);
+    expect(spawnedArgsFor("checkout")).toEqual([]);
+    expect(spawnedArgsFor("pull")).toEqual([]);
+  });
+
+  it("checks out and pulls a matching existing branch in order (TC-278)", async () => {
+    // Case: TC-278
+    // Given: local main exists, origin is registered, and checkout and pull succeed
+    setupSpawnRoutes([
+      { matches: isExactArgs(["branch", "--list", "main"]), spec: { stdout: "* main\n" } },
+      { matches: isExactArgs(["remote"]), spec: { stdout: "origin\n" } },
+      { matches: isExactArgs(["checkout", "main"]), spec: {} },
+      { matches: isExactArgs(["pull", "origin", "main"]), spec: {} }
+    ]);
+
+    // When: the matching remote branch is requested
+    const result = await ds.checkoutBranch(REPO, "main", {
+      remoteName: "origin",
+      branchName: "main"
+    });
+
+    // Then: all four commands run exactly once in semantic order with explicit pull args
+    expect(spawnedArgs()).toEqual([
+      ["branch", "--list", "main"],
+      ["remote"],
+      ["checkout", "main"],
+      ["pull", "origin", "main"]
+    ]);
+    expect(cp.spawn).toHaveBeenCalledTimes(4);
+    expect(result).toEqual({ kind: "completed", status: null });
+  });
+
+  it("returns remoteNotFound and skips checkout and pull (TC-279)", async () => {
+    // Case: TC-279
+    // Given: local main exists but only upstream is registered
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "* main\n" } },
+      { matches: isSubcommand("remote"), spec: { stdout: "upstream\n" } }
+    ]);
+
+    // When: origin/main is requested
+    const result = await ds.checkoutBranch(REPO, "main", {
+      remoteName: "origin",
+      branchName: "main"
+    });
+
+    // Then: the missing remote is reported before mutating commands
+    expect(result).toEqual({ kind: "remoteNotFound" });
+    expect(cp.spawn).toHaveBeenCalledTimes(2);
+    expect(spawnedArgsFor("checkout")).toEqual([]);
+    expect(spawnedArgsFor("pull")).toEqual([]);
+  });
+
+  it("preserves a remote query failure and skips checkout and pull (TC-280)", async () => {
+    // Case: TC-280
+    // Given: local main exists but git remote fails
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "* main\n" } },
+      { matches: isSubcommand("remote"), spec: { stderr: "fatal: remote fail\n", exitCode: 128 } }
+    ]);
+
+    // When: origin/main is requested
+    const result = await ds.checkoutBranch(REPO, "main", {
+      remoteName: "origin",
+      branchName: "main"
+    });
+
+    // Then: the query status is returned and mutating commands are skipped
+    expect(result).toEqual({ kind: "completed", status: "fatal: remote fail" });
+    expect(cp.spawn).toHaveBeenCalledTimes(2);
+    expect(spawnedArgsFor("checkout")).toEqual([]);
+    expect(spawnedArgsFor("pull")).toEqual([]);
+  });
+
+  it("preserves a matching checkout failure and skips pull (TC-281)", async () => {
+    // Case: TC-281
+    // Given: remote validation succeeds but checkout main fails
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "* main\n" } },
+      { matches: isSubcommand("remote"), spec: { stdout: "origin\n" } },
+      {
+        matches: isSubcommand("checkout"),
+        spec: { stderr: "fatal: checkout failed\n", exitCode: 1 }
+      }
+    ]);
+
+    // When: matching origin/main is requested
+    const result = await ds.checkoutBranch(REPO, "main", {
+      remoteName: "origin",
+      branchName: "main"
+    });
+
+    // Then: checkout status is returned and pull never runs
+    expect(result).toEqual({ kind: "completed", status: "fatal: checkout failed" });
+    expect(cp.spawn).toHaveBeenCalledTimes(3);
+    expect(spawnedArgsFor("pull")).toEqual([]);
+  });
+
+  it("returns pullFailed without invoking reset or rollback commands (TC-282)", async () => {
+    // Case: TC-282
+    // Given: checkout main succeeds but the explicit pull reports a conflict
+    setupSpawnRoutes([
+      { matches: isSubcommand("branch"), spec: { stdout: "* main\n" } },
+      { matches: isSubcommand("remote"), spec: { stdout: "origin\n" } },
+      { matches: isSubcommand("checkout"), spec: {} },
+      { matches: isSubcommand("pull"), spec: { stderr: "CONFLICT\n", exitCode: 1 } }
+    ]);
+
+    // When: matching origin/main is requested
+    const result = await ds.checkoutBranch(REPO, "main", {
+      remoteName: "origin",
+      branchName: "main"
+    });
+
+    // Then: partial success keeps the pull status and no destructive recovery is attempted
+    expect(result).toEqual({ kind: "pullFailed", status: "CONFLICT" });
+    expect(spawnedArgsFor("pull")).toEqual([["pull", "origin", "main"]]);
+    expect(spawnedArgsFor("reset")).toEqual([]);
+    expect(spawnedArgs().flat()).not.toContain("-B");
   });
 });
 

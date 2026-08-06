@@ -3,7 +3,10 @@ import { describe, expect, it } from "vitest";
 import {
   CheckoutBranchResult,
   PushTarget,
+  RemoteBranchTarget,
+  RequestCheckoutBranch,
   RequestPush,
+  ResponseCheckoutBranch,
   ResponseOpenWorktreeInNewWindow,
   ResponsePush,
   ResponseRevealWorktreeInOS,
@@ -114,11 +117,94 @@ describe("worktree open/reveal response status requirement", () => {
   });
 });
 
-// S4: checkout 結果と二段階 Push の型契約（Response への repo 必須化）
+// S6: remote checkout target・結果と二段階 Push の型契約
 // @see docs/testing/perspectives/src/types-test.md
+describe("RemoteBranchTarget and RequestCheckoutBranch contract", () => {
+  it("keeps remote and branch names as separate strings (TC-044)", () => {
+    // Case: TC-044
+    // Given: a valid remote target
+    const target: RemoteBranchTarget = { remoteName: "origin", branchName: "main" };
+
+    // When: the target is inspected
+    // Then: both names remain independently available
+    expect(target.remoteName).toBe("origin");
+    expect(target.branchName).toBe("main");
+  });
+
+  it("requires remoteName on the remote target (TC-045)", () => {
+    // Case: TC-045
+    // Given: a target missing remoteName
+    // @ts-expect-error remoteName is mandatory
+    const missingRemoteName: RemoteBranchTarget = { branchName: "main" };
+
+    // When: the invalid literal is inspected at runtime
+    // Then: TypeScript reports the omission and the field is absent
+    expect(missingRemoteName.remoteName).toBeUndefined();
+  });
+
+  it("requires branchName on the remote target (TC-046)", () => {
+    // Case: TC-046
+    // Given: a target missing branchName
+    // @ts-expect-error branchName is mandatory
+    const missingBranchName: RemoteBranchTarget = { remoteName: "origin" };
+
+    // When: the invalid literal is inspected at runtime
+    // Then: TypeScript reports the omission and the field is absent
+    expect(missingBranchName.branchName).toBeUndefined();
+  });
+
+  it("accepts a local checkout request with remoteBranch null (TC-047)", () => {
+    // Case: TC-047
+    // Given: a local checkout request
+    const localRequest: RequestCheckoutBranch = {
+      command: "checkoutBranch",
+      repo: "/r",
+      branchName: "main",
+      remoteBranch: null
+    };
+
+    // When: the request is narrowed by remoteBranch
+    // Then: the local path preserves null exactly
+    expect(localRequest.remoteBranch).toBeNull();
+  });
+
+  it("accepts a structured remote checkout request (TC-048)", () => {
+    // Case: TC-048
+    // Given: a remote checkout request
+    const remoteRequest: RequestCheckoutBranch = {
+      command: "checkoutBranch",
+      repo: "/r",
+      branchName: "main",
+      remoteBranch: { remoteName: "origin", branchName: "main" }
+    };
+
+    // When: the request is narrowed by remoteBranch
+    // Then: both target fields remain available
+    if (remoteRequest.remoteBranch !== null) {
+      expect(remoteRequest.remoteBranch.remoteName).toBe("origin");
+      expect(remoteRequest.remoteBranch.branchName).toBe("main");
+    }
+  });
+
+  it("requires remoteBranch on every checkout request (TC-049)", () => {
+    // Case: TC-049
+    // Given: a checkout request missing remoteBranch
+    // @ts-expect-error remoteBranch is mandatory
+    const missingRemoteBranch: RequestCheckoutBranch = {
+      command: "checkoutBranch",
+      repo: "/r",
+      branchName: "main"
+    };
+
+    // When: the invalid literal is inspected at runtime
+    // Then: TypeScript reports the omission and the field is absent
+    expect(missingRemoteBranch.remoteBranch).toBeUndefined();
+  });
+});
+
 describe("CheckoutBranchResult discriminated union", () => {
-  it("accepts the branchExists variant without a status field (TC-026)", () => {
-    // Case: TC-026
+  it("accepts the branchExists variant without a status field (TC-050)", () => {
+    // Case: TC-050
     // Given: the branchExists variant of the checkout result
     const result: CheckoutBranchResult = { kind: "branchExists" };
 
@@ -131,8 +217,8 @@ describe("CheckoutBranchResult discriminated union", () => {
     }
   });
 
-  it("accepts the invalidRef variant (TC-027)", () => {
-    // Case: TC-027
+  it("accepts the invalidRef variant (TC-051)", () => {
+    // Case: TC-051
     // Given: the invalidRef variant of the checkout result
     const result: CheckoutBranchResult = { kind: "invalidRef" };
 
@@ -141,8 +227,54 @@ describe("CheckoutBranchResult discriminated union", () => {
     expect(result.kind).toBe("invalidRef");
   });
 
-  it("accepts the completed variant and exposes status after narrowing (TC-028)", () => {
-    // Case: TC-028
+  it("accepts remoteNotFound without a status field (TC-052)", () => {
+    // Case: TC-052
+    // Given: the remoteNotFound variant of the checkout result
+    const result: CheckoutBranchResult = { kind: "remoteNotFound" };
+
+    // When: the value is narrowed by kind
+    // Then: the variant carries no status field
+    expect(result.kind).toBe("remoteNotFound");
+    if (result.kind === "remoteNotFound") {
+      // @ts-expect-error the remoteNotFound variant has no status field
+      expect(result.status).toBeUndefined();
+    }
+  });
+
+  it("accepts pullFailed with a string status (TC-053)", () => {
+    // Case: TC-053
+    // Given: a valid pullFailed result
+    const result: CheckoutBranchResult = { kind: "pullFailed", status: "CONFLICT" };
+
+    // When: the result is narrowed by kind
+    // Then: status remains a string
+    if (result.kind === "pullFailed") expect(result.status).toBe("CONFLICT");
+  });
+
+  it("requires status on pullFailed (TC-054)", () => {
+    // Case: TC-054
+    // Given: pullFailed without status
+    // @ts-expect-error status is mandatory on pullFailed
+    const missingStatus: CheckoutBranchResult = { kind: "pullFailed" };
+
+    // When: the invalid literal is inspected at runtime
+    // Then: TypeScript reports the omission and status is absent
+    expect(missingStatus.status).toBeUndefined();
+  });
+
+  it("rejects null status on pullFailed (TC-055)", () => {
+    // Case: TC-055
+    // Given: pullFailed with a null status
+    // @ts-expect-error pullFailed status cannot be null
+    const nullStatus: CheckoutBranchResult = { kind: "pullFailed", status: null };
+
+    // When: the invalid literal is inspected at runtime
+    // Then: TypeScript reports the invalid null while runtime preserves it
+    expect(nullStatus.status).toBeNull();
+  });
+
+  it("accepts the completed variant and exposes status after narrowing (TC-056)", () => {
+    // Case: TC-056
     // Given: the completed variant with a null status
     const result: CheckoutBranchResult = { kind: "completed", status: null };
 
@@ -154,8 +286,8 @@ describe("CheckoutBranchResult discriminated union", () => {
     }
   });
 
-  it("requires status on the completed variant (TC-029)", () => {
-    // Case: TC-029
+  it("requires status on the completed variant (TC-057)", () => {
+    // Case: TC-057
     // Given: a completed literal without the mandatory status field
     // @ts-expect-error status is mandatory on the completed variant
     const missingStatus: CheckoutBranchResult = { kind: "completed" };
@@ -165,8 +297,8 @@ describe("CheckoutBranchResult discriminated union", () => {
     expect(missingStatus.kind).toBe("completed");
   });
 
-  it("rejects a kind outside the union (TC-030)", () => {
-    // Case: TC-030
+  it("rejects a kind outside the union (TC-058)", () => {
+    // Case: TC-058
     // Given: a literal using a kind that is not part of the union
     // @ts-expect-error "unknown" is not a member of CheckoutBranchResult
     const unknownKind: CheckoutBranchResult = { kind: "unknown" };
@@ -175,11 +307,154 @@ describe("CheckoutBranchResult discriminated union", () => {
     // Then: the unsupported discriminant is what was written
     expect(unknownKind.kind).toBe("unknown");
   });
+
+  it("narrows exhaustively across all five result kinds (TC-059)", () => {
+    // Case: TC-059
+    // Given: a switch that handles every CheckoutBranchResult kind
+    function describeResult(result: CheckoutBranchResult): string {
+      switch (result.kind) {
+        case "branchExists":
+        case "invalidRef":
+        case "remoteNotFound":
+          return result.kind;
+        case "pullFailed":
+          return result.status;
+        case "completed":
+          return result.status ?? "completed";
+        default: {
+          const exhaustive: never = result;
+          return exhaustive;
+        }
+      }
+    }
+
+    // When: every variant is passed through the switch
+    // Then: each branch returns its discriminant-specific value
+    expect(describeResult({ kind: "branchExists" })).toBe("branchExists");
+    expect(describeResult({ kind: "invalidRef" })).toBe("invalidRef");
+    expect(describeResult({ kind: "remoteNotFound" })).toBe("remoteNotFound");
+    expect(describeResult({ kind: "pullFailed", status: "CONFLICT" })).toBe("CONFLICT");
+    expect(describeResult({ kind: "completed", status: null })).toBe("completed");
+  });
+});
+
+describe("ResponseCheckoutBranch discriminated union", () => {
+  it("accepts a branchExists response (TC-060)", () => {
+    // Case: TC-060
+    // Given: a branchExists response
+    const response: ResponseCheckoutBranch = { command: "checkoutBranch", kind: "branchExists" };
+
+    // When: its discriminant is read
+    // Then: it compiles without a status field
+    expect(response.kind).toBe("branchExists");
+  });
+
+  it("accepts an invalidRef response (TC-061)", () => {
+    // Case: TC-061
+    // Given: an invalidRef response
+    const response: ResponseCheckoutBranch = { command: "checkoutBranch", kind: "invalidRef" };
+
+    // When: its discriminant is read
+    // Then: it compiles without a status field
+    expect(response.kind).toBe("invalidRef");
+  });
+
+  it("accepts a remoteNotFound response (TC-062)", () => {
+    // Case: TC-062
+    // Given: a remoteNotFound response
+    const response: ResponseCheckoutBranch = {
+      command: "checkoutBranch",
+      kind: "remoteNotFound"
+    };
+
+    // When: its discriminant is read
+    // Then: it compiles without a status field
+    expect(response.kind).toBe("remoteNotFound");
+  });
+
+  it("accepts a pullFailed response with string status (TC-063)", () => {
+    // Case: TC-063
+    // Given: a pullFailed response
+    const response: ResponseCheckoutBranch = {
+      command: "checkoutBranch",
+      kind: "pullFailed",
+      status: "CONFLICT"
+    };
+
+    // When: the response is narrowed by kind
+    // Then: status remains a string
+    if (response.kind === "pullFailed") expect(response.status).toBe("CONFLICT");
+  });
+
+  it("accepts a completed response with null status (TC-064)", () => {
+    // Case: TC-064
+    // Given: a completed response
+    const response: ResponseCheckoutBranch = {
+      command: "checkoutBranch",
+      kind: "completed",
+      status: null
+    };
+
+    // When: the response is narrowed by kind
+    // Then: completed preserves null exactly
+    if (response.kind === "completed") expect(response.status).toBeNull();
+  });
+
+  it("requires status on pullFailed and completed responses (TC-065)", () => {
+    // Case: TC-065
+    // Given: status-bearing variants with status omitted
+    // @ts-expect-error pullFailed status is mandatory
+    const pullFailed: ResponseCheckoutBranch = { command: "checkoutBranch", kind: "pullFailed" };
+    // @ts-expect-error completed status is mandatory
+    const completed: ResponseCheckoutBranch = { command: "checkoutBranch", kind: "completed" };
+
+    // When: the invalid literals are inspected at runtime
+    // Then: the omitted fields remain absent while TypeScript reports both errors
+    expect(pullFailed.status).toBeUndefined();
+    expect(completed.status).toBeUndefined();
+  });
+
+  it("narrows exhaustively across all five response kinds (TC-066)", () => {
+    // Case: TC-066
+    // Given: a switch that handles every ResponseCheckoutBranch kind
+    function describeResponse(response: ResponseCheckoutBranch): string {
+      switch (response.kind) {
+        case "branchExists":
+        case "invalidRef":
+        case "remoteNotFound":
+          return response.kind;
+        case "pullFailed":
+          return response.status;
+        case "completed":
+          return response.status ?? "completed";
+        default: {
+          const exhaustive: never = response;
+          return exhaustive;
+        }
+      }
+    }
+
+    // When: every variant is passed through the switch
+    // Then: all five kinds reach a defined branch
+    expect(describeResponse({ command: "checkoutBranch", kind: "branchExists" })).toBe(
+      "branchExists"
+    );
+    expect(describeResponse({ command: "checkoutBranch", kind: "invalidRef" })).toBe("invalidRef");
+    expect(describeResponse({ command: "checkoutBranch", kind: "remoteNotFound" })).toBe(
+      "remoteNotFound"
+    );
+    expect(
+      describeResponse({ command: "checkoutBranch", kind: "pullFailed", status: "CONFLICT" })
+    ).toBe("CONFLICT");
+    expect(describeResponse({ command: "checkoutBranch", kind: "completed", status: null })).toBe(
+      "completed"
+    );
+  });
 });
 
 describe("RequestPush two-phase contract", () => {
-  it("accepts the initial request with a null selectedRemote (TC-031)", () => {
-    // Case: TC-031
+  it("accepts the initial request with a null selectedRemote (TC-067)", () => {
+    // Case: TC-067
     // Given: the first request of a push operation
     const request: RequestPush = {
       command: "push",
@@ -194,8 +469,8 @@ describe("RequestPush two-phase contract", () => {
     expect(request.selectedRemote).toBeNull();
   });
 
-  it("accepts the follow-up request carrying the selected remote (TC-032)", () => {
-    // Case: TC-032
+  it("accepts the follow-up request carrying the selected remote (TC-068)", () => {
+    // Case: TC-068
     // Given: the second request of the same push operation
     const request: RequestPush = {
       command: "push",
@@ -210,8 +485,8 @@ describe("RequestPush two-phase contract", () => {
     expect(request.selectedRemote).toBe("origin");
   });
 
-  it("requires operationId on the request (TC-033)", () => {
-    // Case: TC-033
+  it("requires operationId on the request (TC-069)", () => {
+    // Case: TC-069
     // Given: a request literal without the correlation id
     // @ts-expect-error operationId is mandatory on RequestPush
     const missingOperationId: RequestPush = {
@@ -225,8 +500,8 @@ describe("RequestPush two-phase contract", () => {
     expect(missingOperationId.command).toBe("push");
   });
 
-  it("requires selectedRemote on the request (TC-034)", () => {
-    // Case: TC-034
+  it("requires selectedRemote on the request (TC-070)", () => {
+    // Case: TC-070
     // Given: a request literal without the selection field
     // @ts-expect-error selectedRemote is mandatory and must not be optional
     const missingSelectedRemote: RequestPush = {
@@ -242,8 +517,8 @@ describe("RequestPush two-phase contract", () => {
 });
 
 describe("ResponsePush phase union", () => {
-  it("accepts the selectRemote variant and exposes its fields after narrowing (TC-035)", () => {
-    // Case: TC-035
+  it("accepts the selectRemote variant and exposes its fields after narrowing (TC-071)", () => {
+    // Case: TC-071
     // Given: the selectRemote phase response
     const response: ResponsePush = {
       command: "push",
@@ -264,8 +539,8 @@ describe("ResponsePush phase union", () => {
     }
   });
 
-  it("accepts the noRemotes variant without phase-specific fields (TC-036)", () => {
-    // Case: TC-036
+  it("accepts the noRemotes variant without phase-specific fields (TC-072)", () => {
+    // Case: TC-072
     // Given: the noRemotes phase response
     const response: ResponsePush = {
       command: "push",
@@ -283,8 +558,8 @@ describe("ResponsePush phase union", () => {
     }
   });
 
-  it("accepts the completed variant and exposes status after narrowing (TC-037)", () => {
-    // Case: TC-037
+  it("accepts the completed variant and exposes status after narrowing (TC-073)", () => {
+    // Case: TC-073
     // Given: the completed phase response
     const response: ResponsePush = {
       command: "push",
@@ -302,8 +577,8 @@ describe("ResponsePush phase union", () => {
     }
   });
 
-  it("requires status on the completed variant (TC-038)", () => {
-    // Case: TC-038
+  it("requires status on the completed variant (TC-074)", () => {
+    // Case: TC-074
     // Given: a completed response literal without status
     // @ts-expect-error status is mandatory on the completed variant
     const missingStatus: ResponsePush = {
@@ -318,8 +593,8 @@ describe("ResponsePush phase union", () => {
     expect(missingStatus.phase).toBe("completed");
   });
 
-  it("requires defaultRemote on the selectRemote variant (TC-039)", () => {
-    // Case: TC-039
+  it("requires defaultRemote on the selectRemote variant (TC-075)", () => {
+    // Case: TC-075
     // Given: a selectRemote response literal without defaultRemote
     // @ts-expect-error defaultRemote is mandatory on the selectRemote variant
     const missingDefaultRemote: ResponsePush = {
@@ -335,8 +610,8 @@ describe("ResponsePush phase union", () => {
     expect(missingDefaultRemote.phase).toBe("selectRemote");
   });
 
-  it("requires operationId on every response variant (TC-040)", () => {
-    // Case: TC-040
+  it("requires operationId on every response variant (TC-076)", () => {
+    // Case: TC-076
     // Given: one literal per phase, each missing the correlation id
     // @ts-expect-error operationId is mandatory on the selectRemote variant
     const selectRemote: ResponsePush = {
@@ -363,8 +638,8 @@ describe("ResponsePush phase union", () => {
     expect(completed.phase).toBe("completed");
   });
 
-  it("requires repo on every response variant (TC-041)", () => {
-    // Case: TC-041
+  it("requires repo on every response variant (TC-077)", () => {
+    // Case: TC-077
     // Given: one literal per phase, each missing the repository path
     // @ts-expect-error repo is mandatory on the selectRemote variant
     const selectRemote: ResponsePush = {
@@ -391,8 +666,8 @@ describe("ResponsePush phase union", () => {
     expect(completed.phase).toBe("completed");
   });
 
-  it("narrows exhaustively on phase (TC-042)", () => {
-    // Case: TC-042
+  it("narrows exhaustively on phase (TC-078)", () => {
+    // Case: TC-078
     // Given: a switch that handles all three phases and asserts the rest is never
     function describePhase(response: ResponsePush): string {
       switch (response.phase) {
