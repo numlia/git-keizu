@@ -179,9 +179,16 @@ export type GitFileChangeType = "A" | "M" | "D" | "R";
 
 /* Checkout / Push Result Types */
 
+export interface RemoteBranchTarget {
+  remoteName: string;
+  branchName: string;
+}
+
 export type CheckoutBranchResult =
   | { kind: "branchExists" }
   | { kind: "invalidRef" }
+  | { kind: "remoteNotFound" }
+  | { kind: "pullFailed"; status: string }
   | { kind: "completed"; status: GitCommandStatus };
 
 export interface PushTarget {
@@ -219,11 +226,13 @@ export interface RequestCheckoutBranch {
   command: "checkoutBranch";
   repo: string;
   branchName: string;
-  remoteBranch: string | null;
+  remoteBranch: RemoteBranchTarget | null;
 }
 export type ResponseCheckoutBranch =
   | { command: "checkoutBranch"; kind: "branchExists" }
   | { command: "checkoutBranch"; kind: "invalidRef" }
+  | { command: "checkoutBranch"; kind: "remoteNotFound" }
+  | { command: "checkoutBranch"; kind: "pullFailed"; status: string }
   | { command: "checkoutBranch"; kind: "completed"; status: GitCommandStatus };
 
 export interface RequestCheckoutCommit {
