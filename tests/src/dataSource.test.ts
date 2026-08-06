@@ -2031,6 +2031,71 @@ describe("checkoutBranch", () => {
     expect(spawnedArgsFor("reset")).toEqual([]);
     expect(spawnedArgs().flat()).not.toContain("-B");
   });
+
+  it("rejects an undefined remote target without spawning git (TC-288)", async () => {
+    // Case: TC-288
+    // Given: the runtime payload omits remoteBranch entirely
+    setupSpawnRoutes([]);
+
+    // When: checkoutBranch receives the malformed webview value
+    const result = await ds.checkoutBranch(
+      REPO,
+      "main",
+      undefined as unknown as Parameters<DataSource["checkoutBranch"]>[2]
+    );
+
+    // Then: the malformed target is rejected before any property access or git process
+    expect(result).toEqual({ kind: "invalidRef" });
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+  });
+
+  it("rejects a non-object remote target without spawning git (TC-289)", async () => {
+    // Case: TC-289
+    // Given: the runtime payload contains a remote ref string instead of an object
+    setupSpawnRoutes([]);
+
+    // When: checkoutBranch receives the malformed webview value
+    const result = await ds.checkoutBranch(
+      REPO,
+      "main",
+      "origin/main" as unknown as Parameters<DataSource["checkoutBranch"]>[2]
+    );
+
+    // Then: the malformed target is rejected before any property access or git process
+    expect(result).toEqual({ kind: "invalidRef" });
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+  });
+
+  it("rejects a remote target with a missing field without spawning git (TC-290)", async () => {
+    // Case: TC-290
+    // Given: the runtime payload omits branchName from the remote target object
+    setupSpawnRoutes([]);
+
+    // When: checkoutBranch receives the malformed webview value
+    const result = await ds.checkoutBranch(REPO, "main", {
+      remoteName: "origin"
+    } as unknown as Parameters<DataSource["checkoutBranch"]>[2]);
+
+    // Then: the incomplete target is rejected before any git process
+    expect(result).toEqual({ kind: "invalidRef" });
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+  });
+
+  it("rejects a remote target with a non-string field without spawning git (TC-291)", async () => {
+    // Case: TC-291
+    // Given: the runtime payload contains a numeric remoteName
+    setupSpawnRoutes([]);
+
+    // When: checkoutBranch receives the malformed webview value
+    const result = await ds.checkoutBranch(REPO, "main", {
+      remoteName: 1,
+      branchName: "main"
+    } as unknown as Parameters<DataSource["checkoutBranch"]>[2]);
+
+    // Then: the invalid field type is rejected before any git process
+    expect(result).toEqual({ kind: "invalidRef" });
+    expect(cp.spawn).toHaveBeenCalledTimes(0);
+  });
 });
 
 // S44: pull() 既存挙動の維持

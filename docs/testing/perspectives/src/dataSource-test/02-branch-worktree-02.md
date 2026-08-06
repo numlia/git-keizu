@@ -211,6 +211,10 @@ local checkout と未使用名の tracking checkout を維持しつつ、remote 
 | TC-285  | 実 Git 一時 repository。local / `origin/main` が diverged、`pull.ff=only` を設定                        | Exception - diverged pull 拒否（実 Git）                                   | `kind` が `pullFailed` で `status` が非空。current branch は `main`、local branch hash と worktree は pull 前と一致し、reset / `-B` による自動 rollback がない                                                          | 決定的な拒否                  |
 | TC-286  | 実 Git 一時 repository。target は `origin/main`、入力 local 名は既存 `develop`                          | Validation - 別名拒否の repository 保全（実 Git）                          | `{ kind: "branchExists" }`。`main` / `develop` の hash、current branch、upstream config、`status --porcelain` が実行前後で一致する                                                                                      | S41/TC-240・TC-242 の引き継ぎ |
 | TC-287  | Given: target は `origin/main` / When: local branch existence query が `"fatal: not a git repository"`  | External - local branch existence query 失敗                               | Then: Git query が args `['branch', '--list', 'main']` で 1 回だけ呼ばれ、`{ kind: "completed", status: "fatal: not a git repository" }` を返す。remote query / checkout / pull args の call count は 0                 | S41/TC-237 の引き継ぎ         |
+| TC-288  | webview 由来の runtime payload で `remoteBranch = undefined`                                            | Type - undefined remote target                                             | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | object guard                  |
+| TC-289  | webview 由来の runtime payload で `remoteBranch = "origin/main"`                                        | Type - non-object remote target                                            | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | object guard                  |
+| TC-290  | webview 由来の runtime payload で `remoteBranch = { remoteName: "origin" }`                             | Type - remote target field 欠落                                            | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | `branchName` 欠落             |
+| TC-291  | webview 由来の runtime payload で `remoteBranch = { remoteName: 1, branchName: "main" }`                | Type - remote target field が非 string                                     | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | `remoteName` が number        |
 
 ### 失敗源インベントリ（include-or-justify）— Feature 051 追加分（S46）
 
@@ -229,7 +233,7 @@ local checkout と未使用名の tracking checkout を維持しつつ、remote 
 | 実 repository の fast-forward / branch 保全                         | TC-284、TC-285、TC-286                                                                                                                  |
 | `-B` / hard reset / rollback の再導入                               | TC-275、TC-282、TC-285                                                                                                                  |
 | 境界値（0 / minimum / maximum / +/-1 / NULL）                       | excluded(ref と remote は文字列で数値境界を持たない。`remoteBranch: null` は TC-273 / TC-274、empty は TC-268 / TC-270 / TC-272 で検証) |
-| 不正な型・payload field 欠落                                        | excluded(`src/types-test.md` S6 の型契約で担保)                                                                                         |
+| 不正な型・payload field 欠落                                        | TC-288、TC-289、TC-290、TC-291                                                                                                          |
 
 **失敗カテゴリ網羅（diversity floor）**:
 
@@ -237,6 +241,6 @@ local checkout と未使用名の tracking checkout を維持しつつ、remote 
 - Exception: TC-274、TC-276、TC-281、TC-285
 - External: TC-280、TC-282、TC-287
 - Boundary: TC-268、TC-270、TC-272
-- Type: excluded(`src/types-test.md` S6 の責務)
+- Type: TC-288、TC-289、TC-290、TC-291
 
-**失敗系/正常系比（煙感知器）**: 正常系5件（TC-273、TC-275、TC-278、TC-283、TC-284）、失敗系16件（残り）。比は 3.2:1 で、失敗源インベントリから導出した結果である。
+**失敗系/正常系比（煙感知器）**: 正常系5件（TC-273、TC-275、TC-278、TC-283、TC-284）、失敗系20件（残り）。比は 4.0:1 で、失敗源インベントリから導出した結果である。

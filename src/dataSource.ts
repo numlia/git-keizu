@@ -748,6 +748,13 @@ export class DataSource {
         status: await this.runGitCommandSpawn(["checkout", branchName], repo)
       };
     }
+    if (
+      typeof remoteBranch !== "object" ||
+      typeof remoteBranch.remoteName !== "string" ||
+      typeof remoteBranch.branchName !== "string"
+    ) {
+      return { kind: "invalidRef" };
+    }
     const remoteTrackingRef = `${remoteBranch.remoteName}/${remoteBranch.branchName}`;
     if (
       !isSafeRemoteName(remoteBranch.remoteName) ||
