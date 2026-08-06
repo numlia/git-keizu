@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.4] - 2026-08-07
+
+This release makes remote branch checkout usable when the local branch is simply out of date: checking out a remote branch into a same-named existing local branch now performs a checkout followed by an explicit pull.
+
+### Changed
+
+- **Remote branch checkout now updates a same-named existing local branch**: Checking out `origin/main` while a local `main` already existed previously stopped with "A branch with this name already exists." and changed nothing, leaving no way to bring the stale local branch up to date from the graph. When the entered local branch name is exactly the remote branch name, Git Keizu now checks that branch out and then runs `git pull <remote> <branch>` against the remote branch you right-clicked — the same result as checking out the old local branch and pulling manually. The branch reference is still never force-moved (`git checkout -B` remains unused), and the branch's upstream configuration (`branch.<name>.remote` / `branch.<name>.merge`) is neither consulted nor modified, so a branch tracking a different remote is not silently re-pointed. Entering a _different_ existing branch name (e.g. `develop` for `origin/main`) is still refused so history cannot be mixed in by mistake, names that differ only in letter case are not treated as the same branch, and an unused name still creates a tracking branch with `git checkout --track -b`.
+- **Checkout dialog explains what will happen**: The remote branch checkout dialog no longer says only that a new branch will be created — it now states that entering an existing branch of the same name checks it out and pulls the selected remote branch, in both English and Japanese.
+- **The selected remote is verified before anything runs**: On the same-name update path, the remote name is sent to the extension host as a separate value, validated so it can never be read as a git option, and checked against the repository's registered remotes before checkout. A remote that is no longer registered (e.g. removed after the graph was drawn) is reported with a dedicated message and runs no git command; a failure to list the remotes is reported as the usual git error. The new-branch path performs no remote lookup, exactly as before.
+- **A failed pull is distinguished from a failed checkout**: If the checkout succeeds but the pull fails (conflict, disconnection, authentication failure, non-fast-forward, …), the graph is redrawn to match the repository's actual state — the checked-out branch is marked as current — and the git output is then shown under the "Unable to Pull" title instead of a checkout error. No automatic `reset`, `merge --abort`, or checkout back to the previous branch is performed, so a conflicted intermediate state is left intact for you to resolve. If the checkout itself fails, the pull is not attempted at all.
+
 ## [0.8.3] - 2026-08-04
 
 This release makes remote branch checkout and Push safe: Git Keizu no longer moves existing branch references or rewrites upstream tracking as a side effect of these two actions.
@@ -489,7 +500,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.8.3...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.8.4...HEAD
+[0.8.4]: https://github.com/numlia/git-keizu/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/numlia/git-keizu/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/numlia/git-keizu/compare/v0.8.1...v0.8.2
 [0.8.1]: https://github.com/numlia/git-keizu/compare/v0.8.0...v0.8.1
