@@ -210,6 +210,7 @@ local checkout と未使用名の tracking checkout を維持しつつ、remote 
 | TC-284  | 実 Git 一時 repository。local `main` が remote `origin/main` より 1 commit 遅れた fast-forward 可能状態 | Normal - fast-forward（実 Git）                                            | 戻り値が `{ kind: "completed", status: null }`。`rev-parse main` と `rev-parse origin/main` の hash が一致し、current branch が `main`、worktree が clean                                                               | 実 repository state を観測    |
 | TC-285  | 実 Git 一時 repository。local / `origin/main` が diverged、`pull.ff=only` を設定                        | Exception - diverged pull 拒否（実 Git）                                   | `kind` が `pullFailed` で `status` が非空。current branch は `main`、local branch hash と worktree は pull 前と一致し、reset / `-B` による自動 rollback がない                                                          | 決定的な拒否                  |
 | TC-286  | 実 Git 一時 repository。target は `origin/main`、入力 local 名は既存 `develop`                          | Validation - 別名拒否の repository 保全（実 Git）                          | `{ kind: "branchExists" }`。`main` / `develop` の hash、current branch、upstream config、`status --porcelain` が実行前後で一致する                                                                                      | S41/TC-240・TC-242 の引き継ぎ |
+| TC-287  | Given: target は `origin/main` / When: local branch existence query が `"fatal: not a git repository"`  | External - local branch existence query 失敗                               | Then: Git query が args `['branch', '--list', 'main']` で 1 回だけ呼ばれ、`{ kind: "completed", status: "fatal: not a git repository" }` を返す。remote query / checkout / pull args の call count は 0                 | S41/TC-237 の引き継ぎ         |
 
 ### 失敗源インベントリ（include-or-justify）— Feature 051 追加分（S46）
 
@@ -219,6 +220,7 @@ local checkout と未使用名の tracking checkout を維持しつつ、remote 
 | 入力検証 × unsafe / empty remote 名                                 | TC-269、TC-270                                                                                                                          |
 | 入力検証 × 不正 / empty remote branch ref                           | TC-271、TC-272                                                                                                                          |
 | 存在 guard × 別名既存 branch                                        | TC-277、TC-286                                                                                                                          |
+| local branch existence query × query 失敗                           | TC-287                                                                                                                                  |
 | remote query × 不在 / query 失敗                                    | TC-279、TC-280                                                                                                                          |
 | checkout × local / tracking / 同名経路の失敗                        | TC-274、TC-276、TC-281                                                                                                                  |
 | pull × 失敗と部分成功                                               | TC-282、TC-285                                                                                                                          |
@@ -233,8 +235,8 @@ local checkout と未使用名の tracking checkout を維持しつつ、remote 
 
 - Validation: TC-267、TC-269、TC-271、TC-277、TC-279、TC-286
 - Exception: TC-274、TC-276、TC-281、TC-285
-- External: TC-280、TC-282
+- External: TC-280、TC-282、TC-287
 - Boundary: TC-268、TC-270、TC-272
 - Type: excluded(`src/types-test.md` S6 の責務)
 
-**失敗系/正常系比（煙感知器）**: 正常系5件（TC-273、TC-275、TC-278、TC-283、TC-284）、失敗系15件（残り）。比は 3.0:1 で、失敗源インベントリから導出した結果である。
+**失敗系/正常系比（煙感知器）**: 正常系5件（TC-273、TC-275、TC-278、TC-283、TC-284）、失敗系16件（残り）。比は 3.2:1 で、失敗源インベントリから導出した結果である。
