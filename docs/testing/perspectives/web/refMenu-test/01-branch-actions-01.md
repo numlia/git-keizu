@@ -10,8 +10,9 @@
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 2.2
 > Added: 2026-02-25
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S20
 
 **シグネチャ**: `checkoutBranchAction(repo: string, sourceElem: HTMLElement, refName: string, isRemoteCombined?: boolean): void`
 **テスト対象パス**: `web/refMenu.ts`
@@ -256,3 +257,54 @@ Push 確認の確定時に `crypto.randomUUID()` で `operationId` を 1 回生�
 - Type: excluded(型契約は `src/types-test.md` S4 の責務)
 
 **失敗系/正常系比（煙感知器）**: 正常系1件（TC-091）、失敗系0件。本セクションは撤去された module state の置き換え配線 1 本だけを対象とする追補で、cancel・自動確定・型の失敗源はいずれも S17 と `src/types-test.md` S4 へ割り当て済みであることを確認した。
+
+## S20: checkoutBranchAction() remote target・初期値・prompt
+
+> Origin: Feature 051 (remote-checkout-pull) (light-spec-plan)
+> Added: 2026-08-06
+> Status: active
+> Supersedes: S1
+> Signature: `checkoutBranchAction(repo: string, sourceElem: HTMLElement, refName: string, isRemoteCombined?: boolean, recordAction?: boolean): void`
+> Target Path: `web/refMenu.ts`（`checkoutBranchAction()`）
+> Test File: `tests/web/refMenu.test.ts`
+
+remote ref の branch 部分を初期値として提案する S1 の契約を維持し、callback では parse 済みの remote 名 / branch 名を構造化 target として送る。同名既存 branch なら checkout 後に選択 remote branch を pull することを説明する新 prompt を使う。host routing と Git 実行は各 backend owner の責務。
+
+| Case ID | Input / Precondition                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                     | Notes                             |
+| ------- | ------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| TC-092  | remote ref `origin/feature/ebook`                       | Normal - 2階層の初期値                                                     | `showRefInputDialog` が default value `"feature/ebook"` で 1 回呼ばれる                                                                                                                                                                                                                             | S1/TC-001 の引き継ぎ              |
+| TC-093  | remote ref `origin/main`                                | Normal - 1階層の初期値                                                     | `showRefInputDialog` が default value `"main"` で 1 回呼ばれる                                                                                                                                                                                                                                      | S1/TC-002 の引き継ぎ              |
+| TC-094  | remote ref `origin/a/b/c`                               | Normal - 3階層の初期値                                                     | `showRefInputDialog` が default value `"a/b/c"` で 1 回呼ばれる                                                                                                                                                                                                                                     | S1/TC-003 の引き継ぎ              |
+| TC-095  | remote ref `upstream/feature/x`                         | Normal - 別 remote の初期値                                                | `showRefInputDialog` が default value `"feature/x"` で 1 回呼ばれる                                                                                                                                                                                                                                 | S1/TC-004 の引き継ぎ              |
+| TC-096  | remote ref `origin`（slash なし）                       | Boundary - slash なし                                                      | `showRefInputDialog` が fallback default value `"origin"` で 1 回呼ばれる                                                                                                                                                                                                                           | 空 parse 結果から入力不能にしない |
+| TC-097  | remote ref `o/x`                                        | Boundary - minimum ref parts                                               | `showRefInputDialog` が default value `"x"` で 1 回呼ばれる                                                                                                                                                                                                                                         | S1/TC-006 の引き継ぎ              |
+| TC-098  | `origin/main` の dialog callback に `"main"` を渡す     | Normal - structured remote payload                                         | `sendMessage` が `{ command: "checkoutBranch", repo, branchName: "main", remoteBranch: { remoteName: "origin", branchName: "main" } }` で 1 回呼ばれる                                                                                                                                              | object payload                    |
+| TC-099  | local HEAD `main` を直接 checkout                       | Normal - local payload                                                     | `sendMessage` が `{ command: "checkoutBranch", repo, branchName: "main", remoteBranch: null }` で 1 回呼ばれ、dialog は呼ばれない                                                                                                                                                                   | local 経路維持                    |
+| TC-100  | remote ref `origin/main` の dialog を開く               | Normal - checkout＋pull prompt                                             | `showRefInputDialog` の prompt が `t("Enter the local branch name for checking out {0}. If a branch with the same name already exists, the selected remote branch will be pulled after checkout:", "<b><i>origin/main</i></b>")` の戻り値と一致する。旧「new branch を作成する」prompt は使われない | 同名既存時の pull を説明          |
+| TC-101  | remote checkout dialog を cancel（callback 未呼び出し） | Boundary - cancel path                                                     | `sendMessage` と `recordRecentAction` の call count が 0                                                                                                                                                                                                                                            | 未確定時は送信しない              |
+
+### 失敗源インベントリ（include-or-justify）— Feature 051 追加分（S20）
+
+| 失敗源                                      | 対応ケースまたは除外理由                                                                                                   |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| branch 名初期値の欠落・階層切り捨て         | TC-092〜TC-097                                                                                                             |
+| remote target の文字列化 / field 取り違え   | TC-098                                                                                                                     |
+| local checkout へ remote object を混入      | TC-099                                                                                                                     |
+| 新規 branch 専用と読める旧 prompt の残存    | TC-100                                                                                                                     |
+| prompt placeholder の remote ref 取り違え   | TC-100                                                                                                                     |
+| cancel 時の送信・recent action 記録         | TC-101                                                                                                                     |
+| host routing / Git 実行分岐                 | excluded(`src/gitGraphView-test/01-message-routing-03.md` S32 / `src/dataSource-test/02-branch-worktree-02.md` S46 の責務) |
+| response の refresh / error 表示            | excluded(`web/messageHandler-test/03-git-operation-responses-01.md` S15 の責務)                                            |
+| 境界値（0 / maximum / +/-1 / NULL / empty） | excluded(数値境界を持たない。最短 ref は TC-097、slash なしは TC-096、cancel は TC-101 で検証)                             |
+| 不正な型・payload field 欠落                | excluded(`src/types-test.md` S6 の責務)                                                                                    |
+| 外部依存の失敗・例外送出                    | excluded(webview 内の dialog / message 呼び出しのみで外部依存と throw 経路を持たない)                                      |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(callback に runtime validation 分岐がなく、payload 値の一致は TC-098 / TC-099 で検証)
+- Exception: excluded(throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: TC-096、TC-097、TC-101
+- Type: excluded(`src/types-test.md` S6 の責務)
+
+**失敗系/正常系比（煙感知器）**: 正常系7件（TC-092〜TC-095、TC-098〜TC-100）、失敗系3件（TC-096、TC-097、TC-101）。UI 入力の境界は ref 構造と cancel に限られ、runtime validation と Git failure は owner 外として対応付けた。
