@@ -20,6 +20,7 @@ import {
   GitRepoSet,
   RequestMessage,
   type RequestPush,
+  type ResponseCheckoutBranch,
   ResponseMessage,
   type ResponsePush,
   UNCOMMITTED_CHANGES_HASH
@@ -190,15 +191,7 @@ export class GitKeizuView {
                 msg.branchName,
                 msg.remoteBranch
               );
-              this.sendMessage(
-                checkoutResult.kind === "completed"
-                  ? {
-                      command: "checkoutBranch",
-                      kind: "completed",
-                      status: checkoutResult.status
-                    }
-                  : { command: "checkoutBranch", kind: checkoutResult.kind }
-              );
+              this.sendMessage(buildCheckoutBranchResponse(checkoutResult));
               break;
             }
             case "checkoutCommit":
@@ -889,6 +882,19 @@ export class GitKeizuView {
   }
 }
 
+function buildCheckoutBranchResponse(result: CheckoutBranchResult): ResponseCheckoutBranch {
+  switch (result.kind) {
+    case "branchExists":
+    case "invalidRef":
+    case "remoteNotFound":
+      return { command: "checkoutBranch", kind: result.kind };
+    case "pullFailed":
+      return { command: "checkoutBranch", kind: "pullFailed", status: result.status };
+    case "completed":
+      return { command: "checkoutBranch", kind: "completed", status: result.status };
+  }
+}
+
 function describeCheckoutResult(result: CheckoutBranchResult): GitCommandStatus {
   switch (result.kind) {
     case "completed":
@@ -897,6 +903,10 @@ function describeCheckoutResult(result: CheckoutBranchResult): GitCommandStatus 
       return BRANCH_ALREADY_EXISTS_MESSAGE;
     case "invalidRef":
       return INVALID_REF_NAME_MESSAGE;
+    case "remoteNotFound":
+      return UNREGISTERED_REMOTE_MESSAGE;
+    case "pullFailed":
+      return result.status;
   }
 }
 
