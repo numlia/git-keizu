@@ -109,12 +109,15 @@ function hasInvalidDividers(menu: ContextMenuElement[]): boolean {
   return menu.some((item, index) => item === null && menu[index + 1] === null);
 }
 
+// S20: checkoutBranchAction() remote target・初期値・prompt
+// @see docs/testing/perspectives/web/refMenu-test/01-branch-actions-01.md
 describe("checkoutBranchAction branch name suggestion", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("suggests 'feature/ebook' from 'origin/feature/ebook' (TC-001)", () => {
+  it("suggests 'feature/ebook' from 'origin/feature/ebook' (TC-092)", () => {
+    // Case: TC-092
     // Given: A remote branch ref "origin/feature/ebook" with isRemoteCombined=true
     const sourceElem = createMockElement(["remote"]);
 
@@ -127,7 +130,8 @@ describe("checkoutBranchAction branch name suggestion", () => {
     expect(defaultBranchName).toBe("feature/ebook");
   });
 
-  it("suggests 'main' from 'origin/main' (TC-002)", () => {
+  it("suggests 'main' from 'origin/main' (TC-093)", () => {
+    // Case: TC-093
     // Given: A remote branch ref "origin/main"
     const sourceElem = createMockElement(["remote"]);
 
@@ -140,7 +144,8 @@ describe("checkoutBranchAction branch name suggestion", () => {
     expect(defaultBranchName).toBe("main");
   });
 
-  it("suggests 'a/b/c' from 'origin/a/b/c' for deep nesting (TC-003)", () => {
+  it("suggests 'a/b/c' from 'origin/a/b/c' for deep nesting (TC-094)", () => {
+    // Case: TC-094
     // Given: A deeply nested remote branch ref "origin/a/b/c"
     const sourceElem = createMockElement(["remote"]);
 
@@ -153,7 +158,8 @@ describe("checkoutBranchAction branch name suggestion", () => {
     expect(defaultBranchName).toBe("a/b/c");
   });
 
-  it("suggests 'feature/x' from 'upstream/feature/x' for non-origin remote (TC-004)", () => {
+  it("suggests 'feature/x' from 'upstream/feature/x' for non-origin remote (TC-095)", () => {
+    // Case: TC-095
     // Given: A remote branch ref from "upstream" remote
     const sourceElem = createMockElement(["remote"]);
 
@@ -166,7 +172,8 @@ describe("checkoutBranchAction branch name suggestion", () => {
     expect(defaultBranchName).toBe("feature/x");
   });
 
-  it("uses full refName when no slash is present (TC-005)", () => {
+  it("uses full refName when no slash is present (TC-096)", () => {
+    // Case: TC-096
     // Given: A branch ref "origin" with no slash (edge case, should not normally occur)
     const sourceElem = createMockElement(["remote"]);
 
@@ -179,7 +186,8 @@ describe("checkoutBranchAction branch name suggestion", () => {
     expect(defaultBranchName).toBe("origin");
   });
 
-  it("suggests 'x' from 'o/x' for minimal path (TC-006)", () => {
+  it("suggests 'x' from 'o/x' for minimal path (TC-097)", () => {
+    // Case: TC-097
     // Given: A minimal remote branch ref "o/x" (1-char remote + 1-char branch)
     const sourceElem = createMockElement(["remote"]);
 
@@ -193,12 +201,71 @@ describe("checkoutBranchAction branch name suggestion", () => {
   });
 });
 
+describe("checkoutBranchAction remote checkout request", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("sends a structured remote target from the dialog callback (TC-098)", () => {
+    // Case: TC-098
+    // Given: the origin/main checkout dialog is open
+    const sourceElem = createMockElement(["remote"]);
+    checkoutBranchAction(REPO, sourceElem, "origin/main", true);
+    const callback = (showRefInputDialog as ReturnType<typeof vi.fn>).mock.calls[0][3] as (
+      branchName: string
+    ) => void;
+
+    // When: the user confirms main as the local branch name
+    callback("main");
+
+    // Then: one request keeps remote and branch names in separate fields
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "checkoutBranch",
+      repo: REPO,
+      branchName: "main",
+      remoteBranch: { remoteName: "origin", branchName: "main" }
+    });
+  });
+
+  it("explains matching checkout and selected remote pull in the prompt (TC-100)", () => {
+    // Case: TC-100
+    // Given: an origin/main remote branch
+    const sourceElem = createMockElement(["remote"]);
+
+    // When: checkoutBranchAction opens its input dialog
+    checkoutBranchAction(REPO, sourceElem, "origin/main", true);
+
+    // Then: the prompt uses the new checkout-and-pull source key with the remote ref
+    const prompt = (showRefInputDialog as ReturnType<typeof vi.fn>).mock.calls[0][0];
+    expect(prompt).toBe(
+      "Enter the local branch name for checking out <b><i>origin/main</i></b>. If a branch with the same name already exists, the selected remote branch will be pulled after checkout:"
+    );
+    expect(prompt).not.toContain("create a new branch");
+  });
+
+  it("does not send or record an action when the dialog is cancelled (TC-101)", () => {
+    // Case: TC-101
+    // Given: remote checkout records recent actions only after dialog confirmation
+    const sourceElem = createMockElement(["remote"]);
+
+    // When: the dialog is opened and its callback is not invoked
+    checkoutBranchAction(REPO, sourceElem, "origin/main", true, true);
+
+    // Then: cancellation produces no message and no recent-action record
+    expect(showRefInputDialog).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledTimes(0);
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
+  });
+});
+
 describe("checkoutBranchAction local branch checkout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("sends checkoutBranch message directly for local head branch", () => {
+  it("sends checkoutBranch message directly for local head branch (TC-099)", () => {
+    // Case: TC-099
     // Given: A local branch element with "head" class (not remote)
     const sourceElem = createMockElement(["head"]);
 

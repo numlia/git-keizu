@@ -19,6 +19,7 @@ import {
   GitUnsavedChanges,
   PushPreparation,
   PushTarget,
+  RemoteBranchTarget,
   UNCOMMITTED_CHANGES_HASH,
   VALID_UNCOMMITTED_RESET_MODES,
   WorktreeMap
@@ -736,7 +737,7 @@ export class DataSource {
   public async checkoutBranch(
     repo: string,
     branchName: string,
-    remoteBranch: string | null
+    remoteBranch: RemoteBranchTarget | null
   ): Promise<CheckoutBranchResult> {
     if (!isValidRefName(branchName)) {
       return { kind: "invalidRef" };
@@ -747,27 +748,59 @@ export class DataSource {
         status: await this.runGitCommandSpawn(["checkout", branchName], repo)
       };
     }
-    if (!isValidRefName(remoteBranch)) {
+    if (
+      typeof remoteBranch !== "object" ||
+      typeof remoteBranch.remoteName !== "string" ||
+      typeof remoteBranch.branchName !== "string"
+    ) {
+      return { kind: "invalidRef" };
+    }
+    const remoteTrackingRef = `${remoteBranch.remoteName}/${remoteBranch.branchName}`;
+    if (
+      !isSafeRemoteName(remoteBranch.remoteName) ||
+      !isValidRefName(remoteBranch.branchName) ||
+      !isValidRefName(remoteTrackingRef)
+    ) {
       return { kind: "invalidRef" };
     }
 
-    // A local branch of the same name would be moved onto the remote commit, so check for it
-    // before creating anything and leave the existing branch to the caller.
     const existingBranch = await this.runGitQuery(["branch", "--list", branchName], repo);
     if (existingBranch.kind === "error") {
       return { kind: "completed", status: existingBranch.status };
     }
-    if (existingBranch.stdout.trim() !== "") {
+    if (existingBranch.stdout.trim() === "") {
+      return {
+        kind: "completed",
+        status: await this.runGitCommandSpawn(
+          ["checkout", "--track", "-b", branchName, remoteTrackingRef],
+          repo
+        )
+      };
+    }
+    if (branchName !== remoteBranch.branchName) {
       return { kind: "branchExists" };
     }
 
-    return {
-      kind: "completed",
-      status: await this.runGitCommandSpawn(
-        ["checkout", "--track", "-b", branchName, remoteBranch],
-        repo
-      )
-    };
+    const remotes = await this.queryRemoteNames(repo);
+    if (remotes.kind === "error") {
+      return { kind: "completed", status: remotes.status };
+    }
+    if (!remotes.remotes.includes(remoteBranch.remoteName)) {
+      return { kind: "remoteNotFound" };
+    }
+
+    const checkoutStatus = await this.runGitCommandSpawn(["checkout", branchName], repo);
+    if (checkoutStatus !== null) {
+      return { kind: "completed", status: checkoutStatus };
+    }
+
+    const pullStatus = await this.runGitCommandSpawn(
+      ["pull", remoteBranch.remoteName, remoteBranch.branchName],
+      repo
+    );
+    return pullStatus === null
+      ? { kind: "completed", status: null }
+      : { kind: "pullFailed", status: pullStatus };
   }
 
   public checkoutCommit(repo: string, commitHash: string) {

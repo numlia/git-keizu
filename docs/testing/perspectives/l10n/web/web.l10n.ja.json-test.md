@@ -98,3 +98,42 @@ remote checkout の拒否理由と二段階 Push の選択 UI に使う 5 キー
 - Type: excluded(値は JSON string で型分岐が存在しない)
 
 **失敗系/正常系比（煙感知器）**: 正常系5件（TC-005〜TC-009）、失敗系1件（TC-010）。静的 JSON データの存在・非空検証が中心で実行分岐を持たないため、失敗系が少ないことはインベントリ欠落ではないことを確認した。
+
+## S4: 同名 remote checkout＋pull の日本語 prompt / error
+
+> Origin: Feature 051 (remote-checkout-pull) (light-spec-plan)
+> Added: 2026-08-06
+> Status: active
+> Supersedes: -
+> Signature: 追加キー `Enter the local branch name for checking out {0}. If a branch with the same name already exists, the selected remote branch will be pulled after checkout:` / `error.checkoutRemoteNotFound`
+> Target Path: `l10n/web/web.l10n.ja.json`
+> Test File: `tests/web/i18n.test.ts`
+
+| Case ID | Input / Precondition                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                | Notes                 |
+| ------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| TC-011  | ja bundle から Feature 051 prompt source key を読み込む           | Normal - checkout＋pull prompt                                             | key が存在し、値が非空の日本語文字列で「選択したリモートブランチ」と同名既存時の pull を明示し、`{0}` placeholder をちょうど 1 個含む          | 利用者説明            |
+| TC-012  | ja bundle から `error.checkoutRemoteNotFound` を読み込む          | Normal - remote not found error                                            | key が存在し、値が非空の日本語文字列で、値が raw key `error.checkoutRemoteNotFound` と一致しない                                               | raw fallback 防止     |
+| TC-013  | ja / en 両 bundle で prompt と error key 集合・placeholder を比較 | Validation - locale parity / raw fallback                                  | en bundle で欠落している key が 0 件、prompt の placeholder 集合が両 locale で `{0}` と一致し、ja の 2 値がいずれも key 文字列そのものではない | parity と未翻訳を検出 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 051 追加分（S4）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                                                                                |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| ja prompt key の欠落・空値                            | TC-011                                                                                                                                  |
+| ja remoteNotFound key の欠落・空値                    | TC-012                                                                                                                                  |
+| raw key fallback / 未翻訳                             | TC-012、TC-013                                                                                                                          |
+| 片 locale だけの追加 / placeholder 不一致             | TC-013                                                                                                                                  |
+| UI での prompt / error 利用分岐                       | excluded(`web/refMenu-test/01-branch-actions-01.md` S20 TC-100 / `web/messageHandler-test/03-git-operation-responses-01.md` S15 の責務) |
+| 境界値（0 / minimum / maximum / +/-1 / NULL / empty） | excluded(静的 JSON に数値境界がなく、empty は TC-011 / TC-012 の非空検証で充足)                                                         |
+| 外部依存の失敗・例外送出                              | excluded(bundle は静的データで外部依存と throw 経路を持たない)                                                                          |
+| 不正な型・形式                                        | excluded(JSON string の型は parse / TypeScript で保証し、placeholder 形式は TC-011 / TC-013 で検証)                                     |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-013
+- Exception: excluded(throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: excluded(数値境界なし。empty は TC-011 / TC-012 で検証)
+- Type: excluded(bundle 値は string の静的データ)
+
+**失敗系/正常系比（煙感知器）**: 正常系2件（TC-011、TC-012）、失敗系1件（TC-013）。件数が近いため再導出し、静的 locale の失敗源が欠落・空値・parity・placeholder・raw fallback に限られることを確認した。

@@ -10,8 +10,9 @@
 
 > Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
 > Added: 2026-08-03
-> Status: active
+> Status: superseded
 > Supersedes: S9
+> Superseded By: S46
 > Signature: `checkoutBranch(repo: string, branchName: string, remoteBranch: string | null): Promise<CheckoutBranchResult>`
 > Target Path: `src/dataSource.ts`（`checkoutBranch()`。実装後に行範囲へ更新）
 > Test File: `tests/src/dataSource.test.ts` / `tests/src/dataSource.git.test.ts`
@@ -174,3 +175,72 @@ Task 6 の coverage 分析で、`branch.<name>.merge` が `refs/heads/` 以外�
 - Type: excluded(型契約は `src/types-test.md` S3 の責務)
 
 **失敗系/正常系比（煙感知器）**: 正常系0件、失敗系1件（TC-266）。本セクションは既存 S42 が取りこぼした拒否分岐 1 本だけを対象とする追補のため、正常系0件はインベントリ欠落ではないことを確認した（正常系の upstream 昇格は S42 TC-243 が担保）。
+
+## S46: checkoutBranch() 同名 remote checkout の checkout＋pull
+
+> Origin: Feature 051 (remote-checkout-pull) (light-spec-plan)
+> Added: 2026-08-06
+> Status: active
+> Supersedes: S41
+> Signature: `checkoutBranch(repo: string, branchName: string, remoteBranch: RemoteBranchTarget | null): Promise<CheckoutBranchResult>`
+> Target Path: `src/dataSource.ts`（`checkoutBranch()`）
+> Test File: `tests/src/dataSource.test.ts` / `tests/src/dataSource.git.test.ts`
+
+local checkout と未使用名の tracking checkout を維持しつつ、remote branch と同名の既存 local branch だけを checkout 後に明示 remote / branch で pull する。別名の既存 branch は従来どおり拒否し、同名経路だけで remote 実在確認を行う。Git 実行結果を response へ写像する責務は `src/gitGraphView-test/01-message-routing-03.md` S32、表示責務は `web/messageHandler-test/03-git-operation-responses-01.md` S15 に置く。
+
+| Case ID | Input / Precondition                                                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                         | Notes                         |
+| ------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| TC-267  | `branchName = "-delete"`, `remoteBranch = { remoteName: "origin", branchName: "main" }`                 | Validation - 不正 local ref                                                | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | local guard                   |
+| TC-268  | `branchName = ""`, `remoteBranch = null`                                                                | Boundary - empty local branch                                              | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | local 経路も検証              |
+| TC-269  | `branchName = "main"`, `remoteName = "-evil"`                                                           | Validation - 不正 remote 名                                                | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | remote query 前に停止         |
+| TC-270  | `branchName = "main"`, `remoteName = ""`                                                                | Boundary - empty remote 名                                                 | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | empty を独立検証              |
+| TC-271  | `branchName = "main"`, `remoteBranch.branchName = "main..x"`                                            | Validation - 不正 remote branch ref                                        | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | remote branch guard           |
+| TC-272  | `branchName = "main"`, `remoteBranch.branchName = ""`                                                   | Boundary - empty remote branch                                             | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | empty を独立検証              |
+| TC-273  | `remoteBranch = null`、`checkout main` が exit 0                                                        | Normal - local checkout                                                    | `cp.spawn` が `['checkout', 'main']` で 1 回呼ばれ、`{ kind: "completed", status: null }` を返す                                                                                                                        | S41/TC-234 の引き継ぎ         |
+| TC-274  | `remoteBranch = null`、`checkout main` が `"error: pathspec"` で失敗                                    | Exception - local checkout 失敗                                            | `{ kind: "completed", status: "error: pathspec" }` を返し、`pull` args の call count が 0                                                                                                                               | S41/TC-239 の引き継ぎ         |
+| TC-275  | local `feature/new` が未使用、target が `{ origin, feature/new }`                                       | Normal - tracking checkout                                                 | `cp.spawn` が `['checkout', '--track', '-b', 'feature/new', 'origin/feature/new']` で 1 回呼ばれ、`{ kind: "completed", status: null }` を返す。remote 一覧 query と `pull` の call count は 0、args に `-B` を含まない | S41/TC-236・TC-241 の引き継ぎ |
+| TC-276  | TC-275 の tracking checkout が `"fatal: invalid reference"` で失敗                                      | Exception - tracking checkout 失敗                                         | `{ kind: "completed", status: "fatal: invalid reference" }` を返し、remote 一覧 query と `pull` の call count が 0                                                                                                      | S41/TC-238 の引き継ぎ         |
+| TC-277  | target は `origin/main`、既存 local は入力名 `develop`                                                  | Validation - 別名既存 branch                                               | `{ kind: "branchExists" }` を返し、存在確認以後の remote query / checkout / pull の call count が 0                                                                                                                     | 誤履歴混入を防ぐ              |
+| TC-278  | target は `origin/main`、同名 local `main` が存在し、remote 一覧に `origin` があり全 Git command が成功 | Normal - 同名 checkout＋pull                                               | Git call が存在確認 → remote 一覧 query → `['checkout', 'main']` → `['pull', 'origin', 'main']` の順で各 1 回実行され、`{ kind: "completed", status: null }` を返す                                                     | 引数と順序を固定              |
+| TC-279  | 同名 local `main` が存在するが remote 一覧に `origin` がない                                            | Validation - remote 不在                                                   | `{ kind: "remoteNotFound" }` を返し、checkout / pull の call count が 0                                                                                                                                                 | remote 実在 guard             |
+| TC-280  | 同名 local `main` が存在し、remote query が `"fatal: remote fail"` で失敗                               | External - remote query 失敗                                               | `{ kind: "completed", status: "fatal: remote fail" }` を返し、checkout / pull の call count が 0                                                                                                                        | 失敗詳細を維持                |
+| TC-281  | remote 照合成功後の `checkout main` が `"fatal: checkout failed"` で失敗                                | Exception - 同名 checkout 失敗                                             | `{ kind: "completed", status: "fatal: checkout failed" }` を返し、`pull` の call count が 0                                                                                                                             | pull 前に停止                 |
+| TC-282  | `checkout main` 成功後の `pull origin main` が `"CONFLICT"` で失敗                                      | External - pull 失敗                                                       | `{ kind: "pullFailed", status: "CONFLICT" }` を返す。current branch は `main` のままで rollback / reset command の call count が 0                                                                                      | 部分成功を保持                |
+| TC-283  | local `main` の upstream が `upstream/main`、target が `origin/main`                                    | Normal - 選択 remote の優先                                                | pull args が `['pull', 'origin', 'main']` と一致し、`branch.main.remote` と `branch.main.merge` が実行前後でそれぞれ `upstream` / `refs/heads/main` のまま                                                              | upstream を書き換えない       |
+| TC-284  | 実 Git 一時 repository。local `main` が remote `origin/main` より 1 commit 遅れた fast-forward 可能状態 | Normal - fast-forward（実 Git）                                            | 戻り値が `{ kind: "completed", status: null }`。`rev-parse main` と `rev-parse origin/main` の hash が一致し、current branch が `main`、worktree が clean                                                               | 実 repository state を観測    |
+| TC-285  | 実 Git 一時 repository。local / `origin/main` が diverged、`pull.ff=only` を設定                        | Exception - diverged pull 拒否（実 Git）                                   | `kind` が `pullFailed` で `status` が非空。current branch は `main`、local branch hash と worktree は pull 前と一致し、reset / `-B` による自動 rollback がない                                                          | 決定的な拒否                  |
+| TC-286  | 実 Git 一時 repository。target は `origin/main`、入力 local 名は既存 `develop`                          | Validation - 別名拒否の repository 保全（実 Git）                          | `{ kind: "branchExists" }`。`main` / `develop` の hash、current branch、upstream config、`status --porcelain` が実行前後で一致する                                                                                      | S41/TC-240・TC-242 の引き継ぎ |
+| TC-287  | Given: target は `origin/main` / When: local branch existence query が `"fatal: not a git repository"`  | External - local branch existence query 失敗                               | Then: Git query が args `['branch', '--list', 'main']` で 1 回だけ呼ばれ、`{ kind: "completed", status: "fatal: not a git repository" }` を返す。remote query / checkout / pull args の call count は 0                 | S41/TC-237 の引き継ぎ         |
+| TC-288  | webview 由来の runtime payload で `remoteBranch = undefined`                                            | Type - undefined remote target                                             | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | object guard                  |
+| TC-289  | webview 由来の runtime payload で `remoteBranch = "origin/main"`                                        | Type - non-object remote target                                            | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | object guard                  |
+| TC-290  | webview 由来の runtime payload で `remoteBranch = { remoteName: "origin" }`                             | Type - remote target field 欠落                                            | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | `branchName` 欠落             |
+| TC-291  | webview 由来の runtime payload で `remoteBranch = { remoteName: 1, branchName: "main" }`                | Type - remote target field が非 string                                     | `{ kind: "invalidRef" }` を返し、`cp.spawn` の call count が 0                                                                                                                                                          | `remoteName` が number        |
+
+### 失敗源インベントリ（include-or-justify）— Feature 051 追加分（S46）
+
+| 失敗源                                                              | 対応ケースまたは除外理由                                                                                                                |
+| ------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| 入力検証 × 不正 local ref / empty                                   | TC-267、TC-268                                                                                                                          |
+| 入力検証 × unsafe / empty remote 名                                 | TC-269、TC-270                                                                                                                          |
+| 入力検証 × 不正 / empty remote branch ref                           | TC-271、TC-272                                                                                                                          |
+| 存在 guard × 別名既存 branch                                        | TC-277、TC-286                                                                                                                          |
+| local branch existence query × query 失敗                           | TC-287                                                                                                                                  |
+| remote query × 不在 / query 失敗                                    | TC-279、TC-280                                                                                                                          |
+| checkout × local / tracking / 同名経路の失敗                        | TC-274、TC-276、TC-281                                                                                                                  |
+| pull × 失敗と部分成功                                               | TC-282、TC-285                                                                                                                          |
+| 各分岐の negative 側（local / 新規 tracking / 同名 checkout＋pull） | TC-273、TC-275、TC-278                                                                                                                  |
+| 既存 upstream に従う誤 pull / upstream 書換え                       | TC-283                                                                                                                                  |
+| 実 repository の fast-forward / branch 保全                         | TC-284、TC-285、TC-286                                                                                                                  |
+| `-B` / hard reset / rollback の再導入                               | TC-275、TC-282、TC-285                                                                                                                  |
+| 境界値（0 / minimum / maximum / +/-1 / NULL）                       | excluded(ref と remote は文字列で数値境界を持たない。`remoteBranch: null` は TC-273 / TC-274、empty は TC-268 / TC-270 / TC-272 で検証) |
+| 不正な型・payload field 欠落                                        | TC-288、TC-289、TC-290、TC-291                                                                                                          |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-267、TC-269、TC-271、TC-277、TC-279、TC-286
+- Exception: TC-274、TC-276、TC-281、TC-285
+- External: TC-280、TC-282、TC-287
+- Boundary: TC-268、TC-270、TC-272
+- Type: TC-288、TC-289、TC-290、TC-291
+
+**失敗系/正常系比（煙感知器）**: 正常系5件（TC-273、TC-275、TC-278、TC-283、TC-284）、失敗系20件（残り）。比は 4.0:1 で、失敗源インベントリから導出した結果である。

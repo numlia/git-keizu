@@ -38,8 +38,9 @@
 
 > Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
 > Added: 2026-08-03
-> Status: active
+> Status: superseded
 > Supersedes: S11
+> Superseded By: S32
 > Signature: `case "checkoutBranch"` / `case "createBranch"` の routing（`CheckoutBranchResult` → `ResponseCheckoutBranch`）
 > Target Path: `src/gitGraphView.ts`（`handleMessage` switch の `case "checkoutBranch"` と `case "createBranch"`。実装後に行範囲へ更新）
 > Test File: `tests/src/gitGraphView.test.ts`
@@ -160,3 +161,55 @@
 - Type: excluded(型契約は `src/types-test.md` S4 の責務。host 側は値の routing のみを検証する)
 
 **失敗系/正常系比（煙感知器）**: 正常系5件（TC-133、TC-134、TC-138、TC-143、TC-145）、失敗系8件（TC-135、TC-136、TC-137、TC-139、TC-140、TC-141、TC-142、TC-144）。比は 1.6:1 で、S28 と同じ分岐構成へ repo 相関の1件を加えた結果である。
+
+## S32: checkout remote target の中継と 5 kind Response 写像
+
+> Origin: Feature 051 (remote-checkout-pull) (light-spec-plan)
+> Added: 2026-08-06
+> Status: active
+> Supersedes: S29
+> Signature: `case "checkoutBranch"` の routing（`RequestCheckoutBranch` → `DataSource.checkoutBranch()` → `ResponseCheckoutBranch`）/ `case "createBranch"`
+> Target Path: `src/gitGraphView.ts`（`handleMessage` switch の `case "checkoutBranch"` / `case "createBranch"` と `describeCheckoutResult()`）
+> Test File: `tests/src/gitGraphView.test.ts`
+
+request の構造化 remote target を加工せず DataSource へ渡し、5 kind の result を同じ kind / field の response へ写像する。createBranch 成功後の local checkout と部分成功メッセージは S29 から引き継ぎ、通常到達しない remote-only kind も exhaustive な説明関数で処理する。Git 内部分岐は `src/dataSource-test/02-branch-worktree-02.md` S46、webview 表示は `web/messageHandler-test/03-git-operation-responses-01.md` S15 の責務。
+
+| Case ID | Input / Precondition                                                                                                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                | Notes                 |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| TC-146  | `{ command: "checkoutBranch", repo: "/r", branchName: "main", remoteBranch: { remoteName: "origin", branchName: "main" } }`、DataSource が completed/null を返す | Normal - structured target routing                                         | `dataSource.checkoutBranch` が `("/r", "main", { remoteName: "origin", branchName: "main" })` で 1 回呼ばれ、`sendMessage` が `{ command: "checkoutBranch", kind: "completed", status: null }` で 1 回呼ばれる | 引数不変中継          |
+| TC-147  | DataSource が `{ kind: "branchExists" }` を返す                                                                                                                  | Validation - branchExists 写像                                             | `sendMessage` が `{ command: "checkoutBranch", kind: "branchExists" }` で 1 回呼ばれ、`status` field を持たない                                                                                                | S29/TC-122 の引き継ぎ |
+| TC-148  | DataSource が `{ kind: "invalidRef" }` を返す                                                                                                                    | Validation - invalidRef 写像                                               | `sendMessage` が `{ command: "checkoutBranch", kind: "invalidRef" }` で 1 回呼ばれる                                                                                                                           | S29/TC-123 の引き継ぎ |
+| TC-149  | DataSource が `{ kind: "remoteNotFound" }` を返す                                                                                                                | Validation - remoteNotFound 写像                                           | `sendMessage` が `{ command: "checkoutBranch", kind: "remoteNotFound" }` で 1 回呼ばれ、`status` field を持たない                                                                                              | 新 kind               |
+| TC-150  | DataSource が `{ kind: "pullFailed", status: "CONFLICT" }` を返す                                                                                                | Exception - pullFailed 写像                                                | `sendMessage` が `{ command: "checkoutBranch", kind: "pullFailed", status: "CONFLICT" }` で 1 回呼ばれる                                                                                                       | status を保持         |
+| TC-151  | DataSource が `{ kind: "completed", status: "fatal: checkout" }` を返す                                                                                          | Exception - completed failure 写像                                         | `sendMessage` が `{ command: "checkoutBranch", kind: "completed", status: "fatal: checkout" }` で 1 回呼ばれる                                                                                                 | S29/TC-125 の引き継ぎ |
+| TC-152  | createBranch 成功 + `checkout: true`、local checkout が completed/`"fatal: pathspec"`                                                                            | Exception - create 後 checkout 失敗                                        | `ResponseCreateBranch.status` が `Branch 'feature/x' was created, but checkout failed: fatal: pathspec` と完全一致する                                                                                         | S29/TC-126 の引き継ぎ |
+| TC-153  | createBranch 成功 + `checkout: true`、local checkout が completed/null                                                                                           | Normal - create＋checkout 成功                                             | `checkoutBranch(repo, branchName, null)` が 1 回呼ばれ、`ResponseCreateBranch.status` が `null`                                                                                                                | S29/TC-127 の引き継ぎ |
+| TC-154  | createBranch 成功 + `checkout: true`、local checkout が `{ kind: "invalidRef" }`                                                                                 | Validation - create 後 non-completed result                                | `ResponseCreateBranch.status` が `Branch 'feature/x' was created, but checkout failed:` で始まり、`undefined` または生の kind にならない                                                                       | S29/TC-128 の引き継ぎ |
+| TC-155  | createBranch 成功 + `checkout: false`                                                                                                                            | Normal - checkout 抑止                                                     | `checkoutBranch` の call count が 0、`ResponseCreateBranch.status` が `null`                                                                                                                                   | S29/TC-129 の引き継ぎ |
+| TC-156  | createBranch が `"fatal: branch exists"` を返す + `checkout: true`                                                                                               | Exception - createBranch 失敗                                              | `checkoutBranch` の call count が 0、`ResponseCreateBranch.status` が `"fatal: branch exists"`                                                                                                                 | S29/TC-130 の引き継ぎ |
+| TC-157  | createBranch request の `checkout` が `undefined`                                                                                                                | Boundary - legacy compat                                                   | `checkoutBranch` の call count が 0、`ResponseCreateBranch.status` が `null`                                                                                                                                   | S29/TC-131 の引き継ぎ |
+
+### 失敗源インベントリ（include-or-justify）— Feature 051 追加分（S32）
+
+| 失敗源                                                                 | 対応ケースまたは除外理由                                                                                                      |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| structured remote target の field 欠落・文字列化                       | TC-146（object の deep equality と DataSource call args を検証）                                                              |
+| result kind の写像漏れ                                                 | TC-147〜TC-151                                                                                                                |
+| `pullFailed.status` の欠落・握り潰し                                   | TC-150                                                                                                                        |
+| createBranch 後 checkout の部分成功メッセージ崩れ                      | TC-152、TC-154                                                                                                                |
+| createBranch 失敗後 / checkout false / legacy request で checkout する | TC-155〜TC-157                                                                                                                |
+| 各分岐の negative 側（成功 response）                                  | TC-146、TC-153                                                                                                                |
+| remote query / checkout / pull 自体の失敗                              | excluded(DataSource 内部分岐は `src/dataSource-test/02-branch-worktree-02.md` S46 の責務)                                     |
+| webview の refresh / dialog 表示                                       | excluded(`web/messageHandler-test/03-git-operation-responses-01.md` S15 の責務)                                               |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）                  | excluded(payload は文字列と object で数値境界を持たない。`remoteBranch: null` は TC-153、legacy `undefined` は TC-157 で検証) |
+| 不正な型・payload field 欠落                                           | excluded(`src/types-test.md` S6 の型契約で担保)                                                                               |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-147、TC-148、TC-149、TC-154
+- Exception: TC-150、TC-151、TC-152、TC-156
+- External: excluded(external Git 依存は DataSource owner の責務)
+- Boundary: TC-157
+- Type: excluded(`src/types-test.md` S6 の責務)
+
+**失敗系/正常系比（煙感知器）**: 正常系3件（TC-146、TC-153、TC-155）、失敗系9件（残り）。比は 3.0:1 で、result kind と createBranch の既存分岐から導出した結果である。

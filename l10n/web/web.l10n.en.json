@@ -93,6 +93,7 @@
   "error.checkoutBranch": "Unable to Checkout Branch",
   "error.checkoutBranchExists": "A branch with this name already exists.",
   "error.checkoutInvalidRef": "The branch name is not a valid Git reference name.",
+  "error.checkoutRemoteNotFound": "The selected remote is not registered in this repository.",
   "error.checkoutCommit": "Unable to Checkout Commit",
   "error.cherrypickCommit": "Unable to Cherry Pick Commit",
   "error.cleanUntrackedFiles": "Unable to Clean Untracked Files",
@@ -204,5 +205,6 @@
   "Are you sure you want to push {0}?": "Are you sure you want to push {0}?",
   "Tag Name": "Tag Name",
   "Branch Name": "Branch Name",
-  "Enter the name of the new branch you would like to create when checking out {0}:": "Enter the name of the new branch you would like to create when checking out {0}:"
+  "Enter the name of the new branch you would like to create when checking out {0}:": "Enter the name of the new branch you would like to create when checking out {0}:",
+  "Enter the local branch name for checking out {0}. If a branch with the same name already exists, the selected remote branch will be pulled after checkout:": "Enter the local branch name for checking out {0}. If a branch with the same name already exists, the selected remote branch will be pulled after checkout:"
 }
