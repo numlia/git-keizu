@@ -42,6 +42,7 @@ const NULL_BYTE_OPTION = "-z";
 const NULL_BYTE_SEPARATOR = "\0";
 const NAME_STATUS_OPTION = "--name-status";
 const NUMSTAT_OPTION = "--numstat";
+const NO_WALK_SORTED_OPTION = "--no-walk=sorted";
 const TAB_SEPARATOR = "\t";
 const VALID_FILE_CHANGE_TYPES: ReadonlySet<string> = new Set(["A", "M", "D", "R"]);
 
@@ -103,6 +104,36 @@ function isRefNameSafe(refName: string): boolean {
 
 const VALID_RESET_MODES = new Set(["soft", "mixed", "hard"]);
 
+function parseGitLogCommits(stdout: string): GitCommit[] {
+  const lines = stdout.split(eolRegex);
+  const gitCommits: GitCommit[] = [];
+  for (let i = 0; i < lines.length - 1; i++) {
+    const line = lines[i].split(gitLogSeparator);
+    if (line.length !== LOG_FORMAT_FIELD_COUNT) break;
+    gitCommits.push({
+      hash: line[0],
+      parentHashes: line[1].split(" ").filter(Boolean),
+      author: line[2],
+      email: line[3],
+      date: parseInt(line[4], 10),
+      message: line[5]
+    });
+  }
+  return gitCommits;
+}
+
+/**
+ * Collect the HEAD of every detached worktree, deduplicated and restricted to
+ * hashes that pass validation, so that only safe values reach the Git arguments.
+ */
+function collectDetachedHeads(worktrees: WorktreeCollection): string[] {
+  const heads = new Set<string>();
+  for (const worktree of worktrees.detached) {
+    if (isValidCommitHash(worktree.head)) heads.add(worktree.head);
+  }
+  return [...heads];
+}
+
 export class DataSource {
   private gitPath: string = DEFAULT_GIT_PATH;
   private gitLogFormat!: string;
@@ -162,16 +193,25 @@ export class DataSource {
     authors: string[],
     commitOrdering: CommitOrdering
   ) {
-    const [commits, refData, stashes, authorList, worktrees] = await Promise.all([
+    const worktrees = await this.getWorktrees(repo);
+
+    const [commits, refData, stashes, authorList, pinnedCommits] = await Promise.all([
       this.getGitLog(repo, branches, maxCommits + 1, showRemoteBranches, authors, commitOrdering),
       this.getRefs(repo, showRemoteBranches),
       this.getStashes(repo),
       this.getAuthors(repo),
-      this.getWorktrees(repo)
+      this.getPinnedDetachedCommits(repo, collectDetachedHeads(worktrees), authors)
     ]);
 
     const moreCommitsAvailable = commits.length === maxCommits + 1;
     if (moreCommitsAvailable) commits.pop();
+
+    const knownHashes = new Set(commits.map((commit) => commit.hash));
+    for (const pinnedCommit of pinnedCommits) {
+      if (knownHashes.has(pinnedCommit.hash)) continue;
+      knownHashes.add(pinnedCommit.hash);
+      commits.push(pinnedCommit);
+    }
 
     if (refData.head !== null) {
       for (let i = 0; i < commits.length; i++) {
@@ -1163,28 +1203,24 @@ export class DataSource {
       if (showRemoteBranches) args.push("--remotes");
     }
 
-    return this.spawnGit(
-      args,
-      repo,
-      (stdout) => {
-        const lines = stdout.split(eolRegex);
-        const gitCommits: GitCommit[] = [];
-        for (let i = 0; i < lines.length - 1; i++) {
-          const line = lines[i].split(gitLogSeparator);
-          if (line.length !== LOG_FORMAT_FIELD_COUNT) break;
-          gitCommits.push({
-            hash: line[0],
-            parentHashes: line[1].split(" ").filter(Boolean),
-            author: line[2],
-            email: line[3],
-            date: parseInt(line[4], 10),
-            message: line[5]
-          });
-        }
-        return gitCommits;
-      },
-      []
-    );
+    return this.spawnGit<GitCommit[]>(args, repo, parseGitLogCommits, []);
+  }
+
+  /**
+   * Fetch the given detached worktree HEADs themselves, without walking their
+   * history, so that a HEAD outside the normal commit window can still be shown.
+   * The author filter is shared with the normal log, the branch filter is not.
+   */
+  private getPinnedDetachedCommits(repo: string, heads: string[], authors: string[]) {
+    if (heads.length === 0) return Promise.resolve<GitCommit[]>([]);
+
+    const args = ["log", NO_WALK_SORTED_OPTION, `--format=${this.gitLogFormat}`];
+    for (const author of authors) {
+      args.push(`--author=${escapeRegExp(author)}`);
+    }
+    args.push(...heads);
+
+    return this.spawnGit<GitCommit[]>(args, repo, parseGitLogCommits, []);
   }
 
   private getGitUnsavedChanges(repo: string) {
