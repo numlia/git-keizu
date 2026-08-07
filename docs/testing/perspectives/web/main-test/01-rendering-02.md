@@ -1,0 +1,81 @@
+# テスト観点表: web/main.ts
+
+> Source: `web/main.ts`
+> Generated: 2026-08-08T00:00:00Z
+> Language: TypeScript
+> Test Framework: Vitest
+> Responsibility: rendering
+
+## S48: worktree ラベル描画（branch lookup の collection 化と detached 表示専用ラベル）
+
+> Origin: Feature 052 (detached-worktree-display) (light-spec-plan)
+> Added: 2026-08-08
+> Status: active
+> Supersedes: S35
+> Signature: `private renderTable(): void` / `loadCommits(commits, commitHead, moreAvailable, forceRender, authors?, worktrees?: GG.WorktreeCollection)`
+> Target Path: `web/main.ts`（branch ラベル描画、detached ラベル描画、`gitRef` の contextmenu / dblclick / click handler。実装後に行範囲へ更新）
+> Test File: `tests/web/main.test.ts`
+
+webview 内部状態と `loadCommits()` の worktree 引数を `WorktreeCollection` へ変え、branch ラベルの lookup を `worktrees.branches` へ移したうえで、コミット行の hash と `DetachedWorktreeInfo.head` が一致し `isMain === false` の worktree について表示専用ラベル `gitRef worktree detachedWorktree` を描画する変更。detached ラベルは `data-name` を持たず、右クリックで branch context menu を開かず、ダブルクリックで checkout を実行しない。S35 は lookup 元が flat な `worktreeMap` であることを前提に branch ラベルの表示契約を固定していたため supersede し、branch 側の期待結果は本 section へ引き継ぐ。差分判定の helper そのものは `web/utils-test.md` S5、応答データの生成は `src/dataSource-test/02-branch-worktree-03.md` S47 の責務。
+
+| Case ID | Input / Precondition                                                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                              | Notes                                          |
+| ------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| TC-277  | `worktrees.branches` に `feature/x`（`isMain: false`）があり、同名 branch ラベルを持つコミット行            | Normal - branch worktree label                                             | 当該 `span` の class に `worktree` が含まれ、`data-worktree-path` 属性と `svgIcons.worktree` の要素を持つ    | S35/TC-194 の引き継ぎ                          |
+| TC-278  | `worktrees.branches` に存在しない branch 名のラベル                                                         | Normal - branch without worktree                                           | 当該 `span` の class に `worktree` を含まず、`data-worktree-path` 属性を持たない                             | S35/TC-195 の引き継ぎ                          |
+| TC-279  | `worktrees.branches` に `feature/x`（path=`/wt/x`）がある branch ラベル                                     | Normal - branch worktree title                                             | `title` 属性が `Worktree: /wt/x` である                                                                      | S35/TC-196 の引き継ぎ                          |
+| TC-280  | branch worktree の path が `<script>alert(1)</script>` を含む                                               | Boundary - branch path XSS prevention                                      | `data-worktree-path` の値が `escapeHtml()` 適用済みで、ラベル配下に `script` 要素が生成されない              | S35/TC-197 の引き継ぎ                          |
+| TC-281  | remote branch ラベル（`worktrees.branches` に同名 entry があっても）                                        | Normal - remote label exclusion                                            | worktree アイコンが表示されない                                                                              | S35/TC-198 の引き継ぎ                          |
+| TC-282  | branch worktree ラベルで contextmenu を発火                                                                 | Normal - branch worktreeInfo passed                                        | `buildRefContextMenuItems` へ渡る `worktreeInfo` が `{ path, isMainWorktree }` を持つ                        | S35/TC-199 の引き継ぎ                          |
+| TC-283  | worktree のない branch ラベルで contextmenu を発火                                                          | Normal - branch worktreeInfo null                                          | `buildRefContextMenuItems` へ渡る `worktreeInfo` が `null` である                                            | S35/TC-200 の引き継ぎ                          |
+| TC-284  | `worktrees.branches` が `{}`                                                                                | Boundary - empty branches map                                              | すべての branch ラベルが worktree 関連の class / 属性 / アイコンを持たない                                   | S35/TC-201 の引き継ぎ                          |
+| TC-285  | `detached` に `{ path: "/tmp/wt8", head: "abc1234", isMain: false }`、hash `abc1234` のコミット行が存在する | Normal - detached label rendered                                           | 当該行に class が `gitRef worktree detachedWorktree` の `span` が 1 個あり、`svgIcons.worktree` の要素を含む | 4.4 の描画契約                                 |
+| TC-286  | 同上の `detached` があり、hash が `def5678` の別コミット行                                                  | Validation - hash mismatch not labelled                                    | 当該行の `detachedWorktree` 要素の個数が 0 である                                                            | 8.3 の精度ガード                               |
+| TC-287  | `detached` に同じ `head` を指す 2 entry（path=`/tmp/b`, `/tmp/a`）                                          | Normal - multiple labels ordered by path                                   | 当該行の `detachedWorktree` 要素が 2 個で、`data-worktree-path` の並びが `["/tmp/a", "/tmp/b"]` である       | 完全 path の昇順                               |
+| TC-288  | `detached` の entry が `isMain: true` で、その `head` と一致するコミット行がある                            | Validation - detached main excluded                                        | 当該行の `detachedWorktree` 要素の個数が 0 である                                                            | 4.4 の main 非表示                             |
+| TC-289  | detached entry の path が `/tmp/a/wt8`                                                                      | Normal - basename displayed                                                | ラベルの表示テキストが `wt8` である                                                                          | 最終 component                                 |
+| TC-290  | detached entry の path が `/tmp/a/wt8/`（末尾スラッシュ）                                                   | Boundary - trailing separator stripped                                     | ラベルの表示テキストが `wt8` である                                                                          | 末尾区切りの除去                               |
+| TC-291  | detached entry の path が `C:\tmp\a\wt8`（バックスラッシュ区切り）                                          | Boundary - backslash separator                                             | ラベルの表示テキストが `wt8` である                                                                          | 区切り両対応                                   |
+| TC-292  | detached entry の path が `/`（最終 component が空になる）                                                  | Boundary - empty final component                                           | ラベルの表示テキストが `/`（完全 path）である                                                                | 4.4 のフォールバック                           |
+| TC-293  | detached entry の path が `<script>alert("x")&</script>/wt8`                                                | Boundary - detached path XSS prevention                                    | ラベル配下に `script` 要素が生成されず、`data-worktree-path` と `title` から元の path を復元できる           | 8.3 の精度ガード                               |
+| TC-294  | detached ラベルの DOM 属性を検査する                                                                        | Validation - no branch dataset                                             | `detachedWorktree` 要素が `data-name` 属性を持たない                                                         | branch ref として扱わせない                    |
+| TC-295  | detached ラベルで contextmenu を発火                                                                        | Validation - branch context menu suppressed                                | branch context menu の表示が 0 回で、`buildRefContextMenuItems` が呼ばれない                                 | 8.3 の精度ガード                               |
+| TC-296  | detached ラベルで dblclick を発火                                                                           | Validation - checkout suppressed                                           | checkout の `postMessage` 送信が 0 回である                                                                  | 8.3 の精度ガード                               |
+| TC-297  | detached ラベルで click を発火                                                                              | Normal - row propagation stopped                                           | コミット行の click handler が呼ばれない（0回）                                                               | 既存 ref ラベルと同じ伝播停止                  |
+| TC-298  | `loadCommits()` を `worktrees` 引数なしで呼ぶ                                                               | Boundary - response field omitted                                          | 内部状態が `{ branches: {}, detached: [] }` となり、`detachedWorktree` 要素の個数が 0 である                 | 4.1 の省略時契約                               |
+| TC-299  | 直前と `detached[0].head` だけが異なる worktrees を `forceRender=false` で `loadCommits()`                  | Normal - collection diff triggers rerender                                 | 再描画のスキップ分岐へ入らず、`detachedWorktree` ラベルが新しい hash の行へ描画される                        | 8.3 の差分検出                                 |
+| TC-300  | detached ラベルが描画される行に HEAD dot、remote / tag / stash ラベルが同居する                             | Normal - existing labels retained                                          | HEAD dot と remote / tag / stash の各ラベルが従来どおり 1 個ずつ描画される                                   | 5 章の維持契約                                 |
+| TC-301  | `detached` に 1 entry あるが、どのコミット行の hash とも一致しない                                          | Validation - no matching commit                                            | 全コミット行の `detachedWorktree` 要素の合計が 0 である                                                      | 8.3 の「存在するだけで全行に付ける」実装の禁止 |
+| TC-302  | `worktrees` が `{ branches: {...}, detached: [] }`                                                          | Boundary - empty detached array                                            | `detachedWorktree` 要素の個数が 0 で、branch worktree ラベルは従来どおり描画される                           | 空配列の境界                                   |
+
+### 失敗源インベントリ（include-or-justify）— Feature 052 追加分（S48）
+
+| 失敗源                                          | 対応ケースまたは除外理由                                                                                                                   |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| lookup 元の変更で branch worktree 表示が壊れる  | TC-277〜TC-284                                                                                                                             |
+| detached entry の存在だけで全行へラベルを付ける | TC-286、TC-301                                                                                                                             |
+| hash 一致以外の条件でラベルを出す・出さない     | TC-285、TC-286、TC-288                                                                                                                     |
+| detached main を linked と同様に表示する        | TC-288                                                                                                                                     |
+| 複数ラベルの順序が非決定になる                  | TC-287                                                                                                                                     |
+| 表示名の算出が path 形式に依存して壊れる        | TC-289〜TC-292                                                                                                                             |
+| path 由来の XSS                                 | TC-280、TC-293                                                                                                                             |
+| detached ラベルを branch 操作へ流す             | TC-294、TC-295、TC-296                                                                                                                     |
+| click の伝播抑止を失う                          | TC-297                                                                                                                                     |
+| 応答省略時に描画が壊れる                        | TC-298                                                                                                                                     |
+| 差分を検出できず古い描画のままになる            | TC-299                                                                                                                                     |
+| 既存 ref ラベル・HEAD dot の描画を壊す          | TC-300                                                                                                                                     |
+| 境界値（empty）                                 | TC-284（branches 空）、TC-292（表示名が空）、TC-298（field 省略）、TC-302（detached 空配列）                                               |
+| 境界値（minimum / maximum / +/-1 / 0）          | TC-285（label 1 個）、TC-287（label 2 個）、TC-286 / TC-288 / TC-301（label 0 個）。上限は collection に存在しないため非該当               |
+| 境界値（NULL）                                  | excluded(`worktrees` は optional field で `null` を取らない。未指定は TC-298 で検証)                                                       |
+| 外部依存の失敗                                  | excluded(描画は受領済み response だけに依存し、Git 実行の失敗は `src/dataSource-test/02-branch-worktree-03.md` S47 TC-308 / TC-309 の責務) |
+| 例外送出                                        | excluded(描画経路に throw を持たず、`data-name` の非 null assertion へ流さないことは TC-294〜TC-296 で担保する)                            |
+| 差分判定 helper 自体の誤り                      | excluded(`web/utils-test.md` S5 の責務)                                                                                                    |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-286、TC-288、TC-294、TC-295、TC-296、TC-301
+- Exception: excluded(throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: TC-280、TC-284、TC-290〜TC-293、TC-298、TC-302
+- Type: excluded(引数の型契約は `src/types-test.md` S7 の責務)
+
+**失敗系/正常系比（煙感知器）**: 正常系 12 件（TC-277〜TC-279、TC-281〜TC-283、TC-285、TC-287、TC-289、TC-297、TC-299、TC-300）、失敗系 14 件（TC-280、TC-284、TC-286、TC-288、TC-290〜TC-296、TC-298、TC-301、TC-302）。比 1.17 で近接（差 1 以内）ではないため、インベントリ再導出は不要と判断した。

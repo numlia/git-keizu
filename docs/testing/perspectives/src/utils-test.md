@@ -102,3 +102,55 @@
 | TC-016  | ファイル不在 + `getNewPathOfRenamedFile` が repo 外へ脱出する新パスを返す    | Validation - renamed path escape rejected                                  | リネーム先の `path.relative` が `".."` 始まりのため `PATH_TRAVERSAL_ERROR` を返す                                                      | リネーム先にも relative 検証適用                                                           |
 | TC-017  | repo=`/repo`、filePath=`""`（repo ルート自身に解決）                         | Boundary - repo root allowed                                               | `path.relative(repo, repo)` が `""` で `".."` 始まりでも絶対でもないためガードを通過する                                               | repo ルート境界                                                                            |
 | TC-018  | repo=`/repo`、resolvedPath が `/repo-evil/x`（接頭辞共有の兄弟ディレクトリ） | Boundary - sibling prefix rejected                                         | `path.relative` が `"../repo-evil/x"` で `".."` 始まりのため拒否される（旧 `startsWith("/repo")` は誤許可していた）                    | L12 の中核回帰                                                                             |
+
+## S7: isValidCommitHash() コミットハッシュ値域の共有 helper
+
+> Origin: Feature 052 (detached-worktree-display) (light-spec-plan)
+> Added: 2026-08-08
+> Status: active
+> Supersedes: -
+> Signature: `isValidCommitHash(hash: string): boolean`
+> Target Path: `src/utils.ts`（`isValidCommitHash()`。実装後に行範囲へ更新）
+> Test File: `tests/src/utils.test.ts`
+
+`src/dataSource.ts` の非公開 helper（`/^[0-9a-f]{4,40}$/i`）を `src/utils.ts` へ移して export し、DataSource と `src/worktree.ts` が同じ規則を使えるようにする追加。値域は現行のまま変えず、SHA-256 の 64 文字 object ID は本対応の対象外として拒否されることを固定する。移動元の各 call site の振る舞いは `src/dataSource-test/` の既存 section が担保し、本 section は helper 単体の値域だけを対象とする。
+
+| Case ID | Input / Precondition                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result         | Notes                                    |
+| ------- | --------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------- | ---------------------------------------- |
+| TC-019  | `hash` = 40 文字の小文字 16 進文字列                | Normal - full length hash                                                  | 戻り値が `true` である  | 通常の完全ハッシュ。最大長の境界も兼ねる |
+| TC-020  | `hash` = `"ABCD1234"`（大文字 16 進）               | Normal - case insensitive                                                  | 戻り値が `true` である  | `/i` フラグの維持                        |
+| TC-021  | `hash` = `"abcd"`（4 文字）                         | Boundary - minimum length                                                  | 戻り値が `true` である  | 短縮ハッシュの下限                       |
+| TC-022  | `hash` = `"abc"`（3 文字）                          | Boundary - minimum minus one                                               | 戻り値が `false` である | 下限 -1                                  |
+| TC-023  | `hash` = 41 文字の 16 進文字列                      | Boundary - maximum plus one                                                | 戻り値が `false` である | 上限 +1                                  |
+| TC-024  | `hash` = `""`（空文字列）                           | Boundary - empty                                                           | 戻り値が `false` である | 空入力                                   |
+| TC-025  | `hash` = 64 文字の 16 進文字列（SHA-256 object ID） | Boundary - sha-256 length rejected                                         | 戻り値が `false` である | 6 章の対象外契約を明示的に固定する       |
+| TC-026  | `hash` = `"zzzz"`（16 進外の英字）                  | Type - non-hex character                                                   | 戻り値が `false` である | 文字種の検証                             |
+| TC-027  | `hash` = `"abcd\n"`（末尾改行付き）                 | Validation - trailing newline rejected                                     | 戻り値が `false` である | `$` が複数行境界にならないことの確認     |
+| TC-028  | `hash` = `" abcd"`（先頭空白付き）                  | Validation - surrounding whitespace rejected                               | 戻り値が `false` である | trim せずに拒否する                      |
+| TC-029  | `hash` = `"-abcd"`（option 形式の文字列）           | Validation - option-like argument rejected                                 | 戻り値が `false` である | Git 引数へ option を渡さない担保         |
+
+### 失敗源インベントリ（include-or-justify）— Feature 052 追加分（S7）
+
+| 失敗源                                         | 対応ケースまたは除外理由                                                                                                                        |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| 移設時に長さ下限・上限が変わる                 | TC-019、TC-021、TC-022、TC-023                                                                                                                  |
+| 大文字ハッシュを誤って拒否する                 | TC-020                                                                                                                                          |
+| 16 進以外の文字を通す                          | TC-026                                                                                                                                          |
+| 前後の空白・改行を許して部分一致にする         | TC-027、TC-028                                                                                                                                  |
+| option 形式の文字列を Git 引数へ通す           | TC-029                                                                                                                                          |
+| SHA-256 の 64 文字を追加してしまう             | TC-025                                                                                                                                          |
+| 境界値（0 / minimum / maximum / +/-1 / empty） | TC-021（minimum）、TC-022（minimum-1）、TC-019（maximum）、TC-023（maximum+1）、TC-024（empty）。長さ 0 は TC-024 と同一入力のため統合した      |
+| 境界値（NULL）                                 | excluded(引数が `string` 型で `null` / `undefined` を取り得ない。空文字は TC-024 で検証)                                                        |
+| 外部依存の失敗                                 | excluded(正規表現判定のみで外部依存を持たない)                                                                                                  |
+| 例外送出                                       | excluded(戻り値が `boolean` の純関数で throw 経路を持たない)                                                                                    |
+| DataSource 各 call site の振る舞い変化         | excluded(`src/dataSource-test/01-history-diff-01.md` S27 TC-162 ほか既存 section が call site 単位で担保する。本対応は helper の値域を変えない) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-027、TC-028、TC-029
+- Exception: excluded(throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: TC-021、TC-022、TC-023、TC-024、TC-025
+- Type: TC-026
+
+**失敗系/正常系比（煙感知器）**: 正常系 2 件（TC-019、TC-020）、失敗系 9 件（TC-021〜TC-029。`Perspective` が `Boundary` / `Type` / `Validation` で始まるものを失敗系として数える）。比 4.5 で近接（差 1 以内）ではないため、インベントリ再導出は不要と判断した。

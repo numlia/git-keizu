@@ -140,8 +140,9 @@
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S47
 
 **シグネチャ**: `getWorktrees(repo: string): Promise<WorktreeMap>`
 **テスト対象パス**: `src/dataSource.ts`

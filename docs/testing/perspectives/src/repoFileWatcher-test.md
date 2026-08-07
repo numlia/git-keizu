@@ -104,8 +104,9 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S13
 
 **テスト対象パス**: `src/repoFileWatcher.ts:50` (regex: L5-6)
 
@@ -231,3 +232,74 @@ fileChangeRegex は3パターンのOR:
 | TC-061  | マッチ変更で `refreshTimeout` 保留中に `mute()` を呼ぶ                 | Normal - mute clears pending timer                                         | `clearTimeout(refreshTimeout)` が呼ばれ `refreshTimeout=null`。加えて `muteCount` が +1 される            | ミュート時の保留クリア         |
 | TC-062  | `refreshTimeout===null`（保留なし）で `mute()` を呼ぶ                  | Boundary - mute no pending timer                                           | `refreshTimeout` 用の `clearTimeout` は呼ばれず、`muteCount` のみ +1 される                               | 保留なし境界                   |
 | TC-063  | `mute()` で保留タイマークリア後、時間を `advanceTimersByTime` で進める | Boundary - cleared timer never fires                                       | クリア済みの保留分の `repoChangeCallback` が発火しない（0回）                                             | クリア済みタイマーの非発火保証 |
+
+## S13: refresh(uri) linked worktree の Git 状態監視（`worktrees/` prefix）
+
+> Origin: Feature 052 (detached-worktree-display) (light-spec-plan)
+> Added: 2026-08-08
+> Status: active
+> Supersedes: S7
+> Signature: `private refresh(uri: vscode.Uri)` / `watchedRepositoryStatePrefixes`
+> Target Path: `src/repoFileWatcher.ts`（`watchedRepositoryStatePrefixes` と `isWatchedRepositoryStatePath()`。実装後に行範囲へ更新）
+> Test File: `tests/src/repoFileWatcher.test.ts`
+
+`watchedRepositoryStatePrefixes` へ `worktrees/` を追加し、共通 Git directory を watch root とした `worktrees/<name>` とその任意の非空 descendant の create / change / delete を既存 750ms debounce へ流す変更。`pathValue.startsWith(prefix) && pathValue !== prefix` の既存判定を維持するため prefix 自体は発火させない。旧 S7 は `.git` 前置の regex を前提に「`.git` で始まらない全ファイルが発火する」「`.git/logs/HEAD` は発火しない」を固定しており、現行の watch root 相対判定でも本追加でも成立しないため supersede する。watch root の構築・複数 root・stop / restart の契約は S9 が active のまま担保し、glob 正規化は S10、`muteCount` は S11、保留タイマーのクリアは S12 の責務。watch root 自体の取得は `src/dataSource-test/03-author-watch-paths-01.md` の責務。
+
+| Case ID | Input / Precondition                                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                      | Notes                               |
+| ------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| TC-064  | watchRoot=`/repo/.git`、`worktrees/feature-x/HEAD` の create を通知                                  | Normal - worktree head create                                              | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | 8.1 の解消ケース                    |
+| TC-065  | 同 path の change を通知                                                                             | Normal - worktree head change                                              | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | HEAD 移動の検知                     |
+| TC-066  | 同 path の delete を通知                                                                             | Normal - worktree head delete                                              | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | worktree 削除の検知                 |
+| TC-067  | `worktrees/feature-x`（prefix 直下、最短の非空 descendant）の create を通知                          | Boundary - minimum non-empty descendant                                    | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | prefix + 1 セグメント               |
+| TC-068  | `worktrees/feature-x` の delete を通知                                                               | Boundary - minimum descendant delete                                       | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | worktree ディレクトリごとの削除     |
+| TC-069  | `worktrees/feature-x/gitdir` の create を通知                                                        | Normal - gitdir create                                                     | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | 8.1 の gitdir create                |
+| TC-070  | `worktrees/feature-x/gitdir` の delete を通知                                                        | Normal - gitdir delete                                                     | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | 8.1 の gitdir delete                |
+| TC-071  | `worktrees/feature-x/commondir` の change を通知                                                     | Normal - commondir change                                                  | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | 4.6 の列挙 path                     |
+| TC-072  | `worktrees/feature-x/index` の change を通知                                                         | Normal - worktree index change                                             | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | 4.6 の列挙 path                     |
+| TC-073  | `worktrees/feature-x/logs/HEAD`（多段 nested）の change を通知                                       | Normal - nested descendant                                                 | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | 任意の非空 descendant               |
+| TC-074  | `worktrees/`（prefix 自体）の create を通知                                                          | Boundary - prefix itself rejected                                          | `repoChangeCallback` が呼ばれない（0回）                                                             | `pathValue !== prefix` の維持       |
+| TC-075  | `worktrees`（末尾区切りなし）の create を通知                                                        | Boundary - prefix without separator rejected                               | `repoChangeCallback` が呼ばれない（0回）                                                             | `startsWith("worktrees/")` に不一致 |
+| TC-076  | `objects/ab/cd1234` の change を通知                                                                 | Validation - git object path rejected                                      | `repoChangeCallback` が呼ばれない（0回）                                                             | 8.2 の維持ケース                    |
+| TC-077  | working tree の `src/index.ts` の change を通知                                                      | Validation - working tree path rejected                                    | `repoChangeCallback` が呼ばれない（0回）                                                             | 8.2 の維持ケース                    |
+| TC-078  | watchRoots=[`/repo/.git`]、`/other/.git/worktrees/feature-x/HEAD` の change を通知                   | Validation - outside watch roots rejected                                  | `repoChangeCallback` が呼ばれない（0回）                                                             | root 外イベントの拒否               |
+| TC-079  | watchRoot=`/repo/.git`、`HEAD` の change を通知                                                      | Normal - existing allowlist retained (HEAD)                                | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | 既存許可リストの維持                |
+| TC-080  | watchRoot=`/repo/.git`、`refs/heads/main` の change を通知                                           | Normal - existing allowlist retained (branch ref)                          | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | 既存 prefix の維持                  |
+| TC-081  | watchRoot=`/repo/.git`、`refs/heads/`（空 suffix）の change を通知                                   | Boundary - empty ref suffix rejected                                       | `repoChangeCallback` が呼ばれない（0回）                                                             | 既存 prefix 境界の維持              |
+| TC-082  | watchRoots=[linked git-dir, common-dir]、common-dir 側の `worktrees/feature-x/HEAD` を通知           | Normal - second watch root                                                 | 750ms 経過後に `repoChangeCallback` が 1 回呼ばれる                                                  | 複数 root 契約の維持                |
+| TC-083  | 750ms 以内に `worktrees/feature-x/HEAD` と `HEAD` の変更が連続して到達                               | Normal - debounce across paths                                             | `clearTimeout` が 1 回呼ばれ、750ms 経過後の `repoChangeCallback` が合計 1 回だけ実行される          | debounce 契約の維持                 |
+| TC-084  | `worktrees/feature-x/HEAD` の change 後、749ms だけ時間を進める                                      | Boundary - before debounce elapses                                         | `repoChangeCallback` が呼ばれない（0回）                                                             | 750ms 未満の境界                    |
+| TC-085  | `mute()` 済みの状態で `worktrees/feature-x/HEAD` の change を通知                                    | Validation - muted                                                         | `repoChangeCallback` が呼ばれない（0回）                                                             | mute 契約の維持                     |
+| TC-086  | `unmute()` 直後（現在時刻 < `resumeAt`）に `worktrees/feature-x/HEAD` の change を通知               | Boundary - grace period                                                    | `repoChangeCallback` が呼ばれない（0回）                                                             | 1500ms 猶予の維持                   |
+| TC-087  | watchRoot=`C:/repo/.git`、`worktrees\feature-x\HEAD`（バックスラッシュ区切り）の change を通知       | Boundary - separator normalized                                            | `normaliseWatchPath()` 適用後に prefix と一致し、750ms 経過後に `repoChangeCallback` が 1 回呼ばれる | 区切り正規化の維持                  |
+| TC-088  | `stop()` 実行後に `worktrees/feature-x/HEAD` の change を通知                                        | Validation - after stop                                                    | `repoChangeCallback` が呼ばれない（0回）                                                             | watchRoots が空になる               |
+| TC-089  | watchRoot=`/repo/.git`、working tree 側の同名 path `/repo/worktrees/feature-x/HEAD` の change を通知 | Validation - working tree namesake rejected                                | `repoChangeCallback` が呼ばれない（0回）                                                             | 相対 path が `..` 始まりになる      |
+
+### 失敗源インベントリ（include-or-justify）— Feature 052 追加分（S13）
+
+| 失敗源                                                  | 対応ケースまたは除外理由                                                                                                                 |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `worktrees/` 配下の変更を検知できない（現行の根本原因） | TC-064〜TC-073                                                                                                                           |
+| event 種別ごとに取りこぼす（create / change / delete）  | TC-064（create）、TC-065（change）、TC-066（delete）、TC-067 / TC-068（create / delete）、TC-069 / TC-070（create / delete）             |
+| prefix 自体や prefix 前方一致だけの path で発火する     | TC-074、TC-075                                                                                                                           |
+| Git 管理外・監視対象外の path まで許可を広げる          | TC-076、TC-077、TC-089                                                                                                                   |
+| watch root 外のイベントを受理する                       | TC-078、TC-088                                                                                                                           |
+| 既存許可リスト・既存 prefix 境界を壊す                  | TC-079、TC-080、TC-081                                                                                                                   |
+| 複数 root のいずれかで発火しなくなる                    | TC-082                                                                                                                                   |
+| debounce を壊して多重発火する                           | TC-083、TC-084                                                                                                                           |
+| mute / 猶予期間の抑止を貫通する                         | TC-085、TC-086                                                                                                                           |
+| 区切り文字の違いで prefix 判定に失敗する                | TC-087                                                                                                                                   |
+| 境界値（empty / minimum / +/-1）                        | TC-074（prefix 自体 = 空 suffix）、TC-081（既存 prefix の空 suffix）、TC-067（最短の非空 descendant）、TC-084（debounce -1ms）           |
+| 境界値（0 / maximum / NULL）                            | excluded(監視 path の段数と debounce に上限がなく、`uri` は必須引数で `null` を取り得ない。callback 0 回は TC-074〜TC-078 ほかで検証)    |
+| 外部依存の失敗                                          | excluded(`vscode.workspace.createFileSystemWatcher` は mock で、watcher 生成失敗時の分岐が実装に存在しない。生成引数の検証は S10 の責務) |
+| 例外送出                                                | excluded(`refresh()` は早期 return のみで throw 経路を持たない)                                                                          |
+| watch root の取得内容の誤り                             | excluded(`src/dataSource-test/03-author-watch-paths-01.md` の責務)                                                                       |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-076、TC-077、TC-078、TC-085、TC-088、TC-089
+- Exception: excluded(throw 経路なし。抑止は早期 return として Validation / Boundary で検証)
+- External: excluded(外部依存の失敗分岐が実装に存在しない)
+- Boundary: TC-067、TC-068、TC-074、TC-075、TC-081、TC-084、TC-086、TC-087
+- Type: excluded(引数が `vscode.Uri` に固定され、不正型は typecheck が拒否する)
+
+**失敗系/正常系比（煙感知器）**: 正常系 12 件（TC-064〜TC-066、TC-069〜TC-073、TC-079、TC-080、TC-082、TC-083）、失敗系 14 件（TC-067、TC-068、TC-074〜TC-078、TC-081、TC-084〜TC-089）。比 1.17 で近接（差 1 以内）ではないが、正常系が多いのは 4.6 が発火すべき path を列挙する仕様であるためであり、インベントリを再導出して拒否側（prefix 自体・前方一致のみ・objects・working tree・root 外・停止後・同名 path・空 suffix・debounce 未経過・mute・猶予）の列挙漏れがないことを確認した。

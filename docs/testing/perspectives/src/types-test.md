@@ -287,3 +287,57 @@ checkout request の remote 値を役割別 field を持つ object にし、chec
 - Type: TC-044〜TC-078
 
 **失敗系/正常系比（煙感知器）**: 正常系0件、失敗系35件（全件 Type / Boundary）。型定義 artifact のため Normal runtime case は存在せず、正常な代入と拒否される代入を Type category 内で対にしている。
+
+## S7: detached worktree と WorktreeCollection の型契約
+
+> Origin: Feature 052 (detached-worktree-display) (light-spec-plan)
+> Added: 2026-08-08
+> Status: active
+> Supersedes: -
+> Signature: `WorktreeInfo` / `DetachedWorktreeInfo` / `WorktreeMap` / `WorktreeCollection` / `ResponseLoadCommits.worktrees`
+> Target Path: `src/types.ts`（worktree 型群と `ResponseLoadCommits`。実装後に行範囲へ更新）
+> Test File: `tests/src/types.test.ts`
+
+branch 名をキーにする `WorktreeMap` では表現できない detached HEAD worktree を、`head` を必須に持つ `DetachedWorktreeInfo` と、branch / detached の双方を保持する `WorktreeCollection` で表す型契約の追加。`WorktreeInfo` と `WorktreeMap` の形は変えず、`ResponseLoadCommits.worktrees` は optional のまま型だけを collection 化する。runtime の分類は `src/worktree-test.md` S2、応答生成は `src/dataSource-test/02-branch-worktree-03.md` S47、webview の描画・比較は `web/main-test/01-rendering-02.md` S48 と `web/utils-test.md` S5 の責務で、本 section は `@ts-expect-error` と代入可否だけを検証する。
+
+| Case ID | Input / Precondition                                                                                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                      | Notes                             |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | --------------------------------- |
+| TC-079  | `{ path: "/tmp/wt8", isMain: false, head: "abc1234" }` を `DetachedWorktreeInfo` へ代入                                                                             | Type - detached entry                                                      | 代入がコンパイルでき、`head` を `string` として参照できる                            | detached の最小契約               |
+| TC-080  | `DetachedWorktreeInfo` から `head` を欠落させた object literal                                                                                                      | Type - head 必須                                                           | `@ts-expect-error` が有効（型エラーになる）                                          | optional 化を防ぐ                 |
+| TC-081  | `DetachedWorktreeInfo` から `path` を欠落させた object literal                                                                                                      | Type - path 必須（継承 field）                                             | `@ts-expect-error` が有効（型エラーになる）                                          | `extends WorktreeInfo` の継承確認 |
+| TC-082  | `DetachedWorktreeInfo` から `isMain` を欠落させた object literal                                                                                                    | Type - isMain 必須（継承 field）                                           | `@ts-expect-error` が有効（型エラーになる）                                          | main / linked の判別を型で強制    |
+| TC-083  | `DetachedWorktreeInfo` を `WorktreeInfo` 型の変数へ代入                                                                                                             | Type - assignable to base                                                  | 代入がコンパイルできる                                                               | 継承方向の互換                    |
+| TC-084  | `{ path, isMain }` だけの値を `WorktreeCollection["detached"]` の要素へ代入                                                                                         | Type - base not assignable to detached                                     | `@ts-expect-error` が有効（型エラーになる）                                          | `head` なしを detached に混ぜない |
+| TC-085  | `{ branches: {}, detached: [] }` を `WorktreeCollection` へ代入                                                                                                     | Boundary - empty collection                                                | 代入がコンパイルでき、`branches` が `WorktreeMap`、`detached` が配列として参照できる | 空 fallback と同形                |
+| TC-086  | `WorktreeCollection` から `branches` を欠落させた object literal                                                                                                    | Type - branches 必須                                                       | `@ts-expect-error` が有効（型エラーになる）                                          | 片側だけの collection を防ぐ      |
+| TC-087  | `WorktreeCollection` から `detached` を欠落させた object literal                                                                                                    | Type - detached 必須                                                       | `@ts-expect-error` が有効（型エラーになる）                                          | 同上                              |
+| TC-088  | `{ "feature/x": { path: "/wt/x", isMain: false } }` を `WorktreeCollection["branches"]` へ代入                                                                      | Type - branch entry unchanged                                              | 代入がコンパイルできる（`head` を要求しない）                                        | 既存 `WorktreeMap` 契約の維持     |
+| TC-089  | `worktrees` を省略した object literal を `ResponseLoadCommits` へ代入                                                                                               | Boundary - optional field omitted                                          | 代入がコンパイルできる                                                               | optional 性の維持（4.1）          |
+| TC-090  | `worktrees: { branches: { main: { path: "/r", isMain: true } }, detached: [{ path: "/tmp/wt8", isMain: false, head: "abc1234" }] }` を `ResponseLoadCommits` へ代入 | Type - response collection                                                 | 代入がコンパイルでき、`worktrees` から `branches` / `detached` を参照できる          | 応答の新形状                      |
+| TC-091  | `worktrees: { main: { path: "/r", isMain: true } }`（旧 flat map 形状）を `ResponseLoadCommits` へ代入                                                              | Type - flat map rejected                                                   | `@ts-expect-error` が有効（型エラーになる）                                          | 旧形状への逆戻り防止              |
+
+### 失敗源インベントリ（include-or-justify）— Feature 052 追加分（S7）
+
+| 失敗源                                         | 対応ケースまたは除外理由                                                                                                                                       |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| detached の `head` を optional にする          | TC-080                                                                                                                                                         |
+| `path` / `isMain` を継承し損ねる               | TC-081、TC-082                                                                                                                                                 |
+| `head` を持たない値を `detached` へ混入させる  | TC-084                                                                                                                                                         |
+| `WorktreeCollection` の片側 field 欠落         | TC-086、TC-087                                                                                                                                                 |
+| 既存 `WorktreeMap` の形を壊す                  | TC-088、TC-083                                                                                                                                                 |
+| 応答 field を必須化して既存 webview 契約を壊す | TC-089                                                                                                                                                         |
+| 応答を旧 flat map のまま残す                   | TC-090、TC-091                                                                                                                                                 |
+| 境界値（empty）                                | TC-085（空 collection）、TC-089（field 省略）                                                                                                                  |
+| 境界値（0 / minimum / maximum / +/-1 / NULL）  | excluded(型定義に数値境界がなく、`null` を許容する field も持たない)                                                                                           |
+| runtime の分類・描画・比較の誤り               | excluded(`src/worktree-test.md` S2、`src/dataSource-test/02-branch-worktree-03.md` S47、`web/utils-test.md` S5、`web/main-test/01-rendering-02.md` S48 の責務) |
+| 外部依存の失敗・例外送出                       | excluded(型定義のみで外部依存と throw 経路を持たない)                                                                                                          |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(型定義のみで runtime validation 分岐なし)
+- Exception: excluded(型定義のみで throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: TC-085、TC-089
+- Type: TC-079〜TC-084、TC-086〜TC-088、TC-090、TC-091
+
+**失敗系/正常系比（煙感知器）**: 正常系0件、失敗系13件（全件 Type / Boundary）。S2〜S6 と同じく型契約のみを対象とし正常実行経路を持たないため、正常系0件はインベントリ欠落ではない。

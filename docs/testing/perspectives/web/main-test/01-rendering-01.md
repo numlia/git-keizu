@@ -132,8 +132,9 @@
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S48
 
 **テスト対象パス**: `web/main.ts`
 
