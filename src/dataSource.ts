@@ -22,16 +22,15 @@ import {
   RemoteBranchTarget,
   UNCOMMITTED_CHANGES_HASH,
   VALID_UNCOMMITTED_RESET_MODES,
-  WorktreeMap
+  WorktreeCollection
 } from "./types";
-import { getPathFromStr } from "./utils";
+import { getPathFromStr, isValidCommitHash } from "./utils";
 import { parseWorktreeList } from "./worktree";
 
 const eolRegex = /\r\n|\r|\n/g;
 const headRegex = /^\(HEAD detached (at|from) .+\)$/;
 const REGEX_META_CHARS = /[.*+?^${}()|[\]\\]/g;
 const gitLogSeparator = "XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb";
-const COMMIT_HASH_PATTERN = /^[0-9a-f]{4,40}$/i;
 const NO_QUOTE_PATH_CONFIG = ["-c", "core.quotePath=false"];
 const LOG_FORMAT_FIELD_COUNT = 6;
 const STASH_FORMAT_FIELD_COUNT = 7;
@@ -68,10 +67,6 @@ const COMMIT_DETAILS_FIELD = {
 
 function escapeRegExp(str: string): string {
   return str.replace(REGEX_META_CHARS, "\\$&");
-}
-
-function isValidCommitHash(hash: string): boolean {
-  return COMMIT_HASH_PATTERN.test(hash);
 }
 
 const VALID_GIT_REFS = new Set([
@@ -1083,11 +1078,11 @@ export class DataSource {
   }
 
   public getWorktrees(repo: string) {
-    return this.spawnGit<WorktreeMap>(
+    return this.spawnGit<WorktreeCollection>(
       ["worktree", "list", "--porcelain"],
       repo,
       (stdout) => parseWorktreeList(stdout),
-      {}
+      { branches: {}, detached: [] }
     );
   }
 
