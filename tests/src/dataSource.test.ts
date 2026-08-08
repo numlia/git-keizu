@@ -30,6 +30,7 @@ vi.mock("../../src/gitExecutable", () => ({
   resolveGitExecutable: resolveGitExecutableMock
 }));
 
+import { getConfig } from "../../src/config";
 import { COMMIT_ORDER_FLAGS, DataSource } from "../../src/dataSource";
 import { type CommitOrdering, type GitStash, UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 
@@ -3749,72 +3750,543 @@ describe("getGitLog() commit ordering parameter (S21)", () => {
   });
 });
 
-describe("getWorktrees", () => {
+// S47: getWorktrees() collection 化と pinned detached commit の取得・統合
+// @see docs/testing/perspectives/src/dataSource-test/02-branch-worktree-03.md
+describe("getWorktrees collection and pinned detached commits (S47)", () => {
+  const NO_WALK_SORTED = "--no-walk=sorted";
+  const WORKTREE_LIST_ARGS = ["worktree", "list", "--porcelain"];
+  const GIT_LOG_FORMAT = `%H${SEP}%P${SEP}%an${SEP}%ae${SEP}%at${SEP}%s`;
+  const HASH_A = "aaa1111";
+  const HASH_B = "bbb2222";
+  const HASH_C = "ccc3333";
+  const HASH_D = "ddd4444";
+  const DEFAULT_CONFIG = {
+    gitPath: () => ["git"],
+    dateType: () => "Author Date",
+    showUncommittedChanges: () => false
+  } as unknown as ReturnType<typeof getConfig>;
+
+  const BRANCH_AND_DETACHED_PORCELAIN = [
+    "worktree /home/user/project",
+    `HEAD ${HASH_A}`,
+    "branch refs/heads/main",
+    "",
+    "worktree /home/user/wt8",
+    `HEAD ${HASH_D}`,
+    "detached",
+    ""
+  ].join("\n");
+  const BRANCH_AND_DETACHED_COLLECTION = {
+    branches: { main: { path: "/home/user/project", isMain: true } },
+    detached: [{ path: "/home/user/wt8", isMain: false, head: HASH_D }]
+  };
+  const BRANCH_ONLY_PORCELAIN = [
+    "worktree /home/user/project",
+    `HEAD ${HASH_A}`,
+    "branch refs/heads/main",
+    ""
+  ].join("\n");
+
+  function detachedPorcelain(entries: { path: string; head: string }[]): string {
+    return entries
+      .map((entry) => [`worktree ${entry.path}`, `HEAD ${entry.head}`, "detached", ""].join("\n"))
+      .join("\n");
+  }
+
+  function makeLogOutput(...lines: string[]): string {
+    return [...lines, ""].join("\n");
+  }
+
+  interface DetachedSpawnConfig {
+    porcelain?: string;
+    porcelainExitCode?: number;
+    logOutput?: string;
+    pinnedOutput?: string;
+    pinnedExitCode?: number;
+    refOutput?: string;
+    stashOutput?: string;
+    statusOutput?: string;
+  }
+
+  function isPinnedArgs(args: string[]): boolean {
+    return args[0] === "log" && args[1] === NO_WALK_SORTED;
+  }
+
+  function setupDetachedSpawn(config: DetachedSpawnConfig) {
+    const spawnArgs: string[][] = [];
+    let worktreeQueryClosed = false;
+    let worktreeQueryClosedAtPinnedSpawn: boolean | null = null;
+
+    vi.mocked(cp.spawn).mockImplementation(((_cmd: string, args: string[]) => {
+      spawnArgs.push(args);
+      if (args[0] === "worktree") {
+        const proc = createMockProcess(config.porcelain ?? "", config.porcelainExitCode ?? 0);
+        proc.on("close", () => {
+          worktreeQueryClosed = true;
+        });
+        return proc;
+      }
+      if (isPinnedArgs(args)) {
+        worktreeQueryClosedAtPinnedSpawn = worktreeQueryClosed;
+        return createMockProcess(config.pinnedOutput ?? "", config.pinnedExitCode ?? 0);
+      }
+      if (args[0] === "log") return createMockProcess(config.logOutput ?? "");
+      if (args[0] === "show-ref") return createMockProcess(config.refOutput ?? "");
+      if (args[0] === "reflog") return createMockProcess(config.stashOutput ?? "");
+      if (args[0] === "status") return createMockProcess(config.statusOutput ?? "");
+      return createMockProcess("");
+    }) as unknown as typeof cp.spawn);
+
+    return {
+      spawnArgs,
+      pinnedCalls: () => spawnArgs.filter(isPinnedArgs),
+      normalLogArgs: () => spawnArgs.find((args) => args[0] === "log" && !isPinnedArgs(args)),
+      worktreeQueryClosedAtPinnedSpawn: () => worktreeQueryClosedAtPinnedSpawn
+    };
+  }
+
   let ds: DataSource;
-  const spawnMock = vi.mocked(cp.spawn);
 
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getConfig).mockReturnValue(DEFAULT_CONFIG);
     ds = new DataSource();
   });
 
   afterEach(() => {
+    vi.mocked(getConfig).mockReset();
     vi.restoreAllMocks();
   });
 
-  it("returns parsed worktree map on spawnGit success (TC-132)", async () => {
-    // Given: spawnGit succeeds with porcelain output containing main + feature branch
-    const porcelainOutput = [
-      "worktree /home/user/project",
-      "HEAD abc1234",
-      "branch refs/heads/main",
-      "",
-      "worktree /home/user/project-feature",
-      "HEAD def5678",
-      "branch refs/heads/feature/x",
-      ""
-    ].join("\n");
-    spawnMock.mockImplementation(() => createMockProcess(porcelainOutput));
+  it("returns the parsed collection on a successful worktree query (TC-292)", async () => {
+    // Case: TC-292
+    // Given: the porcelain output holds one branch record and one detached record
+    setupDetachedSpawn({ porcelain: BRANCH_AND_DETACHED_PORCELAIN });
 
-    // When: getWorktrees(repo) is called
+    // When: getWorktrees is called
     const result = await ds.getWorktrees(REPO);
 
-    // Then: parseWorktreeList result is returned with correct args
-    expect(result).toEqual({
-      main: { path: "/home/user/project", isMain: true },
-      "feature/x": { path: "/home/user/project-feature", isMain: false }
-    });
-    expect(spawnMock).toHaveBeenCalledWith("git", ["worktree", "list", "--porcelain"], SPAWN_OPTS);
+    // Then: both sides of the parsed collection are returned by the documented query
+    expect(result).toEqual(BRANCH_AND_DETACHED_COLLECTION);
+    expect(vi.mocked(cp.spawn)).toHaveBeenCalledWith("git", WORKTREE_LIST_ARGS, SPAWN_OPTS);
   });
 
-  it("returns empty map when spawnGit fails (TC-133)", async () => {
-    // Given: spawnGit fails with non-zero exit code
-    spawnMock.mockImplementation(() => createMockProcess("", 1));
+  it("falls back to an empty collection when the worktree query fails (TC-293)", async () => {
+    // Case: TC-293
+    // Given: the worktree query exits with a non-zero code
+    setupDetachedSpawn({ porcelainExitCode: 1 });
 
-    // When: getWorktrees(repo) is called
+    // When: getWorktrees is called
     const result = await ds.getWorktrees(REPO);
 
-    // Then: empty map is returned as fallback
-    expect(result).toEqual({});
+    // Then: the fallback keeps the collection shape instead of an empty flat map
+    expect(result).toEqual({ branches: {}, detached: [] });
   });
 
-  it("returns single entry map for main worktree only (TC-134)", async () => {
-    // Given: Repository has only the main worktree (no additional worktrees)
-    const porcelainOutput = [
-      "worktree /home/user/project",
-      "HEAD abc1234",
-      "branch refs/heads/main",
-      ""
-    ].join("\n");
-    spawnMock.mockImplementation(() => createMockProcess(porcelainOutput));
-
-    // When: getWorktrees(repo) is called
-    const result = await ds.getWorktrees(REPO);
-
-    // Then: single entry with isMain=true
-    expect(result).toEqual({
-      main: { path: "/home/user/project", isMain: true }
+  it("completes the worktree query before spawning the pinned query (TC-294)", async () => {
+    // Case: TC-294
+    // Given: the repository has one detached worktree
+    const spawn = setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 1, "a")),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 2, "d"))
     });
+
+    // When: getCommits is called
+    await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the worktree query is spawned first and has already closed when the pinned query starts
+    const worktreeIndex = spawn.spawnArgs.findIndex((args) => args[0] === "worktree");
+    const pinnedIndex = spawn.spawnArgs.findIndex(isPinnedArgs);
+    expect(worktreeIndex).toBeGreaterThanOrEqual(0);
+    expect(pinnedIndex).toBeGreaterThan(worktreeIndex);
+    expect(spawn.worktreeQueryClosedAtPinnedSpawn()).toBe(true);
+  });
+
+  it("does not spawn the pinned query without a detached worktree (TC-295)", async () => {
+    // Case: TC-295
+    // Given: the porcelain output holds only a branch record
+    const spawn = setupDetachedSpawn({
+      porcelain: BRANCH_ONLY_PORCELAIN,
+      logOutput: makeLogOutput(makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 1, "a"))
+    });
+
+    // When: getCommits is called
+    await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: no pinned query is spawned at all
+    expect(spawn.pinnedCalls()).toHaveLength(0);
+  });
+
+  it("passes a shared head only once to the pinned query (TC-296)", async () => {
+    // Case: TC-296
+    // Given: two detached worktrees at different paths share the same head
+    const spawn = setupDetachedSpawn({
+      porcelain: detachedPorcelain([
+        { path: "/wt/a", head: HASH_D },
+        { path: "/wt/b", head: HASH_D }
+      ]),
+      logOutput: makeLogOutput(makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 1, "a")),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 2, "d"))
+    });
+
+    // When: getCommits is called
+    await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the duplicated head appears exactly once in the pinned revision arguments
+    const pinnedArgs = spawn.pinnedCalls()[0];
+    expect(pinnedArgs.filter((arg) => arg === HASH_D)).toHaveLength(1);
+    expect(pinnedArgs).toEqual(["log", NO_WALK_SORTED, `--format=${GIT_LOG_FORMAT}`, HASH_D]);
+  });
+
+  it("builds the pinned query from format and revisions only (TC-297)", async () => {
+    // Case: TC-297
+    // Given: two detached worktrees with different heads and no author filter
+    const spawn = setupDetachedSpawn({
+      porcelain: detachedPorcelain([
+        { path: "/wt/a", head: HASH_C },
+        { path: "/wt/b", head: HASH_D }
+      ]),
+      logOutput: makeLogOutput(makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 1, "a")),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_C, "", "C", "c@t.com", 2, "c"))
+    });
+
+    // When: getCommits is called
+    await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the pinned query runs once with no window, ordering or ref-selection flags
+    const pinnedCalls = spawn.pinnedCalls();
+    expect(pinnedCalls).toHaveLength(1);
+    expect(pinnedCalls[0]).toEqual([
+      "log",
+      NO_WALK_SORTED,
+      `--format=${GIT_LOG_FORMAT}`,
+      HASH_C,
+      HASH_D
+    ]);
+    expect(pinnedCalls[0]).not.toContain("--max-count=11");
+    expect(pinnedCalls[0]).not.toContain("--date-order");
+    expect(pinnedCalls[0]).not.toContain("--branches");
+    expect(pinnedCalls[0]).not.toContain("--tags");
+    expect(pinnedCalls[0]).not.toContain("--remotes");
+  });
+
+  it("applies the author filter to the pinned query (TC-298)", async () => {
+    // Case: TC-298
+    // Given: one detached worktree and an author filter
+    const spawn = setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 1, "a")),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 2, "d"))
+    });
+
+    // When: getCommits is called with authors=["Alice"]
+    await ds.getCommits(REPO, [], 10, false, ["Alice"], "date");
+
+    // Then: the pinned query carries the same --author value as the normal log
+    const pinnedAuthorArgs = spawn.pinnedCalls()[0].filter((arg) => arg.startsWith("--author="));
+    const normalAuthorArgs = spawn.normalLogArgs()!.filter((arg) => arg.startsWith("--author="));
+    expect(pinnedAuthorArgs).toEqual(["--author=Alice"]);
+    expect(pinnedAuthorArgs).toEqual(normalAuthorArgs);
+  });
+
+  it("escapes regex metacharacters in the pinned author filter (TC-299)", async () => {
+    // Case: TC-299
+    // Given: one detached worktree and an author name containing regex metacharacters
+    const spawn = setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 1, "a")),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 2, "d"))
+    });
+
+    // When: getCommits is called with authors=["a.b+c"]
+    await ds.getCommits(REPO, [], 10, false, ["a.b+c"], "date");
+
+    // Then: the escaped value matches the one handed to the normal log
+    const pinnedAuthorArgs = spawn.pinnedCalls()[0].filter((arg) => arg.startsWith("--author="));
+    const normalAuthorArgs = spawn.normalLogArgs()!.filter((arg) => arg.startsWith("--author="));
+    expect(pinnedAuthorArgs).toEqual(["--author=a\\.b\\+c"]);
+    expect(pinnedAuthorArgs).toEqual(normalAuthorArgs);
+  });
+
+  it("never applies the branch filter to the pinned query (TC-300)", async () => {
+    // Case: TC-300
+    // Given: one detached worktree and a branch filter
+    const spawn = setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 1, "a")),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 2, "d"))
+    });
+
+    // When: getCommits is called with branches=["feature/x"]
+    await ds.getCommits(REPO, ["feature/x"], 10, false, [], "date");
+
+    // Then: neither the branch name nor the ref-selection flags reach the pinned query
+    const pinnedArgs = spawn.pinnedCalls()[0];
+    expect(pinnedArgs).not.toContain("feature/x");
+    expect(pinnedArgs).not.toContain("--branches");
+    expect(pinnedArgs).not.toContain("--tags");
+    expect(pinnedArgs).not.toContain("--remotes");
+  });
+
+  it("keeps an unvalidated head out of the Git arguments (TC-301)", async () => {
+    // Case: TC-301
+    // Given: the collection carries a detached entry whose head is not a valid hash
+    const spawn = setupDetachedSpawn({
+      logOutput: makeLogOutput(makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 1, "a"))
+    });
+    vi.spyOn(ds, "getWorktrees").mockResolvedValue({
+      branches: {},
+      detached: [{ path: "/wt/bad", isMain: false, head: "zzzz" }]
+    });
+
+    // When: getCommits is called
+    await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: no pinned query runs and the invalid value never reaches a Git argument
+    expect(spawn.pinnedCalls()).toHaveLength(0);
+    expect(spawn.spawnArgs.flat()).not.toContain("zzzz");
+  });
+
+  it("appends a pinned commit that is outside the normal window (TC-302)", async () => {
+    // Case: TC-302
+    // Given: the pinned commit hash is absent from the normal log result
+    setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a"),
+        makeCommitLine(HASH_B, "", "B", "b@t.com", 2, "b")
+      ),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 1, "d"))
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the pinned commit is the last row and appears exactly once
+    expect(result.commits[result.commits.length - 1].hash).toBe(HASH_D);
+    expect(result.commits.filter((commit) => commit.hash === HASH_D)).toHaveLength(1);
+  });
+
+  it("skips a pinned commit already present in the normal window (TC-303)", async () => {
+    // Case: TC-303
+    // Given: the pinned commit hash is already in the normal log result
+    setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a"),
+        makeCommitLine(HASH_D, "", "D", "d@t.com", 2, "d")
+      ),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 2, "d"))
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the row count matches the normal log and the hash is not duplicated
+    expect(result.commits).toHaveLength(2);
+    expect(result.commits.filter((commit) => commit.hash === HASH_D)).toHaveLength(1);
+  });
+
+  it("renders one row for two worktrees on the same head (TC-304)", async () => {
+    // Case: TC-304
+    // Given: two detached worktrees share an out-of-window head
+    setupDetachedSpawn({
+      porcelain: detachedPorcelain([
+        { path: "/wt/a", head: HASH_D },
+        { path: "/wt/b", head: HASH_D }
+      ]),
+      logOutput: makeLogOutput(makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a")),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 1, "d"))
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the commit appears once while both worktrees survive in the response
+    expect(result.commits.filter((commit) => commit.hash === HASH_D)).toHaveLength(1);
+    expect(result.worktrees.detached).toHaveLength(2);
+  });
+
+  it("keeps the pinned commit out of the more-commits decision (TC-305)", async () => {
+    // Case: TC-305
+    // Given: the normal log returns maxCommits + 1 rows and one pinned commit is out of window
+    setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 4, "a"),
+        makeCommitLine(HASH_B, HASH_C, "B", "b@t.com", 3, "b"),
+        makeCommitLine(HASH_C, "", "C", "c@t.com", 2, "c")
+      ),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 1, "d"))
+    });
+
+    // When: getCommits is called with maxCommits=2
+    const result = await ds.getCommits(REPO, [], 2, false, [], "date");
+
+    // Then: the extra normal row drives the flag and the pinned row is added on top of the window
+    expect(result.moreCommitsAvailable).toBe(true);
+    expect(result.commits).toHaveLength(3);
+  });
+
+  it("does not set the more-commits flag because of a pinned commit (TC-306)", async () => {
+    // Case: TC-306
+    // Given: the normal log stays below maxCommits and one pinned commit is out of window
+    setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a"),
+        makeCommitLine(HASH_B, "", "B", "b@t.com", 2, "b")
+      ),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 1, "d"))
+    });
+
+    // When: getCommits is called with maxCommits=5
+    const result = await ds.getCommits(REPO, [], 5, false, [], "date");
+
+    // Then: the flag stays false even though a pinned row was appended
+    expect(result.moreCommitsAvailable).toBe(false);
+  });
+
+  it("preserves the normal commit order while appending the pinned commit (TC-307)", async () => {
+    // Case: TC-307
+    // Given: the normal log returns A, B, C in that order and D is pinned
+    setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 4, "a"),
+        makeCommitLine(HASH_B, HASH_C, "B", "b@t.com", 3, "b"),
+        makeCommitLine(HASH_C, "", "C", "c@t.com", 2, "c")
+      ),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 1, "d"))
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the normal sequence is untouched and the pinned commit follows it
+    expect(result.commits.map((commit) => commit.hash)).toEqual([HASH_A, HASH_B, HASH_C, HASH_D]);
+  });
+
+  it("returns the normal commits when the pinned query fails (TC-308)", async () => {
+    // Case: TC-308
+    // Given: the pinned query exits non-zero
+    setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a"),
+        makeCommitLine(HASH_B, "", "B", "b@t.com", 2, "b")
+      ),
+      pinnedExitCode: 1
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the normal result is returned unchanged and the fetched collection is kept
+    expect(result.commits.map((commit) => commit.hash)).toEqual([HASH_A, HASH_B]);
+    expect(result.worktrees).toEqual(BRANCH_AND_DETACHED_COLLECTION);
+  });
+
+  it("returns the normal commits when the worktree query fails (TC-309)", async () => {
+    // Case: TC-309
+    // Given: the worktree query exits non-zero so the pinned input is the empty fallback
+    const spawn = setupDetachedSpawn({
+      porcelainExitCode: 1,
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a"),
+        makeCommitLine(HASH_B, "", "B", "b@t.com", 2, "b")
+      )
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: no pinned query runs and the failure is reported as "no worktrees"
+    expect(spawn.pinnedCalls()).toHaveLength(0);
+    expect(result.commits.map((commit) => commit.hash)).toEqual([HASH_A, HASH_B]);
+    expect(result.worktrees).toEqual({ branches: {}, detached: [] });
+  });
+
+  it("merges the pinned commit before uncommitted, stash and ref processing (TC-310)", async () => {
+    // Case: TC-310
+    // Given: uncommitted changes, a stash based on a normal commit and a tag on the pinned commit
+    vi.mocked(getConfig).mockReturnValue({
+      gitPath: () => ["git"],
+      dateType: () => "Author Date",
+      showUncommittedChanges: () => true
+    } as unknown as ReturnType<typeof getConfig>);
+    const stashHash = "eee5555";
+    setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 4, "a"),
+        makeCommitLine(HASH_B, "", "B", "b@t.com", 3, "b")
+      ),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 1, "d")),
+      refOutput: `${HASH_A} HEAD\n${HASH_D} refs/tags/v1\n`,
+      stashOutput: [
+        makeStashLine(
+          stashHash,
+          HASH_B,
+          "idx111",
+          null,
+          "stash@{0}",
+          "S",
+          "s@t.com",
+          2,
+          "WIP on main"
+        ),
+        ""
+      ].join("\n"),
+      statusOutput: "## main\n M a.ts\n?? b.ts\n"
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the uncommitted row leads, the stash sits before its base commit and the tag is attached
+    expect(result.commits[0].hash).toBe(UNCOMMITTED_CHANGES_HASH);
+    const stashIndex = result.commits.findIndex((commit) => commit.hash === stashHash);
+    const baseIndex = result.commits.findIndex((commit) => commit.hash === HASH_B);
+    expect(stashIndex).toBeGreaterThanOrEqual(0);
+    expect(stashIndex).toBeLessThan(baseIndex);
+    const pinnedNode = result.commits[result.commits.length - 1];
+    expect(pinnedNode.hash).toBe(HASH_D);
+    expect(pinnedNode.refs).toEqual([{ hash: HASH_D, name: "v1", type: "tag" }]);
+  });
+
+  it("pins the head of a detached main worktree (TC-311)", async () => {
+    // Case: TC-311
+    // Given: the only detached entry is the main worktree
+    const spawn = setupDetachedSpawn({
+      porcelain: ["worktree /home/user/project", `HEAD ${HASH_D}`, "detached", ""].join("\n"),
+      logOutput: makeLogOutput(makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a")),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 1, "d"))
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the main worktree head is still a pinned revision even though it renders no label
+    expect(result.worktrees.detached[0].isMain).toBe(true);
+    expect(spawn.pinnedCalls()[0]).toContain(HASH_D);
+  });
+
+  it("returns the worktree collection in the getCommits response (TC-312)", async () => {
+    // Case: TC-312
+    // Given: the porcelain output holds one branch record and one detached record
+    setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a")),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, "", "D", "d@t.com", 1, "d"))
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the response field carries both sides of the porcelain-derived collection
+    expect(result.worktrees).toEqual(BRANCH_AND_DETACHED_COLLECTION);
   });
 });
 

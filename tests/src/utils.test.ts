@@ -43,6 +43,7 @@ import {
   doesFileExist,
   evalPromises,
   getPathFromStr,
+  isValidCommitHash,
   openFile
 } from "../../src/utils";
 
@@ -129,6 +130,116 @@ describe("evalPromises", () => {
         return x;
       })
     ).rejects.toThrow("fail");
+  });
+});
+
+// S7: isValidCommitHash() コミットハッシュ値域の共有 helper
+// @see docs/testing/perspectives/src/utils-test.md
+describe("isValidCommitHash", () => {
+  const FULL_LENGTH_HASH = "abcdef1234567890abcdef1234567890abcdef12";
+
+  it("accepts a 40-character lowercase hex hash (TC-019)", () => {
+    // Case: TC-019
+    // Given: a full-length lowercase hexadecimal commit hash
+    // When: isValidCommitHash is called
+    const result = isValidCommitHash(FULL_LENGTH_HASH);
+    // Then: the hash is accepted (also covers the maximum length boundary)
+    expect(FULL_LENGTH_HASH).toHaveLength(40);
+    expect(result).toBe(true);
+  });
+
+  it("accepts an uppercase hex hash (TC-020)", () => {
+    // Case: TC-020
+    // Given: an abbreviated hash written in uppercase hexadecimal
+    // When: isValidCommitHash is called
+    const result = isValidCommitHash("ABCD1234");
+    // Then: the case-insensitive flag keeps it valid
+    expect(result).toBe(true);
+  });
+
+  it("accepts a 4-character hash at the minimum length (TC-021)", () => {
+    // Case: TC-021
+    // Given: the shortest abbreviated hash allowed by the pattern
+    // When: isValidCommitHash is called
+    const result = isValidCommitHash("abcd");
+    // Then: the minimum length is accepted
+    expect(result).toBe(true);
+  });
+
+  it("rejects a 3-character hash below the minimum length (TC-022)", () => {
+    // Case: TC-022
+    // Given: a hash one character shorter than the minimum
+    // When: isValidCommitHash is called
+    const result = isValidCommitHash("abc");
+    // Then: the hash is rejected
+    expect(result).toBe(false);
+  });
+
+  it("rejects a 41-character hash above the maximum length (TC-023)", () => {
+    // Case: TC-023
+    // Given: a hash one character longer than the maximum
+    const tooLongHash = `${FULL_LENGTH_HASH}a`;
+    // When: isValidCommitHash is called
+    const result = isValidCommitHash(tooLongHash);
+    // Then: the hash is rejected
+    expect(tooLongHash).toHaveLength(41);
+    expect(result).toBe(false);
+  });
+
+  it("rejects an empty string (TC-024)", () => {
+    // Case: TC-024
+    // Given: an empty hash value
+    // When: isValidCommitHash is called
+    const result = isValidCommitHash("");
+    // Then: the hash is rejected
+    expect(result).toBe(false);
+  });
+
+  it("rejects a 64-character SHA-256 object ID (TC-025)", () => {
+    // Case: TC-025
+    // Given: a 64-character hexadecimal object ID (SHA-256 repositories)
+    const sha256Hash = `${FULL_LENGTH_HASH}${FULL_LENGTH_HASH.substring(0, 24)}`;
+    // When: isValidCommitHash is called
+    const result = isValidCommitHash(sha256Hash);
+    // Then: SHA-256 lengths stay out of scope and are rejected
+    expect(sha256Hash).toHaveLength(64);
+    expect(result).toBe(false);
+  });
+
+  it("rejects non-hexadecimal characters (TC-026)", () => {
+    // Case: TC-026
+    // Given: a 4-character string outside the hexadecimal alphabet
+    // When: isValidCommitHash is called
+    const result = isValidCommitHash("zzzz");
+    // Then: the hash is rejected
+    expect(result).toBe(false);
+  });
+
+  it("rejects a hash with a trailing newline (TC-027)", () => {
+    // Case: TC-027
+    // Given: a valid hash followed by a newline character
+    // When: isValidCommitHash is called
+    const result = isValidCommitHash("abcd\n");
+    // Then: the anchors do not match across lines, so the value is rejected
+    expect(result).toBe(false);
+  });
+
+  it("rejects a hash with leading whitespace (TC-028)", () => {
+    // Case: TC-028
+    // Given: a valid hash preceded by a space
+    // When: isValidCommitHash is called
+    const result = isValidCommitHash(" abcd");
+    // Then: the value is rejected without being trimmed
+    expect(result).toBe(false);
+  });
+
+  it("rejects an option-like argument (TC-029)", () => {
+    // Case: TC-029
+    // Given: a string that would be read as a Git option
+    // When: isValidCommitHash is called
+    const result = isValidCommitHash("-abcd");
+    // Then: the value is rejected so no option can reach the Git arguments
+    expect(result).toBe(false);
   });
 });
 

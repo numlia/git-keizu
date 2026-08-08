@@ -9,7 +9,7 @@ import {
   svgIcons,
   UNCOMMITTED_CHANGES_HASH,
   unescapeHtml,
-  worktreeMapsEqual
+  worktreeCollectionsEqual
 } from "../../web/utils";
 
 describe("escapeHtml", () => {
@@ -209,39 +209,182 @@ describe("arraysEqual", () => {
   });
 });
 
-describe("worktreeMapsEqual", () => {
-  it("returns true for two empty maps", () => {
-    expect(worktreeMapsEqual({}, {})).toBe(true);
+// S5: worktreeCollectionsEqual() collection 差分判定
+// @see docs/testing/perspectives/web/utils-test.md
+describe("worktreeCollectionsEqual", () => {
+  const DETACHED_ENTRY = { path: "/tmp/wt8", isMain: false, head: "abc1234" };
+
+  it("returns true for two collections whose every field matches (TC-020)", () => {
+    // Case: TC-020
+    // Given: two collections with one identical branch entry and one identical detached entry
+    const a = { branches: { feat: { path: "/wt", isMain: false } }, detached: [DETACHED_ENTRY] };
+    const b = {
+      branches: { feat: { path: "/wt", isMain: false } },
+      detached: [{ path: "/tmp/wt8", isMain: false, head: "abc1234" }]
+    };
+
+    // When: the collections are compared
+    const result = worktreeCollectionsEqual(a, b);
+
+    // Then: the collections are reported as equal
+    expect(result).toBe(true);
   });
 
-  it("returns true for identical maps", () => {
-    const a = { main: { path: "/repo", isMain: true }, feat: { path: "/wt", isMain: false } };
-    const b = { main: { path: "/repo", isMain: true }, feat: { path: "/wt", isMain: false } };
-    expect(worktreeMapsEqual(a, b)).toBe(true);
+  it("returns true for two empty collections (TC-021)", () => {
+    // Case: TC-021
+    // Given: two empty collections matching the Git failure fallback
+    // When: the collections are compared
+    const result = worktreeCollectionsEqual(
+      { branches: {}, detached: [] },
+      {
+        branches: {},
+        detached: []
+      }
+    );
+
+    // Then: the empty fallbacks are reported as equal
+    expect(result).toBe(true);
   });
 
-  it("returns false when key count differs", () => {
-    const a = { main: { path: "/repo", isMain: true } };
-    const b = {};
-    expect(worktreeMapsEqual(a, b)).toBe(false);
+  it("returns true when only detached entries are present and match (TC-022)", () => {
+    // Case: TC-022
+    // Given: two collections without branches whose detached entries match
+    const a = { branches: {}, detached: [DETACHED_ENTRY] };
+    const b = { branches: {}, detached: [{ path: "/tmp/wt8", isMain: false, head: "abc1234" }] };
+
+    // When: the collections are compared
+    const result = worktreeCollectionsEqual(a, b);
+
+    // Then: a branch-less repository still compares as equal
+    expect(result).toBe(true);
   });
 
-  it("returns false when a key is missing in b", () => {
-    const a = { main: { path: "/repo", isMain: true }, feat: { path: "/wt", isMain: false } };
-    const b = { main: { path: "/repo", isMain: true }, other: { path: "/x", isMain: false } };
-    expect(worktreeMapsEqual(a, b)).toBe(false);
+  it("returns false when the branch key count differs (TC-023)", () => {
+    // Case: TC-023
+    // Given: two collections whose branches maps hold 1 and 2 keys
+    const a = { branches: { main: { path: "/repo", isMain: true } }, detached: [DETACHED_ENTRY] };
+    const b = {
+      branches: {
+        main: { path: "/repo", isMain: true },
+        feat: { path: "/wt", isMain: false }
+      },
+      detached: [DETACHED_ENTRY]
+    };
+
+    // When: the collections are compared
+    const result = worktreeCollectionsEqual(a, b);
+
+    // Then: the branch count difference is detected
+    expect(result).toBe(false);
   });
 
-  it("returns false when path differs", () => {
-    const a = { feat: { path: "/wt-old", isMain: false } };
-    const b = { feat: { path: "/wt-new", isMain: false } };
-    expect(worktreeMapsEqual(a, b)).toBe(false);
+  it("returns false when only a branch key name differs (TC-024)", () => {
+    // Case: TC-024
+    // Given: two collections with the same branch count but different key names
+    const a = { branches: { "feature/x": { path: "/wt", isMain: false } }, detached: [] };
+    const b = { branches: { "feature/y": { path: "/wt", isMain: false } }, detached: [] };
+
+    // When: the collections are compared
+    const result = worktreeCollectionsEqual(a, b);
+
+    // Then: the renamed key is detected despite the equal count
+    expect(result).toBe(false);
   });
 
-  it("returns false when isMain differs", () => {
-    const a = { feat: { path: "/wt", isMain: false } };
-    const b = { feat: { path: "/wt", isMain: true } };
-    expect(worktreeMapsEqual(a, b)).toBe(false);
+  it("returns false when only a branch path differs (TC-025)", () => {
+    // Case: TC-025
+    // Given: two collections whose branch entries differ only in path
+    const a = { branches: { feat: { path: "/wt-old", isMain: false } }, detached: [] };
+    const b = { branches: { feat: { path: "/wt-new", isMain: false } }, detached: [] };
+
+    // When: the collections are compared
+    const result = worktreeCollectionsEqual(a, b);
+
+    // Then: the path difference is detected
+    expect(result).toBe(false);
+  });
+
+  it("returns false when only a branch isMain differs (TC-026)", () => {
+    // Case: TC-026
+    // Given: two collections whose branch entries differ only in isMain
+    const a = { branches: { feat: { path: "/wt", isMain: false } }, detached: [] };
+    const b = { branches: { feat: { path: "/wt", isMain: true } }, detached: [] };
+
+    // When: the collections are compared
+    const result = worktreeCollectionsEqual(a, b);
+
+    // Then: the isMain difference is detected
+    expect(result).toBe(false);
+  });
+
+  it("returns false when the detached array length differs (TC-027)", () => {
+    // Case: TC-027
+    // Given: two collections with identical branches but 1 and 2 detached entries
+    const a = { branches: {}, detached: [DETACHED_ENTRY] };
+    const b = {
+      branches: {},
+      detached: [DETACHED_ENTRY, { path: "/tmp/wt9", isMain: false, head: "def5678" }]
+    };
+
+    // When: the collections are compared
+    const result = worktreeCollectionsEqual(a, b);
+
+    // Then: the detached length difference is detected
+    expect(result).toBe(false);
+  });
+
+  it("returns false when only a detached path differs (TC-028)", () => {
+    // Case: TC-028
+    // Given: two collections whose detached entries differ only in path
+    const a = { branches: {}, detached: [DETACHED_ENTRY] };
+    const b = { branches: {}, detached: [{ path: "/tmp/wt9", isMain: false, head: "abc1234" }] };
+
+    // When: the collections are compared
+    const result = worktreeCollectionsEqual(a, b);
+
+    // Then: the path difference is detected
+    expect(result).toBe(false);
+  });
+
+  it("returns false when only a detached isMain differs (TC-029)", () => {
+    // Case: TC-029
+    // Given: two collections whose detached entries differ only in isMain
+    const a = { branches: {}, detached: [DETACHED_ENTRY] };
+    const b = { branches: {}, detached: [{ path: "/tmp/wt8", isMain: true, head: "abc1234" }] };
+
+    // When: the collections are compared
+    const result = worktreeCollectionsEqual(a, b);
+
+    // Then: the isMain difference is detected
+    expect(result).toBe(false);
+  });
+
+  it("returns false when only a detached head differs (TC-030)", () => {
+    // Case: TC-030
+    // Given: two collections whose detached entries differ only in head
+    const a = { branches: {}, detached: [DETACHED_ENTRY] };
+    const b = { branches: {}, detached: [{ path: "/tmp/wt8", isMain: false, head: "def5678" }] };
+
+    // When: the collections are compared
+    const result = worktreeCollectionsEqual(a, b);
+
+    // Then: a moved detached HEAD is detected
+    expect(result).toBe(false);
+  });
+
+  it("returns false when the detached entries are only reordered (TC-031)", () => {
+    // Case: TC-031
+    // Given: two collections holding the same detached entries in swapped order
+    const first = { path: "/tmp/a", isMain: false, head: "abc1234" };
+    const second = { path: "/tmp/b", isMain: false, head: "def5678" };
+    const a = { branches: {}, detached: [first, second] };
+    const b = { branches: {}, detached: [second, first] };
+
+    // When: the collections are compared
+    const result = worktreeCollectionsEqual(a, b);
+
+    // Then: the index-wise comparison reports a difference without re-sorting
+    expect(result).toBe(false);
   });
 });
 
