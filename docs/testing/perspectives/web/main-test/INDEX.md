@@ -7,14 +7,14 @@
 > Test Framework: Vitest
 > Total Shards: 10
 > Total Sections: 45
-> Total Cases: 278
+> Total Cases: 280
 
 ## Shards
 
 | Shard File                  | Responsibility     | Sections | Cases | Last Updated |
 | --------------------------- | ------------------ | -------- | ----- | ------------ |
 | 01-rendering-01.md          | rendering          | 7        | 35    | 2026-03-05   |
-| 01-rendering-02.md          | rendering          | 1        | 26    | 2026-08-08   |
+| 01-rendering-02.md          | rendering          | 1        | 28    | 2026-08-08   |
 | 02-context-menu-01.md       | context-menu       | 6        | 49    | 2026-07-04   |
 | 03-compare-find-01.md       | compare-find       | 3        | 25    | 2026-03-01   |
 | 04-keyboard-selection-01.md | keyboard-selection | 9        | 52    | 2026-07-19   |

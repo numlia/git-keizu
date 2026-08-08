@@ -5776,6 +5776,49 @@ describe("worktree label rendering (S48)", () => {
     const headSpan = document.querySelector(".gitRef.head");
     expect(headSpan!.classList.contains("worktree")).toBe(true);
   });
+
+  it("leaves a branch label plain when its entry is the main worktree (TC-303)", () => {
+    // Case: TC-303
+    // Given: the branches map marks the rendered head branch as the main worktree
+    setBranchLabels({ heads: [{ name: "main", remotes: [] }] });
+
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: { main: { path: "/home/user/repo", isMain: true } },
+      detached: []
+    });
+
+    // Then: the head label carries no worktree markers and keeps the plain branch icon
+    const headSpan = document.querySelector(".gitRef.head");
+    expect(headSpan).not.toBeNull();
+    expect(headSpan!.classList.contains("worktree")).toBe(false);
+    expect(headSpan!.hasAttribute("data-worktree-path")).toBe(false);
+    expect(headSpan!.querySelector(".codicon.codicon-worktree-small")).toBeNull();
+    expect(headSpan!.querySelector(".codicon.codicon-git-branch")).not.toBeNull();
+  });
+
+  it("escapes the detached label text when the final path component is markup (TC-304)", () => {
+    // Case: TC-304
+    // Given: the last component of the detached worktree path is a script tag
+    // (a closing tag cannot appear here: its slash would start a new path component)
+    const maliciousPath = '/tmp/<script>alert("x")&';
+
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry(maliciousPath, COMMIT_HASH_1)]
+    });
+
+    // Then: the label shows the markup as literal text instead of creating an element
+    const label = rowFor(COMMIT_HASH_1).querySelector(".detachedWorktree");
+    expect(label!.textContent).toBe('<script>alert("x")&');
+    expect(label!.querySelector("script")).toBeNull();
+    expect(document.querySelectorAll("script")).toHaveLength(0);
+
+    // And: the attributes still decode back to the original path
+    expect(label!.getAttribute("data-worktree-path")).toBe(maliciousPath);
+    expect(label!.getAttribute("title")).toBe(`Worktree: ${maliciousPath}`);
+  });
 });
 
 /* ------------------------------------------------------------------ */
