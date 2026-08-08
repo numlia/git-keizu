@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-08-08
+
+This release makes detached HEAD worktrees visible: worktrees created without a branch — such as the throwaway worktrees AI coding tools create with `git worktree add <path> <commit>` — now appear in the graph, stay visible even when their commit is unreachable from any branch, and keep the graph up to date automatically as they come and go.
+
+### Added
+
+- **Detached HEAD worktrees are shown in the graph**: A worktree checked out directly at a commit (no branch) now displays a worktree label — the worktree icon plus the directory name, with the full path in the tooltip — on its HEAD commit row. Previously such worktrees were invisible: only branch-based worktrees got a label. Multiple detached worktrees pointing at the same commit each get their own label, ordered by path. The labels are display-only: they open no branch context menu and double-click performs no checkout, so a detached worktree can never be mistaken for a branch. When the repository's main worktree is itself in detached HEAD state, it is not given an extra label — the existing HEAD indicator already marks it.
+- **Unreachable worktree HEADs are pinned into view**: When a detached worktree's HEAD commit cannot be reached from any branch or tag, or is older than the loaded commit window, the commit is now fetched separately and appended at the bottom of the graph so the worktree is always visible. The normal history is untouched — commit count, ordering, and "Load More" behave exactly as before, and the pinned commit is shown even when a branch filter is active. The author filter still applies: a pinned commit whose author does not match the filter stays hidden. If this extra lookup fails, the graph simply renders without the pinned commit instead of failing the whole load.
+- **Worktree changes refresh the graph automatically**: Creating or removing a worktree and moving a worktree's HEAD (e.g. `git checkout` inside it) now trigger the same debounced auto refresh as other Git operations, by watching the `worktrees/` area of the Git directory. No manual Refresh needed to see worktrees appear and disappear.
+
 ## [0.8.4] - 2026-08-07
 
 This release makes remote branch checkout usable when the local branch is simply out of date: checking out a remote branch into a same-named existing local branch now performs a checkout followed by an explicit pull.
@@ -500,7 +510,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.8.4...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/numlia/git-keizu/compare/v0.8.4...v0.9.0
 [0.8.4]: https://github.com/numlia/git-keizu/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/numlia/git-keizu/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/numlia/git-keizu/compare/v0.8.1...v0.8.2
