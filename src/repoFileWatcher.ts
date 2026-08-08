@@ -11,7 +11,7 @@ const watchedRepositoryStateFiles = new Set([
   "packed-refs",
   "refs/stash"
 ]);
-const watchedRepositoryStatePrefixes = ["refs/heads/", "refs/remotes/", "refs/tags/"];
+const watchedRepositoryStatePrefixes = ["refs/heads/", "refs/remotes/", "refs/tags/", "worktrees/"];
 
 function normaliseWatchPath(pathValue: string) {
   return pathValue.split(path.sep).join("/");

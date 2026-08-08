@@ -7,7 +7,7 @@ vi.mock("vscode", () => ({
 }));
 
 vi.mock("../../src/utils", () => ({
-  getPathFromUri: vi.fn((uri: { fsPath: string }) => uri.fsPath),
+  getPathFromUri: vi.fn((uri: { fsPath: string }) => uri.fsPath.replace(/\\/g, "/")),
   getPathFromStr: vi.fn((str: string) => str.replace(/\\/g, "/"))
 }));
 
@@ -45,6 +45,8 @@ function createUri(watchRoot: string, relativePath: string): { fsPath: string } 
   };
 }
 
+type WatcherEvent = "onDidCreate" | "onDidChange" | "onDidDelete";
+
 function startWatcher(
   callback: Mock,
   watchRoots: string[] = [MAIN_GIT_DIR]
@@ -52,6 +54,8 @@ function startWatcher(
   rfWatcher: RepoFileWatcher;
   mockWatchers: MockWatcher[];
   triggerChange: (watcherIndex: number, relativePath: string) => void;
+  trigger: (watcherIndex: number, event: WatcherEvent, relativePath: string) => void;
+  triggerAbsolutePath: (watcherIndex: number, event: WatcherEvent, fsPath: string) => void;
 } {
   const rfWatcher = new RepoFileWatcher(callback);
   const mockWatchers = watchRoots.map(() => createMockWatcher());
@@ -59,15 +63,31 @@ function startWatcher(
   mockedCreateFSWatcher.mockImplementation(() => mockWatchers[watcherIndex++]);
   rfWatcher.start(watchRoots);
 
+  const triggerAbsolutePath = (
+    targetWatcherIndex: number,
+    event: WatcherEvent,
+    fsPath: string
+  ): void => {
+    const handler = mockWatchers[targetWatcherIndex][event].mock.calls[0][0] as (uri: {
+      fsPath: string;
+    }) => void;
+    handler({ fsPath });
+  };
+  const trigger = (targetWatcherIndex: number, event: WatcherEvent, relativePath: string): void => {
+    triggerAbsolutePath(
+      targetWatcherIndex,
+      event,
+      createUri(watchRoots[targetWatcherIndex], relativePath).fsPath
+    );
+  };
+
   return {
     rfWatcher,
     mockWatchers,
-    triggerChange: (targetWatcherIndex, relativePath) => {
-      const handler = mockWatchers[targetWatcherIndex].onDidChange.mock.calls[0][0] as (uri: {
-        fsPath: string;
-      }) => void;
-      handler(createUri(watchRoots[targetWatcherIndex], relativePath));
-    }
+    triggerChange: (targetWatcherIndex, relativePath) =>
+      trigger(targetWatcherIndex, "onDidChange", relativePath),
+    trigger,
+    triggerAbsolutePath
   };
 }
 
@@ -603,6 +623,396 @@ describe("RepoFileWatcher pending debounce timer clearing (S12)", () => {
     vi.advanceTimersByTime(DEBOUNCE_MS * 2);
 
     // Then: the cleared timer never invokes the callback
+    expect(callback).not.toHaveBeenCalled();
+  });
+});
+
+// S13: refresh(uri) linked worktree の Git 状態監視（`worktrees/` prefix）
+// @see docs/testing/perspectives/src/repoFileWatcher-test.md
+describe("RepoFileWatcher linked worktree state watching (S13)", () => {
+  const WORKTREE_HEAD_PATH = "worktrees/feature-x/HEAD";
+  const WINDOWS_GIT_DIR = "C:/repo/.git";
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.resetAllMocks();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("fires for a created worktree HEAD file (TC-064)", () => {
+    // Case: TC-064
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: a linked worktree HEAD file is created
+    trigger(0, "onDidCreate", WORKTREE_HEAD_PATH);
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the callback runs once after the debounce delay
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires for a changed worktree HEAD file (TC-065)", () => {
+    // Case: TC-065
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: the linked worktree HEAD moves
+    trigger(0, "onDidChange", WORKTREE_HEAD_PATH);
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the callback runs once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires for a deleted worktree HEAD file (TC-066)", () => {
+    // Case: TC-066
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: the linked worktree HEAD file is removed
+    trigger(0, "onDidDelete", WORKTREE_HEAD_PATH);
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the callback runs once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires for the shortest non-empty descendant of the prefix on create (TC-067)", () => {
+    // Case: TC-067
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: the worktree directory itself is created one segment below the prefix
+    trigger(0, "onDidCreate", "worktrees/feature-x");
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the callback runs once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires for the shortest non-empty descendant of the prefix on delete (TC-068)", () => {
+    // Case: TC-068
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: the whole worktree directory is removed
+    trigger(0, "onDidDelete", "worktrees/feature-x");
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the callback runs once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires for a created worktree gitdir file (TC-069)", () => {
+    // Case: TC-069
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: the gitdir pointer of a new worktree is created
+    trigger(0, "onDidCreate", "worktrees/feature-x/gitdir");
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the callback runs once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires for a deleted worktree gitdir file (TC-070)", () => {
+    // Case: TC-070
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: the gitdir pointer is removed
+    trigger(0, "onDidDelete", "worktrees/feature-x/gitdir");
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the callback runs once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires for a changed worktree commondir file (TC-071)", () => {
+    // Case: TC-071
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: the commondir pointer of a worktree changes
+    trigger(0, "onDidChange", "worktrees/feature-x/commondir");
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the callback runs once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires for a changed worktree index file (TC-072)", () => {
+    // Case: TC-072
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: the per-worktree index changes
+    trigger(0, "onDidChange", "worktrees/feature-x/index");
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the callback runs once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires for a deeply nested worktree descendant (TC-073)", () => {
+    // Case: TC-073
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: a multi-level descendant below the worktree directory changes
+    trigger(0, "onDidChange", "worktrees/feature-x/logs/HEAD");
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the callback runs once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores the worktrees prefix itself (TC-074)", () => {
+    // Case: TC-074
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: the prefix directory itself is created
+    trigger(0, "onDidCreate", "worktrees/");
+    vi.runAllTimers();
+
+    // Then: the callback is not called
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("ignores a prefix match without the trailing separator (TC-075)", () => {
+    // Case: TC-075
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: a path equal to the prefix without its separator is created
+    trigger(0, "onDidCreate", "worktrees");
+    vi.runAllTimers();
+
+    // Then: the callback is not called
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("ignores Git object paths (TC-076)", () => {
+    // Case: TC-076
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: a loose object file changes
+    trigger(0, "onDidChange", "objects/ab/cd1234");
+    vi.runAllTimers();
+
+    // Then: the callback is not called
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("ignores working tree source paths (TC-077)", () => {
+    // Case: TC-077
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: a working tree source file changes
+    trigger(0, "onDidChange", "src/index.ts");
+    vi.runAllTimers();
+
+    // Then: the callback is not called
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("ignores a worktree path from outside every watch root (TC-078)", () => {
+    // Case: TC-078
+    // Given: the watcher is active for one Git directory only
+    const callback = vi.fn();
+    const { triggerAbsolutePath } = startWatcher(callback);
+
+    // When: a worktree HEAD from a different repository is delivered to the watcher
+    triggerAbsolutePath(0, "onDidChange", `/other/.git/${WORKTREE_HEAD_PATH}`);
+    vi.runAllTimers();
+
+    // Then: the callback is not called
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("still fires for the allowlisted HEAD file (TC-079)", () => {
+    // Case: TC-079
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: the repository HEAD changes
+    trigger(0, "onDidChange", "HEAD");
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the existing allowlist entry still fires the callback once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("still fires for an existing branch ref prefix (TC-080)", () => {
+    // Case: TC-080
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: a branch ref changes
+    trigger(0, "onDidChange", "refs/heads/main");
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the existing prefix still fires the callback once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("still ignores an existing ref prefix with an empty suffix (TC-081)", () => {
+    // Case: TC-081
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: the refs/heads directory itself changes
+    trigger(0, "onDidChange", "refs/heads/");
+    vi.runAllTimers();
+
+    // Then: the callback is not called
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("fires for a worktree path reported by the second watch root (TC-082)", () => {
+    // Case: TC-082
+    // Given: the watcher is active for the linked git-dir and the shared common-dir
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback, [LINKED_WORKTREE_GIT_DIR, COMMON_GIT_DIR]);
+
+    // When: the common-dir watcher reports a worktree HEAD change
+    trigger(1, "onDidChange", WORKTREE_HEAD_PATH);
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: the callback runs once for the second root
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("debounces a worktree change together with a HEAD change (TC-083)", () => {
+    // Case: TC-083
+    // Given: the watcher is active and no debounce timer is pending
+    const callback = vi.fn();
+    const clearTimeoutSpy = vi.spyOn(globalThis, "clearTimeout");
+    const { trigger } = startWatcher(callback);
+    clearTimeoutSpy.mockClear();
+
+    // When: a worktree HEAD change and a repository HEAD change arrive within the window
+    trigger(0, "onDidChange", WORKTREE_HEAD_PATH);
+    trigger(0, "onDidChange", "HEAD");
+
+    // Then: the pending timer is cleared once and only one callback fires
+    expect(clearTimeoutSpy).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not fire before the debounce delay elapses (TC-084)", () => {
+    // Case: TC-084
+    // Given: the watcher is active for the common Git directory
+    const callback = vi.fn();
+    const { trigger } = startWatcher(callback);
+
+    // When: a worktree HEAD change is followed by 749ms
+    trigger(0, "onDidChange", WORKTREE_HEAD_PATH);
+    vi.advanceTimersByTime(DEBOUNCE_MS - 1);
+
+    // Then: the callback has not run yet
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("suppresses a worktree change while muted (TC-085)", () => {
+    // Case: TC-085
+    // Given: the watcher is muted
+    const callback = vi.fn();
+    const { rfWatcher, trigger } = startWatcher(callback);
+    rfWatcher.mute();
+
+    // When: a worktree HEAD change arrives
+    trigger(0, "onDidChange", WORKTREE_HEAD_PATH);
+    vi.runAllTimers();
+
+    // Then: the callback is not called
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("suppresses a worktree change during the unmute grace period (TC-086)", () => {
+    // Case: TC-086
+    // Given: the watcher was unmuted at a fixed time
+    const callback = vi.fn();
+    const { rfWatcher, trigger } = startWatcher(callback);
+    vi.setSystemTime(new Date(10_000));
+    rfWatcher.mute();
+    rfWatcher.unmute();
+
+    // When: a worktree HEAD change arrives before resumeAt
+    vi.setSystemTime(new Date(10_000 + GRACE_PERIOD_MS - 1));
+    trigger(0, "onDidChange", WORKTREE_HEAD_PATH);
+    vi.runAllTimers();
+
+    // Then: the callback is not called
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("fires for a backslash-separated worktree path (TC-087)", () => {
+    // Case: TC-087
+    // Given: the watcher is active for a Windows-style Git directory
+    const callback = vi.fn();
+    const { triggerAbsolutePath } = startWatcher(callback, [WINDOWS_GIT_DIR]);
+
+    // When: the change arrives with backslash separators below the watch root
+    triggerAbsolutePath(0, "onDidChange", `${WINDOWS_GIT_DIR}/worktrees\\feature-x\\HEAD`);
+    vi.advanceTimersByTime(DEBOUNCE_MS);
+
+    // Then: separator normalization makes it match the prefix and the callback runs once
+    expect(callback).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores a worktree change after stop (TC-088)", () => {
+    // Case: TC-088
+    // Given: the watcher has been stopped, clearing its watch roots
+    const callback = vi.fn();
+    const { rfWatcher, trigger } = startWatcher(callback);
+    rfWatcher.stop();
+
+    // When: a worktree HEAD change is delivered to the disposed watcher callback
+    trigger(0, "onDidChange", WORKTREE_HEAD_PATH);
+    vi.runAllTimers();
+
+    // Then: the callback is not called
+    expect(callback).not.toHaveBeenCalled();
+  });
+
+  it("ignores a working tree path that shares the worktrees name (TC-089)", () => {
+    // Case: TC-089
+    // Given: the watcher is active for the Git directory of the repository
+    const callback = vi.fn();
+    const { triggerAbsolutePath } = startWatcher(callback);
+
+    // When: a same-named path in the working tree changes
+    triggerAbsolutePath(0, "onDidChange", `/path/to/repo/${WORKTREE_HEAD_PATH}`);
+    vi.runAllTimers();
+
+    // Then: the relative path starts with ".." so the callback is not called
     expect(callback).not.toHaveBeenCalled();
   });
 });

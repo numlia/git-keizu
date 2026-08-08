@@ -2,16 +2,20 @@ import { describe, expect, it } from "vitest";
 
 import {
   CheckoutBranchResult,
+  DetachedWorktreeInfo,
   PushTarget,
   RemoteBranchTarget,
   RequestCheckoutBranch,
   RequestPush,
   ResponseCheckoutBranch,
+  ResponseLoadCommits,
   ResponseOpenWorktreeInNewWindow,
   ResponsePush,
   ResponseRevealWorktreeInOS,
   UNCOMMITTED_CHANGES_HASH,
-  VALID_UNCOMMITTED_RESET_MODES
+  VALID_UNCOMMITTED_RESET_MODES,
+  WorktreeCollection,
+  WorktreeInfo
 } from "../../src/types";
 
 describe("UNCOMMITTED_CHANGES_HASH", () => {
@@ -736,5 +740,181 @@ describe("PushTarget branch contract", () => {
     expect(target.upstreamBranchName).toBe("main");
     expect(missingLocal.localBranchName).toBeUndefined();
     expect(missingUpstream.upstreamBranchName).toBeUndefined();
+  });
+});
+
+// S7: detached worktree と WorktreeCollection の型契約
+// @see docs/testing/perspectives/src/types-test.md
+describe("DetachedWorktreeInfo contract", () => {
+  it("accepts a detached entry carrying path, isMain and head (TC-079)", () => {
+    // Case: TC-079
+    // Given: a detached worktree entry literal
+    const entry: DetachedWorktreeInfo = { path: "/tmp/wt8", isMain: false, head: "abc1234" };
+
+    // When: the entry is inspected
+    // Then: head is available as a string alongside the inherited fields
+    expect(entry.head).toBe("abc1234");
+    expect(entry.path).toBe("/tmp/wt8");
+    expect(entry.isMain).toBe(false);
+  });
+
+  it("requires head on a detached entry (TC-080)", () => {
+    // Case: TC-080
+    // Given: a detached entry literal without head
+    // @ts-expect-error head is mandatory: omitting it must be a type error
+    const missingHead: DetachedWorktreeInfo = { path: "/tmp/wt8", isMain: false };
+
+    // When: the literal is inspected at runtime
+    // Then: head is absent, confirming it cannot be made optional
+    expect(missingHead.head).toBeUndefined();
+  });
+
+  it("requires the inherited path field on a detached entry (TC-081)", () => {
+    // Case: TC-081
+    // Given: a detached entry literal without path
+    // @ts-expect-error path is inherited from WorktreeInfo and mandatory
+    const missingPath: DetachedWorktreeInfo = { isMain: false, head: "abc1234" };
+
+    // When: the literal is inspected at runtime
+    // Then: path is absent, confirming the extends relationship is enforced
+    expect(missingPath.path).toBeUndefined();
+  });
+
+  it("requires the inherited isMain field on a detached entry (TC-082)", () => {
+    // Case: TC-082
+    // Given: a detached entry literal without isMain
+    // @ts-expect-error isMain is inherited from WorktreeInfo and mandatory
+    const missingIsMain: DetachedWorktreeInfo = { path: "/tmp/wt8", head: "abc1234" };
+
+    // When: the literal is inspected at runtime
+    // Then: isMain is absent, so main and linked stay distinguishable by type
+    expect(missingIsMain.isMain).toBeUndefined();
+  });
+
+  it("assigns a detached entry to the WorktreeInfo base type (TC-083)", () => {
+    // Case: TC-083
+    // Given: a detached entry assigned to its base type
+    const detached: DetachedWorktreeInfo = { path: "/tmp/wt8", isMain: false, head: "abc1234" };
+    const base: WorktreeInfo = detached;
+
+    // When: the base-typed value is inspected
+    // Then: the assignment compiles and the base fields are readable
+    expect(base.path).toBe("/tmp/wt8");
+    expect(base.isMain).toBe(false);
+  });
+
+  it("rejects a base worktree entry as a detached collection element (TC-084)", () => {
+    // Case: TC-084
+    // Given: a base entry literal assigned to a detached collection element
+    // @ts-expect-error a value without head is not a DetachedWorktreeInfo
+    const element: WorktreeCollection["detached"][number] = { path: "/tmp/wt8", isMain: false };
+
+    // When: the literal is inspected at runtime
+    // Then: head is absent, so head-less values cannot be mixed into detached
+    expect(element.head).toBeUndefined();
+  });
+});
+
+// S7: detached worktree と WorktreeCollection の型契約
+// @see docs/testing/perspectives/src/types-test.md
+describe("WorktreeCollection contract", () => {
+  it("accepts an empty collection (TC-085)", () => {
+    // Case: TC-085
+    // Given: an empty collection literal matching the Git failure fallback
+    const collection: WorktreeCollection = { branches: {}, detached: [] };
+
+    // When: both sides of the collection are inspected
+    // Then: branches is a map and detached is an array
+    expect(collection.branches).toEqual({});
+    expect(Array.isArray(collection.detached)).toBe(true);
+  });
+
+  it("requires the branches field (TC-086)", () => {
+    // Case: TC-086
+    // Given: a collection literal without branches
+    // @ts-expect-error branches is mandatory: omitting it must be a type error
+    const missingBranches: WorktreeCollection = { detached: [] };
+
+    // When: the literal is inspected at runtime
+    // Then: branches is absent, so a one-sided collection is rejected
+    expect(missingBranches.branches).toBeUndefined();
+  });
+
+  it("requires the detached field (TC-087)", () => {
+    // Case: TC-087
+    // Given: a collection literal without detached
+    // @ts-expect-error detached is mandatory: omitting it must be a type error
+    const missingDetached: WorktreeCollection = { branches: {} };
+
+    // When: the literal is inspected at runtime
+    // Then: detached is absent, so a one-sided collection is rejected
+    expect(missingDetached.detached).toBeUndefined();
+  });
+
+  it("keeps the existing branch entry shape without head (TC-088)", () => {
+    // Case: TC-088
+    // Given: a branch map literal assigned to the branches side of the collection
+    const branches: WorktreeCollection["branches"] = {
+      "feature/x": { path: "/wt/x", isMain: false }
+    };
+
+    // When: the branch entry is inspected
+    // Then: the assignment compiles without requiring head
+    expect(branches["feature/x"]).toEqual({ path: "/wt/x", isMain: false });
+  });
+});
+
+// S7: detached worktree と WorktreeCollection の型契約
+// @see docs/testing/perspectives/src/types-test.md
+describe("ResponseLoadCommits worktrees field contract", () => {
+  const BASE_RESPONSE: Omit<ResponseLoadCommits, "worktrees"> = {
+    command: "loadCommits",
+    commits: [],
+    head: null,
+    moreCommitsAvailable: false,
+    hard: true
+  };
+
+  it("allows the worktrees field to be omitted (TC-089)", () => {
+    // Case: TC-089
+    // Given: a response literal without the worktrees field
+    const response: ResponseLoadCommits = { ...BASE_RESPONSE };
+
+    // When: the response is inspected
+    // Then: the assignment compiles and worktrees stays undefined
+    expect(response.worktrees).toBeUndefined();
+  });
+
+  it("carries a worktree collection in the response (TC-090)", () => {
+    // Case: TC-090
+    // Given: a response literal carrying both sides of the collection
+    const response: ResponseLoadCommits = {
+      ...BASE_RESPONSE,
+      worktrees: {
+        branches: { main: { path: "/r", isMain: true } },
+        detached: [{ path: "/tmp/wt8", isMain: false, head: "abc1234" }]
+      }
+    };
+
+    // When: the collection is read back from the response
+    // Then: branches and detached are both reachable with their values intact
+    expect(response.worktrees).toEqual({
+      branches: { main: { path: "/r", isMain: true } },
+      detached: [{ path: "/tmp/wt8", isMain: false, head: "abc1234" }]
+    });
+  });
+
+  it("rejects the legacy flat worktree map in the response (TC-091)", () => {
+    // Case: TC-091
+    // Given: a response literal using the pre-collection flat map shape
+    const response: ResponseLoadCommits = {
+      ...BASE_RESPONSE,
+      // @ts-expect-error the flat WorktreeMap shape is no longer assignable
+      worktrees: { main: { path: "/r", isMain: true } }
+    };
+
+    // When: the collection side of the field is inspected at runtime
+    // Then: branches is absent, confirming the flat shape is not a collection
+    expect(response.worktrees!.branches).toBeUndefined();
   });
 });

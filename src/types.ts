@@ -171,7 +171,17 @@ export interface WorktreeInfo {
   isMain: boolean;
 }
 
+export interface DetachedWorktreeInfo extends WorktreeInfo {
+  head: string;
+}
+
 export type WorktreeMap = { [branchName: string]: WorktreeInfo };
+
+export interface WorktreeCollection {
+  branches: WorktreeMap;
+  detached: DetachedWorktreeInfo[];
+}
+
 export type CommitOrdering = "date" | "topo" | "author-date";
 export type RepoCommitOrdering = CommitOrdering | "default";
 export type GitResetMode = "soft" | "mixed" | "hard";
@@ -379,7 +389,7 @@ export interface ResponseLoadCommits {
   moreCommitsAvailable: boolean;
   hard: boolean;
   authors?: string[];
-  worktrees?: WorktreeMap;
+  worktrees?: WorktreeCollection;
 }
 
 export interface RequestLoadRepos {

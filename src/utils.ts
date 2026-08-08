@@ -7,9 +7,14 @@ import type { DataSource } from "./dataSource";
 import { UNCOMMITTED_CHANGES_HASH } from "./types";
 
 const FS_REGEX = /\\/g;
+const COMMIT_HASH_PATTERN = /^[0-9a-f]{4,40}$/i;
 
 export function abbrevCommit(commitHash: string) {
   return commitHash.substring(0, 8);
+}
+
+export function isValidCommitHash(hash: string): boolean {
+  return COMMIT_HASH_PATTERN.test(hash);
 }
 
 export async function copyToClipboard(text: string): Promise<boolean> {

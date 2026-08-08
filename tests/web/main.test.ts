@@ -5262,222 +5262,169 @@ describe("Commit ordering context menu (S34)", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* S35: worktree アイコン描画とデータ属性                             */
+/* S48: worktree ラベル描画（branch collection lookup と detached）    */
 /* ------------------------------------------------------------------ */
 
-describe("worktree icon drawing and data attributes (S35)", () => {
+// S48: worktree ラベル描画（branch lookup の collection 化と detached 表示専用ラベル）
+// @see docs/testing/perspectives/web/main-test/01-rendering-02.md
+describe("worktree label rendering (S48)", () => {
+  const EMPTY_COLLECTION = { branches: {}, detached: [] };
+
+  interface BranchLabels {
+    heads?: { name: string; remotes: string[] }[];
+    remotes?: { name: string; remote: string }[];
+    tags?: { name: string }[];
+  }
+
+  function setBranchLabels(labels: BranchLabels): void {
+    vi.mocked(getBranchLabels).mockReturnValue({
+      heads: labels.heads ?? [],
+      remotes: labels.remotes ?? [],
+      tags: labels.tags ?? []
+    } as unknown as ReturnType<typeof getBranchLabels>);
+  }
+
+  function loadWithWorktrees(worktrees: unknown, overrides: Record<string, unknown> = {}): void {
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true,
+      ...(worktrees === undefined ? {} : { worktrees }),
+      ...overrides
+    });
+  }
+
+  function detachedEntry(path: string, head: string, isMain = false) {
+    return { path, isMain, head };
+  }
+
+  function rowFor(hash: string): HTMLElement {
+    const row = document.querySelector<HTMLElement>(`[data-hash="${hash}"]`);
+    if (row === null) throw new Error(`Commit row not found for hash: ${hash}`);
+    return row;
+  }
+
+  function postedCommands(command: string): unknown[] {
+    return vi
+      .mocked(vscode.postMessage)
+      .mock.calls.filter((call) => (call[0] as Record<string, unknown>).command === command);
+  }
+
   beforeEach(() => {
     resetCommitState();
   });
 
-  it("adds worktree CSS class, data-worktree-path, and replaces branch icon for linked worktree (TC-194)", () => {
-    // Given: a head branch "feature" has a linked worktree entry (isMain: false)
-    vi.mocked(getBranchLabels).mockReturnValue({
-      heads: [{ name: "feature", remotes: [] }],
-      remotes: [],
-      tags: []
+  afterEach(() => {
+    setBranchLabels({});
+  });
+
+  it("marks a branch label whose entry is a linked worktree (TC-277)", () => {
+    // Case: TC-277
+    // Given: the branches map holds a linked worktree for the rendered head branch
+    setBranchLabels({ heads: [{ name: "feature", remotes: [] }] });
+
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: { feature: { path: "/home/user/feature-wt", isMain: false } },
+      detached: []
     });
 
-    // When: loadCommits with worktrees map is dispatched
-    dispatchMessage({
-      command: "loadCommits",
-      commits: MOCK_COMMITS,
-      head: COMMIT_HASH_1,
-      moreCommitsAvailable: false,
-      hard: true,
-      worktrees: { feature: { path: "/home/user/feature-wt", isMain: false } }
-    });
-
-    // Then: the gitRef head span has worktree class and data-worktree-path
+    // Then: the head label carries the worktree class, path attribute and worktree icon
     const headSpan = document.querySelector(".gitRef.head");
     expect(headSpan).not.toBeNull();
     expect(headSpan!.classList.contains("worktree")).toBe(true);
     expect(headSpan!.getAttribute("data-worktree-path")).toBe("/home/user/feature-wt");
-    // And: the branch icon is replaced with the worktree icon (codicon-worktree-small)
-    const icon = headSpan!.querySelector(".codicon.codicon-worktree-small");
-    expect(icon).not.toBeNull();
-
-    // Cleanup
-    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+    expect(headSpan!.querySelector(".codicon.codicon-worktree-small")).not.toBeNull();
   });
 
-  it("renders branch without worktree-related elements when not in worktree map (TC-195)", () => {
-    // Given: a head branch "develop" with no worktree entry
-    vi.mocked(getBranchLabels).mockReturnValue({
-      heads: [{ name: "develop", remotes: [] }],
-      remotes: [],
-      tags: []
-    });
+  it("leaves a branch label untouched when it has no worktree entry (TC-278)", () => {
+    // Case: TC-278
+    // Given: the rendered head branch is absent from the branches map
+    setBranchLabels({ heads: [{ name: "develop", remotes: [] }] });
 
-    // When: loadCommits with empty worktrees map is dispatched
-    dispatchMessage({
-      command: "loadCommits",
-      commits: MOCK_COMMITS,
-      head: COMMIT_HASH_1,
-      moreCommitsAvailable: false,
-      hard: true,
-      worktrees: {}
-    });
+    // When: the collection is loaded
+    loadWithWorktrees(EMPTY_COLLECTION);
 
-    // Then: the gitRef head span does NOT have worktree class or data-worktree-path
+    // Then: the head label keeps the plain branch icon and no worktree markers
     const headSpan = document.querySelector(".gitRef.head");
     expect(headSpan).not.toBeNull();
     expect(headSpan!.classList.contains("worktree")).toBe(false);
     expect(headSpan!.hasAttribute("data-worktree-path")).toBe(false);
-    // And: the branch icon is the standard branch icon (codicon-git-branch)
-    const icon = headSpan!.querySelector(".codicon.codicon-git-branch");
-    expect(icon).not.toBeNull();
-
-    // Cleanup
-    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+    expect(headSpan!.querySelector(".codicon.codicon-git-branch")).not.toBeNull();
   });
 
-  it("sets tooltip title='Worktree: <path>' on gitRef span for linked worktree (TC-196)", () => {
-    // Given: a head branch with linked worktree
-    vi.mocked(getBranchLabels).mockReturnValue({
-      heads: [{ name: "feature", remotes: [] }],
-      remotes: [],
-      tags: []
+  it("sets the worktree tooltip on a linked branch label (TC-279)", () => {
+    // Case: TC-279
+    // Given: the branches map holds a linked worktree path for the head branch
+    setBranchLabels({ heads: [{ name: "feature", remotes: [] }] });
+
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: { feature: { path: "/tmp/my-worktree", isMain: false } },
+      detached: []
     });
 
-    // When: loadCommits with worktrees is dispatched
-    dispatchMessage({
-      command: "loadCommits",
-      commits: MOCK_COMMITS,
-      head: COMMIT_HASH_1,
-      moreCommitsAvailable: false,
-      hard: true,
-      worktrees: { feature: { path: "/tmp/my-worktree", isMain: false } }
-    });
-
-    // Then: the gitRef span has title attribute with "Worktree: <path>"
+    // Then: the label tooltip states the worktree path
     const headSpan = document.querySelector(".gitRef.head.worktree");
     expect(headSpan).not.toBeNull();
     expect(headSpan!.getAttribute("title")).toBe("Worktree: /tmp/my-worktree");
-
-    // Cleanup
-    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
   });
 
-  it("applies escapeHtml to worktree path with HTML special characters (TC-197)", () => {
-    // Given: a worktree path containing HTML special characters
+  it("escapes a branch worktree path containing HTML markup (TC-280)", () => {
+    // Case: TC-280
+    // Given: the linked worktree path contains a script tag
     const maliciousPath = '/tmp/<script>alert("xss")</script>';
-    vi.mocked(getBranchLabels).mockReturnValue({
-      heads: [{ name: "feature", remotes: [] }],
-      remotes: [],
-      tags: []
+    setBranchLabels({ heads: [{ name: "feature", remotes: [] }] });
+
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: { feature: { path: maliciousPath, isMain: false } },
+      detached: []
     });
 
-    // When: loadCommits with the malicious path is dispatched
-    dispatchMessage({
-      command: "loadCommits",
-      commits: MOCK_COMMITS,
-      head: COMMIT_HASH_1,
-      moreCommitsAvailable: false,
-      hard: true,
-      worktrees: { feature: { path: maliciousPath, isMain: false } }
-    });
-
-    // Then: no <script> element was injected into the DOM (XSS prevented by escapeHtml)
+    // Then: no script element is created and both attributes still decode to the original path
     const headSpan = document.querySelector(".gitRef.head");
     expect(headSpan).not.toBeNull();
-    expect(headSpan!.querySelector("script")).toBeNull();
-
-    // And: quotes in path are escaped in the serialized HTML (jsdom re-escapes " as &quot;)
-    const outerHtml = headSpan!.outerHTML;
-    expect(outerHtml).toContain("&quot;xss&quot;");
-
-    // And: getAttribute returns the decoded original path (DOM decodes entities)
+    expect(document.querySelectorAll("script")).toHaveLength(0);
     expect(headSpan!.getAttribute("data-worktree-path")).toBe(maliciousPath);
-
-    // And: the tooltip on the gitRef span contains the path
     expect(headSpan!.getAttribute("title")).toBe(`Worktree: ${maliciousPath}`);
-
-    // Cleanup
-    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
   });
 
-  it("does not add worktree indicators for remote branches (TC-198)", () => {
-    // Given: only remote branches are present (no head branches)
-    vi.mocked(getBranchLabels).mockReturnValue({
-      heads: [],
-      remotes: [{ name: "origin/feature", remote: "origin" }],
-      tags: []
+  it("never marks a remote label as a worktree (TC-281)", () => {
+    // Case: TC-281
+    // Given: only a remote label is rendered and the branches map holds the same name
+    setBranchLabels({ remotes: [{ name: "origin/feature", remote: "origin" }] });
+
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: { "origin/feature": { path: "/tmp/wt", isMain: false } },
+      detached: []
     });
 
-    // When: loadCommits with worktrees that include a matching name is dispatched
-    dispatchMessage({
-      command: "loadCommits",
-      commits: MOCK_COMMITS,
-      head: COMMIT_HASH_1,
-      moreCommitsAvailable: false,
-      hard: true,
-      worktrees: { "origin/feature": { path: "/tmp/wt", isMain: false } }
-    });
-
-    // Then: remote branch span does not have worktree class
+    // Then: the remote label carries no worktree class
     const remoteSpan = document.querySelector(".gitRef.remote");
     expect(remoteSpan).not.toBeNull();
     expect(remoteSpan!.classList.contains("worktree")).toBe(false);
-
-    // Cleanup
-    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
   });
 
-  it("does not add worktree CSS class or icon for main worktree branch (TC-194b)", () => {
-    // Given: a head branch "main" is the main worktree (isMain: true)
-    vi.mocked(getBranchLabels).mockReturnValue({
-      heads: [{ name: "main", remotes: [] }],
-      remotes: [],
-      tags: []
-    });
-
-    // When: loadCommits with main worktree is dispatched
-    dispatchMessage({
-      command: "loadCommits",
-      commits: MOCK_COMMITS,
-      head: COMMIT_HASH_1,
-      moreCommitsAvailable: false,
-      hard: true,
-      worktrees: { main: { path: "/home/user/repo", isMain: true } }
-    });
-
-    // Then: the gitRef head span does NOT have worktree class or data-worktree-path
-    const headSpan = document.querySelector(".gitRef.head");
-    expect(headSpan).not.toBeNull();
-    expect(headSpan!.classList.contains("worktree")).toBe(false);
-    expect(headSpan!.hasAttribute("data-worktree-path")).toBe(false);
-    // And: the branch icon is the standard branch icon (codicon-git-branch)
-    const icon = headSpan!.querySelector(".codicon.codicon-git-branch");
-    expect(icon).not.toBeNull();
-
-    // Cleanup
-    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
-  });
-
-  it("passes worktreeInfo with path and isMainWorktree to buildRefContextMenuItems (TC-199)", () => {
-    // Given: a worktree branch is rendered
-    vi.mocked(getBranchLabels).mockReturnValue({
-      heads: [{ name: "feature", remotes: [] }],
-      remotes: [],
-      tags: []
-    });
-    dispatchMessage({
-      command: "loadCommits",
-      commits: MOCK_COMMITS,
-      head: COMMIT_HASH_1,
-      moreCommitsAvailable: false,
-      hard: true,
-      worktrees: { feature: { path: "/home/user/wt", isMain: true } }
+  it("passes the branch worktree info to the ref context menu (TC-282)", () => {
+    // Case: TC-282
+    // Given: a branch label backed by a worktree entry is rendered
+    setBranchLabels({ heads: [{ name: "feature", remotes: [] }] });
+    loadWithWorktrees({
+      branches: { feature: { path: "/home/user/wt", isMain: true } },
+      detached: []
     });
     vi.clearAllMocks();
 
-    // When: contextmenu is triggered on the gitRef head element
-    const headSpan = document.querySelector(".gitRef.head");
-    expect(headSpan).not.toBeNull();
-    headSpan!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    // When: the branch label receives a contextmenu event
+    document
+      .querySelector(".gitRef.head")!
+      .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
 
-    // Then: buildRefContextMenuItems is called with worktreeInfo containing path and isMainWorktree
+    // Then: the menu builder receives the path and main flag from the branches map
     expect(buildRefContextMenuItems).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(String),
@@ -5487,34 +5434,21 @@ describe("worktree icon drawing and data attributes (S35)", () => {
       undefined,
       { path: "/home/user/wt", isMainWorktree: true }
     );
-
-    // Cleanup
-    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
   });
 
-  it("passes null worktreeInfo when branch has no worktree (TC-200)", () => {
-    // Given: a branch with no worktree entry is rendered
-    vi.mocked(getBranchLabels).mockReturnValue({
-      heads: [{ name: "develop", remotes: [] }],
-      remotes: [],
-      tags: []
-    });
-    dispatchMessage({
-      command: "loadCommits",
-      commits: MOCK_COMMITS,
-      head: COMMIT_HASH_1,
-      moreCommitsAvailable: false,
-      hard: true,
-      worktrees: {}
-    });
+  it("passes null worktree info for a branch without an entry (TC-283)", () => {
+    // Case: TC-283
+    // Given: a branch label with no matching entry in the branches map is rendered
+    setBranchLabels({ heads: [{ name: "develop", remotes: [] }] });
+    loadWithWorktrees(EMPTY_COLLECTION);
     vi.clearAllMocks();
 
-    // When: contextmenu is triggered on the gitRef head element
-    const headSpan = document.querySelector(".gitRef.head");
-    expect(headSpan).not.toBeNull();
-    headSpan!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    // When: the branch label receives a contextmenu event
+    document
+      .querySelector(".gitRef.head")!
+      .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
 
-    // Then: buildRefContextMenuItems is called with worktreeInfo = null
+    // Then: the menu builder receives null worktree info
     expect(buildRefContextMenuItems).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(String),
@@ -5524,41 +5458,366 @@ describe("worktree icon drawing and data attributes (S35)", () => {
       undefined,
       null
     );
-
-    // Cleanup
-    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
   });
 
-  it("renders all branches without worktree elements when worktree map is empty (TC-201)", () => {
-    // Given: multiple head branches, worktree map is empty
-    vi.mocked(getBranchLabels).mockReturnValue({
+  it("renders every branch label plainly when the branches map is empty (TC-284)", () => {
+    // Case: TC-284
+    // Given: two head branches are rendered and the branches map is empty
+    setBranchLabels({
       heads: [
         { name: "main", remotes: [] },
         { name: "feature", remotes: [] }
-      ],
-      remotes: [],
-      tags: []
+      ]
     });
 
-    // When: loadCommits without worktrees field is dispatched (backward compat)
-    dispatchMessage({
-      command: "loadCommits",
-      commits: MOCK_COMMITS,
-      head: COMMIT_HASH_1,
-      moreCommitsAvailable: false,
-      hard: true
-    });
+    // When: the collection is loaded
+    loadWithWorktrees(EMPTY_COLLECTION);
 
-    // Then: no branch has worktree class (2 heads × 3 commits = 6 spans)
+    // Then: no branch label carries a worktree class or path attribute
     const headSpans = document.querySelectorAll(".gitRef.head");
     expect(headSpans.length).toBeGreaterThanOrEqual(2);
     headSpans.forEach((span) => {
       expect(span.classList.contains("worktree")).toBe(false);
       expect(span.hasAttribute("data-worktree-path")).toBe(false);
     });
+  });
 
-    // Cleanup
-    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+  it("renders a detached label on the commit row with a matching hash (TC-285)", () => {
+    // Case: TC-285
+    // Given: a linked detached worktree points at the first commit
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/tmp/wt8", COMMIT_HASH_1)]
+    });
+
+    // Then: that row carries exactly one display-only worktree label with the worktree icon
+    const labels = rowFor(COMMIT_HASH_1).querySelectorAll(".gitRef.worktree.detachedWorktree");
+    expect(labels).toHaveLength(1);
+    expect(labels[0].querySelector(".codicon.codicon-worktree-small")).not.toBeNull();
+  });
+
+  it("does not label a commit row whose hash differs (TC-286)", () => {
+    // Case: TC-286
+    // Given: the detached worktree points at the first commit
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/tmp/wt8", COMMIT_HASH_1)]
+    });
+
+    // Then: a different commit row carries no detached label
+    expect(rowFor(COMMIT_HASH_2).querySelectorAll(".detachedWorktree")).toHaveLength(0);
+  });
+
+  it("orders multiple detached labels by full path (TC-287)", () => {
+    // Case: TC-287
+    // Given: two detached worktrees on the same commit are supplied in descending path order
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/tmp/b", COMMIT_HASH_1), detachedEntry("/tmp/a", COMMIT_HASH_1)]
+    });
+
+    // Then: both labels are rendered in ascending path order
+    const labels = rowFor(COMMIT_HASH_1).querySelectorAll(".detachedWorktree");
+    expect(labels).toHaveLength(2);
+    expect([...labels].map((label) => label.getAttribute("data-worktree-path"))).toEqual([
+      "/tmp/a",
+      "/tmp/b"
+    ]);
+  });
+
+  it("does not label the detached main worktree (TC-288)", () => {
+    // Case: TC-288
+    // Given: the detached entry is the main worktree and its head matches a commit row
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/repo", COMMIT_HASH_1, true)]
+    });
+
+    // Then: the matching row carries no detached label
+    expect(rowFor(COMMIT_HASH_1).querySelectorAll(".detachedWorktree")).toHaveLength(0);
+  });
+
+  it("shows the final path component as the label text (TC-289)", () => {
+    // Case: TC-289
+    // Given: the detached worktree path has several components
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/tmp/a/wt8", COMMIT_HASH_1)]
+    });
+
+    // Then: the label shows only the final component
+    const label = rowFor(COMMIT_HASH_1).querySelector(".detachedWorktree");
+    expect(label!.textContent).toBe("wt8");
+  });
+
+  it("strips a trailing separator before taking the label text (TC-290)", () => {
+    // Case: TC-290
+    // Given: the detached worktree path ends with a slash
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/tmp/a/wt8/", COMMIT_HASH_1)]
+    });
+
+    // Then: the trailing separator is ignored when deriving the label text
+    const label = rowFor(COMMIT_HASH_1).querySelector(".detachedWorktree");
+    expect(label!.textContent).toBe("wt8");
+  });
+
+  it("handles backslash separators in the label text (TC-291)", () => {
+    // Case: TC-291
+    // Given: the detached worktree path uses Windows backslash separators
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("C:\\tmp\\a\\wt8", COMMIT_HASH_1)]
+    });
+
+    // Then: the final component is derived from the backslash separator too
+    const label = rowFor(COMMIT_HASH_1).querySelector(".detachedWorktree");
+    expect(label!.textContent).toBe("wt8");
+  });
+
+  it("falls back to the full path when the final component is empty (TC-292)", () => {
+    // Case: TC-292
+    // Given: the detached worktree path is the root separator alone
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/", COMMIT_HASH_1)]
+    });
+
+    // Then: the label falls back to the full path
+    const label = rowFor(COMMIT_HASH_1).querySelector(".detachedWorktree");
+    expect(label!.textContent).toBe("/");
+  });
+
+  it("escapes a detached worktree path containing HTML markup (TC-293)", () => {
+    // Case: TC-293
+    // Given: the detached worktree path contains a script tag and an ampersand
+    const maliciousPath = '<script>alert("x")&</script>/wt8';
+
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry(maliciousPath, COMMIT_HASH_1)]
+    });
+
+    // Then: no script element is created and the original path is recoverable from the DOM
+    const label = rowFor(COMMIT_HASH_1).querySelector(".detachedWorktree");
+    expect(document.querySelectorAll("script")).toHaveLength(0);
+    expect(label!.getAttribute("data-worktree-path")).toBe(maliciousPath);
+    expect(label!.getAttribute("title")).toBe(`Worktree: ${maliciousPath}`);
+  });
+
+  it("gives the detached label no branch dataset entry (TC-294)", () => {
+    // Case: TC-294
+    // Given: a detached label is rendered
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/tmp/wt8", COMMIT_HASH_1)]
+    });
+
+    // Then: the label carries no data-name, so it cannot be read as a branch ref
+    const label = rowFor(COMMIT_HASH_1).querySelector(".detachedWorktree");
+    expect(label!.hasAttribute("data-name")).toBe(false);
+  });
+
+  it("suppresses the branch context menu on a detached label (TC-295)", () => {
+    // Case: TC-295
+    // Given: a detached label is rendered
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/tmp/wt8", COMMIT_HASH_1)]
+    });
+    vi.clearAllMocks();
+
+    // When: the detached label receives a contextmenu event
+    rowFor(COMMIT_HASH_1)
+      .querySelector(".detachedWorktree")!
+      .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+    // Then: no ref menu is built and no context menu is shown
+    expect(buildRefContextMenuItems).not.toHaveBeenCalled();
+    expect(showContextMenu).not.toHaveBeenCalled();
+  });
+
+  it("suppresses checkout on a detached label double click (TC-296)", () => {
+    // Case: TC-296
+    // Given: a detached label is rendered
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/tmp/wt8", COMMIT_HASH_1)]
+    });
+    vi.clearAllMocks();
+
+    // When: the detached label receives a dblclick event
+    rowFor(COMMIT_HASH_1)
+      .querySelector(".detachedWorktree")!
+      .dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+
+    // Then: no checkout action runs and no checkout message is posted
+    expect(checkoutBranchAction).not.toHaveBeenCalled();
+    expect(postedCommands("checkoutBranch")).toHaveLength(0);
+  });
+
+  it("stops a detached label click from reaching the commit row (TC-297)", () => {
+    // Case: TC-297
+    // Given: a detached label is rendered on a commit row
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/tmp/wt8", COMMIT_HASH_1)]
+    });
+    vi.clearAllMocks();
+
+    // When: the detached label receives a click event
+    rowFor(COMMIT_HASH_1)
+      .querySelector(".detachedWorktree")!
+      .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Then: the commit row handler does not run, so the row stays collapsed and asks for nothing
+    expect(postedCommands("commitDetails")).toHaveLength(0);
+    expect(rowFor(COMMIT_HASH_1).classList.contains("commitDetailsOpen")).toBe(false);
+  });
+
+  it("treats an omitted worktrees field as an empty collection (TC-298)", () => {
+    // Case: TC-298
+    // Given: a head branch label is rendered
+    setBranchLabels({ heads: [{ name: "main", remotes: [] }] });
+
+    // When: loadCommits arrives without the worktrees field
+    loadWithWorktrees(undefined);
+
+    // Then: nothing is rendered as a worktree, matching the empty collection default
+    expect(document.querySelectorAll(".detachedWorktree")).toHaveLength(0);
+    expect(document.querySelectorAll(".gitRef.worktree")).toHaveLength(0);
+  });
+
+  it("re-renders when only a detached head changed (TC-299)", () => {
+    // Case: TC-299
+    // Given: a detached label is already rendered on the first commit
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/tmp/wt8", COMMIT_HASH_1)]
+    });
+    expect(rowFor(COMMIT_HASH_1).querySelectorAll(".detachedWorktree")).toHaveLength(1);
+
+    // When: the same commits arrive with only the detached head moved, without forcing a render
+    loadWithWorktrees(
+      { branches: {}, detached: [detachedEntry("/tmp/wt8", COMMIT_HASH_2)] },
+      { hard: false }
+    );
+
+    // Then: the skip branch is not taken and the label moves to the new row
+    expect(rowFor(COMMIT_HASH_1).querySelectorAll(".detachedWorktree")).toHaveLength(0);
+    expect(rowFor(COMMIT_HASH_2).querySelectorAll(".detachedWorktree")).toHaveLength(1);
+  });
+
+  it("keeps the existing labels on a row that gains a detached label (TC-300)", () => {
+    // Case: TC-300
+    // Given: the first commit is the HEAD commit, carries a stash and has remote and tag labels
+    setBranchLabels({
+      remotes: [{ name: "origin/feature", remote: "origin" }],
+      tags: [{ name: "v1" }]
+    });
+    const commitsWithStash: GitCommitNode[] = [
+      { ...MOCK_COMMITS[0], stash: makeStash({ baseHash: COMMIT_HASH_2 }) },
+      MOCK_COMMITS[1],
+      MOCK_COMMITS[2]
+    ];
+
+    // When: a detached worktree label is rendered on that row
+    loadWithWorktrees(
+      { branches: {}, detached: [detachedEntry("/tmp/wt8", COMMIT_HASH_1)] },
+      { commits: commitsWithStash }
+    );
+
+    // Then: the HEAD dot and the remote, tag and stash labels are each still rendered once
+    const row = rowFor(COMMIT_HASH_1);
+    expect(row.querySelectorAll(".detachedWorktree")).toHaveLength(1);
+    expect(row.querySelectorAll(".commitHeadDot")).toHaveLength(1);
+    expect(row.querySelectorAll(".gitRef.remote")).toHaveLength(1);
+    expect(row.querySelectorAll(".gitRef.tag")).toHaveLength(1);
+    expect(row.querySelectorAll(".gitRef.stash")).toHaveLength(1);
+  });
+
+  it("labels no row when the detached head matches no commit (TC-301)", () => {
+    // Case: TC-301
+    // Given: the detached worktree points at a commit that is not in the table
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry("/tmp/wt8", "fff9999fff9999ff")]
+    });
+
+    // Then: no row in the whole table carries a detached label
+    expect(document.querySelectorAll(".detachedWorktree")).toHaveLength(0);
+  });
+
+  it("keeps branch worktree labels when the detached array is empty (TC-302)", () => {
+    // Case: TC-302
+    // Given: the collection holds a linked branch worktree and no detached entry
+    setBranchLabels({ heads: [{ name: "feature", remotes: [] }] });
+
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: { feature: { path: "/home/user/feature-wt", isMain: false } },
+      detached: []
+    });
+
+    // Then: no detached label is drawn while the branch worktree label still is
+    expect(document.querySelectorAll(".detachedWorktree")).toHaveLength(0);
+    const headSpan = document.querySelector(".gitRef.head");
+    expect(headSpan!.classList.contains("worktree")).toBe(true);
+  });
+
+  it("leaves a branch label plain when its entry is the main worktree (TC-303)", () => {
+    // Case: TC-303
+    // Given: the branches map marks the rendered head branch as the main worktree
+    setBranchLabels({ heads: [{ name: "main", remotes: [] }] });
+
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: { main: { path: "/home/user/repo", isMain: true } },
+      detached: []
+    });
+
+    // Then: the head label carries no worktree markers and keeps the plain branch icon
+    const headSpan = document.querySelector(".gitRef.head");
+    expect(headSpan).not.toBeNull();
+    expect(headSpan!.classList.contains("worktree")).toBe(false);
+    expect(headSpan!.hasAttribute("data-worktree-path")).toBe(false);
+    expect(headSpan!.querySelector(".codicon.codicon-worktree-small")).toBeNull();
+    expect(headSpan!.querySelector(".codicon.codicon-git-branch")).not.toBeNull();
+  });
+
+  it("escapes the detached label text when the final path component is markup (TC-304)", () => {
+    // Case: TC-304
+    // Given: the last component of the detached worktree path is a script tag
+    // (a closing tag cannot appear here: its slash would start a new path component)
+    const maliciousPath = '/tmp/<script>alert("x")&';
+
+    // When: the collection is loaded
+    loadWithWorktrees({
+      branches: {},
+      detached: [detachedEntry(maliciousPath, COMMIT_HASH_1)]
+    });
+
+    // Then: the label shows the markup as literal text instead of creating an element
+    const label = rowFor(COMMIT_HASH_1).querySelector(".detachedWorktree");
+    expect(label!.textContent).toBe('<script>alert("x")&');
+    expect(label!.querySelector("script")).toBeNull();
+    expect(document.querySelectorAll("script")).toHaveLength(0);
+
+    // And: the attributes still decode back to the original path
+    expect(label!.getAttribute("data-worktree-path")).toBe(maliciousPath);
+    expect(label!.getAttribute("title")).toBe(`Worktree: ${maliciousPath}`);
   });
 });
 
@@ -6608,7 +6867,7 @@ describe("gitRef contextmenu and checkout raw dataset.name (S44)", () => {
     resetCommitState();
   });
 
-  function renderHead(name: string, remotes: string[], worktrees?: Record<string, unknown>): void {
+  function renderHead(name: string, remotes: string[], branches?: Record<string, unknown>): void {
     vi.mocked(getBranchLabels).mockReturnValue({
       heads: [{ name, remotes }],
       remotes: [],
@@ -6620,7 +6879,7 @@ describe("gitRef contextmenu and checkout raw dataset.name (S44)", () => {
       head: COMMIT_HASH_1,
       moreCommitsAvailable: false,
       hard: true,
-      worktrees: worktrees ?? {}
+      worktrees: { branches: branches ?? {}, detached: [] }
     });
     vi.clearAllMocks();
   }
