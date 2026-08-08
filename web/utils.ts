@@ -61,16 +61,28 @@ export function arraysEqual<T>(a: T[], b: T[], equalElements: (a: T, b: T) => bo
   return true;
 }
 
-export function worktreeMapsEqual(a: GG.WorktreeMap, b: GG.WorktreeMap): boolean {
-  const keysA = Object.keys(a);
-  const keysB = Object.keys(b);
+export function worktreeCollectionsEqual(
+  a: GG.WorktreeCollection,
+  b: GG.WorktreeCollection
+): boolean {
+  const keysA = Object.keys(a.branches);
+  const keysB = Object.keys(b.branches);
   if (keysA.length !== keysB.length) return false;
   for (const key of keysA) {
-    const entryB = b[key];
-    if (entryB === undefined || a[key].path !== entryB.path || a[key].isMain !== entryB.isMain)
+    const entryB = b.branches[key];
+    if (
+      entryB === undefined ||
+      a.branches[key].path !== entryB.path ||
+      a.branches[key].isMain !== entryB.isMain
+    )
       return false;
   }
-  return true;
+  return arraysEqual(
+    a.detached,
+    b.detached,
+    (entryA, entryB) =>
+      entryA.path === entryB.path && entryA.isMain === entryB.isMain && entryA.head === entryB.head
+  );
 }
 export function pad2(i: number) {
   return i > 9 ? i : `0${i}`;

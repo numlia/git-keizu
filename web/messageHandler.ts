@@ -4,7 +4,7 @@ import type {
   GitFileChange,
   GitRepoSet,
   ResponseMessage,
-  WorktreeMap
+  WorktreeCollection
 } from "../src/types";
 import { hideDialog, showErrorDialog } from "./dialogs";
 import { generateGitFileTree } from "./fileTree";
@@ -26,7 +26,7 @@ export interface GitKeizuViewAPI {
     moreAvailable: boolean,
     hard: boolean,
     authors?: string[],
-    worktrees?: WorktreeMap
+    worktrees?: WorktreeCollection
   ): void;
   loadRepos(repos: GitRepoSet, lastActiveRepo: string | null): void;
   refresh(mode: RefreshMode): void;

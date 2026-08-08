@@ -30,13 +30,14 @@ import {
   buildCommitRowAttributes,
   buildStashSelectorDisplay,
   escapeHtml,
+  getRepoName,
   getVSCodeStyle,
   insertAfter,
   sendMessage,
   svgIcons,
   UNCOMMITTED_CHANGES_HASH,
   vscode,
-  worktreeMapsEqual
+  worktreeCollectionsEqual
 } from "./utils";
 
 const FLASH_ANIMATION_DURATION_MS = 850;
@@ -81,6 +82,15 @@ function getFileViewToggle(mode: FileViewType): { icon: string; title: string } 
   return mode === FILE_VIEW_LIST
     ? { icon: svgIcons.treeView, title: t("toolbar.switchToTreeView") }
     : { icon: svgIcons.listView, title: t("toolbar.switchToListView") };
+}
+
+const EMPTY_WORKTREE_COLLECTION: GG.WorktreeCollection = { branches: {}, detached: [] };
+const WORKTREE_PATH_TRAILING_SEPARATORS = /[/\\]+$/;
+const DETACHED_WORKTREE_CLASS = "detachedWorktree";
+
+function getWorktreeLabelName(worktreePath: string): string {
+  const finalComponent = getRepoName(worktreePath.replace(WORKTREE_PATH_TRAILING_SEPARATORS, ""));
+  return finalComponent === "" ? worktreePath : finalComponent;
 }
 
 type PendingCommitLoad = {
@@ -144,7 +154,7 @@ class GitKeizuView {
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
   private pendingLoadBranchesAndCommitsForceRender: boolean | null = null;
   private pendingLoadCommits: PendingCommitLoad | null = null;
-  private worktrees: GG.WorktreeMap = {};
+  private worktrees: GG.WorktreeCollection = EMPTY_WORKTREE_COLLECTION;
 
   private commitOrdering: GG.CommitOrdering;
   private selectedAuthors: string[] = [];
@@ -424,13 +434,13 @@ class GitKeizuView {
     moreAvailable: boolean,
     forceRender: boolean,
     authors?: string[],
-    worktrees?: GG.WorktreeMap
+    worktrees?: GG.WorktreeCollection
   ) {
     if (
       !forceRender &&
       this.moreCommitsAvailable === moreAvailable &&
       this.commitHead === commitHead &&
-      worktreeMapsEqual(this.worktrees, worktrees ?? {}) &&
+      worktreeCollectionsEqual(this.worktrees, worktrees ?? EMPTY_WORKTREE_COLLECTION) &&
       arraysEqual(
         this.commits,
         commits,
@@ -453,7 +463,7 @@ class GitKeizuView {
     this.moreCommitsAvailable = moreAvailable;
     this.commits = commits;
     this.commitHead = commitHead;
-    this.worktrees = worktrees ?? {};
+    this.worktrees = worktrees ?? EMPTY_WORKTREE_COLLECTION;
     this.commitLookup = {};
     this.saveState();
 
@@ -722,7 +732,7 @@ class GitKeizuView {
         const headRemotes = branchLabels.heads[j].remotes;
         const remotesAttr =
           headRemotes.length > 0 ? ` data-remotes="${headRemotes.map(escapeHtml).join(",")}"` : "";
-        const wtEntry = this.worktrees[branchLabels.heads[j].name];
+        const wtEntry = this.worktrees.branches[branchLabels.heads[j].name];
         const isLinkedWorktree = wtEntry !== undefined && !wtEntry.isMain;
         const wtClass = isLinkedWorktree ? " worktree" : "";
         const wtAttr = isLinkedWorktree ? ` data-worktree-path="${escapeHtml(wtEntry.path)}"` : "";
@@ -743,6 +753,15 @@ class GitKeizuView {
       for (j = 0; j < branchLabels.tags.length; j++) {
         refName = escapeHtml(branchLabels.tags[j].name);
         refs += `<span class="gitRef tag" data-name="${refName}">${svgIcons.tag}${refName}</span>`;
+      }
+      const commitHash: string = this.commits[i].hash;
+      const detachedWorktrees = this.worktrees.detached
+        .filter((entry) => !entry.isMain && entry.head === commitHash)
+        .sort((a, b) => a.path.localeCompare(b.path));
+      for (const detachedWorktree of detachedWorktrees) {
+        const worktreePath = escapeHtml(detachedWorktree.path);
+        const worktreeName = escapeHtml(getWorktreeLabelName(detachedWorktree.path));
+        refs += `<span class="gitRef worktree ${DETACHED_WORKTREE_CLASS}" data-worktree-path="${worktreePath}" title="Worktree: ${worktreePath}">${svgIcons.worktree}${worktreeName}</span>`;
       }
       if (this.commits[i].stash !== null) {
         let selectorDisplay = escapeHtml(
@@ -948,6 +967,7 @@ class GitKeizuView {
       e.stopPropagation();
       let target = <HTMLElement>e.target;
       let sourceElem = <HTMLElement>target.closest(".gitRef")!;
+      if (sourceElem.classList.contains(DETACHED_WORKTREE_CLASS)) return;
       let isRemoteCombined = target.classList.contains("gitRefHeadRemote");
       let refName = isRemoteCombined ? target.dataset.name! : sourceElem.dataset.name!;
       const remotes = sourceElem.dataset.remotes
@@ -955,7 +975,7 @@ class GitKeizuView {
         : undefined;
       let worktreeInfo: { path: string; isMainWorktree: boolean } | null = null;
       if (sourceElem.classList.contains("head") && !isRemoteCombined) {
-        const wtEntry = this.worktrees[sourceElem.dataset.name!];
+        const wtEntry = this.worktrees.branches[sourceElem.dataset.name!];
         if (wtEntry) {
           worktreeInfo = { path: wtEntry.path, isMainWorktree: wtEntry.isMain };
         }
@@ -982,6 +1002,7 @@ class GitKeizuView {
       if (isContextMenuActive()) hideContextMenu();
       let target = <HTMLElement>e.target;
       let sourceElem = <HTMLElement>target.closest(".gitRef")!;
+      if (sourceElem.classList.contains(DETACHED_WORKTREE_CLASS)) return;
       let isRemoteCombined = target.classList.contains("gitRefHeadRemote");
       if (isRemoteCombined) {
         checkoutBranchAction(this.currentRepo, sourceElem, target.dataset.name!, true);
