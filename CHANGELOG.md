@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.1] - 2026-08-09
+
+This release changes nothing about how the extension behaves. It republishes the marketplace listing so that it picks up the rewritten README, and adds the changelog to the extension package.
+
+### Changed
+
+- **The README now leads with how to get started**: The README opens with a Getting Started section showing the two ways to open Git Keizu — the Source Control view and the Command Palette — with a screenshot of the Source Control entry point, and explains that the Status Bar item only appears once the extension has activated and detected a repository. The exhaustive feature list has been replaced with workflow-oriented Highlights, requirements now come before reference material, and the commands and settings tables are grouped under a single Reference section. Marketplace listings render the README bundled inside the extension package, so this release is what makes the rewrite visible on the Marketplace and Open VSX pages.
+- **The changelog is included in the extension package**: `CHANGELOG.md` was missing from the package, leaving the Changelog tab of the marketplace listing empty. It is now bundled, so release notes can be read directly from the marketplace page and from the installed extension.
+
 ## [0.9.0] - 2026-08-08
 
 This release makes detached HEAD worktrees visible: worktrees created without a branch — such as the throwaway worktrees AI coding tools create with `git worktree add <path> <commit>` — now appear in the graph, stay visible even when their commit is unreachable from any branch, and keep the graph up to date automatically as they come and go.
@@ -510,7 +519,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.9.1...HEAD
+[0.9.1]: https://github.com/numlia/git-keizu/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/numlia/git-keizu/compare/v0.8.4...v0.9.0
 [0.8.4]: https://github.com/numlia/git-keizu/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/numlia/git-keizu/compare/v0.8.2...v0.8.3
