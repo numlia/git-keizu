@@ -11,9 +11,9 @@
 [![vscode installs](https://badgen.net/vs-marketplace/i/numlia-vs.git-keizu?label=install)](https://marketplace.visualstudio.com/items?itemName=numlia-vs.git-keizu)
 [![open-vsx downloads](https://img.shields.io/open-vsx/dt/numlia-vs/git-keizu?label=open-vsx)](https://open-vsx.org/extension/numlia-vs/git-keizu)
 
-**Git Keizu** is a fast, focused **git history graph**. View all your branches, commits, stashes, and tags in one interactive visual graph — and perform git actions (checkout, merge, rebase, cherry-pick, stash) and manage git worktrees directly from it, without ever opening a terminal.
+**Git Keizu** is a focused Git history graph for VS Code. Explore branches, commits, stashes, tags, and uncommitted changes in one graph. Run common Git actions and manage worktrees without opening a terminal.
 
-An actively maintained fork of [Git Graph](https://github.com/mhutchie/vscode-git-graph) (MIT, 2019), intentionally kept focused on the essentials. If the core graph experience is what you're after, this is for you.
+Git Keizu is an actively maintained fork of [Git Graph](https://github.com/mhutchie/vscode-git-graph), intentionally focused on the core graph experience.
 
 > **Japanese UI supported / 日本語UI対応**
 >
@@ -21,78 +21,83 @@ An actively maintained fork of [Git Graph](https://github.com/mhutchie/vscode-gi
 >
 > VS Codeの表示言語を日本語に設定するだけで、コマンド、設定項目、メニュー、ダイアログ、エラーメッセージ、日付表示まで含めて、Git Keizuのインターフェース全体が自動的に日本語へ切り替わります。追加の設定は不要です。
 
-## Screenshots
+## Getting Started
 
-**Graph view** — all branches, tags, stashes, and uncommitted changes in one visual graph. Merge commits are dimmed by default to keep the important commits easy to spot:
+Open a folder or workspace that contains a Git repository. On first use, the Git Keizu Status Bar item may not be visible yet. Open the graph using either of these methods:
+
+1. **Source Control**: Open VS Code's built-in Source Control view and click the Git Keizu graph button in the view title.
+2. **Command Palette**: Run `Git Keizu: View Git Keizu (git log)`.
+
+![Open Git Keizu from the Source Control view](./resources/screenshots/getting-started-source-control.png)
+
+After Git Keizu has been activated and detects a repository, the Status Bar item appears by default and provides a quick way to reopen the graph.
+
+## Highlights
+
+### Understand your repository at a glance
+
+See branches, commits, tags, stash entries, and uncommitted changes together in one graph.
+
 ![Graph overview](./resources/screenshots/graph-overview.gif)
 
-**Commit actions** — right-click any commit to checkout, cherry-pick, revert, merge, reset, or add a tag, without ever opening a terminal:
-![Commit actions](./resources/screenshots/commit-actions.png)
+- Filter the graph by branch or author, and search commit messages with regex and case-sensitive modes.
+- Choose date, topological, or author-date ordering. Merge commits and non-ancestor commits can be visually muted.
+- Combined local and remote labels, automatic commit loading, and restored scroll position keep long histories manageable.
 
-**Worktree at a glance** — branches with a linked worktree show a distinct icon right on the graph label. Hover to see the worktree path in a tooltip:
-![Worktree icons](./resources/screenshots/worktree-icons.png)
+### Inspect changes and compare commits
 
-**Worktree actions** — right-click any worktree branch to open it in a new window, reveal it in the file manager, open a terminal there, copy its path, or remove it — all without leaving the graph:
-![Worktree actions](./resources/screenshots/worktree-actions.png)
+Select a commit to inspect its files and diffs, or Ctrl/Cmd+click a second commit to compare the two.
 
-**Create worktree from commit** — right-click any commit and choose "Create Worktree Here..." to spin up a new branch + worktree at that point in history; the path auto-fills as you type the branch name:
-![Create worktree](./resources/screenshots/worktree-create.png)
-
-**Branch filter** — narrow the graph to one or more branches with a multi-select dropdown:
-![Branch filter](./resources/screenshots/branch-filter.png)
-
-**2-commit comparison** — Ctrl/Cmd+click a second commit to see all changes between the two:
 ![2-commit comparison](./resources/screenshots/commit-comparison.png)
 
-## Features
+- Switch commit files between a folder tree and a flat list.
+- Open working-tree files directly from commit details; renamed files are resolved through Git rename tracking.
+- Navigate commits with the keyboard, follow parent links, and keep comparison state when switching tabs.
 
-- **Graph View**: See all your branches, tags, stash entries, and uncommitted changes in one visual graph. The menu bar and column headers stay fixed as you scroll, so controls are always within reach in long histories.
-- **Japanese UI (i18n) / 日本語UI**: When VS Code's display language is set to Japanese, the entire Git Keizu interface — commands, configuration descriptions, toolbar, context menus, dialogs, error messages, and relative/absolute date display — automatically switches to Japanese. Other locales fall back to English. The dictionary-based infrastructure (`l10n/` directory and `package.nls.ja.json`) supports adding further locales without code changes. VS Codeの表示言語が日本語のときは、コマンド・設定説明・ツールバー・コンテキストメニュー・ダイアログ・エラーメッセージ・相対/絶対日付表示まで、UI全体が自動的に日本語に切り替わります。
-- **Commit display order**: Choose how commits are sorted in the graph — Date (default, by committer date), Topological (same-branch commits appear consecutively), or Author Date. Set the global default in settings (`git-keizu.repository.commits.order`); override per repository via the table header right-click context menu. The current order is indicated with a checkmark.
-- **Muted merge commits**: Merge commits are shown with dimmed text (commit message, date, author, and hash) by default, making non-merge commits easier to spot in a busy history. Branch labels always render at full opacity regardless of mute state. Non-ancestor commits can also be muted via settings (`git-keizu.repository.commits.mute.*`).
-- **Author Filter**: A multi-select dropdown in the toolbar lets you filter commits by author — select one or more names to show only their commits, or choose "Show All" to clear the filter. The author list covers all authors reachable from HEAD (not just the currently loaded commits), so no one is missed even in long histories.
-- **Commit Details**: Click on a commit to see what changed and view diffs for any file. A loading indicator appears immediately when you click, and the diff data loads in parallel for faster response. The panel height adjusts to your viewport size, and the view only scrolls enough to bring the panel into view — no jarring auto-center on every click. Parent hashes are clickable links that jump straight to the parent commit's details.
-- **Open File from commit details**: Each file entry in the commit details panel shows an "Open File" icon on hover (not shown for deleted files); clicking it opens the working-tree copy in VS Code in preview mode. Right-clicking any file row also opens a context menu with the same "Open File" option — works in both Tree View and List View (available even for deleted files). If the file has since been renamed, Git Keizu resolves the new path automatically via git rename tracking — if the file cannot be found, an error dialog is shown. Use `git-keizu.openNewTabEditorGroup` to choose which editor group the file opens in.
-- **File View Toggle**: Switch between Tree View (folder hierarchy) and List View (flat alphabetical list of full paths) in the commit details panel; the chosen mode is saved per repository.
-- **Branch filter**: A multi-select dropdown in the toolbar lets you filter the graph to one or more branches simultaneously; selecting no individual branch returns to "Show All" (all branches visible).
-- **Branch Actions**: Right-click to create, checkout, delete, rename, merge, or rebase branches. High-frequency actions (Checkout, Merge, Rebase, Pull, Push) appear at the top of the menu; less-used or destructive actions (Rename Branch, Delete Branch, Remove Worktree) are grouped under a "More…" submenu that expands on hover. The Create Branch dialog includes a "Check out" checkbox (on by default) to automatically switch to the new branch after creation. The Merge dialog exposes "Squash Commits" and "No Commit" options in addition to the existing "No Fast Forward" checkbox. When deleting a local branch, an optional checkbox lets you also delete the corresponding remote branch in one step. The Rename Branch dialog includes an "Update upstream tracking" checkbox (on by default) — renaming updates git's tracking config so the branch follows the new remote name, and for branches that have never been pushed the remote is also configured so Push works immediately after rename.
-- **Remote Branch Actions**: Right-click a remote branch label to delete it on the remote, merge it into the current branch, or check it out. Entering an unused name creates a new local branch that tracks the remote branch; entering the remote branch's own name when that local branch already exists checks it out and then pulls the selected remote branch (`git pull <remote> <branch>`), bringing a stale local branch up to date — the branch reference is never force-moved and its upstream configuration is left untouched. Entering a _different_ existing branch name is refused, so history is never mixed in by mistake. If the pull fails, the graph is redrawn to match the checked-out state and the git output is shown as a pull error, leaving any conflict for you to resolve.
-- **Worktree Support**: Create, manage, and remove git worktrees directly from the graph. Branches with a linked worktree show a distinct icon; hover the label to see the worktree path. Right-click any local branch to create a worktree (default path `../repo-branchname`, with path-unsafe characters such as `/` normalized to `-` — e.g. `feature/x` → `../repo-feature-x`; consecutive unsafe characters collapse to a single `-`; an "Open Terminal" checkbox is included whose default state is configurable via `git-keizu.dialog.createWorktree.openTerminal`); right-click a worktree branch to open it in a new VS Code window, reveal it in the OS file manager, open a terminal there, copy its path, or remove it — the Remove Worktree dialog includes an "Also delete branch" checkbox (safe `git branch -d`) so you can clean up the branch in the same step (the main worktree cannot be removed). Right-click any commit to create a new branch + worktree at that point — the path field auto-fills as you type the branch name (applying the same path normalization), and the "Open Terminal" checkbox follows the same `git-keizu.dialog.createWorktree.openTerminal` setting.
-- **Detached HEAD worktree visibility**: Worktrees checked out directly at a commit without a branch (e.g. `git worktree add <path> <commit>`, as AI coding tools often do for throwaway work) appear in the graph too — the HEAD commit shows a display-only worktree label with the directory name and the full path in a tooltip. If the HEAD is unreachable from any branch or older than the loaded window, the commit is pinned at the bottom of the graph so the worktree is always visible, without affecting the normal history, ordering, or "Load More". Creating or removing worktrees and HEAD moves inside them refresh the graph automatically.
-- **Tag Actions**: Add, delete, and push tags directly from the graph
-- **Recent actions in context menus**: Commit, branch, and file context menus show a "Recent" section at the top listing the actions you have performed most recently in that repository — your most common operations are always one click away. The list is kept per repository, deduplicates automatically, and is capped at 5 items. Only frequently-used actions are tracked; low-frequency and highly destructive operations (Revert, Rename Branch, and similar) remain excluded. Actions are recorded only after confirmation dialogs are accepted, so cancelling never pollutes the list. The section only appears when the current menu contains at least two trackable actions. Disable via `git-keizu.menu.showRecentActions` (default: on); changes take effect immediately in the open graph without reloading.
-- **Commit Actions**: Right-click any commit to checkout, cherry-pick, merge, create a branch, or create a worktree — the most common actions appear at the top of the menu. Less-used and destructive operations (Add Tag, Checkout to detached HEAD, Revert, Reset) are grouped under a "More…" submenu that expands on hover. The Cherry-pick dialog includes "Record Origin" and "No Commit" checkboxes; merge-commit cherry-picks also show a parent selector
-- **Stash Support**: Stash entries appear in the graph with a distinct visual style; right-click to apply or pop a stash (shown at the top for quick access), or open "More…" to create a branch from the stash or drop it
-- **Uncommitted Changes Actions**: Right-click the Uncommitted Changes row to stash, reset (Mixed/Hard), or clean untracked files
-- **Configurable dialog defaults**: Set the initial checkbox state for Merge ("No Fast Forward", "Squash Commits", "No Commit"), Cherry-pick ("Record Origin", "No Commit"), Stash ("Include Untracked"), Create Worktree ("Open Terminal"), and Remove Worktree ("Also delete branch") dialogs via `git-keizu.dialog.*` settings — your preferred options are pre-selected each time a dialog opens
-- **Pull/Push for current branch**: Right-click the currently checked-out branch to run `git pull` or `git push` directly from the graph. Push sends the current local branch to its configured upstream remote and branch, even when the local and upstream branch names differ. If no upstream is configured, Git Keizu asks you to choose from the repository's remotes and sets the selected remote as the upstream only after you confirm; cancelling or having no remotes leaves the repository unchanged.
-- **Fetch with automatic prune**: The Fetch button runs `git fetch --prune` — stale remote-tracking references are cleaned up automatically on every fetch
-- **SCM Panel Button**: Open the Git Keizu graph directly from the VS Code Source Control panel title bar; the repository is selected automatically based on the active SCM provider. Button position (Inline or More Actions menu) is configurable
-- **Keyboard Shortcuts**: Configurable shortcuts for Find (Ctrl/Cmd+F), Refresh (Ctrl/Cmd+R), Scroll to HEAD (Ctrl/Cmd+H), and Scroll to Stash (Ctrl/Cmd+S, Shift to go backward); each can be rebound or disabled in settings
-- **Arrow key commit navigation**: With a commit's detail panel open, navigate between commits using Arrow keys — no modifier for table order, Ctrl/Cmd for branch-tracking (parent/child on the same branch), and Ctrl/Cmd+Shift to cross to an alternative branch or merge source; disabled in comparison mode and while typing in a text input, so the search box and dialog fields keep normal caret behaviour
-- **Commit Search**: Press Ctrl/Cmd+F to open a search bar with regex mode, case-sensitive mode, match counter (N of M), and prev/next navigation
-- **2-Commit Comparison**: Ctrl/Cmd+click a second commit to compare it with the selected commit; the panel header shows "Displaying all changes from [older] to [newer]" in chronological order, file diffs always show old→new regardless of which commit was selected first, and comparison state is preserved when switching VS Code tabs
-- **Combined branch/remote labels**: Local and remote branches on the same commit merge into a single pill label — `[main | origin]`. Right-clicking either part opens the appropriate context menu.
-- **Scroll position restore**: When you switch away from the Git Keizu tab and return, the graph scrolls back to where you left off. The position is saved whenever a user action (clicking a commit, toggling a filter, etc.) triggers a state save; passively scrolling without any action does not trigger a save.
-- **Smooth refresh**: Git operations update the graph in the background without blanking the view or losing your scroll position. The background file watcher monitors only Git-relevant state files (`HEAD`, `index`, `config`, `packed-refs`, `refs/*`, `worktrees/*`), so build output and other working-tree changes no longer trigger unnecessary refreshes — noticeably less visual noise in large repositories. Linked worktrees are watched correctly: both the worktree's `.git` dir and the shared common git dir are covered. Refresh or filter actions performed while a load is in-flight are queued and automatically re-sent once the current load completes — no more silent "nothing happened" when clicking Refresh at the wrong moment.
-- **Auto load more commits**: Commits load automatically as you scroll to the bottom of the list — no manual button press needed (configurable)
-- **Dropdown overflow handling**: Long branch and repository names are truncated with an ellipsis; hover to see the full name in a tooltip
-- **Avatar Support**: Optionally fetch commit author avatars from GitHub, GitLab, or Gravatar — if a provider returns an unreadable response, the extension automatically falls back to Gravatar
-- **Multi-Repository**: Support for multiple Git repositories in one workspace
-- **Configurable**: Customize graph colors, style, date format, and more
+### Run Git actions from the graph
 
-## Extension Commands
+Right-click commits, branches, tags, stash entries, or uncommitted changes to access the actions available for that item.
+
+![Commit actions](./resources/screenshots/commit-actions.png)
+
+- Checkout, cherry-pick, merge, rebase, create branches, manage tags, and apply or pop stashes.
+- Pull and push the current branch, including choosing an upstream when one has not been configured. Fetch automatically prunes stale remote-tracking references.
+- Common actions appear first, while less-used and destructive actions are grouped under **More…**. Confirmation dialogs expose relevant Git options before execution.
+
+### Manage worktrees visually
+
+Create and manage Git worktrees without leaving the graph.
+
+![Create worktree from a commit](./resources/screenshots/worktree-create.png)
+
+- Create a worktree from a branch or any commit, with a suggested path derived from the branch name.
+- Open a worktree in VS Code or a terminal, reveal it in the file manager, copy its path, or remove it.
+- Linked and detached-HEAD worktrees remain visible in the graph, including detached commits outside the loaded history.
+
+### Designed for everyday use
+
+- Recent context-menu actions are remembered per repository, making repeated workflows quicker.
+- Git operations refresh the graph in the background without blanking the view or discarding its state.
+- Multiple repositories, configurable keyboard shortcuts, optional avatars, graph colours, date formats, and dialog defaults are supported.
+
+## Requirements
+
+- **Git 2.32 or later** is required. Viewing the changes contained in a stash entry uses `git stash show -u`, whose `-u` (`--include-untracked`) option was added in Git 2.32. Older Git versions are not supported.
+
+## Reference
+
+### Commands
 
 | Command                               | Description                            |
 | ------------------------------------- | -------------------------------------- |
 | `Git Keizu: View Git Keizu (git log)` | Open the Git Keizu graph view          |
 | `Git Keizu: Clear Avatar Cache`       | Clear all cached commit author avatars |
 
-## Extension Settings
+### Settings
 
 All settings are under the `git-keizu.*` namespace.
 
-### General
+#### General
 
 | Setting                                 | Default        | Description                                                                           |
 | --------------------------------------- | -------------- | ------------------------------------------------------------------------------------- |
@@ -113,7 +118,7 @@ All settings are under the `git-keizu.*` namespace.
 | `tabIconColourTheme`                    | `colour`       | Tab icon theme: `colour` or `grey`                                                    |
 | `sourceCodeProviderIntegrationLocation` | `Inline`       | SCM title bar button position: `Inline` or `More Actions`                             |
 
-### Keyboard Shortcuts (`keyboardShortcut*`)
+#### Keyboard Shortcuts (`keyboardShortcut*`)
 
 | Setting            | Default        | Description                                                     |
 | ------------------ | -------------- | --------------------------------------------------------------- |
@@ -122,7 +127,7 @@ All settings are under the `git-keizu.*` namespace.
 | `...ScrollToHead`  | `CTRL/CMD + H` | Keyboard shortcut for Scroll to HEAD (`UNASSIGNED` to disable)  |
 | `...ScrollToStash` | `CTRL/CMD + S` | Keyboard shortcut for Scroll to Stash (`UNASSIGNED` to disable) |
 
-### Dialog Defaults (`dialog.*`)
+#### Dialog Defaults (`dialog.*`)
 
 | Setting                                           | Default | Description                                                                     |
 | ------------------------------------------------- | ------- | ------------------------------------------------------------------------------- |
@@ -135,7 +140,7 @@ All settings are under the `git-keizu.*` namespace.
 | `dialog.createWorktree.openTerminal`              | `true`  | Default state of "Open Terminal" checkbox (Create Worktree)                     |
 | `dialog.removeWorktree.deleteBranch`              | `true`  | Default state of "Also delete branch" checkbox (Remove Worktree)                |
 
-### Commit Ordering (`repository.commits.order`)
+#### Commit Ordering (`repository.commits.order`)
 
 | Setting                    | Default | Description                                                                                                 |
 | -------------------------- | ------- | ----------------------------------------------------------------------------------------------------------- |
@@ -143,20 +148,16 @@ All settings are under the `git-keizu.*` namespace.
 
 Per-repository override is available via the table header right-click context menu.
 
-### Commit Muting (`repository.commits.mute.*`)
+#### Commit Muting (`repository.commits.mute.*`)
 
 | Setting                               | Default | Description                                               |
 | ------------------------------------- | ------- | --------------------------------------------------------- |
 | `...mergeCommits`                     | `true`  | Display merge commits with reduced opacity                |
 | `...commitsThatAreNotAncestorsOfHead` | `false` | Display non-ancestor-of-HEAD commits with reduced opacity |
 
-## Requirements
-
-- **Git 2.32 or later** is required. Viewing the changes contained in a stash entry uses `git stash show -u`, whose `-u` (`--include-untracked`) option was added in Git 2.32. Older Git versions are not supported.
-
 ## Security
 
-Git Keizu has undergone a full security audit and remediation (27 issues fixed):
+Git Keizu applies the following safeguards around Git execution, repository access, avatar requests, and webview content:
 
 - **Shell injection eliminated** — all git commands use `child_process.spawn()` exclusively; `exec()` has been removed entirely
 - **Git binary resolution** — the configured `git.path` (a single path or, as VS Code allows, a list of candidate paths) is verified by running each candidate with `--version` and only the first working executable is adopted; unusable values fall back to `git` on the PATH
@@ -166,18 +167,15 @@ Git Keizu has undergone a full security audit and remediation (27 issues fixed):
 - **SSRF protection** — avatar fetch requests are restricted to an allowlist of known domains (GitHub, GitLab, Gravatar)
 - **XSS fixes** — commit parent hashes, avatar data URIs, and other dynamic values are properly HTML-escaped before insertion into the webview
 
-## Installation
+## Support and Contributing
 
-Search for **git-keizu** in Extensions, or install from:
-
-- [VS Code Marketplace](https://marketplace.visualstudio.com/items?itemName=numlia-vs.git-keizu)
-- [Open VSX Registry](https://open-vsx.org/extension/numlia-vs/git-keizu)
-
-## Contributing & Support
-
-The codebase has been modernized from its 2019 origins: async/await throughout, ES2020 targets, a Vitest test suite, and oxlint/oxfmt for consistent style.
+### Support
 
 Bug reports and feedback via [GitHub Issues](https://github.com/numlia/git-keizu/issues) are welcome. This is a personal project maintained in spare time — responses and fixes are not guaranteed, but reports are appreciated.
+
+### Contributing
+
+The codebase uses async/await throughout, targets ES2020, and includes a Vitest test suite with oxlint and oxfmt for consistent style.
 
 Pull requests are welcome as well. Fork the repository and open a pull request against `main`. CI runs `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test:ci`, so please confirm those pass locally first. For anything larger than a small fix, opening an issue first helps avoid wasted effort.
 
