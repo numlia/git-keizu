@@ -727,6 +727,28 @@ ul.contextMenuSubmenu li.contextMenuDivider {
   margin-top: 10px;
   text-align: left;
 }
+#dialog .errorExplanation {
+  margin-top: 10px;
+  text-align: left;
+}
+#dialog .errorExplanationSummary,
+#dialog .errorExplanationReason,
+#dialog .errorExplanationGuidance {
+  margin-top: 8px;
+}
+#dialog .errorOriginalOutput {
+  margin-top: 8px;
+}
+#dialog .errorOriginalOutput > summary {
+  cursor: pointer;
+  user-select: none;
+}
+#dialog .errorOriginalOutputContent {
+  margin: 6px 0 0 0;
+  font-style: italic;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 #dialog .dialogWarning {
   display: inline-block;
   margin-top: 8px;

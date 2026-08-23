@@ -192,13 +192,25 @@ export function showFormDialog(
   }
 }
 
+export interface ErrorDialogExplanation {
+  summary: string;
+  reason: string;
+  guidance: string;
+  rawOutputLabel: string;
+}
+
 export function showErrorDialog(
   message: string,
   reason: string | null,
-  sourceElem: HTMLElement | null
+  sourceElem: HTMLElement | null,
+  explanation?: ErrorDialogExplanation
 ) {
+  const reasonHtml =
+    explanation !== undefined && reason !== null
+      ? `<div class="errorExplanation"><div class="errorExplanationSummary">${escapeHtml(explanation.summary)}</div><div class="errorExplanationReason">${escapeHtml(explanation.reason)}</div><div class="errorExplanationGuidance">${escapeHtml(explanation.guidance)}</div><details class="errorOriginalOutput"><summary>${escapeHtml(explanation.rawOutputLabel)}</summary><pre class="errorOriginalOutputContent">${escapeHtml(reason)}</pre></details></div>`
+      : `${reason !== null ? `<br><span class="errorReason">${escapeHtml(reason).split("\n").join("<br>")}</span>` : ""}`;
   showDialog(
-    `${svgIcons.alert}${t("dialog.error")} ${message}${reason !== null ? `<br><span class="errorReason">${escapeHtml(reason).split("\n").join("<br>")}</span>` : ""}`,
+    `${svgIcons.alert}${t("dialog.error")} ${message}${reasonHtml}`,
     null,
     t("dialog.dismiss"),
     null,
