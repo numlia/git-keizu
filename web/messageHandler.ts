@@ -114,7 +114,18 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       refreshOrError(gitKeizu, msg.status, t("error.createWorktree"));
       break;
     case "deleteBranch":
-      refreshOrError(gitKeizu, msg.status, t("error.deleteBranch"));
+      if (msg.status === null) {
+        gitKeizu.refresh("soft");
+      } else if (isDeleteBranchNotFullyMergedStatus(msg.status)) {
+        showErrorDialog(t("error.deleteBranch"), msg.status, null, {
+          summary: t("error.deleteBranchNotFullyMerged.summary"),
+          reason: t("error.deleteBranchNotFullyMerged.reason"),
+          guidance: t("error.deleteBranchNotFullyMerged.guidance"),
+          rawOutputLabel: t("dialog.originalGitOutput")
+        });
+      } else {
+        showErrorDialog(t("error.deleteBranch"), msg.status, null);
+      }
       break;
     case "deleteRemoteBranch":
       refreshOrError(gitKeizu, msg.status, t("error.deleteRemoteBranch"));
@@ -238,4 +249,20 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
 
 function refreshOrError(gitKeizu: GitKeizuViewAPI, status: string | null, errorMessage: string) {
   refreshGraphOrDisplayError(status, errorMessage, () => gitKeizu.refresh("soft"), showErrorDialog);
+}
+
+const DELETE_BRANCH_NOT_FULLY_MERGED_PREFIX = "error: the branch '";
+const DELETE_BRANCH_NOT_FULLY_MERGED_SUFFIX = "' is not fully merged.";
+
+function isDeleteBranchNotFullyMergedStatus(rawStatus: string): boolean {
+  return rawStatus
+    .split("\n")
+    .some(
+      (line) =>
+        line.startsWith(DELETE_BRANCH_NOT_FULLY_MERGED_PREFIX) &&
+        line.endsWith(DELETE_BRANCH_NOT_FULLY_MERGED_SUFFIX) &&
+        line.length >
+          DELETE_BRANCH_NOT_FULLY_MERGED_PREFIX.length +
+            DELETE_BRANCH_NOT_FULLY_MERGED_SUFFIX.length
+    );
 }
