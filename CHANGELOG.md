@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-08-23
+
+This release explains the "not fully merged" error when deleting a branch: instead of showing only the raw Git output, the error dialog now describes why the error occurs — including after squash merges and rebases — and what to verify before force-deleting, in English and Japanese.
+
+### Added
+
+- **Branch deletion explains "not fully merged" errors**: When a normal (non-force) branch deletion fails because Git could not confirm the branch is fully merged into its upstream or the current branch, the error dialog now shows a localized explanation instead of only the raw Git output. It summarises what Git could not confirm, explains why the error appears even when the changes were already incorporated — squash merges and rebases do not connect the original commits, and the same error also appears when unmerged commits genuinely remain — and lists what to check before enabling Force Delete in the delete dialog. The dialog never claims the branch is safe to delete, adds no new buttons, runs no extra Git commands, and Force Delete stays off by default.
+
+### Changed
+
+- **The original Git output moves into a collapsible section for this error**: For the explained error only, the full Git output is preserved verbatim — line breaks included — under an initially collapsed "Original Git output" section below the explanation. Only this exact, case-sensitive error message is recognised: any other deletion error, localized Git output, or the same text arriving from a different operation (such as removing a worktree) keeps the existing always-expanded raw display unchanged.
+
 ## [0.9.1] - 2026-08-09
 
 This release changes nothing about how the extension behaves. It republishes the marketplace listing so that it picks up the rewritten README, and adds the changelog to the extension package.
@@ -519,7 +531,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.9.1...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/numlia/git-keizu/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/numlia/git-keizu/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/numlia/git-keizu/compare/v0.8.4...v0.9.0
 [0.8.4]: https://github.com/numlia/git-keizu/compare/v0.8.3...v0.8.4

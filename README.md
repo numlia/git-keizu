@@ -63,6 +63,7 @@ Right-click commits, branches, tags, stash entries, or uncommitted changes to ac
 - Checkout, cherry-pick, merge, rebase, create branches, manage tags, and apply or pop stashes.
 - Pull and push the current branch, including choosing an upstream when one has not been configured. Fetch automatically prunes stale remote-tracking references.
 - Common actions appear first, while less-used and destructive actions are grouped under **More…**. Confirmation dialogs expose relevant Git options before execution.
+- When a branch deletion is rejected because Git could not confirm the branch is fully merged, the error dialog explains why — including after squash merges and rebases — and what to check before using Force Delete, with the original Git output preserved in a collapsible section.
 
 ### Manage worktrees visually
 
