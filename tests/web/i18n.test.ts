@@ -455,3 +455,94 @@ describe("matching remote checkout and pull l10n keys (Feature 051)", () => {
     expect(rawJapaneseValues).toEqual([]);
   });
 });
+
+// S4 (en) / S5 (ja): deleteBranch not fully merged 説明の4キー (Feature 055-01)
+// @see docs/testing/perspectives/l10n/web/web.l10n.en.json-test.md
+// @see docs/testing/perspectives/l10n/web/web.l10n.ja.json-test.md
+describe("delete branch not fully merged l10n keys", () => {
+  const SUMMARY_KEY = "error.deleteBranchNotFullyMerged.summary";
+  const REASON_KEY = "error.deleteBranchNotFullyMerged.reason";
+  const GUIDANCE_KEY = "error.deleteBranchNotFullyMerged.guidance";
+  const RAW_OUTPUT_LABEL_KEY = "dialog.originalGitOutput";
+  const ADDED_KEYS = [SUMMARY_KEY, REASON_KEY, GUIDANCE_KEY, RAW_OUTPUT_LABEL_KEY];
+
+  const ENGLISH_VALUES: Record<string, string> = {
+    [SUMMARY_KEY]:
+      "Git could not confirm that this branch is fully merged into its upstream branch or the current branch.",
+    [REASON_KEY]:
+      "Squash merges and rebases can incorporate the changes without connecting the original commits. The same error also appears when unmerged commits remain.",
+    [GUIDANCE_KEY]:
+      "Before using Force Delete, confirm that the branch has no commits or changes you still need. If it is safe to remove, enable Force Delete in the delete dialog and try again.",
+    [RAW_OUTPUT_LABEL_KEY]: "Original Git output"
+  };
+
+  const JAPANESE_VALUES: Record<string, string> = {
+    [SUMMARY_KEY]:
+      "Git は、このブランチが upstream または現在のブランチに完全にマージ済みであることを確認できませんでした。",
+    [REASON_KEY]:
+      "スカッシュマージやリベースでは、変更内容が取り込まれていても元のコミットが履歴につながらず、このエラーが出ることがあります。未取り込みのコミットが残っている場合にも同じエラーが出ます。",
+    [GUIDANCE_KEY]:
+      "強制削除する前に、このブランチにだけ存在する必要なコミットや変更がないことを確認してください。確認できた場合は、削除ダイアログで「強制削除」を有効にして再度削除できます。",
+    [RAW_OUTPUT_LABEL_KEY]: "Git からの原文"
+  };
+
+  function loadBundle(fileName: string): Record<string, string> {
+    const jsonPath = resolve(process.cwd(), `l10n/web/${fileName}`);
+    return JSON.parse(readFileSync(jsonPath, "utf-8"));
+  }
+
+  function placeholders(value: string): string[] {
+    return value.match(/\{\d+\}/g) ?? [];
+  }
+
+  it("English bundle holds the four fixed explanation values without placeholders (en l10n TC-012)", () => {
+    // Case: TC-012 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const english = loadBundle("web.l10n.en.json");
+
+    // When/Then: each of the four keys exists, exactly equals the fixed English wording,
+    // and contains no {n} placeholder
+    for (const key of ADDED_KEYS) {
+      expect(english[key]).toBe(ENGLISH_VALUES[key]);
+      expect(placeholders(english[key])).toEqual([]);
+    }
+  });
+
+  it("Japanese bundle is missing none of the four explanation keys (en l10n TC-013)", () => {
+    // Case: TC-013 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When: the four-key set is compared against the Japanese bundle
+    const missing = ADDED_KEYS.filter((key) => japanese[key] === undefined);
+
+    // Then: no key was added to English only
+    expect(missing).toEqual([]);
+  });
+
+  it("Japanese bundle holds the four fixed translated values without placeholders (ja l10n TC-014)", () => {
+    // Case: TC-014 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When/Then: each of the four keys exists, exactly equals the fixed Japanese wording,
+    // contains no {n} placeholder, and is not a raw key fallback
+    for (const key of ADDED_KEYS) {
+      expect(japanese[key]).toBe(JAPANESE_VALUES[key]);
+      expect(placeholders(japanese[key])).toEqual([]);
+      expect(japanese[key]).not.toBe(key);
+    }
+  });
+
+  it("English bundle is missing none of the four explanation keys (ja l10n TC-015)", () => {
+    // Case: TC-015 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the English l10n bundle on disk
+    const english = loadBundle("web.l10n.en.json");
+
+    // When: the four-key set is compared against the English bundle
+    const missing = ADDED_KEYS.filter((key) => english[key] === undefined);
+
+    // Then: no key was added to Japanese only
+    expect(missing).toEqual([]);
+  });
+});
