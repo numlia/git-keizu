@@ -142,3 +142,48 @@ multiフォーム（`multiElementForm === true`）のcheckbox名セルをプレ�
 数値・空値境界（0 / minimum / maximum / +/-1 / empty / NULL）は、本セクションの対象がDOM構造とクリックトグルの契約であり仕様上意味を持たないため対象外とする（トグル往復のTC-030、非トグル境界のTC-032、特殊文字境界のTC-034で本変更に意味のある境界を充足）。
 
 **失敗系/正常系比（煙感知器）**: 正常系4件（TC-028、TC-029、TC-031、TC-033）、失敗系3件（TC-030、TC-032、TC-034）、比0.75。件数が1件差以内のためインベントリを再導出したが、本変更スコープの失敗源は上表のとおりすべて対応ケースまたは除外理由で充足されており、追加すべき失敗系ケースはないことを確認した（Validation / Exception / External / Typeが構造上発生しないDOM生成契約のため、失敗系はBoundaryのみとなる）。
+
+## S7: showErrorDialog() 説明付きエラーダイアログの DOM 契約
+
+> Origin: Feature 055-01 (light-spec-plan)
+> Added: 2026-08-23
+> Status: active
+> Supersedes: -
+> Signature: `showErrorDialog(message: string, reason: string | null, sourceElem: HTMLElement | null, explanation?: ErrorDialogExplanation): void`
+> Target Path: `web/dialogs.ts`（実装後に行範囲へ更新）
+
+`showErrorDialog` に省略可能な第4引数 `explanation`（`summary` / `reason` / `guidance` / `rawOutputLabel` の4文字列）を追加し、`explanation !== undefined && reason !== null` のときだけ既存タイトルの下に要約、理由、案内、初期状態が閉じた `details`（`summary` = `rawOutputLabel`、`pre` = Git 原文全文）、閉じるボタンの順で描画する変更。説明4文字列と原文はそれぞれ `escapeHtml()` を通し、説明なしの既存3引数呼び出しは現在の DOM 構造を維持する。分類・routing は `web/messageHandler-test/01-basic-responses-01.md` S16、locale 値は l10n owner（en S4 / ja S5）の責務。
+
+| Case ID | Input / Precondition                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                | Notes                                |
+| ------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| TC-035  | `showErrorDialog("title", "error line", null, { summary, reason, guidance, rawOutputLabel } の4値)` | Normal - 説明付き DOM の順序と閉じるボタン限定                             | dialog 内に要約・理由・案内・`details` がこの順（DOM 出現順）で各1件生成され、`details.open === false`、`details > summary` の `textContent` が `rawOutputLabel` と一致し、button が `#dialogDismiss` の1件だけで `#dialogAction` が存在しない | 表示順序と操作契約（閉じる以外なし） |
+| TC-036  | 説明あり + `reason = "error: line1\nIf you are sure line2"`（複数行の Git 原文）                    | Boundary - 複数行原文の改行保持                                            | `details > pre` の `textContent` が `reason` 全文（`\n` を含む）と完全一致し、`pre` 内に `<br>` 要素が生成されない                                                                                                                             | 原文を加工しない（全文・改行保持）   |
+| TC-037  | 説明あり + `summary = "<b>summary</b>"`、`reason = "<img src=x onerror=alert(1)>"`                  | Boundary - special chars（XSS）                                            | dialog 内に `img` 要素と `b` 要素が生成されず、要約要素の `textContent` に `<b>summary</b>`、`pre` の `textContent` に `<img src=x onerror=alert(1)>` が文字列としてそのまま含まれる                                                           | 説明・原文とも `escapeHtml` を通す   |
+| TC-038  | `showErrorDialog("title", "error message", null)`（第4引数なしの既存3引数呼び出し）                 | Normal - 説明なしの既存 DOM 維持                                           | 既存どおり `.errorReason` 要素に原文が表示され、dialog 内に `details` 要素と要約・理由・案内の説明要素が生成されない                                                                                                                           | 後方互換（既存 HTML 生成式の維持）   |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-01 追加分（S7）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                                                                                                  |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 説明要素の欠落・順序崩れ                              | TC-035                                                                                                                                                    |
+| `details` が初期展開される（`open` 属性の付与）       | TC-035                                                                                                                                                    |
+| 閉じる以外のボタン生成（強制削除・再試行・コピー等）  | TC-035（`#dialogDismiss` 1件のみ、`#dialogAction` 不在で担保）                                                                                            |
+| 原文改行の欠落・`<br>` 化・一部欠落                   | TC-036                                                                                                                                                    |
+| escape 欠落（説明・原文が HTML として展開される）     | TC-037                                                                                                                                                    |
+| 説明なし既存 DOM の破壊（後方互換の退行）             | TC-038                                                                                                                                                    |
+| `deleteBranch` の分類・routing の誤り                 | excluded(`web/messageHandler-test/01-basic-responses-01.md` S16 の責務)                                                                                   |
+| locale 値の欠落・不一致                               | excluded(`l10n/web/web.l10n.en.json-test.md` S4 / `web.l10n.ja.json-test.md` S5 の責務)                                                                   |
+| CSS の視覚崩れ（折り返し・余白）                      | excluded(jsdom で検証不能。プラン §6 の使い捨てリポジトリでの手動確認に委譲)                                                                              |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL） | excluded(数値境界を持たない DOM 生成契約。`reason: null` と説明の同時渡しは実装分岐上 explanation 判定前に説明なし経路へ倒れ、説明なし側は TC-038 で担保) |
+| 外部依存の失敗                                        | excluded(外部依存なし。引数はテスト側で直接構築する)                                                                                                      |
+| 不正な型・フォーマット                                | excluded(`ErrorDialogExplanation` の型は TypeScript コンパイル時に保証される)                                                                             |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(本変更は DOM 生成契約のみで、入力検証分岐を追加しない)
+- Exception: excluded(本変更スコープに例外経路が存在しない)
+- External: excluded(外部依存なし)
+- Boundary: TC-036、TC-037
+- Type: excluded(引数型は TypeScript コンパイル時に保証される)
+
+**失敗系/正常系比（煙感知器）**: 正常系2件（TC-035、TC-038）、失敗系2件（TC-036、TC-037）。件数が同数のためインベントリを再導出したが、本変更は DOM 生成契約のみで失敗源は上表のとおりすべて対応ケースまたは除外理由で充足されており、追加すべき失敗系ケースはないことを確認した。

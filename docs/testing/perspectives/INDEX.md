@@ -1,18 +1,18 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-08-08T09:42:55+09:00
+> Auto-generated: 2026-08-23T12:13:21+09:00
 > Total sources: 43
 > Total physical files: 70
-> Total sections: 476
-> Total cases: 2520
+> Total sections: 479
+> Total cases: 2541
 
 ## Source File -> Perspectives (Forward Lookup)
 
 | Source File | Storage Mode | Perspectives Entry | Shards | Sections | Cases | Last Updated |
 |-------------|--------------|--------------------|--------|----------|-------|--------------|
 | `Dependency automation operational contract` | single-file | `dependency-automation-test.md` | 1 | 1 | 25 | 2026-08-04 |
-| `l10n/web/web.l10n.en.json` | single-file | `l10n/web/web.l10n.en.json-test.md` | 1 | 3 | 11 | 2026-08-06 |
-| `l10n/web/web.l10n.ja.json` | single-file | `l10n/web/web.l10n.ja.json-test.md` | 1 | 4 | 13 | 2026-08-06 |
+| `l10n/web/web.l10n.en.json` | single-file | `l10n/web/web.l10n.en.json-test.md` | 1 | 4 | 13 | 2026-08-23 |
+| `l10n/web/web.l10n.ja.json` | single-file | `l10n/web/web.l10n.ja.json-test.md` | 1 | 5 | 15 | 2026-08-23 |
 | `package.json` | single-file | `package.json-test.md` | 1 | 3 | 43 | 2026-08-04 |
 | `src/avatarManager.ts` | single-file | `src/avatarManager-test.md` | 1 | 25 | 101 | 2026-07-19 |
 | `src/config.ts` | single-file | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md` | 1 | 14 | 79 | 2026-05-02 |
@@ -37,7 +37,7 @@
 | `web/commitMenu.ts` | single-file | `web/commitMenu-test.md` | 1 | 11 | 50 | 2026-07-19 |
 | `web/contextMenu.ts` | single-file | `web/contextMenu-test.md` | 1 | 3 | 22 | 2026-05-02 |
 | `web/dates.ts` | single-file | `web/dates-test.md` | 1 | 8 | 31 | 2026-07-04 |
-| `web/dialogs.ts` | single-file | `web/dialogs-test.md` | 1 | 6 | 34 | 2026-07-14 |
+| `web/dialogs.ts` | single-file | `web/dialogs-test.md` | 1 | 7 | 38 | 2026-08-23 |
 | `web/dropdown.ts` | single-file | `web/dropdown-test.md` | 1 | 10 | 38 | 2026-03-07 |
 | `web/fileMenu.ts` | single-file | `web/fileMenu-test.md` | 1 | 3 | 14 | 2026-05-02 |
 | `web/fileTree.ts` | single-file | `web/fileTree-test.md` | 1 | 4 | 30 | 2026-07-04 |
@@ -47,7 +47,7 @@
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
 | `web/main.ts` | sharded | `web/main-test/INDEX.md` | 10 | 45 | 280 | 2026-08-08 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
-| `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 3 | 12 | 43 | 2026-08-06 |
+| `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 3 | 12 | 56 | 2026-08-23 |
 | `web/refMenu.ts` | single-file | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md` | 1 | 14 | 74 | 2026-07-19 |
 | `web/refMenu.ts` | sharded | `web/refMenu-test/INDEX.md` | 3 | 16 | 88 | 2026-08-06 |
 | `web/stashMenu.ts` | single-file | `web/stashMenu-test.md` | 1 | 8 | 30 | 2026-04-30 |
@@ -75,7 +75,7 @@
 | Feature 003 (ux-fixes-and-enhancements) Task 3.3 | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md`, `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md`, `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, `web/refMenu-test/INDEX.md` |
 | Feature 003 (ux-fixes-and-enhancements) Task 4.2 | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md`, `src/dataSource-test/INDEX.md` |
 | Feature 003 (ux-fixes-and-enhancements) Task 5.2 | `web/dialogs-test.md` |
-| Feature 004 (webview-ux-polish) (aidd-spec-tasks-test) | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md`, `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
+| Feature 004 (webview-ux-polish) (aidd-spec-tasks-test) | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md`, `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md`, `web/main-test/INDEX.md` |
 | Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test) | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md`, `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md`, `archive/web/main-test/2026-03-22-pre-sharding-main-test.md`, `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md`, `src/config-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/repoManager-test.md`, `web/dropdown-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
 | Feature 006 (git-graph-parity) (aidd-spec-tasks-test) | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md`, `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md`, `archive/web/main-test/2026-03-22-pre-sharding-main-test.md`, `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md`, `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `web/fileTree-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | Feature 009 (merge-commit-fix) (aidd-spec-tasks-test) | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md`, `src/config-test/INDEX.md`, `web/graph-test.md`, `web/utils-test.md` |
@@ -114,6 +114,7 @@
 | Feature 050 (pnpm-security-update) (light-spec-plan) | `package.json-test.md` |
 | Feature 051 (remote-checkout-pull) (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | Feature 052 (detached-worktree-display) (light-spec-plan) | `src/dataSource-test/INDEX.md`, `src/repoFileWatcher-test.md`, `src/types-test.md`, `src/utils-test.md`, `src/worktree-test.md`, `web/main-test/INDEX.md`, `web/utils-test.md` |
+| Feature 055-01 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `web/dialogs-test.md`, `web/messageHandler-test/INDEX.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
 | test-plan | `web/stashMenu-test.md` |

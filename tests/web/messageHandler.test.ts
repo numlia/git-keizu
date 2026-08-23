@@ -73,38 +73,277 @@ describe("handleMessage pull response", () => {
   });
 });
 
-describe("refreshOrError soft refresh argument (S2)", () => {
+// S16: deleteBranch の not fully merged 分類と説明表示
+// @see docs/testing/perspectives/web/messageHandler-test/01-basic-responses-01.md
+describe("handleMessage deleteBranch not fully merged explanation", () => {
+  const DELETE_BRANCH_ERROR = "Unable to Delete Branch";
+  const EXPLANATION_MESSAGES = {
+    "error.deleteBranchNotFullyMerged.summary":
+      "Git could not confirm that this branch is fully merged into its upstream branch or the current branch.",
+    "error.deleteBranchNotFullyMerged.reason":
+      "Squash merges and rebases can incorporate the changes without connecting the original commits. The same error also appears when unmerged commits remain.",
+    "error.deleteBranchNotFullyMerged.guidance":
+      "Before using Force Delete, confirm that the branch has no commits or changes you still need. If it is safe to remove, enable Force Delete in the delete dialog and try again.",
+    "dialog.originalGitOutput": "Original Git output"
+  };
+  const EXPECTED_EXPLANATION = {
+    summary: EXPLANATION_MESSAGES["error.deleteBranchNotFullyMerged.summary"],
+    reason: EXPLANATION_MESSAGES["error.deleteBranchNotFullyMerged.reason"],
+    guidance: EXPLANATION_MESSAGES["error.deleteBranchNotFullyMerged.guidance"],
+    rawOutputLabel: EXPLANATION_MESSAGES["dialog.originalGitOutput"]
+  };
   let gitKeizu: GitKeizuViewAPI;
 
   beforeEach(() => {
     vi.clearAllMocks();
     gitKeizu = createMockGitKeizuView();
+    globalThis.webviewMessages = { ...globalThis.webviewMessages, ...EXPLANATION_MESSAGES };
   });
 
-  it('calls refresh("soft") on deleteBranch success (TC-005)', () => {
-    // Given: A deleteBranch success response (status = null) routed through refreshOrError
-    const msg: ResponseMessage = { command: "deleteBranch", status: null };
+  it("shows the explanation dialog for the canonical not-fully-merged failure (TC-064)", () => {
+    // Case: TC-064
+    // Given: a deleteBranch failure whose status is the canonical two-line not-fully-merged output
+    const status =
+      "error: the branch 'feature' is not fully merged.\nIf you are sure you want to delete it, run 'git branch -D feature'";
+    const msg: ResponseMessage = { command: "deleteBranch", status };
 
-    // When: handleMessage is called with the success response
+    // When: handleMessage is called
     handleMessage(msg, gitKeizu);
 
-    // Then: the soft refresh mode is requested
+    // Then: showErrorDialog runs once with the full status and the four explanation values,
+    // and the graph is not refreshed
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(
+      DELETE_BRANCH_ERROR,
+      status,
+      null,
+      EXPECTED_EXPLANATION
+    );
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("classifies a single-character branch name as known (TC-065)", () => {
+    // Case: TC-065
+    // Given: a status whose branch name is the minimum single character (+1 length boundary)
+    const status = "error: the branch 'x' is not fully merged.";
+    const msg: ResponseMessage = { command: "deleteBranch", status };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the explanation dialog is shown once and the graph is not refreshed
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(
+      DELETE_BRANCH_ERROR,
+      status,
+      null,
+      EXPECTED_EXPLANATION
+    );
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("classifies a branch name containing a single quote as known (TC-066)", () => {
+    // Case: TC-066
+    // Given: a status whose branch name contains a ' character
+    const status = "error: the branch 'feature/it's' is not fully merged.";
+    const msg: ResponseMessage = { command: "deleteBranch", status };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the line-start/line-end contract still matches and the explanation dialog is shown once
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(
+      DELETE_BRANCH_ERROR,
+      status,
+      null,
+      EXPECTED_EXPLANATION
+    );
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("classifies a multi-line status with surrounding lines as known (TC-067)", () => {
+    // Case: TC-067
+    // Given: a status whose matching line sits between other lines
+    const status =
+      "warning: before\nerror: the branch 'feature' is not fully merged.\nIf you are sure...";
+    const msg: ResponseMessage = { command: "deleteBranch", status };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the dialog receives the full three-line status unchanged with the explanation
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(
+      DELETE_BRANCH_ERROR,
+      status,
+      null,
+      EXPECTED_EXPLANATION
+    );
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the plain dialog for an empty branch name (TC-068)", () => {
+    // Case: TC-068
+    // Given: a status whose branch name part is empty (-1 length boundary)
+    const status = "error: the branch '' is not fully merged.";
+    const msg: ResponseMessage = { command: "deleteBranch", status };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: showErrorDialog runs once with exactly three arguments (no explanation)
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(DELETE_BRANCH_ERROR, status, null);
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the plain dialog when the suffix says fully merged (TC-069)", () => {
+    // Case: TC-069
+    // Given: a status whose line ends with "' is fully merged." instead of the known suffix
+    const status = "error: the branch 'feature' is fully merged.";
+    const msg: ResponseMessage = { command: "deleteBranch", status };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: showErrorDialog runs once with exactly three arguments (no explanation)
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(DELETE_BRANCH_ERROR, status, null);
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the plain dialog for an uppercase status (TC-070)", () => {
+    // Case: TC-070
+    // Given: an uppercase variant of the known status (classification is case-sensitive)
+    const status = "ERROR: THE BRANCH 'feature' IS NOT FULLY MERGED.";
+    const msg: ResponseMessage = { command: "deleteBranch", status };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: showErrorDialog runs once with exactly three arguments (no explanation)
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(DELETE_BRANCH_ERROR, status, null);
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the plain dialog for a localized status (TC-071)", () => {
+    // Case: TC-071
+    // Given: a localized Git output that does not contain the fixed fragments
+    const status = "エラー: ブランチは完全にマージされていません";
+    const msg: ResponseMessage = { command: "deleteBranch", status };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: showErrorDialog runs once with exactly three arguments (no explanation)
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(DELETE_BRANCH_ERROR, status, null);
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the plain dialog for a status with leading whitespace (TC-072)", () => {
+    // Case: TC-072
+    // Given: the known line preceded by a space (no trimming is applied)
+    const status = " error: the branch 'feature' is not fully merged.";
+    const msg: ResponseMessage = { command: "deleteBranch", status };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: showErrorDialog runs once with exactly three arguments (no explanation)
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(DELETE_BRANCH_ERROR, status, null);
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("falls back to the plain dialog for an ANSI-wrapped status (TC-073)", () => {
+    // Case: TC-073
+    // Given: the known line wrapped in ANSI escape sequences (no ANSI stripping is applied)
+    const status = "\u001b[31merror: the branch 'feature' is not fully merged.\u001b[0m";
+    const msg: ResponseMessage = { command: "deleteBranch", status };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: showErrorDialog runs once with exactly three arguments (no explanation)
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(DELETE_BRANCH_ERROR, status, null);
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("keeps the plain dialog for an unrelated fatal error (TC-074)", () => {
+    // Case: TC-074
+    // Given: an unknown deleteBranch failure
+    const status = "fatal: branch not found";
+    const msg: ResponseMessage = { command: "deleteBranch", status };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the existing three-argument dialog is kept and the graph is not refreshed
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(DELETE_BRANCH_ERROR, status, null);
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it('calls refresh("soft") once on deleteBranch success (TC-075)', () => {
+    // Case: TC-075
+    // Given: a deleteBranch success response (status = null)
+    const msg: ResponseMessage = { command: "deleteBranch", status: null };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the soft refresh runs once and no dialog is shown
     expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
     expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
-  it("shows error dialog and skips refresh on deleteBranch failure (TC-006)", () => {
-    // Given: A deleteBranch error response (status = error message string)
-    const errorMsg = "error: branch 'feature' not found.";
-    const msg: ResponseMessage = { command: "deleteBranch", status: errorMsg };
+  it("does not explain the same status for the pull operation (TC-076)", () => {
+    // Case: TC-076
+    // Given: a pull failure carrying the same not-fully-merged string
+    const status = "error: the branch 'feature' is not fully merged.";
+    const msg: ResponseMessage = { command: "pull", status };
 
-    // When: handleMessage is called with the error response
+    // When: handleMessage is called
     handleMessage(msg, gitKeizu);
 
-    // Then: showErrorDialog is called and refresh is NOT called
+    // Then: the pull dialog runs once with exactly three arguments (no explanation)
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
-    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Delete Branch", errorMsg, null);
+    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Pull", status, null);
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("does not explain the removeWorktree branchStatus with the same string (TC-077)", () => {
+    // Case: TC-077
+    // Given: a removeWorktree success whose branchStatus carries the same not-fully-merged string
+    const branchStatus = "error: the branch 'feature' is not fully merged.";
+    const msg: ResponseMessage = { command: "removeWorktree", status: null, branchStatus };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the graph refreshes once and the branch dialog keeps exactly three arguments
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(DELETE_BRANCH_ERROR, branchStatus, null);
+  });
+
+  it("falls back to the plain dialog for an empty status string (TC-078)", () => {
+    // Case: TC-078
+    // Given: a deleteBranch failure with an empty status string (empty boundary)
+    const msg: ResponseMessage = { command: "deleteBranch", status: "" };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: showErrorDialog runs once with exactly three arguments (no explanation)
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith(DELETE_BRANCH_ERROR, "", null);
     expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 });

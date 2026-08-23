@@ -7,9 +7,11 @@ vi.mock("../../web/utils", () => ({
   svgIcons: { alert: "<svg></svg>", loading: "<svg></svg>", info: '<svg class="infoIcon"></svg>' }
 }));
 
+import type { ErrorDialogExplanation } from "../../web/dialogs";
 import { escapeHtml } from "../../web/utils";
 
 let showFormDialog: typeof import("../../web/dialogs").showFormDialog;
+let showErrorDialog: typeof import("../../web/dialogs").showErrorDialog;
 let hideDialog: typeof import("../../web/dialogs").hideDialog;
 let dialogEl: HTMLDivElement;
 
@@ -25,6 +27,7 @@ beforeAll(async () => {
 
   const mod = await import("../../web/dialogs");
   showFormDialog = mod.showFormDialog;
+  showErrorDialog = mod.showErrorDialog;
   hideDialog = mod.hideDialog;
 });
 
@@ -687,5 +690,122 @@ describe("showFormDialog multi-form checkbox label association", () => {
     expect(label).not.toBeNull();
     expect(label!.querySelector("b")).toBeNull();
     expect(label!.textContent).toBe(hostile);
+  });
+});
+
+// S7: showErrorDialog() 説明付きエラーダイアログの DOM 契約
+// @see docs/testing/perspectives/web/dialogs-test.md
+describe("showErrorDialog explanation", () => {
+  function realEscape(value: string): string {
+    return value
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#x27;");
+  }
+
+  function createExplanation(
+    overrides: Partial<ErrorDialogExplanation> = {}
+  ): ErrorDialogExplanation {
+    return {
+      summary: "summary text",
+      reason: "reason text",
+      guidance: "guidance text",
+      rawOutputLabel: "Original Git output",
+      ...overrides
+    };
+  }
+
+  beforeEach(() => {
+    vi.mocked(escapeHtml).mockImplementation(realEscape);
+  });
+
+  afterEach(() => {
+    vi.mocked(escapeHtml).mockImplementation((s: string) => s);
+  });
+
+  // Case: TC-035
+  it("renders summary, reason, guidance and closed details in order with only a dismiss button (TC-035)", () => {
+    // Given: an explanation with all four values and a single-line git reason
+    const explanation = createExplanation();
+
+    // When: showErrorDialog is called with the explanation
+    showErrorDialog("title", "error line", null, explanation);
+
+    // Then: the explanation container holds exactly the four blocks in DOM order
+    const containers = dialogEl.querySelectorAll(".errorExplanation");
+    expect(containers).toHaveLength(1);
+    const children = containers[0].children;
+    expect(children).toHaveLength(4);
+    expect(children[0].className).toBe("errorExplanationSummary");
+    expect(children[0].textContent).toBe(explanation.summary);
+    expect(children[1].className).toBe("errorExplanationReason");
+    expect(children[1].textContent).toBe(explanation.reason);
+    expect(children[2].className).toBe("errorExplanationGuidance");
+    expect(children[2].textContent).toBe(explanation.guidance);
+    expect(children[3].tagName).toBe("DETAILS");
+
+    // And: the details element starts closed with the raw output label as its summary
+    const details = children[3] as HTMLDetailsElement;
+    expect(details.open).toBe(false);
+    expect(details.querySelector("summary")!.textContent).toBe(explanation.rawOutputLabel);
+
+    // And: the only button is the dismiss button (no action button)
+    expect(document.getElementById("dialogDismiss")).not.toBeNull();
+    expect(document.getElementById("dialogAction")).toBeNull();
+    expect(dialogEl.querySelectorAll(".roundedBtn")).toHaveLength(1);
+  });
+
+  // Case: TC-036
+  it("keeps the full multi-line git output with newlines inside the pre element (TC-036)", () => {
+    // Given: an explanation and a multi-line git reason
+    const reason = "error: line1\nIf you are sure line2";
+
+    // When: showErrorDialog is called with the explanation
+    showErrorDialog("title", reason, null, createExplanation());
+
+    // Then: the pre element holds the entire reason including the newline, without <br> elements
+    const pre = dialogEl.querySelector("details > pre.errorOriginalOutputContent");
+    expect(pre).not.toBeNull();
+    expect(pre!.textContent).toBe(reason);
+    expect(pre!.querySelector("br")).toBeNull();
+  });
+
+  // Case: TC-037
+  it("escapes HTML payloads in the explanation and the git output (TC-037)", () => {
+    // Given: a summary and a git reason that both carry HTML injection payloads
+    const hostileSummary = "<b>summary</b>";
+    const hostileReason = "<img src=x onerror=alert(1)>";
+
+    // When: showErrorDialog is called with the hostile strings
+    showErrorDialog("title", hostileReason, null, createExplanation({ summary: hostileSummary }));
+
+    // Then: no img or b element is created anywhere in the dialog
+    expect(dialogEl.querySelector("img")).toBeNull();
+    expect(dialogEl.querySelector("b")).toBeNull();
+
+    // And: both payloads are shown as literal text
+    expect(dialogEl.querySelector(".errorExplanationSummary")!.textContent).toBe(hostileSummary);
+    expect(dialogEl.querySelector(".errorOriginalOutputContent")!.textContent).toBe(hostileReason);
+  });
+
+  // Case: TC-038
+  it("keeps the legacy errorReason structure for the three-argument call (TC-038)", () => {
+    // Given: a legacy three-argument call without an explanation
+    // When: showErrorDialog is called
+    showErrorDialog("title", "error message", null);
+
+    // Then: the reason is rendered in the existing .errorReason element
+    const errorReason = dialogEl.querySelector(".errorReason");
+    expect(errorReason).not.toBeNull();
+    expect(errorReason!.textContent).toBe("error message");
+
+    // And: no explanation blocks or details element are generated
+    expect(dialogEl.querySelector(".errorExplanation")).toBeNull();
+    expect(dialogEl.querySelector(".errorExplanationSummary")).toBeNull();
+    expect(dialogEl.querySelector(".errorExplanationReason")).toBeNull();
+    expect(dialogEl.querySelector(".errorExplanationGuidance")).toBeNull();
+    expect(dialogEl.querySelector("details")).toBeNull();
   });
 });
