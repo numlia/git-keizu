@@ -8,3 +8,12 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+    ignore:
+      # Remove when the coordinated Node 26 runtime and type migration begins.
+      - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
+      # Remove when the Vite 8 migration is approved and planned.
+      - dependency-name: "vite"
+        update-types:
+          - "version-update:semver-major"
