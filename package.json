@@ -76,7 +76,7 @@
     "esbuild": "^0.28.1",
     "eslint-plugin-simple-import-sort": "^14.0.0",
     "jsdom": "^30.0.1",
-    "oxfmt": "^0.33.0",
+    "oxfmt": "^0.64.0",
     "oxlint": "^1.79.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.6",

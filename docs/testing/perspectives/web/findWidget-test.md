@@ -66,14 +66,14 @@
 
 **テスト対象パス**: `web/findWidget.ts`
 
-| Case ID | Input / Precondition                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                 | Notes                                      |
-| ------- | ---------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------ | ---------------- |
-| TC-017  | caseSensitive OFF, テキスト "Fix"        | Normal - standard                                                          | "fix", "Fix", "FIX" 全てにマッチ                | デフォルト動作                             |
-| TC-018  | caseSensitive ON, テキスト "Fix"         | Normal - standard                                                          | "Fix" のみにマッチ、"fix" にはマッチしない      | RegExp iフラグなし                         |
-| TC-019  | regex ON, テキスト "fix                  | feat"                                                                      | Normal - standard                               | "fix" または "feat" を含むコミットにマッチ | 正規表現パターン |
-| TC-020  | regex ON, テキスト "[invalid"            | Exception - handled error                                                  | エラー属性が設定され（赤枠）、マッチなし        | RegExp コンストラクタ例外                  |
-| TC-021  | regex ON, テキスト "(?:)" (ゼロ長マッチ) | Boundary - zero-length                                                     | エラー属性が設定され、マッチがクリアされる      | ReDoS防止                                  |
-| TC-022  | regex ON, テキスト "(a+)+" (潜在的ReDoS) | Boundary - backtracking                                                    | try-catchで安全に処理される（クラッシュしない） | ReDoS防止                                  |
+| Case ID | Input / Precondition                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                 | Notes                     |
+| ------- | ---------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------- |
+| TC-017  | caseSensitive OFF, テキスト "Fix"        | Normal - standard                                                          | "fix", "Fix", "FIX" 全てにマッチ                | デフォルト動作            |
+| TC-018  | caseSensitive ON, テキスト "Fix"         | Normal - standard                                                          | "Fix" のみにマッチ、"fix" にはマッチしない      | RegExp iフラグなし        |
+| TC-019  | regex ON, テキスト "fix\|feat"           | Normal - standard                                                          | "fix" または "feat" を含むコミットにマッチ      | 正規表現パターン          |
+| TC-020  | regex ON, テキスト "[invalid"            | Exception - handled error                                                  | エラー属性が設定され（赤枠）、マッチなし        | RegExp コンストラクタ例外 |
+| TC-021  | regex ON, テキスト "(?:)" (ゼロ長マッチ) | Boundary - zero-length                                                     | エラー属性が設定され、マッチがクリアされる      | ReDoS防止                 |
+| TC-022  | regex ON, テキスト "(a+)+" (潜在的ReDoS) | Boundary - backtracking                                                    | try-catchで安全に処理される（クラッシュしない） | ReDoS防止                 |
 
 ## S5: FindWidget ナビゲーション
 
