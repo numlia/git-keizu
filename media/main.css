@@ -1,3 +1,18 @@
+/* -- Z-Index Layers -------------------------------------------------------- */
+
+:root {
+  --git-keizu-z-index-commit-graph: -1;
+  --git-keizu-z-index-table-header: 11;
+  --git-keizu-z-index-controls: 12;
+  --git-keizu-z-index-context-menu: 15;
+  --git-keizu-z-index-context-submenu: 16;
+  --git-keizu-z-index-find-widget: 100;
+  --git-keizu-z-index-scroll-shadow: 200;
+  --git-keizu-z-index-dialog-backing: 210;
+  --git-keizu-z-index-dialog: 211;
+  --git-keizu-local-z-index-dropdown-menu: 100;
+}
+
 /* -- Layout ---------------------------------------------------------------- */
 
 body {
@@ -32,7 +47,7 @@ body.unableToLoad p {
   width: 100%;
   height: 0px;
   box-shadow: 0 -6px 6px 6px var(--vscode-scrollbar-shadow);
-  z-index: 200;
+  z-index: var(--git-keizu-z-index-scroll-shadow);
 }
 
 /* -- Commit Graph (SVG) ---------------------------------------------------- */
@@ -42,7 +57,7 @@ body.unableToLoad p {
   position: absolute;
   left: 8px;
   top: 0px;
-  z-index: -1;
+  z-index: var(--git-keizu-z-index-commit-graph);
 }
 #commitGraph circle.current {
   fill: var(--vscode-editor-background);
@@ -139,7 +154,7 @@ body.unableToLoad p {
 .tableColHeader {
   position: sticky;
   top: 0;
-  z-index: 11;
+  z-index: var(--git-keizu-z-index-table-header);
   background-color: var(--vscode-editor-background);
 }
 .resizeCol {
@@ -461,7 +476,7 @@ body.unableToLoad p {
   left: 0;
   right: 0;
   top: 0;
-  z-index: 12;
+  z-index: var(--git-keizu-z-index-controls);
   background-color: var(--vscode-editor-background);
   padding: 4px 104px 4px 0;
   border-bottom: 1px solid rgba(128, 128, 128, 0.5);
@@ -547,7 +562,7 @@ body.unableToLoad p {
   list-style-type: none;
   margin: 0;
   padding: 4px 0;
-  z-index: 15;
+  z-index: var(--git-keizu-z-index-context-menu);
 }
 #contextMenu.active {
   display: block;
@@ -605,7 +620,7 @@ ul.contextMenuSubmenu {
   list-style-type: none;
   margin: 0;
   padding: 4px 0;
-  z-index: 16;
+  z-index: var(--git-keizu-z-index-context-submenu);
 }
 ul.contextMenuSubmenu.active {
   display: block;
@@ -647,7 +662,7 @@ ul.contextMenuSubmenu li.contextMenuDivider {
   text-align: center;
   max-width: 360px;
   max-height: 80%;
-  z-index: 20;
+  z-index: var(--git-keizu-z-index-dialog);
   box-shadow: 0 0 30px 5px var(--vscode-widget-shadow);
   overflow-y: auto;
 }
@@ -658,7 +673,7 @@ ul.contextMenuSubmenu li.contextMenuDivider {
   right: 0;
   top: 0;
   bottom: 0;
-  z-index: 19;
+  z-index: var(--git-keizu-z-index-dialog-backing);
 }
 /* Dialog form */
 #dialog > table.dialogForm {
