@@ -13,7 +13,7 @@
   border-top: none;
   border-radius: 0 0 4px 4px;
   box-shadow: 0 2px 8px var(--vscode-widget-shadow);
-  z-index: 100;
+  z-index: var(--git-keizu-z-index-find-widget);
   transform: translateY(-100%);
 }
 .findWidget.active {
