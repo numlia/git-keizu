@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-08-25
+
+This release fixes the overlay stacking order in the graph view: dialogs now always appear in front of the find widget instead of being partially hidden behind it.
+
+### Fixed
+
+- **Dialogs are no longer hidden behind the find widget**: Opening any dialog — error, confirmation, input, checkbox, or select — while the find widget was open previously rendered the find widget on top, covering part of the dialog title and leaving the find controls clickable. Dialogs now render above the find widget and the scroll shadow, and while a dialog is open, pointer clicks on the find widget are blocked just like on the rest of the view. Closing the dialog restores the find widget exactly as it was: its visibility, search text, current match position, and options are untouched.
+
 ## [0.10.0] - 2026-08-23
 
 This release explains the "not fully merged" error when deleting a branch: instead of showing only the raw Git output, the error dialog now describes why the error occurs — including after squash merges and rebases — and what to verify before force-deleting, in English and Japanese.
@@ -531,7 +539,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/numlia/git-keizu/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/numlia/git-keizu/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/numlia/git-keizu/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/numlia/git-keizu/compare/v0.8.4...v0.9.0
