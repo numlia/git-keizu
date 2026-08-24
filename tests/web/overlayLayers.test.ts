@@ -53,7 +53,7 @@ const variableDefinitionCount = (cssText: string, name: string): number =>
 const numericVariableDefinition = (cssText: string, name: string): number => {
   const value = variableDefinition(cssText, name);
   if (value === null) {
-    throw new Error(`definition of ${name} was not found in media/main.css`);
+    throw new Error(`definition of ${name} was not found`);
   }
   const numeric = Number(value);
   if (Number.isNaN(numeric)) {

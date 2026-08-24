@@ -1,7 +1,7 @@
 # テスト観点表: media/dropdown.css
 
 > Source: `media/dropdown.css`
-> Generated: 2026-08-24T00:00:00+09:00
+> Generated: 2026-08-24T22:27:13+09:00
 > Language: CSS
 > Test Framework: Vitest
 > Storage Mode: single-file
