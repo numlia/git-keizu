@@ -135,7 +135,7 @@ function buildWorktreeWarning(
   return `<br><span class="dialogWarning">${svgIcons.alert} ${t("This branch has an active worktree at {0}. Force deleting will orphan the worktree directory (detached HEAD).", `<b>${escapeHtml(worktreeInfo.path)}</b>`)}</span>`;
 }
 
-function showDeleteBranchDialog(
+export function showDeleteBranchDialog(
   repo: string,
   refName: string,
   remotes: string[],

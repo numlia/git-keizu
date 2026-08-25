@@ -3,6 +3,7 @@ import type {
   GitCommitNode,
   GitFileChange,
   GitRepoSet,
+  ResponseLoadBranchCleanup,
   ResponseMessage,
   WorktreeCollection
 } from "../src/types";
@@ -19,6 +20,7 @@ export interface GitKeizuViewAPI {
   showCommitDetails(commitDetails: GitCommitDetails, fileTree: GitFolder): void;
   showCompareResult(fileChanges: GitFileChange[], fromHash: string, toHash: string): void;
   loadAvatar(email: string, image: string): void;
+  loadBranchCleanup(response: ResponseLoadBranchCleanup): void;
   loadBranches(branches: string[], head: string | null, hard: boolean, isRepo: boolean): void;
   loadCommits(
     commits: GitCommitNode[],
@@ -141,6 +143,9 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       break;
     case "fetchAvatar":
       gitKeizu.loadAvatar(msg.email, msg.image);
+      break;
+    case "loadBranchCleanup":
+      gitKeizu.loadBranchCleanup(msg);
       break;
     case "loadBranches":
       gitKeizu.loadBranches(msg.branches, msg.head, msg.hard, msg.isRepo);
