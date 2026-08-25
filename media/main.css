@@ -551,6 +551,64 @@ body.unableToLoad p {
   line-height: 28px;
 }
 
+/* -- Branch Cleanup Panel -------------------------------------------------- */
+
+#branchCleanupPanel {
+  flex-shrink: 0;
+  max-height: 40vh;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  background-color: var(--vscode-editor-background);
+  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
+  font-size: 13px;
+}
+#branchCleanupPanel[hidden] {
+  display: none;
+}
+.branchCleanupHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+}
+.branchCleanupTitle {
+  font-weight: 700;
+}
+.branchCleanupMessage {
+  padding: 4px 10px;
+  opacity: 0.7;
+}
+#branchCleanupPanel table {
+  border-collapse: collapse;
+}
+#branchCleanupPanel th,
+#branchCleanupPanel td {
+  white-space: nowrap;
+  padding: 2px 10px;
+  text-align: left;
+  font-size: 13px;
+}
+#branchCleanupPanel th {
+  position: sticky;
+  top: 0;
+  background-color: var(--vscode-editor-background);
+  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
+}
+#branchCleanupPanel th.branchCleanupActionCell,
+#branchCleanupPanel td.branchCleanupActionCell {
+  position: sticky;
+  right: 0;
+  background-color: var(--vscode-editor-background);
+}
+.branchCleanupActionBtn {
+  display: inline-block;
+  line-height: 18px;
+  padding: 0 8px;
+  margin: 1px 2px;
+  border-radius: 9px;
+}
+
 /* -- Context Menu ---------------------------------------------------------- */
 
 #contextMenu {
