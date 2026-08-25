@@ -28,7 +28,8 @@
   background-color: var(--git-keizu-color);
 }
 
-/* Toolbar icon buttons (search / fetch / current / refresh) */
+/* Toolbar icon buttons (branch cleanup / search / fetch / current / refresh) */
+#branchCleanupBtn .codicon,
 #searchBtn .codicon,
 #fetchBtn .codicon,
 #currentBtn .codicon,
@@ -40,6 +41,7 @@
   color: var(--vscode-editor-foreground);
   opacity: 0.8;
 }
+#branchCleanupBtn:hover .codicon,
 #searchBtn:hover .codicon,
 #fetchBtn:hover .codicon,
 #currentBtn:hover .codicon,

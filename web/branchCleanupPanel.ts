@@ -11,6 +11,7 @@ const COMPARISON_DROPDOWN_ID = "branchCleanupComparisonSelect";
 const CLASS_DROPDOWN = "dropdown";
 const CLASS_HEADER = "branchCleanupHeader";
 const CLASS_TITLE = "branchCleanupTitle";
+const CLASS_COMPARISON = "branchCleanupComparison";
 const CLASS_MESSAGE = "branchCleanupMessage";
 const CLASS_ACTION_CELL = "branchCleanupActionCell";
 const CLASS_ACTION_BTN = "roundedBtn branchCleanupActionBtn";
@@ -196,6 +197,7 @@ export class BranchCleanupPanel {
     header.appendChild(title);
 
     const comparisonControl = document.createElement("span");
+    comparisonControl.className = CLASS_COMPARISON;
     const comparisonText = document.createElement("span");
     comparisonText.textContent = t("cleanup.comparison");
     comparisonControl.appendChild(comparisonText);
