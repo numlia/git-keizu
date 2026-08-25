@@ -152,8 +152,10 @@ describe("BranchCleanupPanel lifecycle", () => {
 
   it("re-requests with a fresh id while open (TC-004)", () => {
     // Case: TC-004
-    // Given: an open panel
+    // Given: an open panel showing a loaded row with a delete action
     panel.toggle(REPO);
+    panel.handleResponse(okResponse(1, [makeRow()]));
+    expect(deleteButtons()).toHaveLength(1);
     vi.mocked(sendMessage).mockClear();
 
     // When: it is refreshed
@@ -162,6 +164,15 @@ describe("BranchCleanupPanel lifecycle", () => {
     // Then: exactly one new request with the next id is sent
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(sentRequests()[0].requestId).toBe(2);
+
+    // Then: the loaded table stays rendered without a loading swap, the delete action is
+    // suppressed while the re-request is in flight, and the fresh response restores it
+    expect(messageText()).toBeNull();
+    expect(bodyRows()).toHaveLength(1);
+    expect(deleteButtons()).toHaveLength(0);
+    expect(showButtons()).toHaveLength(1);
+    panel.handleResponse(okResponse(2, [makeRow()]));
+    expect(deleteButtons()).toHaveLength(1);
   });
 
   it("sends nothing on a refresh while closed (TC-005)", () => {

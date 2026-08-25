@@ -49,6 +49,7 @@
   opacity: 1;
 }
 #branchCleanupBtn.active .codicon {
+  color: var(--vscode-inputOption-activeForeground);
   opacity: 1;
 }
 #refreshBtn.refreshing .codicon {

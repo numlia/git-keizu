@@ -55,6 +55,7 @@ export class BranchCleanupPanel {
   private repo: string | null = null;
   private selectedComparison: string | null = null;
   private latestRequestId: number | null = null;
+  private requestInFlight: boolean = false;
   private nextRequestId: number = FIRST_REQUEST_ID;
   private view: PanelView = { kind: "loading" };
   private branchNames: readonly string[] = [];
@@ -97,8 +98,9 @@ export class BranchCleanupPanel {
 
   public refresh(repo: string): void {
     if (!this.open) return;
+    const preserveLoadedView = repo === this.repo && this.view.kind === "loaded";
     this.setRepository(repo);
-    this.requestLoad();
+    this.requestLoad(preserveLoadedView);
   }
 
   public selectRepository(repo: string): void {
@@ -116,6 +118,7 @@ export class BranchCleanupPanel {
     if (typeof value !== "object" || value === null) return;
     const record = value as Record<string, unknown>;
     if (record.requestId !== this.latestRequestId || record.repo !== this.repo) return;
+    this.requestInFlight = false;
 
     const result = validateResult(record.result);
     if (result === null || result.kind === "error") {
@@ -132,6 +135,7 @@ export class BranchCleanupPanel {
   private close(): void {
     this.open = false;
     this.latestRequestId = null;
+    this.requestInFlight = false;
     this.view = { kind: "loading" };
     this.branchNames = [];
     this.comparisonDropdown.close();
@@ -146,12 +150,13 @@ export class BranchCleanupPanel {
     this.branchNames = [];
   }
 
-  private requestLoad(): void {
+  private requestLoad(preserveLoadedView: boolean = false): void {
     if (this.repo === null) return;
     if (
       !Number.isSafeInteger(this.nextRequestId) ||
       this.nextRequestId >= Number.MAX_SAFE_INTEGER
     ) {
+      this.requestInFlight = false;
       this.view = { kind: "failed" };
       this.render();
       return;
@@ -159,7 +164,10 @@ export class BranchCleanupPanel {
     const requestId = this.nextRequestId;
     this.nextRequestId = requestId + 1;
     this.latestRequestId = requestId;
-    this.view = { kind: "loading" };
+    this.requestInFlight = true;
+    if (!preserveLoadedView) {
+      this.view = { kind: "loading" };
+    }
     this.render();
     sendMessage({
       command: "loadBranchCleanup",
@@ -283,7 +291,7 @@ export class BranchCleanupPanel {
     const actionCell = document.createElement("td");
     actionCell.className = CLASS_ACTION_CELL;
     actionCell.appendChild(this.buildShowButton(row.branchName));
-    if (row.remotes !== null && isDeleteEligible(row, compareBranch)) {
+    if (!this.requestInFlight && row.remotes !== null && isDeleteEligible(row, compareBranch)) {
       actionCell.appendChild(this.buildDeleteButton(repo, row.branchName, row.remotes));
     }
     tr.appendChild(actionCell);
