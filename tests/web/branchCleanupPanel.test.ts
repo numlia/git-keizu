@@ -165,14 +165,21 @@ describe("BranchCleanupPanel lifecycle", () => {
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(sentRequests()[0].requestId).toBe(2);
 
-    // Then: the loaded table stays rendered without a loading swap, the delete action is
-    // suppressed while the re-request is in flight, and the fresh response restores it
+    // Then: the loaded table stays rendered without a loading swap; the delete button keeps
+    // its box as an invisible, non-clickable placeholder (no height jump, no stale delete)
+    // and the fresh response restores it
     expect(messageText()).toBeNull();
     expect(bodyRows()).toHaveLength(1);
-    expect(deleteButtons()).toHaveLength(0);
+    const inFlightDeletes = deleteButtons();
+    expect(inFlightDeletes).toHaveLength(1);
+    expect(inFlightDeletes[0].classList.contains("branchCleanupActionHidden")).toBe(true);
+    inFlightDeletes[0].click();
+    expect(actions.showDeleteDialog).not.toHaveBeenCalled();
     expect(showButtons()).toHaveLength(1);
     panel.handleResponse(okResponse(2, [makeRow()]));
-    expect(deleteButtons()).toHaveLength(1);
+    const restoredDeletes = deleteButtons();
+    expect(restoredDeletes).toHaveLength(1);
+    expect(restoredDeletes[0].classList.contains("branchCleanupActionHidden")).toBe(false);
   });
 
   it("sends nothing on a refresh while closed (TC-005)", () => {

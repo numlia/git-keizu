@@ -16,6 +16,7 @@ const CLASS_MESSAGE = "branchCleanupMessage";
 const CLASS_ACTION_CELL = "branchCleanupActionCell";
 const CLASS_ACTION_BTN = "roundedBtn branchCleanupActionBtn";
 const CLASS_DELETE_BTN = "roundedBtn branchCleanupActionBtn branchCleanupDeleteBtn";
+const CLASS_ACTION_HIDDEN = "branchCleanupActionHidden";
 const FIRST_REQUEST_ID = 1;
 const COMPARISON_AUTO_VALUE = "";
 
@@ -291,7 +292,7 @@ export class BranchCleanupPanel {
     const actionCell = document.createElement("td");
     actionCell.className = CLASS_ACTION_CELL;
     actionCell.appendChild(this.buildShowButton(row.branchName));
-    if (!this.requestInFlight && row.remotes !== null && isDeleteEligible(row, compareBranch)) {
+    if (row.remotes !== null && isDeleteEligible(row, compareBranch)) {
       actionCell.appendChild(this.buildDeleteButton(repo, row.branchName, row.remotes));
     }
     tr.appendChild(actionCell);
@@ -310,7 +311,13 @@ export class BranchCleanupPanel {
     const btn = document.createElement("div");
     btn.className = CLASS_DELETE_BTN;
     btn.textContent = t("cleanup.action.delete");
-    btn.addEventListener("click", () => this.actions.showDeleteDialog(repo, branchName, remotes));
+    if (this.requestInFlight) {
+      // While a re-request is in flight the shown rows are stale: keep the button's box so
+      // the row height never jumps, but make it invisible and attach no click listener
+      btn.classList.add(CLASS_ACTION_HIDDEN);
+    } else {
+      btn.addEventListener("click", () => this.actions.showDeleteDialog(repo, branchName, remotes));
+    }
     return btn;
   }
 }
