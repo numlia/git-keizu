@@ -48,6 +48,9 @@
 #refreshBtn:hover .codicon {
   opacity: 1;
 }
+#branchCleanupBtn.active .codicon {
+  opacity: 1;
+}
 #refreshBtn.refreshing .codicon {
   animation: codicon-spin 1.5s linear infinite;
 }

@@ -7241,11 +7241,19 @@ describe("Branch cleanup panel wiring (S49)", () => {
     expect(panelConstructorCallsAfter - panelConstructorCallsBefore).toBe(1);
 
     // When: the toolbar button is clicked
-    document.getElementById("branchCleanupBtn")!.click();
+    const buttonElem = document.getElementById("branchCleanupBtn")!;
+    buttonElem.click();
 
     // Then: panel.toggle runs once with the current repository
     expect(mockBranchCleanupPanelInstance.toggle).toHaveBeenCalledTimes(1);
     expect(mockBranchCleanupPanelInstance.toggle).toHaveBeenCalledWith(TEST_REPO);
+
+    // Then: the button mirrors the panel's open state after each click
+    expect(buttonElem.classList.contains("active")).toBe(false);
+    mockPanelOpen.value = true;
+    buttonElem.click();
+    expect(mockBranchCleanupPanelInstance.toggle).toHaveBeenCalledTimes(2);
+    expect(buttonElem.classList.contains("active")).toBe(true);
   });
 
   it("adds a panel refresh to an open-panel refresh without touching existing requests (TC-306)", () => {

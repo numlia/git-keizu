@@ -241,6 +241,7 @@ class GitKeizuView {
       branchCleanupBtnElem.innerHTML = svgIcons.branch;
       branchCleanupBtnElem.addEventListener("click", () => {
         this.branchCleanupPanel.toggle(this.currentRepo);
+        branchCleanupBtnElem.classList.toggle("active", this.branchCleanupPanel.isOpen());
       });
     }
     const fetchBtnElem = document.getElementById("fetchBtn")!;
