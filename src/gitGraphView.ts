@@ -294,6 +294,16 @@ export class GitKeizuView {
                 status: await this.dataSource.deleteTag(msg.repo, msg.tagName)
               });
               break;
+            case "loadBranchCleanup":
+              if (Number.isSafeInteger(msg.requestId) && msg.requestId > 0) {
+                this.sendMessage({
+                  command: "loadBranchCleanup",
+                  repo: msg.repo,
+                  requestId: msg.requestId,
+                  result: await this.dataSource.getBranchCleanup(msg.repo, msg.compareBranch)
+                });
+              }
+              break;
             case "loadBranches": {
               const branchData = await this.dataSource.getBranches(
                 msg.repo,
@@ -657,7 +667,9 @@ export class GitKeizuView {
 				<div id="fetchBtn" title="${hostT("Fetch --prune")}"></div>
 				<div id="currentBtn" title="${hostT("Current")}"></div>
 				<div id="refreshBtn" title="${hostT("Refresh")}"></div>
+				<div id="branchCleanupBtn" title="${hostT("Branch Cleanup")}"></div>
 			</div>
+			<div id="branchCleanupPanel" hidden></div>
 			<div id="scrollContainer">
 				<div id="scrollShadow"></div>
 				<div id="content">
