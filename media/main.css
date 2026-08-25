@@ -478,7 +478,7 @@ body.unableToLoad p {
   top: 0;
   z-index: var(--git-keizu-z-index-controls);
   background-color: var(--vscode-editor-background);
-  padding: 4px 104px 4px 0;
+  padding: 4px 128px 4px 0;
   border-bottom: 1px solid rgba(128, 128, 128, 0.5);
   line-height: 32px;
   text-align: center;
@@ -510,7 +510,8 @@ body.unableToLoad p {
   width: 14px;
   vertical-align: text-top;
 }
-/* Toolbar icon buttons (search / fetch / current / refresh) */
+/* Toolbar icon buttons (branch cleanup / search / fetch / current / refresh) */
+#branchCleanupBtn,
 #searchBtn,
 #fetchBtn,
 #currentBtn,
@@ -522,6 +523,9 @@ body.unableToLoad p {
   margin-top: -10px;
   cursor: pointer;
   user-select: none;
+}
+#branchCleanupBtn {
+  right: 106px;
 }
 #searchBtn {
   right: 82px;

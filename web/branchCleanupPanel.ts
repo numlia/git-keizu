@@ -1,11 +1,14 @@
 import * as GG from "../src/types";
 import { getCommitDate } from "./dates";
+import { Dropdown } from "./dropdown";
 import { t } from "./i18n";
 import { sendMessage } from "./utils";
 
 /* === Constants === */
 
 const PANEL_ELEMENT_ID = "branchCleanupPanel";
+const COMPARISON_DROPDOWN_ID = "branchCleanupComparisonSelect";
+const CLASS_DROPDOWN = "dropdown";
 const CLASS_HEADER = "branchCleanupHeader";
 const CLASS_TITLE = "branchCleanupTitle";
 const CLASS_MESSAGE = "branchCleanupMessage";
@@ -45,6 +48,8 @@ type PanelView =
 export class BranchCleanupPanel {
   private readonly actions: BranchCleanupPanelActions;
   private readonly panelElem: HTMLElement;
+  private readonly comparisonDropdownElem: HTMLDivElement;
+  private readonly comparisonDropdown: Dropdown;
   private open: boolean = false;
   private repo: string | null = null;
   private selectedComparison: string | null = null;
@@ -56,6 +61,22 @@ export class BranchCleanupPanel {
   constructor(actions: BranchCleanupPanelActions) {
     this.actions = actions;
     this.panelElem = document.getElementById(PANEL_ELEMENT_ID)!;
+    this.comparisonDropdownElem = document.createElement("div");
+    this.comparisonDropdownElem.id = COMPARISON_DROPDOWN_ID;
+    this.comparisonDropdownElem.className = CLASS_DROPDOWN;
+    // Dropdown resolves its element via document.getElementById, so the element must be
+    // connected while the component is constructed; render() moves it into the header.
+    this.panelElem.appendChild(this.comparisonDropdownElem);
+    this.comparisonDropdown = new Dropdown(
+      COMPARISON_DROPDOWN_ID,
+      false,
+      t("toolbar.branches"),
+      (value: string) => {
+        this.selectedComparison = value === COMPARISON_AUTO_VALUE ? null : value;
+        this.requestLoad();
+      }
+    );
+    this.panelElem.removeChild(this.comparisonDropdownElem);
   }
 
   public isOpen(): boolean {
@@ -112,6 +133,7 @@ export class BranchCleanupPanel {
     this.latestRequestId = null;
     this.view = { kind: "loading" };
     this.branchNames = [];
+    this.comparisonDropdown.close();
     this.panelElem.setAttribute("hidden", "");
     clearChildren(this.panelElem);
   }
@@ -151,6 +173,7 @@ export class BranchCleanupPanel {
   private render(): void {
     clearChildren(this.panelElem);
     this.panelElem.appendChild(this.buildHeader());
+    this.syncComparisonOptions();
     const view = this.view;
     if (view.kind === "loading") {
       this.panelElem.appendChild(buildMessage(t("cleanup.loading")));
@@ -172,37 +195,26 @@ export class BranchCleanupPanel {
     title.textContent = t("cleanup.title");
     header.appendChild(title);
 
-    const comparisonLabel = document.createElement("label");
+    const comparisonControl = document.createElement("span");
     const comparisonText = document.createElement("span");
     comparisonText.textContent = t("cleanup.comparison");
-    comparisonLabel.appendChild(comparisonText);
-    comparisonLabel.appendChild(this.buildComparisonSelect());
-    header.appendChild(comparisonLabel);
+    comparisonControl.appendChild(comparisonText);
+    comparisonControl.appendChild(this.comparisonDropdownElem);
+    header.appendChild(comparisonControl);
 
     return header;
   }
 
-  private buildComparisonSelect(): HTMLSelectElement {
-    const select = document.createElement("select");
-    const autoOption = document.createElement("option");
-    autoOption.value = COMPARISON_AUTO_VALUE;
-    autoOption.textContent = t("cleanup.comparison.auto");
-    select.appendChild(autoOption);
+  private syncComparisonOptions(): void {
+    const options = [{ name: t("cleanup.comparison.auto"), value: COMPARISON_AUTO_VALUE }];
     for (const name of this.branchNames) {
-      const option = document.createElement("option");
-      option.value = name;
-      option.textContent = name;
-      select.appendChild(option);
+      options.push({ name: name, value: name });
     }
-    select.value =
+    const selected =
       this.selectedComparison !== null && this.branchNames.indexOf(this.selectedComparison) > -1
         ? this.selectedComparison
         : COMPARISON_AUTO_VALUE;
-    select.addEventListener("change", () => {
-      this.selectedComparison = select.value === COMPARISON_AUTO_VALUE ? null : select.value;
-      this.requestLoad();
-    });
-    return select;
+    this.comparisonDropdown.setOptions(options, selected);
   }
 
   private buildTable(

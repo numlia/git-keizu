@@ -1,7 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../../web/utils", () => ({
+vi.mock("../../web/utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../web/utils")>()),
   sendMessage: vi.fn()
 }));
 
@@ -80,6 +81,13 @@ function showButtons(scope: ParentNode = panelElem()): HTMLElement[] {
   return [
     ...scope.querySelectorAll<HTMLElement>(".branchCleanupActionBtn:not(.branchCleanupDeleteBtn)")
   ];
+}
+
+function selectComparison(branchName: string): void {
+  const dropdown = panelElem().querySelector<HTMLElement>("#branchCleanupComparisonSelect")!;
+  dropdown.querySelector<HTMLElement>(".dropdownCurrentValue")!.click();
+  const options = [...dropdown.querySelectorAll<HTMLElement>(".dropdownOption")];
+  options.find((option) => option.textContent === branchName)!.click();
 }
 
 beforeEach(() => {
@@ -173,9 +181,7 @@ describe("BranchCleanupPanel lifecycle", () => {
     panel.handleResponse(
       okResponse(1, [makeRow({ branchName: "develop" }), makeRow({ branchName: "main" })])
     );
-    const select = panelElem().querySelector("select")!;
-    select.value = "develop";
-    select.dispatchEvent(new Event("change"));
+    selectComparison("develop");
     expect(sentRequests()[1].compareBranch).toBe("develop");
 
     // When: the repository is switched and the panel is refreshed
@@ -195,9 +201,7 @@ describe("BranchCleanupPanel lifecycle", () => {
     panel.handleResponse(
       okResponse(1, [makeRow({ branchName: "develop" }), makeRow({ branchName: "main" })])
     );
-    const select = panelElem().querySelector("select")!;
-    select.value = "develop";
-    select.dispatchEvent(new Event("change"));
+    selectComparison("develop");
 
     // When: the same repository is refreshed
     panel.refresh(REPO);
@@ -232,9 +236,7 @@ describe("BranchCleanupPanel lifecycle", () => {
     vi.mocked(sendMessage).mockClear();
 
     // When: the comparison is changed to feature/x
-    const select = panelElem().querySelector("select")!;
-    select.value = "feature/x";
-    select.dispatchEvent(new Event("change"));
+    selectComparison("feature/x");
 
     // Then: the loading view replaced the rows and one request carries the new comparison
     expect(messageText()).toBe("Loading ...");
