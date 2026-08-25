@@ -1,10 +1,23 @@
 import * as cp from "node:child_process";
 import * as path from "node:path";
 
+import {
+  BRANCH_SNAPSHOT_FORMAT,
+  BranchSnapshotEntry,
+  parseAheadBehind,
+  parseBranchSnapshot,
+  parseOriginHeadTarget,
+  parseRemoteRefNames,
+  REMOTE_REFS_FORMAT,
+  resolveCompareBranch,
+  synthesizeRows
+} from "./branchCleanup";
 import { getConfig } from "./config";
 import { DEFAULT_GIT_PATH, resolveGitExecutable } from "./gitExecutable";
 import { isSafeRemoteName, isValidRefName } from "./refValidation";
 import {
+  BranchCleanupAheadBehind,
+  BranchCleanupResult,
   CheckoutBranchResult,
   CommitOrdering,
   GitCommandStatus,
@@ -24,7 +37,7 @@ import {
   VALID_UNCOMMITTED_RESET_MODES,
   WorktreeCollection
 } from "./types";
-import { getPathFromStr, isValidCommitHash } from "./utils";
+import { evalPromises, getPathFromStr, isValidCommitHash } from "./utils";
 import { parseWorktreeList } from "./worktree";
 
 const eolRegex = /\r\n|\r|\n/g;
@@ -45,6 +58,7 @@ const NUMSTAT_OPTION = "--numstat";
 const NO_WALK_SORTED_OPTION = "--no-walk=sorted";
 const TAB_SEPARATOR = "\t";
 const VALID_FILE_CHANGE_TYPES: ReadonlySet<string> = new Set(["A", "M", "D", "R"]);
+const BRANCH_COMPARISON_MAX_PARALLEL = 3;
 
 export const COMMIT_ORDER_FLAGS: Readonly<Record<CommitOrdering, string>> = {
   date: "--date-order",
@@ -1135,6 +1149,87 @@ export class DataSource {
 
   public removeWorktree(repo: string, worktreePath: string) {
     return this.runGitCommandSpawn(["worktree", "remove", worktreePath], repo);
+  }
+
+  /**
+   * Collect the branch cleanup facts: a single refs/heads snapshot decides the
+   * row identities and the comparison target, while worktrees, remote names
+   * and remote refs are fetched independently so that each failed collection
+   * only degrades its own fact (unknown / null) instead of the whole result.
+   * Only the snapshot's failure is a whole-result error; an empty snapshot is
+   * a successful empty state.
+   */
+  public async getBranchCleanup(
+    repo: string,
+    requestedCompareBranch: string | null
+  ): Promise<BranchCleanupResult> {
+    const snapshotResult = await this.runGitQuery(
+      ["for-each-ref", `--format=${BRANCH_SNAPSHOT_FORMAT}`, "--sort=refname", "refs/heads"],
+      repo
+    );
+    if (snapshotResult.kind === "error") {
+      return { kind: "error", status: snapshotResult.status };
+    }
+    const entries = parseBranchSnapshot(snapshotResult.stdout);
+
+    const [worktreeResult, remoteNamesResult, remoteRefsResult] = await Promise.all([
+      this.runGitQuery(["worktree", "list", "--porcelain"], repo),
+      this.queryRemoteNames(repo),
+      this.runGitQuery(["for-each-ref", `--format=${REMOTE_REFS_FORMAT}`, "refs/remotes"], repo)
+    ]);
+    const worktrees =
+      worktreeResult.kind === "ok" ? parseWorktreeList(worktreeResult.stdout) : null;
+    const remoteNames = remoteNamesResult.kind === "ok" ? remoteNamesResult.remotes : null;
+    const remoteRefs =
+      remoteRefsResult.kind === "ok" ? parseRemoteRefNames(remoteRefsResult.stdout) : null;
+    const originHeadTarget =
+      remoteRefsResult.kind === "ok" ? parseOriginHeadTarget(remoteRefsResult.stdout) : null;
+
+    const compare = resolveCompareBranch(entries, originHeadTarget, requestedCompareBranch);
+    const comparisons =
+      compare !== null && compare.commitOid !== null
+        ? await this.collectBranchComparisons(repo, compare.commitOid, entries)
+        : new Map<string, BranchCleanupAheadBehind>();
+
+    return {
+      kind: "ok",
+      compareBranch: compare === null ? null : compare.branchName,
+      rows: synthesizeRows(entries, compare, comparisons, worktrees, remoteNames, remoteRefs)
+    };
+  }
+
+  /**
+   * Run one rev-list comparison per snapshot entry that has a validated commit
+   * OID, at most BRANCH_COMPARISON_MAX_PARALLEL at a time and in snapshot
+   * order. Only Git-derived OIDs are put into the revspec, and a failed
+   * rev-list degrades just that branch's entry to unknown.
+   */
+  private async collectBranchComparisons(
+    repo: string,
+    compareOid: string,
+    entries: readonly BranchSnapshotEntry[]
+  ): Promise<Map<string, BranchCleanupAheadBehind>> {
+    const comparable: { branchName: string; commitOid: string }[] = [];
+    for (const entry of entries) {
+      if (entry.commitOid !== null) {
+        comparable.push({ branchName: entry.branchName, commitOid: entry.commitOid });
+      }
+    }
+    const results = await evalPromises(comparable, BRANCH_COMPARISON_MAX_PARALLEL, (branch) =>
+      this.runGitQuery(
+        ["rev-list", "--left-right", "--count", `${compareOid}...${branch.commitOid}`],
+        repo
+      )
+    );
+    const comparisons = new Map<string, BranchCleanupAheadBehind>();
+    for (let i = 0; i < comparable.length; i++) {
+      const result = results[i];
+      comparisons.set(
+        comparable[i].branchName,
+        result.kind === "ok" ? parseAheadBehind(result.stdout) : { kind: "unknown" }
+      );
+    }
+    return comparisons;
   }
 
   private getRefs(repo: string, showRemoteBranches: boolean) {

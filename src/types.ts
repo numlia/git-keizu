@@ -212,6 +212,41 @@ export type PushPreparation =
   | { kind: "selectRemote"; remotes: string[] }
   | { kind: "error"; status: string };
 
+/* Branch Cleanup Diagnostics Types */
+
+export type BranchCleanupAncestry = "ancestor" | "notAncestor" | "unknown" | "notSelected";
+export type BranchCleanupTreeDifference = "same" | "different" | "unknown" | "notSelected";
+export type BranchCleanupAheadBehind =
+  | { kind: "known"; ahead: number; behind: number }
+  | { kind: "unknown" }
+  | { kind: "notSelected" };
+export type BranchCleanupUpstream =
+  | { kind: "unset" }
+  | { kind: "present"; name: string }
+  | { kind: "gone"; name: string }
+  | { kind: "unknown" };
+export type BranchCleanupWorktree =
+  | { kind: "unused" }
+  | { kind: "used"; path: string; isMain: boolean }
+  | { kind: "unknown" };
+export type BranchCleanupLastCommit = { kind: "known"; unixSeconds: number } | { kind: "unknown" };
+
+export interface BranchCleanupRow {
+  branchName: string;
+  isCurrent: boolean | null;
+  ancestry: BranchCleanupAncestry;
+  aheadBehind: BranchCleanupAheadBehind;
+  treeDifference: BranchCleanupTreeDifference;
+  upstream: BranchCleanupUpstream;
+  worktree: BranchCleanupWorktree;
+  lastCommit: BranchCleanupLastCommit;
+  remotes: string[] | null;
+}
+
+export type BranchCleanupResult =
+  | { kind: "ok"; compareBranch: string | null; rows: BranchCleanupRow[] }
+  | { kind: "error"; status: string };
+
 /* Named Constants */
 
 export const UNCOMMITTED_CHANGES_HASH = "*";
@@ -356,6 +391,19 @@ export interface ResponseFetchAvatar {
   command: "fetchAvatar";
   email: string;
   image: string;
+}
+
+export interface RequestLoadBranchCleanup {
+  command: "loadBranchCleanup";
+  repo: string;
+  requestId: number;
+  compareBranch: string | null;
+}
+export interface ResponseLoadBranchCleanup {
+  command: "loadBranchCleanup";
+  repo: string;
+  requestId: number;
+  result: BranchCleanupResult;
 }
 
 export interface RequestLoadBranches {
@@ -723,6 +771,7 @@ export type RequestMessage =
   | RequestFetchAvatar
   | RequestPull
   | RequestPush
+  | RequestLoadBranchCleanup
   | RequestLoadBranches
   | RequestLoadCommits
   | RequestLoadRepos
@@ -765,6 +814,7 @@ export type ResponseMessage =
   | ResponseFetchAvatar
   | ResponsePull
   | ResponsePush
+  | ResponseLoadBranchCleanup
   | ResponseLoadBranches
   | ResponseLoadCommits
   | ResponseLoadRepos
