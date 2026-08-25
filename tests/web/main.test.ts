@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GitCommitDetails, GitCommitNode, GitCommitStash } from "../../src/types";
+import type { GitCommitDetails, GitCommitNode, GitCommitStash, GitRef } from "../../src/types";
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 
 /* ------------------------------------------------------------------ */
@@ -132,6 +132,7 @@ const DROPDOWN_INSTANCES = [
   mockAuthorDropdownInstance
 ];
 let dropdownCallCount = 0;
+let capturedRepoCallback: ((value: string) => void) | null = null;
 let capturedBranchCallback: ((values: string[]) => void) | null = null;
 let capturedAuthorCallback: ((values: string[]) => void) | null = null;
 vi.mock("../../web/dropdown", () => ({
@@ -145,6 +146,9 @@ vi.mock("../../web/dropdown", () => ({
     const index = dropdownCallCount % DROPDOWN_INSTANCES.length;
     dropdownCallCount++;
     // 1st=repoDropdown, 2nd=branchDropdown, 3rd=authorDropdown
+    if (index === 0 && callback) {
+      capturedRepoCallback = callback as (value: string) => void;
+    }
     if (index === 1 && callback) {
       capturedBranchCallback = callback as (values: string[]) => void;
     }
@@ -181,7 +185,39 @@ vi.mock("../../web/branchLabels", () => ({
 
 vi.mock("../../web/refMenu", () => ({
   buildRefContextMenuItems: vi.fn(() => []),
-  checkoutBranchAction: vi.fn()
+  checkoutBranchAction: vi.fn(),
+  showDeleteBranchDialog: vi.fn()
+}));
+
+/* ------------------------------------------------------------------ */
+/* Mock: branchCleanupPanel module                                    */
+/* ------------------------------------------------------------------ */
+
+const { mockBranchCleanupPanelInstance, capturedPanelActions, mockPanelOpen } = vi.hoisted(() => {
+  const mockPanelOpen = { value: false };
+  return {
+    mockPanelOpen,
+    capturedPanelActions: {
+      ref: null as {
+        showBranch: (branchName: string) => void;
+        showDeleteDialog: (repo: string, branchName: string, remotes: string[]) => void;
+      } | null
+    },
+    mockBranchCleanupPanelInstance: {
+      toggle: vi.fn(),
+      refresh: vi.fn(),
+      selectRepository: vi.fn(),
+      handleResponse: vi.fn(),
+      isOpen: vi.fn((): boolean => mockPanelOpen.value)
+    }
+  };
+});
+
+vi.mock("../../web/branchCleanupPanel", () => ({
+  BranchCleanupPanel: vi.fn(function (actions: never) {
+    capturedPanelActions.ref = actions;
+    return mockBranchCleanupPanelInstance;
+  })
 }));
 
 /* ------------------------------------------------------------------ */
@@ -908,6 +944,8 @@ function setupTestDOM(): void {
     '<input id="showRemoteBranchesCheckbox" type="checkbox" checked />',
     '<div id="scrollShadow"></div>',
     '<div id="refreshBtn"></div>',
+    '<div id="branchCleanupBtn"></div>',
+    '<div id="branchCleanupPanel" hidden></div>',
     '<div id="fetchBtn"></div>',
     '<div id="currentBtn"></div>',
     '<div id="searchBtn"></div>'
@@ -7099,5 +7137,257 @@ describe("expanded commit restore loading resend (S45)", () => {
       .mocked(liveVscode.postMessage)
       .mock.calls.filter((call) => (call[0] as { command?: string }).command === "commitDetails");
     expect(commitDetailsCalls).toHaveLength(0);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S49: branch cleanup panel の lifecycle 接続・filter・scroll         */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/main-test/09-branch-cleanup-01.md
+describe("Branch cleanup panel wiring (S49)", () => {
+  let liveVscode: typeof vscode;
+  let freshShowDeleteBranchDialog: ReturnType<typeof vi.fn>;
+  let freshGetBranchLabels: ReturnType<typeof vi.mocked<typeof getBranchLabels>>;
+  let panelConstructorCallsBefore = 0;
+  let panelConstructorCallsAfter = 0;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    capturedRepoCallback = null;
+    capturedPanelActions.ref = null;
+    mockPanelOpen.value = false;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    liveVscode = utilsMod.vscode;
+    vi.mocked(liveVscode.getState).mockReturnValueOnce(null);
+
+    const refMenuMod = await import("../../web/refMenu");
+    freshShowDeleteBranchDialog = vi.mocked(
+      refMenuMod.showDeleteBranchDialog
+    ) as unknown as ReturnType<typeof vi.fn>;
+
+    const branchLabelsMod = await import("../../web/branchLabels");
+    freshGetBranchLabels = vi.mocked(branchLabelsMod.getBranchLabels);
+
+    const panelMod = await import("../../web/branchCleanupPanel");
+    const panelConstructor = vi.mocked(panelMod.BranchCleanupPanel);
+    panelConstructorCallsBefore = panelConstructor.mock.calls.length;
+    await import("../../web/main");
+    panelConstructorCallsAfter = panelConstructor.mock.calls.length;
+    loadTestCommits();
+  });
+
+  beforeEach(() => {
+    mockPanelOpen.value = false;
+    freshGetBranchLabels.mockImplementation(() => ({ heads: [], remotes: [], tags: [] }));
+    resetCommitState();
+  });
+
+  function postedMessages(command: string): Record<string, unknown>[] {
+    return vi
+      .mocked(liveVscode.postMessage)
+      .mock.calls.map((call) => call[0] as Record<string, unknown>)
+      .filter((message) => message.command === command);
+  }
+
+  function renderHeadLabelsFromRefs(): void {
+    freshGetBranchLabels.mockImplementation((refs: GitRef[]) => ({
+      heads: refs
+        .filter((ref) => ref.type === "head")
+        .map((ref) => ({ name: ref.name, remotes: [] })),
+      remotes: [],
+      tags: []
+    }));
+  }
+
+  function showBranchAndLoad(branchName: string, labelNames: string[]): void {
+    renderHeadLabelsFromRefs();
+    capturedPanelActions.ref!.showBranch(branchName);
+    dispatchMessage({
+      command: "loadBranches",
+      branches: ["main", branchName],
+      head: "main",
+      hard: true,
+      isRepo: true
+    });
+    dispatchMessage({
+      command: "loadCommits",
+      commits: [
+        {
+          hash: COMMIT_HASH_1,
+          parentHashes: [],
+          author: "Alice",
+          email: "alice@test.com",
+          date: 1700000000,
+          message: "First commit",
+          refs: labelNames.map((name) => ({ name, type: "head" })),
+          stash: null
+        }
+      ],
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+  }
+
+  it("creates one panel instance and wires the toolbar toggle (TC-305)", () => {
+    // Case: TC-305
+    // Given: the module bootstrap constructed the view once
+    // Then: exactly one BranchCleanupPanel was constructed during that bootstrap
+    expect(panelConstructorCallsAfter - panelConstructorCallsBefore).toBe(1);
+
+    // When: the toolbar button is clicked
+    document.getElementById("branchCleanupBtn")!.click();
+
+    // Then: panel.toggle runs once with the current repository
+    expect(mockBranchCleanupPanelInstance.toggle).toHaveBeenCalledTimes(1);
+    expect(mockBranchCleanupPanelInstance.toggle).toHaveBeenCalledWith(TEST_REPO);
+  });
+
+  it("adds a panel refresh to an open-panel refresh without touching existing requests (TC-306)", () => {
+    // Case: TC-306
+    // Given: the panel reports being open
+    mockPanelOpen.value = true;
+
+    // When: a soft refresh runs (successful fetch response path)
+    dispatchMessage({ command: "fetch", status: null });
+
+    // Then: panel.refresh runs once with the current repo and the existing loadBranches
+    // request is still sent with its unchanged payload
+    expect(mockBranchCleanupPanelInstance.refresh).toHaveBeenCalledTimes(1);
+    expect(mockBranchCleanupPanelInstance.refresh).toHaveBeenCalledWith(TEST_REPO);
+    const branchRequests = postedMessages("loadBranches");
+    expect(branchRequests).toHaveLength(1);
+    expect(branchRequests[0]).toEqual({
+      command: "loadBranches",
+      repo: TEST_REPO,
+      showRemoteBranches: true,
+      hard: false
+    });
+  });
+
+  it("sends no diagnostic message on a refresh while the panel is closed (TC-307)", () => {
+    // Case: TC-307
+    // Given: the panel reports being closed
+    mockPanelOpen.value = false;
+
+    // When: a soft refresh runs
+    dispatchMessage({ command: "fetch", status: null });
+
+    // Then: the panel is not refreshed and no loadBranchCleanup message is sent
+    expect(mockBranchCleanupPanelInstance.refresh).not.toHaveBeenCalled();
+    expect(postedMessages("loadBranchCleanup")).toHaveLength(0);
+  });
+
+  it("notifies the panel when the repository dropdown switches repos (TC-308)", () => {
+    // Case: TC-308
+    // Given: the repository dropdown callback captured at bootstrap
+    // When: the dropdown switches from the current repo to another one
+    capturedRepoCallback!("/other/repo");
+
+    // Then: panel.selectRepository runs once with the new repository
+    expect(mockBranchCleanupPanelInstance.selectRepository).toHaveBeenCalledTimes(1);
+    expect(mockBranchCleanupPanelInstance.selectRepository).toHaveBeenCalledWith("/other/repo");
+
+    // Restore the original repository for the following tests
+    capturedRepoCallback!(TEST_REPO);
+    loadTestCommits();
+  });
+
+  it("never notifies the panel on same-repository refreshes (TC-309)", () => {
+    // Case: TC-309
+    // Given: the repository stays the same
+    // When: two soft refreshes run
+    dispatchMessage({ command: "fetch", status: null });
+    dispatchMessage({ command: "fetch", status: null });
+
+    // Then: panel.selectRepository is never called (selection preserved)
+    expect(mockBranchCleanupPanelInstance.selectRepository).not.toHaveBeenCalled();
+  });
+
+  it("filters the graph to the single branch with one hard reload (TC-310)", () => {
+    // Case: TC-310
+    // Given: the graph action callback injected into the panel
+    // When: showBranch is invoked and the branch list response arrives
+    capturedPanelActions.ref!.showBranch("feature/x");
+    dispatchMessage({
+      command: "loadBranches",
+      branches: ["main", "feature/x"],
+      head: "main",
+      hard: true,
+      isRepo: true
+    });
+
+    // Then: the dropdown selection is replaced by the single branch and exactly one
+    // hard loadCommits request carries that filter
+    expect(mockBranchDropdownInstance.setOptions).toHaveBeenCalledWith(expect.anything(), [
+      "feature/x"
+    ]);
+    const commitRequests = postedMessages("loadCommits");
+    expect(commitRequests).toHaveLength(1);
+    expect(commitRequests[0].branches).toEqual(["feature/x"]);
+    expect(commitRequests[0].hard).toBe(true);
+  });
+
+  it("scrolls to the exact dataset-matched label after rendering (TC-311)", () => {
+    // Case: TC-311
+    // Given: a rendered head label whose dataset name matches the requested branch
+    showBranchAndLoad("feature/x", ["feature/x"]);
+
+    // Then: the commit row owning the label is scrolled to (flash marks the scroll target)
+    const row = document.querySelector(`.commit[data-hash="${COMMIT_HASH_1}"]`)!;
+    expect(row.classList.contains("flash")).toBe(true);
+    expect(document.querySelectorAll(".flash")).toHaveLength(1);
+  });
+
+  it("finds special branch names by dataset equality, never via a selector (TC-312)", () => {
+    // Case: TC-312
+    // Given: a head label named a;b
+    showBranchAndLoad("a;b", ["a;b"]);
+
+    // Then: the label is found by dataset comparison and the row is scrolled to
+    expect(
+      document.querySelector(`.commit[data-hash="${COMMIT_HASH_1}"]`)!.classList.contains("flash")
+    ).toBe(true);
+
+    // Given: a head label named x<img> after a reset
+    resetCommitState();
+    showBranchAndLoad("x<img>", ["x<img>"]);
+
+    // Then: the HTML-like name also resolves to exactly one scroll target
+    expect(document.querySelectorAll(".flash")).toHaveLength(1);
+  });
+
+  it("scrolls nowhere when no label matches the branch (TC-313)", () => {
+    // Case: TC-313
+    // Given: a render without any matching head label
+    showBranchAndLoad("feature/x", []);
+
+    // Then: no commit row is flashed and no exception surfaced
+    expect(document.querySelector(".flash")).toBeNull();
+  });
+
+  it("rejects prefix matches of the branch name (TC-314)", () => {
+    // Case: TC-314
+    // Given: a render whose only label is feature/x-suffix
+    showBranchAndLoad("feature/x", ["feature/x-suffix"]);
+
+    // Then: the prefix match never scrolls
+    expect(document.querySelector(".flash")).toBeNull();
+  });
+
+  it("forwards the delete callback to the exported dialog unchanged (TC-315)", () => {
+    // Case: TC-315
+    // Given: the delete action callback injected into the panel
+    // When: it fires with a repo, branch, and known remotes
+    capturedPanelActions.ref!.showDeleteDialog("/repo", "feature/x", ["origin"]);
+
+    // Then: the exported showDeleteBranchDialog runs once with the exact arguments
+    expect(freshShowDeleteBranchDialog).toHaveBeenCalledTimes(1);
+    expect(freshShowDeleteBranchDialog).toHaveBeenCalledWith("/repo", "feature/x", ["origin"]);
   });
 });

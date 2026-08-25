@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-08-25T21:22:36+09:00
+> Auto-generated: 2026-08-25T22:36:30+09:00
 > Total sources: 48
 > Total physical files: 79
-> Total sections: 500
-> Total cases: 2725
+> Total sections: 501
+> Total cases: 2728
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -18,7 +18,7 @@
 | `media/main.css` | single-file | `media/main-test.md` | 1 | 2 | 27 | 2026-08-25 |
 | `package.json` | single-file | `package.json-test.md` | 1 | 3 | 43 | 2026-08-04 |
 | `src/avatarManager.ts` | single-file | `src/avatarManager-test.md` | 1 | 25 | 101 | 2026-07-19 |
-| `src/branchCleanup.ts` | single-file | `src/branchCleanup-test.md` | 1 | 4 | 40 | 2026-08-25 |
+| `src/branchCleanup.ts` | single-file | `src/branchCleanup-test.md` | 1 | 5 | 43 | 2026-08-25 |
 | `src/config.ts` | single-file | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md` | 1 | 14 | 79 | 2026-05-02 |
 | `src/config.ts` | sharded | `src/config-test/INDEX.md` | 4 | 17 | 95 | 2026-07-19 |
 | `src/dataSource.ts` | single-file | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md` | 1 | 25 | 149 | 2026-04-04 |

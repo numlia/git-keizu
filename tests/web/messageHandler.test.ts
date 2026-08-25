@@ -25,6 +25,7 @@ function createMockGitKeizuView(): GitKeizuViewAPI {
     showCommitDetails: vi.fn(),
     showCompareResult: vi.fn(),
     loadAvatar: vi.fn(),
+    loadBranchCleanup: vi.fn(),
     loadBranches: vi.fn(),
     loadCommits: vi.fn(),
     loadRepos: vi.fn(),
@@ -1116,5 +1117,70 @@ describe("worktree open/reveal response error display (S11)", () => {
     expect(showErrorDialog).toHaveBeenCalledTimes(1);
     expect(showErrorDialog).toHaveBeenCalledWith(REVEAL_WORKTREE_ERROR, "no", null);
     expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+});
+
+// S17: loadBranchCleanup 応答の API 委譲
+// @see docs/testing/perspectives/web/messageHandler-test/04-branch-cleanup-01.md
+describe("handleMessage loadBranchCleanup delegation", () => {
+  let gitKeizu: GitKeizuViewAPI;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitKeizu = createMockGitKeizuView();
+  });
+
+  it("delegates the ok response object untouched exactly once (TC-079)", () => {
+    // Case: TC-079
+    // Given: an ok loadBranchCleanup response
+    const msg: ResponseMessage = {
+      command: "loadBranchCleanup",
+      repo: "/repo",
+      requestId: 3,
+      result: { kind: "ok", compareBranch: "main", rows: [] }
+    };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the API receives the identical message object exactly once
+    expect(gitKeizu.loadBranchCleanup).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(gitKeizu.loadBranchCleanup).mock.calls[0][0]).toBe(msg);
+  });
+
+  it("delegates an error response without interpreting it (TC-080)", () => {
+    // Case: TC-080
+    // Given: a loadBranchCleanup response carrying the error union
+    const msg: ResponseMessage = {
+      command: "loadBranchCleanup",
+      repo: "/repo",
+      requestId: 4,
+      result: { kind: "error", status: "fatal" }
+    };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the handler neither shows a dialog nor refreshes; the panel decides
+    expect(gitKeizu.loadBranchCleanup).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).not.toHaveBeenCalled();
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
+  });
+
+  it("passes a malformed response through without throwing (TC-081)", () => {
+    // Case: TC-081
+    // Given: a response whose rows contain an out-of-union value
+    const msg = {
+      command: "loadBranchCleanup",
+      repo: "/repo",
+      requestId: 5,
+      result: { kind: "ok", compareBranch: null, rows: [{ ancestry: "safe" }] }
+    } as unknown as ResponseMessage;
+
+    // When: handleMessage is called
+    // Then: no exception escapes and the response is still delegated once
+    expect(() => handleMessage(msg, gitKeizu)).not.toThrow();
+    expect(gitKeizu.loadBranchCleanup).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(gitKeizu.loadBranchCleanup).mock.calls[0][0]).toBe(msg);
   });
 });

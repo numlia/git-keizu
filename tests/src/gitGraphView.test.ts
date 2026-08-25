@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   deleteRemoteBranch: vi.fn(),
   rebaseBranch: vi.fn(),
   deleteBranch: vi.fn(),
+  getBranchCleanup: vi.fn(),
   getCommits: vi.fn(),
   executeCommand: vi.fn(),
   encodeDiffDocUri: vi.fn(),
@@ -35,7 +36,8 @@ const mocks = vi.hoisted(() => ({
   reveal: vi.fn(),
   panelDisposeHandler: null as (() => void) | null,
   panelViewStateHandler: null as (() => void) | null,
-  messageHandler: { current: null as ((msg: unknown) => Promise<void>) | null }
+  messageHandler: { current: null as ((msg: unknown) => Promise<void>) | null },
+  watcherCallback: { current: null as (() => void) | null }
 }));
 
 vi.mock("vscode", () => ({
@@ -123,7 +125,8 @@ vi.mock("../../src/i18n", () => ({
 }));
 
 vi.mock("../../src/repoFileWatcher", () => {
-  function MockRepoFileWatcher() {
+  function MockRepoFileWatcher(callback: () => void) {
+    mocks.watcherCallback.current = callback;
     return {
       mute: mocks.mute,
       unmute: mocks.unmute,
@@ -4297,5 +4300,327 @@ describe("GitKeizuView createOrShow reveal persists lastActiveRepo (S23)", () =>
     expect(mockSetLastActiveRepo.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.reveal.mock.invocationCallOrder[0]
     );
+  });
+});
+
+// S33: loadBranchCleanup routing・requestId validation・panel mount
+// @see docs/testing/perspectives/src/gitGraphView-test/05-branch-cleanup-01.md
+describe("GitKeizuView branch cleanup routing and mount (S33)", () => {
+  const OK_RESULT = { kind: "ok", compareBranch: "main", rows: [] };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    mocks.watcherCallback.current = null;
+    GitKeizuView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.getBranchCleanup.mockResolvedValue(OK_RESULT);
+
+    const mockDataSource = {
+      getBranchCleanup: mocks.getBranchCleanup
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  function getWebviewHtml(): string {
+    const panelMock = vi.mocked(vscode.window.createWebviewPanel).mock.results[0].value as {
+      webview: { html: string };
+    };
+    return panelMock.webview.html;
+  }
+
+  it("delegates a valid request to DataSource exactly once with one response (TC-158)", async () => {
+    // Case: TC-158
+    // Given: a whitelisted repo and a valid positive safe integer requestId
+    // When: the loadBranchCleanup request is received
+    await mocks.messageHandler.current!({
+      command: "loadBranchCleanup",
+      repo: TEST_REPO,
+      requestId: 5,
+      compareBranch: null
+    });
+
+    // Then: DataSource runs once and exactly one response is posted
+    expect(mocks.getBranchCleanup).toHaveBeenCalledTimes(1);
+    expect(mocks.getBranchCleanup).toHaveBeenCalledWith(TEST_REPO, null);
+    expect(sentMessages("loadBranchCleanup")).toHaveLength(1);
+  });
+
+  it("echoes repo and requestId and passes the result through unchanged (TC-159)", async () => {
+    // Case: TC-159
+    // Given: a valid request whose response content is inspected
+    // When: the loadBranchCleanup request is received
+    await mocks.messageHandler.current!({
+      command: "loadBranchCleanup",
+      repo: TEST_REPO,
+      requestId: 5,
+      compareBranch: null
+    });
+
+    // Then: repo / requestId are echoed and the result union is forwarded unmodified
+    const responses = sentMessages("loadBranchCleanup") as {
+      command: string;
+      repo: string;
+      requestId: number;
+      result: unknown;
+    }[];
+    expect(responses).toHaveLength(1);
+    expect(responses[0].repo).toBe(TEST_REPO);
+    expect(responses[0].requestId).toBe(5);
+    expect(responses[0].result).toEqual(OK_RESULT);
+  });
+
+  it("passes compareBranch through without interpreting it (TC-160)", async () => {
+    // Case: TC-160
+    // Given: a valid request naming a comparison branch
+    // When: the loadBranchCleanup request is received
+    await mocks.messageHandler.current!({
+      command: "loadBranchCleanup",
+      repo: TEST_REPO,
+      requestId: 5,
+      compareBranch: "develop"
+    });
+
+    // Then: the value reaches DataSource unmodified
+    expect(mocks.getBranchCleanup).toHaveBeenCalledTimes(1);
+    expect(mocks.getBranchCleanup).toHaveBeenCalledWith(TEST_REPO, "develop");
+  });
+
+  it("ignores requestId 0 without calling DataSource or responding (TC-161)", async () => {
+    // Case: TC-161
+    // Given: a request with requestId 0
+    // When: the request is received
+    await mocks.messageHandler.current!({
+      command: "loadBranchCleanup",
+      repo: TEST_REPO,
+      requestId: 0,
+      compareBranch: null
+    });
+
+    // Then: no DataSource call and no response
+    expect(mocks.getBranchCleanup).not.toHaveBeenCalled();
+    expect(sentMessages("loadBranchCleanup")).toHaveLength(0);
+  });
+
+  it("ignores a negative requestId (TC-162)", async () => {
+    // Case: TC-162
+    // Given: a request with requestId -1
+    // When: the request is received
+    await mocks.messageHandler.current!({
+      command: "loadBranchCleanup",
+      repo: TEST_REPO,
+      requestId: -1,
+      compareBranch: null
+    });
+
+    // Then: no DataSource call and no response
+    expect(mocks.getBranchCleanup).not.toHaveBeenCalled();
+    expect(sentMessages("loadBranchCleanup")).toHaveLength(0);
+  });
+
+  it("ignores a fractional requestId (TC-163)", async () => {
+    // Case: TC-163
+    // Given: a request with requestId 1.5
+    // When: the request is received
+    await mocks.messageHandler.current!({
+      command: "loadBranchCleanup",
+      repo: TEST_REPO,
+      requestId: 1.5,
+      compareBranch: null
+    });
+
+    // Then: no DataSource call and no response
+    expect(mocks.getBranchCleanup).not.toHaveBeenCalled();
+    expect(sentMessages("loadBranchCleanup")).toHaveLength(0);
+  });
+
+  it("ignores a string requestId (TC-164)", async () => {
+    // Case: TC-164
+    // Given: a request whose requestId is the string "1"
+    // When: the request is received
+    await mocks.messageHandler.current!({
+      command: "loadBranchCleanup",
+      repo: TEST_REPO,
+      requestId: "1",
+      compareBranch: null
+    });
+
+    // Then: no DataSource call and no response
+    expect(mocks.getBranchCleanup).not.toHaveBeenCalled();
+    expect(sentMessages("loadBranchCleanup")).toHaveLength(0);
+  });
+
+  it("ignores an unsafe integer requestId (TC-165)", async () => {
+    // Case: TC-165
+    // Given: a request with requestId Number.MAX_SAFE_INTEGER + 1
+    // When: the request is received
+    await mocks.messageHandler.current!({
+      command: "loadBranchCleanup",
+      repo: TEST_REPO,
+      requestId: Number.MAX_SAFE_INTEGER + 1,
+      compareBranch: null
+    });
+
+    // Then: no DataSource call and no response
+    expect(mocks.getBranchCleanup).not.toHaveBeenCalled();
+    expect(sentMessages("loadBranchCleanup")).toHaveLength(0);
+  });
+
+  it("accepts the minimum valid requestId 1 (TC-166)", async () => {
+    // Case: TC-166
+    // Given: a request with the smallest valid requestId
+    // When: the request is received
+    await mocks.messageHandler.current!({
+      command: "loadBranchCleanup",
+      repo: TEST_REPO,
+      requestId: 1,
+      compareBranch: null
+    });
+
+    // Then: DataSource runs once and the response echoes requestId 1
+    expect(mocks.getBranchCleanup).toHaveBeenCalledTimes(1);
+    const responses = sentMessages("loadBranchCleanup") as { requestId: number }[];
+    expect(responses).toHaveLength(1);
+    expect(responses[0].requestId).toBe(1);
+  });
+
+  it("accepts the maximum safe integer requestId (TC-167)", async () => {
+    // Case: TC-167
+    // Given: a request with requestId Number.MAX_SAFE_INTEGER
+    // When: the request is received
+    await mocks.messageHandler.current!({
+      command: "loadBranchCleanup",
+      repo: TEST_REPO,
+      requestId: Number.MAX_SAFE_INTEGER,
+      compareBranch: null
+    });
+
+    // Then: DataSource runs once and the response echoes the boundary value
+    expect(mocks.getBranchCleanup).toHaveBeenCalledTimes(1);
+    const responses = sentMessages("loadBranchCleanup") as { requestId: number }[];
+    expect(responses).toHaveLength(1);
+    expect(responses[0].requestId).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it("runs the watcher unmute after the response like every other case (TC-168)", async () => {
+    // Case: TC-168
+    // Given: a valid request processed by the shared message handler
+    // When: the request is received
+    await mocks.messageHandler.current!({
+      command: "loadBranchCleanup",
+      repo: TEST_REPO,
+      requestId: 5,
+      compareBranch: null
+    });
+
+    // Then: mute ran once before and unmute ran once after the response was posted
+    expect(mocks.mute).toHaveBeenCalledTimes(1);
+    expect(mocks.unmute).toHaveBeenCalledTimes(1);
+    expect(mocks.unmute.mock.invocationCallOrder[0]).toBeGreaterThan(
+      mocks.postMessage.mock.invocationCallOrder[0]
+    );
+  });
+
+  it("mounts the panel between the controls and the scroll container (TC-169)", async () => {
+    // Case: TC-169
+    // Given: the generated webview HTML
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const html = getWebviewHtml();
+
+    // When: the mount positions are compared
+    const controlsIndex = html.indexOf('<div id="controls">');
+    const buttonIndex = html.indexOf('id="branchCleanupBtn"');
+    const panelIndex = html.indexOf('id="branchCleanupPanel"');
+    const scrollIndex = html.indexOf('id="scrollContainer"');
+
+    // Then: the order is controls -> button -> panel -> scrollContainer and the panel is hidden
+    expect(controlsIndex).toBeGreaterThan(-1);
+    expect(buttonIndex).toBeGreaterThan(controlsIndex);
+    expect(panelIndex).toBeGreaterThan(buttonIndex);
+    expect(scrollIndex).toBeGreaterThan(panelIndex);
+    expect(html).toContain('<div id="branchCleanupPanel" hidden></div>');
+  });
+
+  it("places the toolbar button inside controls with the l10n title (TC-170)", async () => {
+    // Case: TC-170
+    // Given: the generated webview HTML
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const html = getWebviewHtml();
+
+    // When: the button markup is located
+    const button = '<div id="branchCleanupBtn" title="Branch Cleanup"></div>';
+    const buttonIndex = html.indexOf(button);
+    const controlsIndex = html.indexOf('<div id="controls">');
+    const controlsEndIndex = html.indexOf("</div>", buttonIndex);
+
+    // Then: the button exists inside the controls block with the host l10n title
+    expect(buttonIndex).toBeGreaterThan(controlsIndex);
+    expect(controlsEndIndex).toBeGreaterThan(buttonIndex);
+  });
+
+  it("keeps the existing graph and dialog DOM without embedding branch names (TC-171)", async () => {
+    // Case: TC-171
+    // Given: the generated webview HTML
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const html = getWebviewHtml();
+
+    // When/Then: every existing subtree id survives and the panel mount stays empty
+    for (const id of [
+      "scrollContainer",
+      "commitGraph",
+      "commitTable",
+      "contextMenu",
+      "dialogBacking",
+      "dialog"
+    ]) {
+      expect(html).toContain(`id="${id}"`);
+    }
+    expect(html).toContain('<div id="branchCleanupPanel" hidden></div>');
+  });
+
+  it("never generates a diagnostic request from the host's own refresh path (TC-172)", async () => {
+    // Case: TC-172
+    // Given: no webview request has been received
+    // When: the repository watcher refresh path fires
+    mocks.watcherCallback.current!();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Then: a refresh notification is sent but no loadBranchCleanup message or Git run
+    expect(sentMessages("refresh")).toHaveLength(1);
+    expect(sentMessages("loadBranchCleanup")).toHaveLength(0);
+    expect(mocks.getBranchCleanup).not.toHaveBeenCalled();
   });
 });

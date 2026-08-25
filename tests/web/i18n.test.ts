@@ -546,3 +546,134 @@ describe("delete branch not fully merged l10n keys", () => {
     expect(missing).toEqual([]);
   });
 });
+
+// S5 (en) / S6 (ja): branch cleanup panel のキー集合 (Feature 055-03)
+// @see docs/testing/perspectives/l10n/web/web.l10n.en.json-test.md
+// @see docs/testing/perspectives/l10n/web/web.l10n.ja.json-test.md
+describe("branch cleanup panel l10n keys (Feature 055-03)", () => {
+  const CLEANUP_KEYS = [
+    "cleanup.title",
+    "cleanup.comparison",
+    "cleanup.comparison.auto",
+    "cleanup.column.branch",
+    "cleanup.column.lastCommit",
+    "cleanup.column.ancestry",
+    "cleanup.column.aheadBehind",
+    "cleanup.column.tree",
+    "cleanup.column.upstream",
+    "cleanup.column.worktree",
+    "cleanup.column.actions",
+    "cleanup.ancestry.ancestor",
+    "cleanup.ancestry.notAncestor",
+    "cleanup.aheadBehind.known",
+    "cleanup.tree.same",
+    "cleanup.tree.different",
+    "cleanup.upstream.unset",
+    "cleanup.upstream.gone",
+    "cleanup.worktree.unused",
+    "cleanup.worktree.used",
+    "cleanup.state.unknown",
+    "cleanup.state.notSelected",
+    "cleanup.loading",
+    "cleanup.error",
+    "cleanup.empty",
+    "cleanup.action.show",
+    "cleanup.action.delete"
+  ];
+  const UNKNOWN_KEY = "cleanup.state.unknown";
+  const NOT_SELECTED_KEY = "cleanup.state.notSelected";
+
+  function loadBundle(fileName: string): Record<string, string> {
+    const jsonPath = resolve(process.cwd(), `l10n/web/${fileName}`);
+    return JSON.parse(readFileSync(jsonPath, "utf-8"));
+  }
+
+  function placeholderSet(value: string): string[] {
+    return [...value.matchAll(/\{\d+\}/g)].map((match) => match[0]).sort();
+  }
+
+  it("English bundle contains every panel key with a non-empty value (en TC-014)", () => {
+    // Case: TC-014 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const messages = loadBundle("web.l10n.en.json");
+
+    // When/Then: each panel key exists with a non-empty English string
+    for (const key of CLEANUP_KEYS) {
+      const value = messages[key];
+      expect(typeof value, `type of ${key}`).toBe("string");
+      expect(value.length, `length of ${key}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("English unknown and notSelected wordings are distinct (en TC-015)", () => {
+    // Case: TC-015 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const messages = loadBundle("web.l10n.en.json");
+
+    // When/Then: the two state wordings never collapse into one value
+    expect(messages[UNKNOWN_KEY]).not.toBe(messages[NOT_SELECTED_KEY]);
+  });
+
+  it("Japanese bundle misses no English panel key and placeholders match (en TC-016)", () => {
+    // Case: TC-016 (l10n/web/web.l10n.en.json-test.md)
+    // Given: both web l10n bundles on disk
+    const enMessages = loadBundle("web.l10n.en.json");
+    const jaMessages = loadBundle("web.l10n.ja.json");
+
+    // When: the key sets and placeholder sets are compared
+    const missingInJa = CLEANUP_KEYS.filter((key) => jaMessages[key] === undefined);
+
+    // Then: nothing is missing on the Japanese side and each key keeps the same {N} set
+    expect(missingInJa).toEqual([]);
+    for (const key of CLEANUP_KEYS) {
+      expect(placeholderSet(jaMessages[key]), `placeholders of ${key}`).toEqual(
+        placeholderSet(enMessages[key])
+      );
+    }
+  });
+
+  it("Japanese bundle contains every panel key with a non-empty value (ja TC-016)", () => {
+    // Case: TC-016 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const messages = loadBundle("web.l10n.ja.json");
+
+    // When/Then: each panel key exists with a non-empty Japanese string
+    for (const key of CLEANUP_KEYS) {
+      const value = messages[key];
+      expect(typeof value, `type of ${key}`).toBe("string");
+      expect(value.length, `length of ${key}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("Japanese values are translated and keep the state wordings distinct (ja TC-017)", () => {
+    // Case: TC-017 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const messages = loadBundle("web.l10n.ja.json");
+
+    // When/Then: no raw key leaks as its own value and the state wordings differ
+    for (const key of CLEANUP_KEYS) {
+      expect(messages[key], `raw key fallback of ${key}`).not.toBe(key);
+    }
+    expect(messages[UNKNOWN_KEY]).not.toBe(messages[NOT_SELECTED_KEY]);
+  });
+
+  it("English bundle misses no Japanese panel key and placeholders match (ja TC-018)", () => {
+    // Case: TC-018 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: both web l10n bundles on disk
+    const enMessages = loadBundle("web.l10n.en.json");
+    const jaMessages = loadBundle("web.l10n.ja.json");
+
+    // When: the key sets are compared in both directions over the panel key set
+    const missingInEn = CLEANUP_KEYS.filter((key) => enMessages[key] === undefined);
+    const missingInJa = CLEANUP_KEYS.filter((key) => jaMessages[key] === undefined);
+
+    // Then: neither locale misses a key and each key keeps the same {N} set
+    expect(missingInEn).toEqual([]);
+    expect(missingInJa).toEqual([]);
+    for (const key of CLEANUP_KEYS) {
+      expect(placeholderSet(enMessages[key]), `placeholders of ${key}`).toEqual(
+        placeholderSet(jaMessages[key])
+      );
+    }
+  });
+});

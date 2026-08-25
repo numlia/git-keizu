@@ -293,3 +293,77 @@ describe("media/dropdown.css local overlay layer", () => {
     expect(numericDeclarations).toEqual([]);
   });
 });
+
+// S2: branch cleanup panel のレイアウト契約（40vh・縦横 scroll・flex 縮退）
+// @see docs/testing/perspectives/media/main-test.md
+describe("media/main.css branch cleanup panel layout (S2)", () => {
+  // TC-026 and TC-027 are manual-only webview verifications (flex layout heights at a
+  // width <= 320px and real scroll behavior are not resolved by jsdom); see the Notes
+  // column in docs/testing/perspectives/media/main-test.md.
+
+  it("caps the panel height at 40vh (TC-020)", () => {
+    // Case: TC-020
+    // Given: the #branchCleanupPanel rule block in media/main.css
+    const block = ruleBlock(mainCss, "#branchCleanupPanel");
+
+    // When/Then: the max-height declaration exists with the 40vh cap
+    expect(block).toContain("max-height: 40vh;");
+  });
+
+  it("declares scrolling on both axes of the panel (TC-021)", () => {
+    // Case: TC-021
+    // Given: the #branchCleanupPanel rule block in media/main.css
+    const block = ruleBlock(mainCss, "#branchCleanupPanel");
+
+    // When/Then: both overflow axes are declared as auto
+    expect(block).toContain("overflow-x: auto;");
+    expect(block).toContain("overflow-y: auto;");
+  });
+
+  it("allows the panel to shrink inside the vertical flex column (TC-022)", () => {
+    // Case: TC-022
+    // Given: the #branchCleanupPanel rule block in media/main.css
+    const block = ruleBlock(mainCss, "#branchCleanupPanel");
+
+    // When/Then: the min-height: 0 declaration exists
+    expect(block).toContain("min-height: 0;");
+  });
+
+  it("keeps the table cells on one line for horizontal scrolling (TC-023)", () => {
+    // Case: TC-023
+    // Given: the panel th / td rule block in media/main.css
+    const block = ruleBlock(mainCss, "#branchCleanupPanel th,\n#branchCleanupPanel td");
+
+    // When/Then: the white-space: nowrap declaration exists
+    expect(block).toContain("white-space: nowrap;");
+  });
+
+  it("declares sticky header and action column with theme colors (TC-024)", () => {
+    // Case: TC-024
+    // Given: the header and action column rule blocks in media/main.css
+    const headerBlock = ruleBlock(mainCss, "#branchCleanupPanel th");
+    const actionBlock = ruleBlock(
+      mainCss,
+      "#branchCleanupPanel th.branchCleanupActionCell,\n#branchCleanupPanel td.branchCleanupActionCell"
+    );
+
+    // When/Then: both are sticky and use an existing theme color variable as background
+    expect(headerBlock).toContain("position: sticky;");
+    expect(headerBlock).toContain("background-color: var(--vscode-");
+    expect(actionBlock).toContain("position: sticky;");
+    expect(actionBlock).toContain("background-color: var(--vscode-");
+  });
+
+  it("keeps the 055-02 z-index layer contract untouched (TC-025)", () => {
+    // Case: TC-025
+    // Given: every z-index declaration and layer variable in media/main.css
+    // When: numeric literals and the 10 canonical definitions are checked again
+    const numericDeclarations = numericZIndexDeclarations(mainCss);
+
+    // Then: no numeric z-index literal was introduced and every layer value is unchanged
+    expect(numericDeclarations).toEqual([]);
+    for (const { name, value } of Z_INDEX_VARIABLES) {
+      expect(variableDefinition(mainCss, name), `value of ${name}`).toBe(value);
+    }
+  });
+});

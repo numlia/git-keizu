@@ -209,3 +209,45 @@ requested branch name は local snapshot への完全一致後だけ OID を使�
 - Normal: TC-031〜TC-035
 
 **失敗系/正常系比（煙感知器）**: 正常系5件（TC-031〜TC-035）、失敗系5件（TC-036〜TC-040）。同数のためインベントリを再導出したが、合成段の失敗源は失敗値の保持・伝播境界・immutability に限られ、入力不正（S1 / S3）と実行失敗（dataSource S48）は他 section / owner へ割り当て済みであることを確認した。正常系 5 件のうち TC-031〜TC-033 は §3.1 の反例シナリオを直接固定する case であり、比率合わせの追加・削除は行っていない。
+
+## S5: HEAD mark・upstream prefix・origin 外 symref の fact 劣化
+
+> Origin: Feature 055-03 (light-spec-plan)
+> Added: 2026-08-25
+> Status: active
+> Supersedes: -
+> Signature: `parseBranchSnapshot(stdout: string): BranchSnapshotEntry[]`（HEAD / upstream field の劣化経路）/ `parseOriginHeadTarget(stdout: string): string | null`（origin 外 symref）
+> Target Path: `src/branchCleanup.ts:97-113`（parseIsCurrent / parseUpstream）、`src/branchCleanup.ts:174-186`（parseOriginHeadTarget）
+> Test File: `tests/src/branchCleanup.test.ts`
+
+S1 preamble の契約「commit / tree / date / HEAD / upstream の不正は該当 fact だけを unknown にする」のうち、S1 で case row 未採番だった HEAD mark 不正・upstream prefix 不正と、S2 の contract 記載のみだった origin 外 symref を additive に採番する（Task 6 再照合で発見、既存 S1〜S4 は不変）。正常系・他 fact の保持は S1〜S4 の既存 case が担保する。
+
+| Case ID | Input / Precondition                                                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                     | Notes                            |
+| ------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| TC-041  | `%(HEAD)` field が `*` / 空白 / 空以外の値（`?`）の record                                                       | Validation - HEAD mark 不正                                                | 当該 entry の isCurrent が `null` になり（true / false へ潰さない）、branchName / commit OID / lastCommit は保持される                              | fact 単位の局所化                |
+| TC-042  | `%(upstream)` が `refs/remotes/` にも `refs/heads/` にも該当しない ref（`refs/foo/bar`）の record                | Validation - upstream prefix 不正                                          | 当該 entry の upstream が `{ kind: "unknown" }` と `toEqual` で一致し（unset / present へ潰さない）、他 fact は保持される                           | 不明形式は取得失敗扱い           |
+| TC-043  | origin/HEAD の `%(symref)` が `refs/remotes/origin/` 外（`refs/remotes/upstream/main`）で、snapshot に main あり | Validation - origin 外 symref                                              | `parseOriginHeadTarget()` が `null` を返し、`resolveCompareBranch()` は origin/HEAD を採用せず次順位の `main` を解決する（origin 外の値を使わない） | S2 TC-016〜TC-018 の fallback 列 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-03 追加分（S5）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                                      |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| HEAD mark 不正を true / false へ潰す                  | TC-041                                                                                        |
+| upstream prefix 不正を unset / present へ潰す         | TC-042                                                                                        |
+| origin 外 symref を比較先として流用する               | TC-043                                                                                        |
+| 正常系・他 fact の保持                                | excluded(S1 TC-001〜TC-004 / S2 TC-014〜TC-021 の既存 case が担保。本 section は劣化経路のみ) |
+| 外部依存×失敗モード                                   | excluded(純関数で外部依存なし。Git 実行失敗は dataSource owner S48 の責務)                    |
+| 例外・エラー経路                                      | excluded(throw せず null / unknown へ写像する契約。写像自体を TC-041〜TC-043 で検証)          |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL） | excluded(数値引数なし。空 field は S1 TC-003 / TC-010、空 symref target は同一分岐の TC-043)  |
+| 不正な型・フォーマット                                | excluded(record / field 構造の不正は S1 TC-005〜TC-009 の責務。本 section は値域の劣化)       |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-041〜TC-043
+- Exception: excluded(throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: excluded(数値・空境界は S1 の責務)
+- Type: excluded(構造不正は S1 の責務)
+- Normal: excluded(正常系は S1 / S2 の既存 case が担保する劣化専用 section)
+
+**失敗系/正常系比（煙感知器）**: 正常系0件、失敗系3件（TC-041〜TC-043）。本 section は S1 / S2 の正常系を前提に劣化経路だけを additive に採番したもので、正常系0件はインベントリ欠落ではないことを確認した。
