@@ -2,12 +2,12 @@
 
 > Source: `src/dataSource.ts`
 > Storage Mode: sharded
-> Generated: 2026-08-08T00:00:00Z
+> Generated: 2026-08-25T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 7
-> Total Sections: 40
-> Total Cases: 257
+> Total Shards: 8
+> Total Sections: 41
+> Total Cases: 271
 
 ## Shards
 
@@ -20,6 +20,7 @@
 | 03-author-watch-paths-01.md | author-watch-paths | 8        | 38    | 2026-07-04   |
 | 04-spawn-refname-diff-01.md | spawn-refname-diff | 8        | 40    | 2026-07-19   |
 | 05-git-path-01.md           | git-path           | 1        | 3     | 2026-07-19   |
+| 06-branch-cleanup-01.md     | branch-cleanup     | 1        | 14    | 2026-08-25   |
 
 ## Origin Coverage
 
@@ -40,6 +41,7 @@
 | Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan) | 02-branch-worktree-02.md                              |
 | Feature 051 (remote-checkout-pull) (light-spec-plan)                   | 02-branch-worktree-02.md                              |
 | Feature 052 (detached-worktree-display) (light-spec-plan)              | 02-branch-worktree-03.md                              |
+| Feature 055-03 (light-spec-plan)                                       | 06-branch-cleanup-01.md                               |
 | test-plan (既存テスト)                                                 | 01-history-diff-01.md                                 |
 | フェーズ1 修正 H2 (rename-tracking-repair)                             | 02-branch-worktree-01.md                              |
 | フェーズ1 修正 M2 (spawn-buffer-concat)                                | 01-history-diff-01.md                                 |

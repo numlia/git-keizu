@@ -68,3 +68,51 @@
 - Type: excluded(上表のとおり型分岐なし)
 
 **失敗系/正常系比（煙感知器）**: 正常系13件（TC-001、TC-003〜TC-010、TC-014、TC-015、TC-017、TC-018）、失敗系6件（TC-002、TC-011〜TC-013、TC-016、TC-019）、比0.46。同数・差1に該当しないため再導出は不要だが、静的 CSS 契約は「正しい定義・参照の存在検証」が正常系として並ぶ構造であり、失敗源は上表のとおりすべて対応ケースまたは除外理由で充足されている。比率合わせのためのケース追加・削除は行わない。
+
+## S2: branch cleanup panel のレイアウト契約（40vh・縦横 scroll・flex 縮退）
+
+> Origin: Feature 055-03 (light-spec-plan)
+> Added: 2026-08-25
+> Status: active
+> Supersedes: -
+> Signature: `media/main.css` の `#branchCleanupPanel` ルール群（max-height / overflow / min-height / nowrap / sticky header・action column）
+> Target Path: `media/main.css`（`#branchCleanupPanel` 関連セレクタ。行番号は Task 4 実装後に確定）
+> Test File: `tests/web/overlayLayers.test.ts`
+
+panel 自身に `max-height: 40vh`・縦横 overflow・`min-height: 0`・nowrap table・sticky header／action column を設定し、320px 以下でも graph の flex 領域を残す静的 CSS 契約の観点（対応プラン §4 Task 4 実装内容 6）。CSS はテストから `readFileSync` で文字列として読み込み宣言テキストを照合する。panel の JS state・描画は `web/branchCleanupPanel-test.md` の責務で本表には含めない。
+
+| Case ID | Input / Precondition                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                               | Notes                                                                                                                                                                                            |
+| ------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| TC-020  | `media/main.css` を読み込み `#branchCleanupPanel` ルールを抽出する | Normal - 最大高の宣言                                                      | `max-height: 40vh` の宣言が存在する                                                                                           | パネルが graph を覆い尽くさない上限                                                                                                                                                              |
+| TC-021  | 同ルールの overflow 宣言を抽出する                                 | Normal - 縦横 scroll の宣言                                                | 縦横双方の overflow（`overflow: auto` または `overflow-x` / `overflow-y` の auto / scroll）が宣言されている                   | panel 内 scroll で全列参照                                                                                                                                                                       |
+| TC-022  | 同ルールの min-height 宣言を抽出する                               | Normal - flex 縮退の宣言                                                   | `min-height: 0` の宣言が存在する                                                                                              | 縦 flex 内での縮退を許す                                                                                                                                                                         |
+| TC-023  | panel 内 table 系セレクタの white-space 宣言を抽出する             | Normal - nowrap table                                                      | `white-space: nowrap` の宣言が存在する                                                                                        | 折返しでなく横 scroll で参照                                                                                                                                                                     |
+| TC-024  | sticky header／action column のセレクタの宣言を抽出する            | Normal - sticky と theme color                                             | `position: sticky` の宣言が存在し、背景色が既存 theme color 変数（`var(--vscode-...)`）を参照する                             | 新規 color literal を持ち込まない                                                                                                                                                                |
+| TC-025  | `media/main.css` 全体の z-index 宣言をすべて抽出する               | Validation - z-index 既存契約の維持                                        | panel 追加後も `z-index:` 宣言の値のうち `var(` で始まらないもの（数値直書き）が 0 件で、S1 TC-001 の 10 変数定義が不変である | 055-02 の層契約を変更しない                                                                                                                                                                      |
+| TC-026  | 実際の VS Code Webview の幅を 320px 以下にして panel を開く        | Boundary - 手動: 320px 以下の flex 領域                                    | `#scrollContainer`（graph 領域）の可視高さが 0 より大きく、panel と graph の双方が表示される                                  | 手動確認。理由: jsdom は flex レイアウトの実寸を解決しない。手順: Webview を 320px 以下へ縮小し panel を開いて DevTools で `#scrollContainer` の高さを確認。証跡: スクリーンショットと高さの記録 |
+| TC-027  | 同状態で panel 内を縦横に scroll する                              | Boundary - 手動: 狭幅での全列参照                                          | panel 内の縦横 scroll によって全列・全行が参照でき、body 全体の horizontal scroll が発生しない                                | 手動確認。理由: overflow の実挙動は実描画でのみ判定可能。手順: 狭幅で panel を scroll し列の到達性と body の scroll bar を確認。証跡: スクリーンショットの記録                                   |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-03 追加分（S2）
+
+| 失敗源                                             | 対応ケースまたは除外理由                                                                     |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 最大高・縮退宣言の欠落（graph が消える）           | TC-020、TC-022、TC-026                                                                       |
+| overflow / nowrap の欠落（列が参照不能）           | TC-021、TC-023、TC-027                                                                       |
+| sticky・theme color の欠落（テーマ非追従）         | TC-024                                                                                       |
+| z-index 数値直書きの再混入・既存層契約の破壊       | TC-025                                                                                       |
+| 入力検証×違反パターン                              | excluded(静的 CSS 契約で入力を受け取る経路が存在しない)                                      |
+| 外部依存×失敗モード                                | excluded(CSS 読込失敗は `readFileSync` の例外としてテスト基盤が検出する)                     |
+| 例外・エラー経路                                   | excluded(CSS 宣言に throw 経路が存在しない)                                                  |
+| 境界値（0 / minimum / maximum / +/-1 / 空 / NULL） | excluded(実行時の数値入力が存在しない。意味のある境界は 320px 以下で TC-026 / TC-027 が充足) |
+| 型不正・フォーマット不正                           | excluded(CSS 宣言は静的テキストで型分岐がなく、宣言 drift は TC-020〜TC-024 の照合で検出)    |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-025
+- Exception: excluded(上表のとおり throw 経路なし)
+- External: excluded(上表のとおり外部依存なし)
+- Boundary: TC-026、TC-027
+- Type: excluded(上表のとおり型分岐なし)
+- Normal: TC-020〜TC-024
+
+**失敗系/正常系比（煙感知器）**: 正常系5件（TC-020〜TC-024）、失敗系3件（TC-025〜TC-027）。静的 CSS 契約は宣言の存在検証が正常系として並ぶ構造で、失敗源は再混入・実描画の縮退に限られることをインベントリで確認した。比率合わせのためのケース追加・削除は行わない。

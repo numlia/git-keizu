@@ -308,3 +308,47 @@ remote ref の branch 部分を初期値として提案する S1 の契約を維
 - Type: excluded(`src/types-test.md` S6 の責務)
 
 **失敗系/正常系比（煙感知器）**: 正常系7件（TC-092〜TC-095、TC-098〜TC-100）、失敗系3件（TC-096、TC-097、TC-101）。UI 入力の境界は ref 構造と cancel に限られ、runtime validation と Git failure は owner 外として対応付けた。
+
+## S21: showDeleteBranchDialog() export 後の既存 dialog 契約維持
+
+> Origin: Feature 055-03 (light-spec-plan)
+> Added: 2026-08-25
+> Status: active
+> Supersedes: -
+> Signature: `export function showDeleteBranchDialog(repo: string, refName: string, remotes: string[], worktreeInfo?: { path: string; isMainWorktree: boolean } | null): void`
+> Target Path: `web/refMenu.ts`（`showDeleteBranchDialog()`。実装後に行範囲へ更新）
+> Test File: `tests/web/refMenu.test.ts`
+
+branch cleanup panel から再利用するために `showDeleteBranchDialog()` へ export を付けるだけの変更で、関数本体・dialog 文面・初期 checkbox（force / remote delete とも false）・`recordRecentAction`・`deleteBranch` payload が既存と同一であることを固定する観点（対応プラン §4 Task 5 実装内容 6）。panel 側の eligibility 判定は `web/branchCleanupPanel-test.md` S4 の責務で本表には含めない。
+
+| Case ID | Input / Precondition                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                | Notes                           |
+| ------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| TC-102  | export された `showDeleteBranchDialog("/repo", "feature/x", ["origin"])` を直接呼ぶ | Normal - remote ありの既存 dialog                                          | `showFormDialog` が Force Delete と remote 削除の 2 checkbox（初期値とも `false`）・既存文面で 1 回呼ばれる（S6 TC-025 と同一構成）                                                            | export 経由でも文面・初期値不変 |
+| TC-103  | export された `showDeleteBranchDialog("/repo", "feature/x", [])` を直接呼ぶ         | Boundary - remotes 0 件                                                    | `showCheckboxDialog` が Force Delete のみ（初期値 `false`）で 1 回呼ばれる（S6 TC-026 と同一の既存動作）                                                                                       | 後方互換                        |
+| TC-104  | TC-102 の dialog を既定値のまま確定する                                             | Normal - 既存 deleteBranch payload                                         | `sendMessage` が `{ command: "deleteBranch", repo: "/repo", branchName: "feature/x", forceDelete: false, deleteOnRemotes: [] }` で 1 回呼ばれ、`recordRecentAction` の呼出も既存どおり行われる | payload 契約不変                |
+| TC-105  | context menu の Delete Branch 経路から同 dialog を開く                              | Normal - menu 経由の regression                                            | export 後も menu 経由で `showFormDialog` が TC-102 と同一引数で 1 回呼ばれる（呼出経路によらず同一関数・同一構成）                                                                             | 既存経路の回帰なし              |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-03 追加分（S21）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                                   |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| export に伴う文面・初期 checkbox の変化               | TC-102、TC-103                                                                             |
+| `deleteBranch` payload・recordRecentAction の変化     | TC-104                                                                                     |
+| menu 経由の既存経路の破壊                             | TC-105                                                                                     |
+| panel からの呼出可否（eligibility）                   | excluded(`web/branchCleanupPanel-test.md` S4 の責務)                                       |
+| cancel 時の送信                                       | excluded(既存 dialog 契約で cancel 時は callback 未発火。既存 owner S6 の挙動を変更しない) |
+| 例外・エラー経路                                      | excluded(export 付与のみで throw 経路を追加しない)                                         |
+| 外部依存×失敗モード                                   | excluded(Git 実行は host owner の責務)                                                     |
+| 境界値（0 / minimum / maximum / +/-1 / NULL / empty） | excluded(数値境界なし。remotes 0 件は TC-103 で充足)                                       |
+| 不正な型・フォーマット                                | excluded(引数型は TypeScript の既存 signature のままで型分岐を追加しない)                  |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(export 付与のみで検証分岐を追加しない)
+- Exception: excluded(throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: TC-103
+- Type: excluded(型契約の変更なし)
+- Normal: TC-102、TC-104、TC-105
+
+**失敗系/正常系比（煙感知器）**: 正常系3件（TC-102、TC-104、TC-105）、失敗系1件（TC-103）。export のみの regression section で新規分岐を持たないため、失敗源は既存契約の変化検出に限られることをインベントリで確認した。

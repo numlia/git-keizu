@@ -159,3 +159,44 @@ remote checkout の拒否理由と二段階 Push の選択 UI に使う 5 キー
 - Type: excluded(値は JSON string で型分岐が存在しない)
 
 **失敗系/正常系比（煙感知器）**: 正常系1件（TC-012）、失敗系1件（TC-013）。件数が同数のため再導出したが、静的 JSON データの失敗源は欠落・drift・空値・placeholder・parity に限られ、上表のとおりすべて充足されていることを確認した。
+
+## S5: branch cleanup panel の英語キー集合
+
+> Origin: Feature 055-03 (light-spec-plan)
+> Added: 2026-08-25
+> Status: active
+> Supersedes: -
+> Signature: 追加キー集合: panel title / comparison / 列名 / known・unknown・notSelected 状態 / loading・error・empty / show・delete action（キー名は Task 4 実装時に確定）
+> Target Path: `l10n/web/web.l10n.en.json`
+> Test File: `tests/web/i18n.test.ts`
+
+branch cleanup panel の表示に使う英語キー集合（title、comparison、列名、upstream / worktree / comparison の各状態文言、loading / error / empty、show / delete action）が en bundle に追加されていることを検証する（対応プラン §4 Task 4 実装内容 7）。キーの利用分岐は `web/branchCleanupPanel-test.md` S3 の責務。`unknown` と `notSelected` の文言が同一値にならないことは表示側 TC-019 と対で、bundle 側でも値の相異を検証する。
+
+| Case ID | Input / Precondition                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                  | Notes                           |
+| ------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------- |
+| TC-014  | en bundle から panel キー集合の全キーを読み込む                       | Normal - キー集合の存在                                                    | 全キーが存在し、各値が非空（`length > 0`）の英語文字列である                                     | 集合は Task 4 実装で確定        |
+| TC-015  | en bundle の unknown 用文言と notSelected 用文言を比較する            | Normal - 状態文言の相異                                                    | unknown 用と notSelected 用の値が互いに一致しない（同一文言へ潰していない）                      | §3.2 の区別を bundle 側でも固定 |
+| TC-016  | en / ja 両 bundle を読み込み、panel キー集合と placeholder を比較する | Validation - locale parity                                                 | ja bundle に欠落しているキーが 0 件で、placeholder を含むキーは `{N}` 集合が両 locale で一致する | 片 locale / placeholder drift   |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-03 追加分（S5）
+
+| 失敗源                                        | 対応ケースまたは除外理由                                                     |
+| --------------------------------------------- | ---------------------------------------------------------------------------- |
+| en 側のキー欠落・空値                         | TC-014                                                                       |
+| unknown / notSelected 文言の同一値化          | TC-015                                                                       |
+| 片 locale だけの追加 / placeholder 不一致     | TC-016（ja 側は `web.l10n.ja.json-test.md` S6 TC-018 と対で担保）            |
+| キーの利用分岐の欠落                          | excluded(`web/branchCleanupPanel-test.md` S3 の責務)                         |
+| 境界値（0 / minimum / maximum / +/-1 / NULL） | excluded(静的 JSON に数値境界が存在しない。empty は TC-014 の非空検証で充足) |
+| 外部依存の失敗・例外送出                      | excluded(bundle は静的データで外部依存も throw 経路も持たない)               |
+| 不正な型・形式                                | excluded(値は JSON string で型分岐が存在しない)                              |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-016
+- Exception: excluded(JSON 読み込みの失敗はテスト基盤で検出され、bundle 自体に例外分岐はない)
+- External: excluded(外部依存なし)
+- Boundary: excluded(数値境界が存在しない。empty は TC-014 の非空検証で充足)
+- Type: excluded(値は JSON string で型分岐が存在しない)
+- Normal: TC-014、TC-015
+
+**失敗系/正常系比（煙感知器）**: 正常系2件（TC-014、TC-015）、失敗系1件（TC-016）。差1のためインベントリを再導出したが、静的 locale の失敗源は欠落・空値・同一値化・parity・placeholder に限られることを確認した。

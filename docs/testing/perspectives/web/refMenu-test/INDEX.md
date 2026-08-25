@@ -2,18 +2,18 @@
 
 > Source: `web/refMenu.ts`
 > Storage Mode: sharded
-> Generated: 2026-08-04T00:00:00Z
+> Generated: 2026-08-25T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 3
 > Total Sections: 17
-> Total Cases: 85
+> Total Cases: 92
 
 ## Shards
 
 | Shard File                           | Responsibility              | Sections | Cases | Last Updated |
 | ------------------------------------ | --------------------------- | -------- | ----- | ------------ |
-| 01-branch-actions-01.md              | branch-actions              | 10       | 43    | 2026-08-04   |
+| 01-branch-actions-01.md              | branch-actions              | 10       | 50    | 2026-08-25   |
 | 02-worktree-actions-01.md            | worktree-actions            | 4        | 21    | 2026-07-19   |
 | 03-context-menu-recent-actions-01.md | context-menu-recent-actions | 3        | 21    | 2026-05-09   |
 
@@ -21,7 +21,6 @@
 
 | Origin                                                                 | Shard Files                          |
 | ---------------------------------------------------------------------- | ------------------------------------ |
-| Feature 003 (ux-fixes-and-enhancements) Task 2.2                       | 01-branch-actions-01.md              |
 | Feature 003 (ux-fixes-and-enhancements) Task 3.3                       | 01-branch-actions-01.md              |
 | Feature 006 (git-graph-parity) (aidd-spec-tasks-test)                  | 01-branch-actions-01.md              |
 | Feature 014 (dialog-defaults) (aidd-spec-tasks-test)                   | 01-branch-actions-01.md              |
@@ -32,6 +31,8 @@
 | Feature 037 (delete-branch-recent-actions) Task 4                      | 03-context-menu-recent-actions-01.md |
 | Feature 045 (defensive-fixes) (light-spec-plan)                        | 02-worktree-actions-01.md            |
 | Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan) | 01-branch-actions-01.md              |
+| Feature 051 (remote-checkout-pull) (light-spec-plan)                   | 01-branch-actions-01.md              |
+| Feature 055-03 (light-spec-plan)                                       | 01-branch-actions-01.md              |
 
 ## 移行履歴
 
