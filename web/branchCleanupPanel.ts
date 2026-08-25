@@ -16,7 +16,7 @@ const CLASS_MESSAGE = "branchCleanupMessage";
 const CLASS_ACTION_CELL = "branchCleanupActionCell";
 const CLASS_ACTION_BTN = "roundedBtn branchCleanupActionBtn";
 const CLASS_DELETE_BTN = "roundedBtn branchCleanupActionBtn branchCleanupDeleteBtn";
-const CLASS_ACTION_HIDDEN = "branchCleanupActionHidden";
+const CLASS_DISABLED = "disabled";
 const FIRST_REQUEST_ID = 1;
 const COMPARISON_AUTO_VALUE = "";
 
@@ -312,9 +312,9 @@ export class BranchCleanupPanel {
     btn.className = CLASS_DELETE_BTN;
     btn.textContent = t("cleanup.action.delete");
     if (this.requestInFlight) {
-      // While a re-request is in flight the shown rows are stale: keep the button's box so
-      // the row height never jumps, but make it invisible and attach no click listener
-      btn.classList.add(CLASS_ACTION_HIDDEN);
+      // While a re-request is in flight the shown rows are stale: keep the button visible in
+      // its box so the row height never jumps, but disable it and attach no click listener
+      btn.classList.add(CLASS_DISABLED);
     } else {
       btn.addEventListener("click", () => this.actions.showDeleteDialog(repo, branchName, remotes));
     }

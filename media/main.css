@@ -630,8 +630,12 @@ body.unableToLoad p {
   margin: 1px 2px;
   border-radius: 9px;
 }
-.branchCleanupActionHidden {
-  visibility: hidden;
+.branchCleanupActionBtn.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.branchCleanupActionBtn.disabled:hover {
+  background-color: rgba(128, 128, 128, 0.1);
 }
 
 /* -- Context Menu ---------------------------------------------------------- */
