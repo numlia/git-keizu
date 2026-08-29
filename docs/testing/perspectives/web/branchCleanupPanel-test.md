@@ -214,7 +214,7 @@ table は createElement と textContent で構築し、ancestry / ahead-behind /
 > Status: active
 > Supersedes: -
 > Signature: `BranchCleanupPanel.syncComparisonOptions(): void`
-> Target Path: `web/branchCleanupPanel.ts`（syncComparisonOptions()。Task 3 実装後に行範囲へ更新）
+> Target Path: `web/branchCleanupPanel.ts`（syncComparisonOptions()、219-234行）
 > Test File: `tests/web/branchCleanupPanel.test.ts`
 
 自動選択かつ loaded のときだけ `view.compareBranch ?? t("cleanup.state.notSelected")` を `t("cleanup.comparison.autoResolved", resolved)` へ渡して auto option name を作り、明示選択・loading・failed では `t("cleanup.comparison.auto")` を使う契約（対応プラン §3.1 / §3.2）。auto option の value は `COMPARISON_AUTO_VALUE`（空文字）、Request の自動指定は `compareBranch: null` のまま維持する。locale 固定値の正本は l10n owner（`../l10n/web/web.l10n.en.json-test.md` S7 / `../l10n/web/web.l10n.ja.json-test.md` S8）の責務で、本表は表示分岐だけを扱う。

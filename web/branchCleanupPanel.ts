@@ -217,14 +217,19 @@ export class BranchCleanupPanel {
   }
 
   private syncComparisonOptions(): void {
-    const options = [{ name: t("cleanup.comparison.auto"), value: COMPARISON_AUTO_VALUE }];
-    for (const name of this.branchNames) {
-      options.push({ name: name, value: name });
-    }
-    const selected =
-      this.selectedComparison !== null && this.branchNames.indexOf(this.selectedComparison) > -1
-        ? this.selectedComparison
-        : COMPARISON_AUTO_VALUE;
+    const selectedComparison = this.selectedComparison;
+    const isExplicitSelection =
+      selectedComparison !== null && this.branchNames.indexOf(selectedComparison) > -1;
+    const selected = isExplicitSelection ? selectedComparison : COMPARISON_AUTO_VALUE;
+    const view = this.view;
+    const autoName =
+      !isExplicitSelection && view.kind === "loaded"
+        ? t("cleanup.comparison.autoResolved", view.compareBranch ?? t("cleanup.state.notSelected"))
+        : t("cleanup.comparison.auto");
+    const options = [
+      { name: autoName, value: COMPARISON_AUTO_VALUE },
+      ...this.branchNames.map((name) => ({ name: name, value: name }))
+    ];
     this.comparisonDropdown.setOptions(options, selected);
   }
 
