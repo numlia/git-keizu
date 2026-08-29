@@ -29,6 +29,7 @@ vi.stubGlobal("webviewMessages", {
   "cleanup.title": "Branch Cleanup",
   "cleanup.comparison": "Compare with: ",
   "cleanup.comparison.auto": "Automatic",
+  "cleanup.comparison.autoResolved": "Automatic ({0})",
   "cleanup.column.branch": "Branch",
   "cleanup.column.lastCommit": "Last Commit",
   "cleanup.column.ancestry": "Ancestor of Target",

@@ -80,9 +80,9 @@ describe("handleMessage deleteBranch not fully merged explanation", () => {
   const DELETE_BRANCH_ERROR = "Unable to Delete Branch";
   const EXPLANATION_MESSAGES = {
     "error.deleteBranchNotFullyMerged.summary":
-      "Git could not confirm that this branch is fully merged into its upstream branch or the current branch.",
+      "Git could not confirm that this branch is fully merged into its upstream branch, or into the current branch when no upstream is configured.",
     "error.deleteBranchNotFullyMerged.reason":
-      "Squash merges and rebases can incorporate the changes without connecting the original commits. The same error also appears when unmerged commits remain.",
+      "Squash merges and rebases can incorporate the changes without connecting the original commits. The same error also appears when unmerged commits remain. When deletion is opened from Branch Cleanup, the panel's comparison target can differ from the upstream branch Git checks, or from the current branch when no upstream is configured. This error also appears when the branch is merged into the panel's target but not into that Git reference.",
     "error.deleteBranchNotFullyMerged.guidance":
       "Before using Force Delete, confirm that the branch has no commits or changes you still need. If it is safe to remove, enable Force Delete in the delete dialog and try again.",
     "dialog.originalGitOutput": "Original Git output"

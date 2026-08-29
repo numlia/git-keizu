@@ -90,6 +90,16 @@ function selectComparison(branchName: string): void {
   options.find((option) => option.textContent === branchName)!.click();
 }
 
+function comparisonCurrentText(): string | null {
+  const dropdown = panelElem().querySelector<HTMLElement>("#branchCleanupComparisonSelect")!;
+  return dropdown.querySelector<HTMLElement>(".dropdownCurrentValue")!.textContent;
+}
+
+function autoOptionText(): string | null {
+  const dropdown = panelElem().querySelector<HTMLElement>("#branchCleanupComparisonSelect")!;
+  return dropdown.querySelector<HTMLElement>(".dropdownOption")!.textContent;
+}
+
 beforeEach(() => {
   document.body.innerHTML = '<div id="branchCleanupPanel" hidden></div>';
   vi.clearAllMocks();
@@ -691,5 +701,151 @@ describe("BranchCleanupPanel row actions", () => {
     // Then: the callback receives the unmodified name exactly once
     expect(actions.showBranch).toHaveBeenCalledTimes(1);
     expect(actions.showBranch).toHaveBeenCalledWith("a;b");
+  });
+});
+
+// S5: syncComparisonOptions() の比較先 label（自動解決値の表示）
+// @see docs/testing/perspectives/web/branchCleanupPanel-test.md
+describe("BranchCleanupPanel comparison labels", () => {
+  it("shows the resolved branch in the automatic label without touching the request (TC-036)", () => {
+    // Case: TC-036
+    // Given: an open panel with the automatic comparison (nothing selected)
+    panel.toggle(REPO);
+
+    // When: the latest loaded response resolves the comparison to main
+    panel.handleResponse(okResponse(1, [makeRow()], "main"));
+
+    // Then: the auto option and the current display both read Automatic (main)
+    expect(autoOptionText()).toBe("Automatic (main)");
+    expect(comparisonCurrentText()).toBe("Automatic (main)");
+
+    // Then: the next request still sends compareBranch null (the resolved name never leaks)
+    panel.refresh(REPO);
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    const lastRequest = sentRequests()[sentRequests().length - 1];
+    expect(lastRequest.compareBranch).toBeNull();
+  });
+
+  it("fills the not-selected wording for a null resolved comparison (TC-037)", () => {
+    // Case: TC-037
+    // Given: an open panel with the automatic comparison
+    panel.toggle(REPO);
+
+    // When: the latest loaded response carries compareBranch null
+    panel.handleResponse(okResponse(1, [makeRow({ ancestry: "notSelected" })], null));
+
+    // Then: the auto option fills {0} with the not-selected wording, never an empty pair
+    expect(autoOptionText()).toBe("Automatic (No comparison target)");
+    expect(comparisonCurrentText()).toBe("Automatic (No comparison target)");
+  });
+
+  it("keeps the plain automatic label next to an explicit selection (TC-038)", () => {
+    // Case: TC-038
+    // Given: an open panel listing develop, with develop explicitly selected
+    panel.toggle(REPO);
+    panel.handleResponse(
+      okResponse(1, [makeRow({ branchName: "develop" }), makeRow({ branchName: "main" })])
+    );
+    selectComparison("develop");
+
+    // When: the loaded response for the explicit selection resolves to develop
+    panel.handleResponse(
+      okResponse(
+        2,
+        [makeRow({ branchName: "develop" }), makeRow({ branchName: "main" })],
+        "develop"
+      )
+    );
+
+    // Then: the current display shows the branch name and the auto option stays plain
+    expect(comparisonCurrentText()).toBe("develop");
+    expect(autoOptionText()).toBe("Automatic");
+    expect(autoOptionText()).not.toContain("(");
+  });
+
+  it("falls back to the resolved automatic label when the selection disappears (TC-039)", () => {
+    // Case: TC-039
+    // Given: feature/x is selected from the first loaded response
+    panel.toggle(REPO);
+    panel.handleResponse(
+      okResponse(1, [makeRow({ branchName: "feature/x" }), makeRow({ branchName: "main" })])
+    );
+    selectComparison("feature/x");
+
+    // When: the latest response no longer lists feature/x and resolves to main
+    panel.handleResponse(okResponse(2, [makeRow({ branchName: "main" })], "main"));
+
+    // Then: the current display falls back to the auto option with the resolved name
+    expect(autoOptionText()).toBe("Automatic (main)");
+    expect(comparisonCurrentText()).toBe("Automatic (main)");
+  });
+
+  it("keeps an HTML-like resolved name as text in the label (TC-040)", () => {
+    // Case: TC-040
+    // Given: an open panel with the automatic comparison
+    panel.toggle(REPO);
+
+    // When: the latest loaded response resolves to the HTML-like name x<img>
+    panel.handleResponse(okResponse(1, [makeRow()], "x<img>"));
+
+    // Then: no img element is created and the label carries the raw name
+    expect(panelElem().querySelectorAll("img")).toHaveLength(0);
+    expect(comparisonCurrentText()).toBe("Automatic (x<img>)");
+  });
+
+  it("shows the plain automatic label while loading (TC-041)", () => {
+    // Case: TC-041
+    // Given: an open panel whose request was just sent (no response yet)
+    panel.toggle(REPO);
+
+    // Then: the auto option and the current display stay plain without a resolved value
+    expect(autoOptionText()).toBe("Automatic");
+    expect(comparisonCurrentText()).toBe("Automatic");
+    expect(comparisonCurrentText()).not.toContain("(");
+  });
+
+  it("drops the stale resolved value from the label on a failed refresh (TC-042)", () => {
+    // Case: TC-042
+    // Given: a loaded panel showing Automatic (main)
+    panel.toggle(REPO);
+    panel.handleResponse(okResponse(1, [makeRow()], "main"));
+    expect(comparisonCurrentText()).toBe("Automatic (main)");
+
+    // When: the refresh answers with the error union
+    panel.refresh(REPO);
+    panel.handleResponse({
+      command: "loadBranchCleanup",
+      repo: REPO,
+      requestId: 2,
+      result: { kind: "error", status: "fatal" }
+    });
+
+    // Then: the label returns to plain Automatic without the past resolved value
+    expect(autoOptionText()).toBe("Automatic");
+    expect(comparisonCurrentText()).toBe("Automatic");
+    expect(comparisonCurrentText()).not.toContain("main");
+  });
+
+  it("keeps the old label with the old table and updates both together on refresh (TC-043)", () => {
+    // Case: TC-043
+    // Given: a loaded panel resolved to main with the row feature/a
+    panel.toggle(REPO);
+    panel.handleResponse(okResponse(1, [makeRow({ branchName: "feature/a" })], "main"));
+
+    // When: the same repository is refreshed and no response arrived yet
+    panel.refresh(REPO);
+
+    // Then: the kept table and the label both still show the old response
+    expect(bodyRows()).toHaveLength(1);
+    expect(bodyRows()[0].cells[0].textContent).toBe("feature/a");
+    expect(comparisonCurrentText()).toBe("Automatic (main)");
+
+    // When: the latest response arrives with the row feature/b resolved to develop
+    panel.handleResponse(okResponse(2, [makeRow({ branchName: "feature/b" })], "develop"));
+
+    // Then: the table and the label update to the latest response together
+    expect(bodyRows()).toHaveLength(1);
+    expect(bodyRows()[0].cells[0].textContent).toBe("feature/b");
+    expect(comparisonCurrentText()).toBe("Automatic (develop)");
   });
 });
