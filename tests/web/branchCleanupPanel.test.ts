@@ -107,11 +107,11 @@ beforeEach(() => {
   panel = new BranchCleanupPanel(actions);
 });
 
-// S1: 開閉と request lifecycle（toggle / refresh / selectRepository / requestId）
+// S6: 開閉と request lifecycle（比較先変更時の loaded view 保持を含む）
 // @see docs/testing/perspectives/web/branchCleanupPanel-test.md
 describe("BranchCleanupPanel lifecycle", () => {
-  it("opens with a loading view and the first request id 1 (TC-001)", () => {
-    // Case: TC-001
+  it("opens with a loading view and the first request id 1 (TC-044)", () => {
+    // Case: TC-044
     // Given: a closed panel
     // When: it is toggled open
     panel.toggle(REPO);
@@ -129,8 +129,8 @@ describe("BranchCleanupPanel lifecycle", () => {
     });
   });
 
-  it("increments the request id monotonically without reuse (TC-002)", () => {
-    // Case: TC-002
+  it("increments the request id monotonically without reuse (TC-045)", () => {
+    // Case: TC-045
     // Given: an open panel
     panel.toggle(REPO);
 
@@ -142,8 +142,8 @@ describe("BranchCleanupPanel lifecycle", () => {
     expect(sentRequests().map((request) => request.requestId)).toEqual([1, 2, 3]);
   });
 
-  it("removes the row actions and invalidates the request on close (TC-003)", () => {
-    // Case: TC-003
+  it("removes the row actions and invalidates the request on close (TC-046)", () => {
+    // Case: TC-046
     // Given: an open panel with a rendered eligible row
     panel.toggle(REPO);
     panel.handleResponse(okResponse(1, [makeRow()]));
@@ -160,8 +160,8 @@ describe("BranchCleanupPanel lifecycle", () => {
     expect(showButtons()).toHaveLength(0);
   });
 
-  it("re-requests with a fresh id while open (TC-004)", () => {
-    // Case: TC-004
+  it("re-requests with a fresh id while open (TC-047)", () => {
+    // Case: TC-047
     // Given: an open panel showing a loaded row with a delete action
     panel.toggle(REPO);
     panel.handleResponse(okResponse(1, [makeRow()]));
@@ -192,8 +192,8 @@ describe("BranchCleanupPanel lifecycle", () => {
     expect(restoredDeletes[0].classList.contains("disabled")).toBe(false);
   });
 
-  it("sends nothing on a refresh while closed (TC-005)", () => {
-    // Case: TC-005
+  it("sends nothing on a refresh while closed (TC-048)", () => {
+    // Case: TC-048
     // Given: a closed panel
     // When: it is refreshed
     panel.refresh(REPO);
@@ -202,8 +202,8 @@ describe("BranchCleanupPanel lifecycle", () => {
     expect(sendMessage).not.toHaveBeenCalled();
   });
 
-  it("drops the comparison selection on a repository switch (TC-006)", () => {
-    // Case: TC-006
+  it("drops the comparison selection on a repository switch (TC-049)", () => {
+    // Case: TC-049
     // Given: an open panel with the comparison develop selected
     panel.toggle(REPO);
     panel.handleResponse(
@@ -222,8 +222,8 @@ describe("BranchCleanupPanel lifecycle", () => {
     expect(lastRequest.compareBranch).toBeNull();
   });
 
-  it("keeps the comparison selection across a same-repository refresh (TC-007)", () => {
-    // Case: TC-007
+  it("keeps the comparison selection across a same-repository refresh (TC-050)", () => {
+    // Case: TC-050
     // Given: an open panel with the comparison develop selected
     panel.toggle(REPO);
     panel.handleResponse(
@@ -239,8 +239,8 @@ describe("BranchCleanupPanel lifecycle", () => {
     expect(lastRequest.compareBranch).toBe("develop");
   });
 
-  it("stops requesting and shows the failure view when request ids are exhausted (TC-008)", () => {
-    // Case: TC-008
+  it("stops requesting and shows the failure view when request ids are exhausted (TC-051)", () => {
+    // Case: TC-051
     // Given: an open panel whose next request id reached the positive safe integer limit
     panel.toggle(REPO);
     vi.mocked(sendMessage).mockClear();
@@ -254,9 +254,9 @@ describe("BranchCleanupPanel lifecycle", () => {
     expect(messageText()).toBe("Unable to load branch information");
   });
 
-  it("renders loading before sending the comparison-change request (TC-009)", () => {
-    // Case: TC-009
-    // Given: an open panel listing feature/x
+  it("keeps the loaded table visible while a comparison change is in flight (TC-052)", () => {
+    // Case: TC-052
+    // Given: an open panel listing feature/x with a delete action
     panel.toggle(REPO);
     panel.handleResponse(
       okResponse(1, [makeRow({ branchName: "feature/x" }), makeRow({ branchName: "main" })])
@@ -266,14 +266,64 @@ describe("BranchCleanupPanel lifecycle", () => {
     // When: the comparison is changed to feature/x
     selectComparison("feature/x");
 
-    // Then: the loading view replaced the rows and one request carries the new comparison
+    // Then: the old rows stay rendered without a loading swap and one request carries the
+    // new comparison; the delete button stays visible but disabled and non-clickable
+    expect(messageText()).toBeNull();
+    expect(bodyRows()).toHaveLength(2);
+    const inFlightDeletes = deleteButtons();
+    expect(inFlightDeletes).toHaveLength(1);
+    expect(inFlightDeletes[0].classList.contains("disabled")).toBe(true);
+    inFlightDeletes[0].click();
+    expect(actions.showDeleteDialog).not.toHaveBeenCalled();
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sentRequests()[0]).toEqual({
+      command: "loadBranchCleanup",
+      repo: REPO,
+      requestId: 2,
+      compareBranch: "feature/x"
+    });
+
+    // Then: the fresh response re-renders the table and re-enables the delete action
+    panel.handleResponse(
+      okResponse(
+        2,
+        [makeRow({ branchName: "feature/x" }), makeRow({ branchName: "main" })],
+        "feature/x"
+      )
+    );
+    const restoredDeletes = deleteButtons();
+    expect(restoredDeletes).toHaveLength(1);
+    expect(restoredDeletes[0].classList.contains("disabled")).toBe(false);
+  });
+
+  it("renders loading for a comparison change without a loaded table (TC-053)", () => {
+    // Case: TC-053
+    // Given: an open panel showing the failure view after a failed refresh
+    panel.toggle(REPO);
+    panel.handleResponse(
+      okResponse(1, [makeRow({ branchName: "feature/x" }), makeRow({ branchName: "main" })])
+    );
+    panel.refresh(REPO);
+    panel.handleResponse({
+      command: "loadBranchCleanup",
+      repo: REPO,
+      requestId: 2,
+      result: { kind: "error", status: "fatal" }
+    });
+    expect(messageText()).toBe("Unable to load branch information");
+    vi.mocked(sendMessage).mockClear();
+
+    // When: the comparison is changed to feature/x
+    selectComparison("feature/x");
+
+    // Then: with no table to preserve, the loading view is rendered before the request
     expect(messageText()).toBe("Loading ...");
     expect(bodyRows()).toHaveLength(0);
     expect(sendMessage).toHaveBeenCalledTimes(1);
     expect(sentRequests()[0]).toEqual({
       command: "loadBranchCleanup",
       repo: REPO,
-      requestId: 2,
+      requestId: 3,
       compareBranch: "feature/x"
     });
   });

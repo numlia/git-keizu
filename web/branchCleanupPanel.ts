@@ -76,7 +76,7 @@ export class BranchCleanupPanel {
       t("toolbar.branches"),
       (value: string) => {
         this.selectedComparison = value === COMPARISON_AUTO_VALUE ? null : value;
-        this.requestLoad();
+        this.requestLoad(this.view.kind === "loaded");
       }
     );
     this.panelElem.removeChild(this.comparisonDropdownElem);

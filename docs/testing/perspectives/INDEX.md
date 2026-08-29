@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-08-29T11:14:37+09:00
+> Auto-generated: 2026-08-29T12:18:48+09:00
 > Total sources: 48
 > Total physical files: 79
 > Total sections: 504
-> Total cases: 2740
+> Total cases: 2741
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -37,7 +37,7 @@
 | `src/types.ts` | single-file | `src/types-test.md` | 1 | 6 | 78 | 2026-08-25 |
 | `src/utils.ts` | single-file | `src/utils-test.md` | 1 | 6 | 26 | 2026-08-08 |
 | `src/worktree.ts` | single-file | `src/worktree-test.md` | 1 | 1 | 17 | 2026-08-08 |
-| `web/branchCleanupPanel.ts` | single-file | `web/branchCleanupPanel-test.md` | 1 | 5 | 43 | 2026-08-29 |
+| `web/branchCleanupPanel.ts` | single-file | `web/branchCleanupPanel-test.md` | 1 | 5 | 44 | 2026-08-29 |
 | `web/branchLabels.ts` | single-file | `web/branchLabels-test.md` | 1 | 1 | 17 | 2026-03-21 |
 | `web/commitMenu.ts` | single-file | `web/commitMenu-test.md` | 1 | 11 | 50 | 2026-07-19 |
 | `web/contextMenu.ts` | single-file | `web/contextMenu-test.md` | 1 | 3 | 22 | 2026-05-02 |

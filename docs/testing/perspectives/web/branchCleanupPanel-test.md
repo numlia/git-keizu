@@ -10,7 +10,8 @@
 
 > Origin: Feature 055-03 (light-spec-plan)
 > Added: 2026-08-25
-> Status: active
+> Status: superseded
+> Superseded By: S6
 > Supersedes: -
 > Signature: `BranchCleanupPanel.toggle(repo: string)` / `refresh(repo: string)` / `selectRepository(repo: string)` / `isOpen(): boolean`
 > Target Path: `web/branchCleanupPanel.ts`（open / closed・request 生成。実装後に行範囲へ更新）
@@ -92,7 +93,7 @@ response と全 row field を `unknown` から runtime validate し、最新正�
 | requestId の暗黙型変換                                | TC-017                                                                                       |
 | 最新 valid 応答の誤無視                               | TC-010                                                                                       |
 | 外部依存×失敗モード                                   | excluded(Git 失敗は error union として届く。発生源は dataSource owner S48 の責務)            |
-| 境界値（0 / minimum / maximum / +/-1 / empty / NULL） | excluded(数値入力は requestId のみで S1 TC-001 / TC-008 の責務。空 rows は S3 TC-024 で充足) |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL） | excluded(数値入力は requestId のみで S6 TC-044 / TC-051 の責務。空 rows は S3 TC-024 で充足) |
 | 型契約（compile time）                                | excluded(`src/types-test.md` S8 の責務。本 section は runtime validation を担う)             |
 
 **失敗カテゴリ網羅（diversity floor）**:
@@ -100,7 +101,7 @@ response と全 row field を `unknown` から runtime validate し、最新正�
 - Validation: TC-011〜TC-014
 - Exception: TC-015
 - External: excluded(外部依存なし)
-- Boundary: excluded(数値・空境界は S1 / S3 の責務)
+- Boundary: excluded(数値・空境界は S6 / S3 の責務)
 - Type: TC-016、TC-017
 - Normal: TC-010
 
@@ -258,3 +259,58 @@ table は createElement と textContent で構築し、ancestry / ahead-behind /
 - Normal: TC-036、TC-038、TC-041、TC-043
 
 **失敗系/正常系比（煙感知器）**: 正常系4件（TC-036、TC-038、TC-041、TC-043）、失敗系4件（TC-037、TC-039、TC-040、TC-042）。同数のためインベントリを再導出したが、label 決定の失敗源は明示混同・null 混同・消失 fallback・HTML 解釈・loading／failed の過去値表示に限られ、応答検証系の失敗源は S2 へ割り当て済みであることを確認した。
+
+## S6: 開閉と request lifecycle（比較先変更時の loaded view 保持を含む）
+
+> Origin: Feature 055-03 follow-up
+> Added: 2026-08-29
+> Status: active
+> Supersedes: S1
+> Signature: `BranchCleanupPanel.toggle(repo: string)` / `refresh(repo: string)` / `selectRepository(repo: string)` / `isOpen(): boolean`
+> Target Path: `web/branchCleanupPanel.ts`（toggle / refresh / selectRepository / requestLoad と comparison dropdown callback）
+> Test File: `tests/web/branchCleanupPanel.test.ts`
+
+S1 の lifecycle 契約を引き継ぎ、比較先変更の描画契約だけを再定義する。refresh と比較先変更は同じ扱いで、view が loaded のときは旧表を DOM に保持したまま再要求し（loading swap なし、削除ボタンは disabled・click listener なし）、view が loaded でないときだけ loading 表示を先に描画してから request を送る。requestId の単調増加・close 時の無効化・repository 切替の selection 破棄は S1 と同一契約。graph の内部 state と削除 dialog 本文は `web/main-test/09-branch-cleanup-01.md` / `web/refMenu-test/01-branch-actions-01.md` の責務で本表には含めない。
+
+| Case ID | Input / Precondition                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                | Notes                            |
+| ------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------- |
+| TC-044  | closed 状態で `toggle("/repo")` を呼ぶ                                                     | Normal - open と初回 request                                               | `isOpen()` が `true` になり、loading 表示が描画され、`sendMessage` が `{ command: "loadBranchCleanup", repo: "/repo", requestId: 1, compareBranch: null }` で 1 回呼ばれる                                                                                                     | requestId は 1 から              |
+| TC-045  | open 後に `refresh("/repo")` を 2 回呼ぶ                                                   | Normal - requestId 単調増加                                                | 送信された 3 request の `requestId` が `1`、`2`、`3` と単調増加し、再利用されない                                                                                                                                                                                              | -                                |
+| TC-046  | open 状態で `toggle("/repo")` を呼ぶ                                                       | Normal - close                                                             | `isOpen()` が `false` になり、行操作 button が DOM から除去され、latest request が無効化される                                                                                                                                                                                 | close 後応答は S2 TC-013         |
+| TC-047  | open 状態で `refresh("/repo")` を呼ぶ                                                      | Normal - open 中の再要求                                                   | `sendMessage` が新しい `requestId` の request 1 件で呼ばれる                                                                                                                                                                                                                   | -                                |
+| TC-048  | closed 状態で `refresh("/repo")` を呼ぶ                                                    | Boundary - close 中の refresh                                              | `sendMessage` の call count が 0 である（追加 message 0 件）                                                                                                                                                                                                                   | close 中は要求を生成しない       |
+| TC-049  | 比較先を選択済みの open 状態で `selectRepository("/other")` を呼ぶ                         | Normal - repository 切替で selection 破棄                                  | 以後の request の `compareBranch` が `null` に戻り、request の `repo` が `"/other"` になる                                                                                                                                                                                     | 反例: repo 切替                  |
+| TC-050  | 比較先 `develop` を選択済みの open 状態で `refresh("/repo")` を呼ぶ                        | Normal - 同一 repository では selection 維持                               | 再要求の `compareBranch` が `"develop"` のまま送られる                                                                                                                                                                                                                         | -                                |
+| TC-051  | requestId が正の safe integer の上限に達した状態（test で状態を注入）で `refresh("/repo")` | Boundary - requestId 枯渇                                                  | `sendMessage` の call count が 0 で、取得失敗表示が描画される（wrap して再利用しない）                                                                                                                                                                                         | §3.3 の枯渇契約                  |
+| TC-052  | loaded 表示（行 2 件・delete button あり）の open 状態で比較先を `feature/x` へ変更する    | Normal - comparison 変更（loaded view 保持）                               | 旧表の行 2 件が DOM に残ったまま loading 表示へ置き換わらず、delete button は disabled class 付きで click しても callback が呼ばれず、`sendMessage` が `compareBranch: "feature/x"` の request 1 件で呼ばれ、最新応答受信で表が更新され delete button の disabled が解除される | ちらつき防止（refresh と同契約） |
+| TC-053  | failed 表示の open 状態で比較先を `feature/x` へ変更する                                   | Validation - 非 loaded からの comparison 変更                              | 保持できる表がないため loading 表示が先に描画され、`sendMessage` が `compareBranch: "feature/x"` の request 1 件で呼ばれる                                                                                                                                                     | failed の stale 表を残さない     |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-03 follow-up 追加分（S6）
+
+| 失敗源                                                  | 対応ケースまたは除外理由                                                              |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| close 中・close 後の要求生成                            | TC-048                                                                                |
+| requestId の再利用・非単調                              | TC-045                                                                                |
+| requestId 枯渇時の wrap / 送信                          | TC-051                                                                                |
+| repo 切替で selection が残る                            | TC-049                                                                                |
+| 同一 repo refresh で selection が消える                 | TC-050                                                                                |
+| loading を描画せずに要求だけ送る（非 loaded 時）        | TC-044、TC-053                                                                        |
+| 比較先変更で旧表が消える（loading swap によるちらつき） | TC-052                                                                                |
+| in-flight 中の stale 削除実行                           | TC-052（disabled と callback 不発火を検証）                                           |
+| failed の stale 表の保持                                | TC-053                                                                                |
+| 応答の鮮度・検証の失敗源                                | excluded(S2 の責務)                                                                   |
+| 例外・エラー経路                                        | excluded(lifecycle method に throw 分岐がなく、失敗は表示状態として S2 / S3 で検証)   |
+| 外部依存×失敗モード                                     | excluded(Git 失敗は host / DataSource owner の責務。panel は response union を受ける) |
+| 境界値（0 / minimum / maximum / +/-1 / NULL / empty）   | excluded(数値入力は requestId のみで、初期値 1 は TC-044、上限枯渇は TC-051 で充足)   |
+| 不正な型・フォーマット                                  | excluded(response の runtime validation は S2 の責務)                                 |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-053
+- Exception: excluded(throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: TC-048、TC-051
+- Type: excluded(S2 の責務)
+- Normal: TC-044〜TC-047、TC-049、TC-050、TC-052
+
+**失敗系/正常系比（煙感知器）**: 正常系7件（TC-044〜TC-047、TC-049、TC-050、TC-052）、失敗系3件（TC-048、TC-051、TC-053）。S1 の構造を引き継ぎつつ、比較先変更のちらつき（旧表破棄）と stale 削除実行を失敗源として TC-052 に、failed の stale 表保持を TC-053 に割り当てた。
