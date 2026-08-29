@@ -124,7 +124,8 @@ remote checkout の拒否理由と二段階 Push の選択 UI に使う 5 キー
 
 > Origin: Feature 055-01 (light-spec-plan)
 > Added: 2026-08-23
-> Status: active
+> Status: superseded
+> Superseded By: S6
 > Supersedes: -
 > Signature: 追加キー集合 `error.deleteBranchNotFullyMerged.summary` / `error.deleteBranchNotFullyMerged.reason` / `error.deleteBranchNotFullyMerged.guidance` / `dialog.originalGitOutput`
 > Target Path: `l10n/web/web.l10n.en.json`
@@ -200,3 +201,84 @@ branch cleanup panel の表示に使う英語キー集合（title、comparison�
 - Normal: TC-014、TC-015
 
 **失敗系/正常系比（煙感知器）**: 正常系2件（TC-014、TC-015）、失敗系1件（TC-016）。差1のためインベントリを再導出したが、静的 locale の失敗源は欠落・空値・同一値化・parity・placeholder に限られることを確認した。
+
+## S6: deleteBranch not fully merged 説明の英語固定値（055-03 改訂）
+
+> Origin: Feature 055-03 follow-up
+> Added: 2026-08-29
+> Status: active
+> Supersedes: S4
+> Signature: 更新キー `error.deleteBranchNotFullyMerged.summary` / `error.deleteBranchNotFullyMerged.reason`（不変キー `error.deleteBranchNotFullyMerged.guidance` / `dialog.originalGitOutput` を含む4キー集合）
+> Target Path: `l10n/web/web.l10n.en.json`
+> Test File: `tests/web/i18n.test.ts`
+
+`not fully merged` 説明の summary / reason を、upstream と upstream 未設定時の現在ブランチの条件関係、パネル比較先との差を説明する固定文言（対応プラン §3.3 の English 列）へ改訂する契約。S4 の「055-01 確定仕様 §4.4 との完全一致」を本 section の固定値へ置き換えるため replacement とする。guidance と `dialog.originalGitOutput` は 055-01 の値から変更しない。キーの利用分岐は `web/messageHandler-test/01-basic-responses-01.md` S16 と `web/dialogs-test.md` S7 の責務。
+
+| Case ID | Input / Precondition                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                        | Notes                             |
+| ------- | ------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------- |
+| TC-017  | en bundle から上記4キーを読み込む                       | Normal - 改訂後の固定4値                                                   | summary / reason が対応プラン §3.3 の英語固定値と `toBe` で完全一致し、guidance と `dialog.originalGitOutput` が 055-01 確定仕様 §4.4 の既存英語値と `toBe` で完全一致し（変更なしを固定）、4値から `{数字}` 形式 placeholder を抽出した結果が空である | 値の drift と不変キーの改変を検出 |
+| TC-018  | en / ja 両 bundle を読み込み、上記4キーの集合を比較する | Validation - locale parity                                                 | ja bundle に欠落しているキーが0件である（en 4キー集合との差集合が空）                                                                                                                                                                                  | 片 locale だけの改訂を検出        |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-03 follow-up 追加分（S6）
+
+| 失敗源                                          | 対応ケースまたは除外理由                                                                            |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| summary / reason の改訂漏れ・固定値からの drift | TC-017                                                                                              |
+| guidance / `dialog.originalGitOutput` の誤改変  | TC-017（既存固定値との完全一致で担保）                                                              |
+| 空文字の訳値・placeholder の混入                | TC-017（固定値完全一致と placeholder 抽出空で担保）                                                 |
+| 片 locale だけの改訂（parity 崩れ）             | TC-018（ja 側は `web.l10n.ja.json-test.md` S7 TC-020 と対で担保）                                   |
+| キーの利用分岐の欠落                            | excluded(`web/messageHandler-test/01-basic-responses-01.md` S16 と `web/dialogs-test.md` S7 で担保) |
+| 境界値（0 / minimum / maximum / +/-1 / NULL）   | excluded(静的 JSON に数値境界が存在しない。empty は TC-017 の固定値完全一致で充足)                  |
+| 外部依存の失敗・例外送出                        | excluded(bundle は静的データで外部依存も throw 経路も持たない)                                      |
+| 不正な型・形式                                  | excluded(値は JSON string で型分岐が存在しない)                                                     |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-018
+- Exception: excluded(JSON 読み込みの失敗はテスト基盤で検出され、bundle 自体に例外分岐はない)
+- External: excluded(外部依存なし)
+- Boundary: excluded(数値境界が存在しない。empty は TC-017 の固定値完全一致で充足)
+- Type: excluded(値は JSON string で型分岐が存在しない)
+- Normal: TC-017
+
+**失敗系/正常系比（煙感知器）**: 正常系1件（TC-017）、失敗系1件（TC-018）。件数が同数のため再導出したが、静的 JSON データの失敗源は drift・誤改変・空値・placeholder・parity に限られ、上表のとおりすべて充足されていることを確認した。
+
+## S7: 比較先自動解決 label の英語キー
+
+> Origin: Feature 055-03 follow-up
+> Added: 2026-08-29
+> Status: active
+> Supersedes: -
+> Signature: 追加キー `cleanup.comparison.autoResolved`（値 `Automatic ({0})`、placeholder 集合 `{0}`）
+> Target Path: `l10n/web/web.l10n.en.json`
+> Test File: `tests/web/i18n.test.ts`
+
+比較先ドロップダウンの auto option へ解決済み branch 名を埋め込む新キー `cleanup.comparison.autoResolved` が en bundle に追加され、値が対応プラン §3.3 の固定値と完全一致することを検証する additive section。キーの利用分岐（自動／明示・loaded／loading／failed の label 決定）は `web/branchCleanupPanel-test.md` S5 の責務。
+
+| Case ID | Input / Precondition                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                               | Notes                         |
+| ------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| TC-019  | en bundle から `cleanup.comparison.autoResolved` を読み込む               | Normal - 新キーの固定値                                                    | キーが存在し、値が `Automatic ({0})` と `toBe` で完全一致し、値から抽出した `{数字}` 形式 placeholder 集合が `{0}` のみである | 完全一致により非空も担保      |
+| TC-020  | en / ja 両 bundle を読み込み、当該キーの存在と placeholder 集合を比較する | Validation - locale parity                                                 | ja bundle に `cleanup.comparison.autoResolved` が存在し（欠落0件）、placeholder 集合が両 locale とも `{0}` で一致する         | 片 locale / placeholder drift |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-03 follow-up 追加分（S7）
+
+| 失敗源                                        | 対応ケースまたは除外理由                                                           |
+| --------------------------------------------- | ---------------------------------------------------------------------------------- |
+| en 側のキー欠落・固定値からの drift           | TC-019                                                                             |
+| placeholder の欠落・過剰（`{0}` 以外の混入）  | TC-019                                                                             |
+| 片 locale だけの追加 / placeholder 不一致     | TC-020（ja 側は `web.l10n.ja.json-test.md` S8 TC-022 と対で担保）                  |
+| キーの利用分岐の欠落                          | excluded(`web/branchCleanupPanel-test.md` S5 の責務)                               |
+| 境界値（0 / minimum / maximum / +/-1 / NULL） | excluded(静的 JSON に数値境界が存在しない。empty は TC-019 の固定値完全一致で充足) |
+| 外部依存の失敗・例外送出                      | excluded(bundle は静的データで外部依存も throw 経路も持たない)                     |
+| 不正な型・形式                                | excluded(値は JSON string で型分岐が存在しない)                                    |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-020
+- Exception: excluded(JSON 読み込みの失敗はテスト基盤で検出され、bundle 自体に例外分岐はない)
+- External: excluded(外部依存なし)
+- Boundary: excluded(数値境界が存在しない。empty は TC-019 の固定値完全一致で充足)
+- Type: excluded(値は JSON string で型分岐が存在しない)
+- Normal: TC-019
+
+**失敗系/正常系比（煙感知器）**: 正常系1件（TC-019）、失敗系1件（TC-020）。件数が同数のため再導出したが、単一キーの静的 locale の失敗源は欠落・drift・placeholder・parity に限られ、上表のとおり充足されていることを確認した。

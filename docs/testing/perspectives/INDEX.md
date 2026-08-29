@@ -1,18 +1,18 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-08-25T22:36:30+09:00
+> Auto-generated: 2026-08-29T11:14:37+09:00
 > Total sources: 48
 > Total physical files: 79
-> Total sections: 501
-> Total cases: 2728
+> Total sections: 504
+> Total cases: 2740
 
 ## Source File -> Perspectives (Forward Lookup)
 
 | Source File | Storage Mode | Perspectives Entry | Shards | Sections | Cases | Last Updated |
 |-------------|--------------|--------------------|--------|----------|-------|--------------|
 | `Dependency automation operational contract` | single-file | `dependency-automation-test.md` | 1 | 1 | 25 | 2026-08-04 |
-| `l10n/web/web.l10n.en.json` | single-file | `l10n/web/web.l10n.en.json-test.md` | 1 | 5 | 16 | 2026-08-25 |
-| `l10n/web/web.l10n.ja.json` | single-file | `l10n/web/web.l10n.ja.json-test.md` | 1 | 6 | 18 | 2026-08-25 |
+| `l10n/web/web.l10n.en.json` | single-file | `l10n/web/web.l10n.en.json-test.md` | 1 | 6 | 18 | 2026-08-29 |
+| `l10n/web/web.l10n.ja.json` | single-file | `l10n/web/web.l10n.ja.json-test.md` | 1 | 7 | 20 | 2026-08-29 |
 | `media/dropdown.css` | single-file | `media/dropdown-test.md` | 1 | 1 | 3 | 2026-08-24 |
 | `media/findwidget.css` | single-file | `media/findwidget-test.md` | 1 | 1 | 3 | 2026-08-24 |
 | `media/main.css` | single-file | `media/main-test.md` | 1 | 2 | 27 | 2026-08-25 |
@@ -37,7 +37,7 @@
 | `src/types.ts` | single-file | `src/types-test.md` | 1 | 6 | 78 | 2026-08-25 |
 | `src/utils.ts` | single-file | `src/utils-test.md` | 1 | 6 | 26 | 2026-08-08 |
 | `src/worktree.ts` | single-file | `src/worktree-test.md` | 1 | 1 | 17 | 2026-08-08 |
-| `web/branchCleanupPanel.ts` | single-file | `web/branchCleanupPanel-test.md` | 1 | 4 | 35 | 2026-08-25 |
+| `web/branchCleanupPanel.ts` | single-file | `web/branchCleanupPanel-test.md` | 1 | 5 | 43 | 2026-08-29 |
 | `web/branchLabels.ts` | single-file | `web/branchLabels-test.md` | 1 | 1 | 17 | 2026-03-21 |
 | `web/commitMenu.ts` | single-file | `web/commitMenu-test.md` | 1 | 11 | 50 | 2026-07-19 |
 | `web/contextMenu.ts` | single-file | `web/contextMenu-test.md` | 1 | 3 | 22 | 2026-05-02 |
@@ -119,9 +119,10 @@
 | Feature 050 (pnpm-security-update) (light-spec-plan) | `package.json-test.md` |
 | Feature 051 (remote-checkout-pull) (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | Feature 052 (detached-worktree-display) (light-spec-plan) | `src/dataSource-test/INDEX.md`, `src/repoFileWatcher-test.md`, `src/types-test.md`, `src/utils-test.md`, `src/worktree-test.md`, `web/main-test/INDEX.md`, `web/utils-test.md` |
-| Feature 055-01 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `web/dialogs-test.md`, `web/messageHandler-test/INDEX.md` |
+| Feature 055-01 (light-spec-plan) | `web/dialogs-test.md`, `web/messageHandler-test/INDEX.md` |
 | Feature 055-02 (light-spec-plan) | `media/dropdown-test.md`, `media/findwidget-test.md`, `media/main-test.md` |
 | Feature 055-03 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `src/branchCleanup-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/i18n-test.md`, `src/types-test.md`, `web/branchCleanupPanel-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
+| Feature 055-03 follow-up | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `web/branchCleanupPanel-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
 | test-plan | `web/stashMenu-test.md` |

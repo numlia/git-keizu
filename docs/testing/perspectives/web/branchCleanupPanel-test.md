@@ -206,3 +206,55 @@ table は createElement と textContent で構築し、ancestry / ahead-behind /
 - Normal: TC-027、TC-035
 
 **失敗系/正常系比（煙感知器）**: 正常系2件（TC-027、TC-035）、失敗系7件（TC-028〜TC-034）、比3.5。eligibility の否定分岐を条件ごとに 1 case ずつ置いた構造で、インベントリ由来の導出である。
+
+## S5: syncComparisonOptions() の比較先 label（自動解決値の表示）
+
+> Origin: Feature 055-03 follow-up
+> Added: 2026-08-29
+> Status: active
+> Supersedes: -
+> Signature: `BranchCleanupPanel.syncComparisonOptions(): void`
+> Target Path: `web/branchCleanupPanel.ts`（syncComparisonOptions()。Task 3 実装後に行範囲へ更新）
+> Test File: `tests/web/branchCleanupPanel.test.ts`
+
+自動選択かつ loaded のときだけ `view.compareBranch ?? t("cleanup.state.notSelected")` を `t("cleanup.comparison.autoResolved", resolved)` へ渡して auto option name を作り、明示選択・loading・failed では `t("cleanup.comparison.auto")` を使う契約（対応プラン §3.1 / §3.2）。auto option の value は `COMPARISON_AUTO_VALUE`（空文字）、Request の自動指定は `compareBranch: null` のまま維持する。locale 固定値の正本は l10n owner（`../l10n/web/web.l10n.en.json-test.md` S7 / `../l10n/web/web.l10n.ja.json-test.md` S8）の責務で、本表は表示分岐だけを扱う。
+
+| Case ID | Input / Precondition                                                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                    | Notes                          |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------ |
+| TC-036  | 自動選択（`selectedComparison === null`）で `compareBranch: "main"` の最新 loaded 応答を受信                                  | Normal - 自動解決 label                                                    | auto option の name と dropdown の current 表示 `textContent` が `Automatic (main)` になり、`sendMessage` の request 引数は `compareBranch: null` のまま変化しない | 解決値の表示（主回帰）         |
+| TC-037  | 自動選択で `compareBranch: null` の最新 loaded 応答を受信                                                                     | Boundary - null 解決値                                                     | auto option の name が `Automatic (No comparison target)`（`cleanup.state.notSelected` を `{0}` へ埋めた値）と `toBe` で一致し、`Automatic ()` を表示しない        | null と空文字を混同しない      |
+| TC-038  | `develop` を明示選択済み（最新 `branchNames` に存在）で `compareBranch: "develop"` の loaded 応答を受信                       | Normal - 明示選択の非混同                                                  | dropdown の current 表示 `textContent` が `develop`、auto option の name が `Automatic`（resolved 形式 `(` を含まない）である                                      | 明示へ resolved label 混入禁止 |
+| TC-039  | `feature/x` を選択後、最新 loaded 応答の `branchNames` に `feature/x` が存在しない（`compareBranch: "main"`）                 | Validation - 消失選択の fallback                                           | current 表示が auto option になり、その name の `textContent` が `Automatic (main)` になる                                                                         | 反例: 選択 branch の消失       |
+| TC-040  | 自動選択で `compareBranch: "x<img>"` の最新 loaded 応答を受信                                                                 | Type - HTML 風名称の element 化防止                                        | dropdown 内の `img` element が 0 件で、current 表示の `textContent` が `Automatic (x<img>)` と `toBe` で一致する                                                   | escapeHtml 経路のみで描画      |
+| TC-041  | 自動選択で request 送信直後（loading 表示中、応答未受信）                                                                     | Normal - loading 中の label                                                | auto option の name と current 表示 `textContent` が `Automatic` で、resolved 形式 `(` を含まない                                                                  | 推測値を表示しない             |
+| TC-042  | 自動選択で `compareBranch: "main"` の loaded 表示後、refresh への `kind: "error"` 応答で failed 表示                          | Exception - failed 中の label                                              | auto option の name と current 表示 `textContent` が `Automatic` で、過去の解決値 `main` を含まない                                                                | 反例: 過去値の残留             |
+| TC-043  | `compareBranch: "main"` の loaded 表示から同一 repository で `refresh()` を呼び、その後 `compareBranch: "develop"` の最新応答 | Normal - 同一 repository refresh の label 同期                             | 応答前は行表示が維持されたまま current 表示が `Automatic (main)` の旧値で、最新応答受信後に表の再描画と同時に current 表示が `Automatic (develop)` へ更新される    | 表と label の基準一致          |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-03 follow-up 追加分（S5）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                                                       |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| 明示選択への resolved label 混入                      | TC-038                                                                                                         |
+| null 解決値の `Automatic ()` 化（未確定と空文字混同） | TC-037                                                                                                         |
+| 消失選択の current 表示継続（fallback 欠落）          | TC-039                                                                                                         |
+| branch 名の HTML 解釈（element 化）                   | TC-040                                                                                                         |
+| loading / failed での過去値・推測値表示               | TC-041、TC-042                                                                                                 |
+| refresh 中の表と label の基準不一致                   | TC-043                                                                                                         |
+| 解決値の非表示（常に `Automatic` のまま）             | TC-036                                                                                                         |
+| Request payload への解決値の混入                      | TC-036（`compareBranch: null` 維持を mock 引数で検証）                                                         |
+| 応答の構造不正・stale                                 | excluded(S2 TC-011〜TC-017 の責務。本 section は validate 済み view からの label 決定のみを扱う)               |
+| locale 固定値の drift・parity                         | excluded(l10n owner S7 / S8 の責務)                                                                            |
+| 外部依存×失敗モード                                   | excluded(外部依存なし)                                                                                         |
+| 境界値（0 / minimum / maximum / +/-1 / empty）        | excluded(数値入力なし。NULL は TC-037、auto value の空文字は `COMPARISON_AUTO_VALUE` 契約として TC-036 で充足) |
+| 不正な型・フォーマット                                | excluded(応答の runtime validation は S2 の責務。HTML 風名称は TC-040 で充足)                                  |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-039
+- Exception: TC-042
+- External: excluded(外部依存なし)
+- Boundary: TC-037
+- Type: TC-040
+- Normal: TC-036、TC-038、TC-041、TC-043
+
+**失敗系/正常系比（煙感知器）**: 正常系4件（TC-036、TC-038、TC-041、TC-043）、失敗系4件（TC-037、TC-039、TC-040、TC-042）。同数のためインベントリを再導出したが、label 決定の失敗源は明示混同・null 混同・消失 fallback・HTML 解釈・loading／failed の過去値表示に限られ、応答検証系の失敗源は S2 へ割り当て済みであることを確認した。
