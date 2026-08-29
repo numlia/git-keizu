@@ -549,7 +549,7 @@ body.unableToLoad p {
 #branchCleanupBtn.active {
   background-color: var(--vscode-inputOption-activeBackground);
   /* Inset shadow instead of a border keeps the 20px button box unchanged */
-  box-shadow: inset 0 0 0 1px var(--vscode-inputOption-activeBorder);
+  box-shadow: inset 0 0 0 1px var(--vscode-focusBorder);
   border-radius: 3px;
 }
 /* Load more */
