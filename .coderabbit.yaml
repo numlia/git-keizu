@@ -1,0 +1,18 @@
+# CodeRabbit review settings
+# Reference: https://docs.coderabbit.ai/reference/configuration
+#
+# Coding conventions are picked up automatically from CLAUDE.md / AGENTS.md,
+# so they are not duplicated here.
+
+language: ja-JP
+
+reviews:
+  auto_review:
+    # Draft PRs are skipped by default; this project wants them reviewed too.
+    drafts: true
+
+knowledge_base:
+  code_guidelines:
+    filePatterns:
+      - "docs/test-supplement.md"
+      - "docs/development/directory-structure.md"
