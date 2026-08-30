@@ -1,3 +1,4 @@
+import { BranchCleanupPanel } from "./branchCleanupPanel";
 import { getBranchLabels } from "./branchLabels";
 import { buildCommitContextMenuItems } from "./commitMenu";
 import {
@@ -20,7 +21,7 @@ import { findCommitElemWithId, FindWidget, getCommitElems } from "./findWidget";
 import { Graph } from "./graph";
 import { t } from "./i18n";
 import { handleMessage, type RefreshMode } from "./messageHandler";
-import { buildRefContextMenuItems, checkoutBranchAction } from "./refMenu";
+import { buildRefContextMenuItems, checkoutBranchAction, showDeleteBranchDialog } from "./refMenu";
 import { buildStashContextMenuItems } from "./stashMenu";
 import { buildUncommittedContextMenuItems } from "./uncommittedMenu";
 import {
@@ -149,6 +150,8 @@ class GitKeizuView {
   private authorDropdown: Dropdown;
   private showRemoteBranchesElem: HTMLInputElement;
   private scrollShadowElem: HTMLElement;
+  private branchCleanupPanel: BranchCleanupPanel;
+  private pendingBranchScroll: string | null = null;
 
   private loadBranchesCallback: ((changes: boolean, isRepo: boolean) => void) | null = null;
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
@@ -179,6 +182,7 @@ class GitKeizuView {
     this.scrollContainerElem = document.getElementById("scrollContainer")!;
     this.repoDropdown = new Dropdown("repoSelect", true, t("toolbar.repos"), (value) => {
       this.currentRepo = value;
+      this.branchCleanupPanel.selectRepository(value);
       this.maxCommits = this.config.initialLoadCommits;
       this.expandedCommit = null;
       this.selectedBranches = [];
@@ -227,6 +231,19 @@ class GitKeizuView {
     refreshBtnElem.addEventListener("click", () => {
       this.refresh("hard");
     });
+    this.branchCleanupPanel = new BranchCleanupPanel({
+      showBranch: (branchName) => this.showBranchInGraph(branchName),
+      showDeleteDialog: (repo, branchName, remotes) =>
+        showDeleteBranchDialog(repo, branchName, remotes)
+    });
+    const branchCleanupBtnElem = document.getElementById("branchCleanupBtn");
+    if (branchCleanupBtnElem !== null) {
+      branchCleanupBtnElem.innerHTML = svgIcons.branch;
+      branchCleanupBtnElem.addEventListener("click", () => {
+        this.branchCleanupPanel.toggle(this.currentRepo);
+        branchCleanupBtnElem.classList.toggle("active", this.branchCleanupPanel.isOpen());
+      });
+    }
     const fetchBtnElem = document.getElementById("fetchBtn")!;
     fetchBtnElem.innerHTML = svgIcons.fetch;
     fetchBtnElem.addEventListener("click", () => {
@@ -331,6 +348,7 @@ class GitKeizuView {
         lastActiveRepo !== null && repos[lastActiveRepo] !== undefined
           ? lastActiveRepo
           : repoPaths[0];
+      this.branchCleanupPanel.selectRepository(this.currentRepo);
       this.saveState();
       changedRepo = true;
     }
@@ -358,6 +376,7 @@ class GitKeizuView {
     }
 
     this.currentRepo = repo;
+    this.branchCleanupPanel.selectRepository(repo);
     const repoPaths = Object.keys(this.gitRepos);
     const options = repoPaths.map((path) => {
       const comps = path.split("/");
@@ -406,6 +425,11 @@ class GitKeizuView {
     }
     this.saveState();
 
+    this.syncBranchDropdownOptions();
+
+    this.triggerLoadBranchesCallback(true, isRepo);
+  }
+  private syncBranchDropdownOptions() {
     const options = [{ name: ALL_BRANCHES_LABEL, value: ALL_BRANCHES_VALUE }];
     for (let i = 0; i < this.gitBranches.length; i++) {
       options.push({
@@ -416,8 +440,6 @@ class GitKeizuView {
       });
     }
     this.branchDropdown.setOptions(options, this.selectedBranches);
-
-    this.triggerLoadBranchesCallback(true, isRepo);
   }
   private triggerLoadBranchesCallback(changes: boolean, isRepo: boolean) {
     const callback = this.loadBranchesCallback;
@@ -502,6 +524,7 @@ class GitKeizuView {
     const { options, selected } = buildAuthorOptions(authorList, this.selectedAuthors);
     this.authorDropdown.setOptions(options, selected);
 
+    this.consumePendingBranchScroll();
     this.triggerLoadCommitsCallback(true);
     this.fetchAvatars(avatarsNeeded);
     this.updateCurrentBtnState();
@@ -530,6 +553,36 @@ class GitKeizuView {
     viewState.showRecentActions = showRecentActions;
   }
 
+  public loadBranchCleanup(response: GG.ResponseLoadBranchCleanup) {
+    this.branchCleanupPanel.handleResponse(response);
+  }
+
+  /* Branch Cleanup Panel */
+  private showBranchInGraph(branchName: string) {
+    this.selectedBranches = [branchName];
+    this.maxCommits = this.config.initialLoadCommits;
+    this.syncBranchDropdownOptions();
+    this.saveState();
+    this.pendingBranchScroll = branchName;
+    this.refresh("hard");
+  }
+
+  private consumePendingBranchScroll() {
+    if (this.pendingBranchScroll === null) return;
+    const branchName = this.pendingBranchScroll;
+    this.pendingBranchScroll = null;
+    const labels = document.querySelectorAll<HTMLElement>(".gitRef.head");
+    for (let i = 0; i < labels.length; i++) {
+      if (labels[i].dataset.name !== branchName) continue;
+      const commitElem = labels[i].closest<HTMLElement>(".commit");
+      const hash = commitElem?.dataset.hash;
+      if (hash !== undefined) {
+        this.scrollToCommit(hash, true, true);
+      }
+      return;
+    }
+  }
+
   /* Refresh */
   public refresh(mode: RefreshMode) {
     if (mode === "hard") {
@@ -540,6 +593,9 @@ class GitKeizuView {
       this.renderShowLoading();
     }
     this.requestLoadBranchesAndCommits(mode !== "soft");
+    if (this.branchCleanupPanel.isOpen()) {
+      this.branchCleanupPanel.refresh(this.currentRepo);
+    }
   }
 
   /* Requests */

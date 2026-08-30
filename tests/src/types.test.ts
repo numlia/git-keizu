@@ -1,14 +1,26 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  BranchCleanupAheadBehind,
+  BranchCleanupAncestry,
+  BranchCleanupLastCommit,
+  BranchCleanupResult,
+  BranchCleanupRow,
+  BranchCleanupTreeDifference,
+  BranchCleanupUpstream,
+  BranchCleanupWorktree,
   CheckoutBranchResult,
   DetachedWorktreeInfo,
   PushTarget,
   RemoteBranchTarget,
   RequestCheckoutBranch,
+  RequestLoadBranchCleanup,
+  RequestMessage,
   RequestPush,
   ResponseCheckoutBranch,
+  ResponseLoadBranchCleanup,
   ResponseLoadCommits,
+  ResponseMessage,
   ResponseOpenWorktreeInNewWindow,
   ResponsePush,
   ResponseRevealWorktreeInOS,
@@ -916,5 +928,386 @@ describe("ResponseLoadCommits worktrees field contract", () => {
     // When: the collection side of the field is inspected at runtime
     // Then: branches is absent, confirming the flat shape is not a collection
     expect(response.worktrees!.branches).toBeUndefined();
+  });
+});
+
+// S8: branch cleanup 診断の fact union と message 型契約
+// @see docs/testing/perspectives/src/types-test.md
+describe("branch cleanup fact unions", () => {
+  it("accepts the 4 ancestry literals and rejects a verdict word (TC-092)", () => {
+    // Case: TC-092
+    // Given: the four ancestry literals and a verdict-style word
+    const ancestor: BranchCleanupAncestry = "ancestor";
+    const notAncestor: BranchCleanupAncestry = "notAncestor";
+    const unknown: BranchCleanupAncestry = "unknown";
+    const notSelected: BranchCleanupAncestry = "notSelected";
+    // @ts-expect-error a one-word safety verdict is not part of the union
+    const verdict: BranchCleanupAncestry = "safe";
+
+    // When/Then: the four union members hold their literal values
+    expect(ancestor).toBe("ancestor");
+    expect(notAncestor).toBe("notAncestor");
+    expect(unknown).toBe("unknown");
+    expect(notSelected).toBe("notSelected");
+    expect(verdict).toBe("safe");
+  });
+
+  it("accepts the 4 tree difference literals and rejects an outside value (TC-093)", () => {
+    // Case: TC-093
+    // Given: the four tree difference literals and an outside value
+    const same: BranchCleanupTreeDifference = "same";
+    const different: BranchCleanupTreeDifference = "different";
+    const unknown: BranchCleanupTreeDifference = "unknown";
+    const notSelected: BranchCleanupTreeDifference = "notSelected";
+    // @ts-expect-error "differ" is not part of the union
+    const outside: BranchCleanupTreeDifference = "differ";
+
+    // When/Then: the four union members hold their literal values
+    expect(same).toBe("same");
+    expect(different).toBe("different");
+    expect(unknown).toBe("unknown");
+    expect(notSelected).toBe("notSelected");
+    expect(outside).toBe("differ");
+  });
+
+  it("requires both numbers on the known aheadBehind variant (TC-094)", () => {
+    // Case: TC-094
+    // Given: a complete known literal and one missing ahead
+    const known: BranchCleanupAheadBehind = { kind: "known", ahead: 0, behind: 0 };
+    // @ts-expect-error ahead is mandatory on the known variant
+    const missingAhead: BranchCleanupAheadBehind = { kind: "known", behind: 0 };
+
+    // When/Then: the complete literal keeps both numbers
+    expect(known).toEqual({ kind: "known", ahead: 0, behind: 0 });
+    expect(missingAhead.kind).toBe("known");
+  });
+
+  it("keeps unknown and notSelected aheadBehind as separate number-free variants (TC-095)", () => {
+    // Case: TC-095
+    // Given: the unknown and notSelected variants
+    const unknown: BranchCleanupAheadBehind = { kind: "unknown" };
+    const notSelected: BranchCleanupAheadBehind = { kind: "notSelected" };
+
+    // When: each value is narrowed by kind
+    // Then: neither failure variant exposes the ahead number
+    expect(unknown.kind).toBe("unknown");
+    if (unknown.kind === "unknown") {
+      // @ts-expect-error ahead only exists on the known variant
+      expect(unknown.ahead).toBeUndefined();
+    }
+    expect(notSelected.kind).toBe("notSelected");
+    if (notSelected.kind === "notSelected") {
+      // @ts-expect-error ahead only exists on the known variant
+      expect(notSelected.ahead).toBeUndefined();
+    }
+  });
+
+  it("requires name on the present and gone upstream variants (TC-096)", () => {
+    // Case: TC-096
+    // Given: name-less present / gone literals and complete counterparts
+    // @ts-expect-error present requires a name
+    const namelessPresent: BranchCleanupUpstream = { kind: "present" };
+    // @ts-expect-error gone requires a name
+    const namelessGone: BranchCleanupUpstream = { kind: "gone" };
+    const present: BranchCleanupUpstream = { kind: "present", name: "origin/x" };
+    const gone: BranchCleanupUpstream = { kind: "gone", name: "origin/x" };
+
+    // When/Then: the complete literals compile and keep their names
+    expect(namelessPresent.kind).toBe("present");
+    expect(namelessGone.kind).toBe("gone");
+    expect(present).toEqual({ kind: "present", name: "origin/x" });
+    expect(gone).toEqual({ kind: "gone", name: "origin/x" });
+  });
+
+  it("keeps unset and unknown upstream as separate name-free variants (TC-097)", () => {
+    // Case: TC-097
+    // Given: the unset and unknown variants
+    const unset: BranchCleanupUpstream = { kind: "unset" };
+    const unknown: BranchCleanupUpstream = { kind: "unknown" };
+
+    // When: each value is narrowed by kind
+    // Then: neither variant exposes a name
+    expect(unset.kind).toBe("unset");
+    if (unset.kind === "unset") {
+      // @ts-expect-error name only exists on present / gone
+      expect(unset.name).toBeUndefined();
+    }
+    expect(unknown.kind).toBe("unknown");
+    if (unknown.kind === "unknown") {
+      // @ts-expect-error name only exists on present / gone
+      expect(unknown.name).toBeUndefined();
+    }
+  });
+
+  it("requires path and isMain on the used worktree variant (TC-098)", () => {
+    // Case: TC-098
+    // Given: a complete used literal and literals missing path / isMain
+    const used: BranchCleanupWorktree = { kind: "used", path: "/wt", isMain: false };
+    // @ts-expect-error path is mandatory on the used variant
+    const missingPath: BranchCleanupWorktree = { kind: "used", isMain: false };
+    // @ts-expect-error isMain is mandatory on the used variant
+    const missingIsMain: BranchCleanupWorktree = { kind: "used", path: "/wt" };
+
+    // When/Then: the complete literal keeps both fields
+    expect(used).toEqual({ kind: "used", path: "/wt", isMain: false });
+    expect(missingPath.kind).toBe("used");
+    expect(missingIsMain.kind).toBe("used");
+  });
+
+  it("keeps unused and unknown worktree as separate path-free variants (TC-099)", () => {
+    // Case: TC-099
+    // Given: the unused and unknown variants
+    const unused: BranchCleanupWorktree = { kind: "unused" };
+    const unknown: BranchCleanupWorktree = { kind: "unknown" };
+
+    // When: each value is narrowed by kind
+    // Then: neither variant exposes a path
+    expect(unused.kind).toBe("unused");
+    if (unused.kind === "unused") {
+      // @ts-expect-error path only exists on the used variant
+      expect(unused.path).toBeUndefined();
+    }
+    expect(unknown.kind).toBe("unknown");
+    if (unknown.kind === "unknown") {
+      // @ts-expect-error path only exists on the used variant
+      expect(unknown.path).toBeUndefined();
+    }
+  });
+
+  it("requires unixSeconds on the known lastCommit variant and accepts 0 (TC-100)", () => {
+    // Case: TC-100
+    // Given: a known literal with the epoch 0 and one missing unixSeconds
+    const known: BranchCleanupLastCommit = { kind: "known", unixSeconds: 0 };
+    // @ts-expect-error unixSeconds is mandatory on the known variant
+    const missingSeconds: BranchCleanupLastCommit = { kind: "known" };
+
+    // When/Then: the complete literal keeps the epoch value
+    expect(known).toEqual({ kind: "known", unixSeconds: 0 });
+    expect(missingSeconds.kind).toBe("known");
+  });
+
+  it("accepts a complete row literal (TC-101)", () => {
+    // Case: TC-101
+    // Given: a row literal carrying every fact field
+    const row: BranchCleanupRow = {
+      branchName: "feature/x",
+      isCurrent: false,
+      ancestry: "ancestor",
+      aheadBehind: { kind: "known", ahead: 1, behind: 2 },
+      treeDifference: "different",
+      upstream: { kind: "present", name: "origin/feature/x" },
+      worktree: { kind: "unused" },
+      lastCommit: { kind: "known", unixSeconds: 1700000100 },
+      remotes: ["origin"]
+    };
+
+    // When/Then: each fact field is reachable with its union value intact
+    expect(row.ancestry).toBe("ancestor");
+    expect(row.aheadBehind).toEqual({ kind: "known", ahead: 1, behind: 2 });
+    expect(row.upstream).toEqual({ kind: "present", name: "origin/feature/x" });
+    expect(row.worktree).toEqual({ kind: "unused" });
+    expect(row.lastCommit).toEqual({ kind: "known", unixSeconds: 1700000100 });
+  });
+
+  it("rejects a row literal missing the ancestry fact (TC-102)", () => {
+    // Case: TC-102
+    // Given: a row literal without ancestry
+    // @ts-expect-error every fact field of the row is mandatory
+    const row: BranchCleanupRow = {
+      branchName: "feature/x",
+      isCurrent: false,
+      aheadBehind: { kind: "unknown" },
+      treeDifference: "unknown",
+      upstream: { kind: "unset" },
+      worktree: { kind: "unused" },
+      lastCommit: { kind: "unknown" },
+      remotes: null
+    };
+
+    // When/Then: the incomplete literal is only observable through its present fields
+    expect(row.branchName).toBe("feature/x");
+  });
+
+  it("allows null remotes but not an omitted remotes field (TC-103)", () => {
+    // Case: TC-103
+    // Given: a row with the failure value null and one omitting the field
+    const failedRemotes: BranchCleanupRow = {
+      branchName: "feature/x",
+      isCurrent: false,
+      ancestry: "unknown",
+      aheadBehind: { kind: "unknown" },
+      treeDifference: "unknown",
+      upstream: { kind: "unset" },
+      worktree: { kind: "unknown" },
+      lastCommit: { kind: "unknown" },
+      remotes: null
+    };
+    // @ts-expect-error remotes may be null but never omitted
+    const omittedRemotes: BranchCleanupRow = {
+      branchName: "feature/x",
+      isCurrent: false,
+      ancestry: "unknown",
+      aheadBehind: { kind: "unknown" },
+      treeDifference: "unknown",
+      upstream: { kind: "unset" },
+      worktree: { kind: "unknown" },
+      lastCommit: { kind: "unknown" }
+    };
+
+    // When/Then: the failure null is distinguishable from omission
+    expect(failedRemotes.remotes).toBeNull();
+    expect(omittedRemotes.remotes).toBeUndefined();
+  });
+
+  it("allows null isCurrent for a detached snapshot (TC-104)", () => {
+    // Case: TC-104
+    // Given: a row whose isCurrent is null
+    const row: BranchCleanupRow = {
+      branchName: "feature/x",
+      isCurrent: null,
+      ancestry: "unknown",
+      aheadBehind: { kind: "unknown" },
+      treeDifference: "unknown",
+      upstream: { kind: "unset" },
+      worktree: { kind: "unknown" },
+      lastCommit: { kind: "unknown" },
+      remotes: null
+    };
+
+    // When/Then: the null value stays distinguishable from false
+    expect(row.isCurrent).toBeNull();
+  });
+
+  it("accepts the ok result variant and narrows to its fields (TC-105)", () => {
+    // Case: TC-105
+    // Given: an ok result without a comparison target
+    const result: BranchCleanupResult = { kind: "ok", compareBranch: null, rows: [] };
+
+    // When: the result is narrowed by kind
+    // Then: rows and compareBranch are reachable
+    expect(result.kind).toBe("ok");
+    if (result.kind === "ok") {
+      expect(result.rows).toEqual([]);
+      expect(result.compareBranch).toBeNull();
+    }
+  });
+
+  it("keeps rows out of the error result variant (TC-106)", () => {
+    // Case: TC-106
+    // Given: an error result
+    const result: BranchCleanupResult = { kind: "error", status: "fatal" };
+
+    // When: the result is narrowed by kind
+    // Then: the error variant has no rows field
+    expect(result.kind).toBe("error");
+    if (result.kind === "error") {
+      // @ts-expect-error rows only exists on the ok variant
+      expect(result.rows).toBeUndefined();
+      expect(result.status).toBe("fatal");
+    }
+  });
+
+  it("rejects an unknown result kind (TC-107)", () => {
+    // Case: TC-107
+    // Given: a literal outside the result union
+    // @ts-expect-error "partial" is not a BranchCleanupResult kind
+    const result: BranchCleanupResult = { kind: "partial" };
+
+    // When/Then: the value is only observable through its kind
+    expect(result.kind).toBe("partial");
+  });
+
+  it("requires compareBranch on the request (TC-108)", () => {
+    // Case: TC-108
+    // Given: a complete request literal and one omitting compareBranch
+    const request: RequestLoadBranchCleanup = {
+      command: "loadBranchCleanup",
+      repo: "/r",
+      requestId: 1,
+      compareBranch: null
+    };
+    // @ts-expect-error compareBranch may be null but never omitted
+    const omitted: RequestLoadBranchCleanup = {
+      command: "loadBranchCleanup",
+      repo: "/r",
+      requestId: 1
+    };
+
+    // When/Then: the complete literal keeps its fields
+    expect(request.compareBranch).toBeNull();
+    expect(omitted.compareBranch).toBeUndefined();
+  });
+
+  it("joins the request into the RequestMessage union (TC-109)", () => {
+    // Case: TC-109
+    // Given: a diagnostic request assigned to the message union
+    const message: RequestMessage = {
+      command: "loadBranchCleanup",
+      repo: "/r",
+      requestId: 1,
+      compareBranch: null
+    };
+
+    // When: the union is narrowed by command
+    // Then: the diagnostic fields are reachable
+    expect(message.command).toBe("loadBranchCleanup");
+    if (message.command === "loadBranchCleanup") {
+      expect(message.requestId).toBe(1);
+      expect(message.compareBranch).toBeNull();
+    }
+  });
+
+  it("requires requestId on the response and joins the ResponseMessage union (TC-110)", () => {
+    // Case: TC-110
+    // Given: a complete response assigned to both types and one missing requestId
+    const response: ResponseLoadBranchCleanup = {
+      command: "loadBranchCleanup",
+      repo: "/r",
+      requestId: 1,
+      result: { kind: "ok", compareBranch: null, rows: [] }
+    };
+    const message: ResponseMessage = response;
+    // @ts-expect-error requestId is mandatory for the freshness echo
+    const missingRequestId: ResponseLoadBranchCleanup = {
+      command: "loadBranchCleanup",
+      repo: "/r",
+      result: { kind: "ok", compareBranch: null, rows: [] }
+    };
+
+    // When: the union is narrowed by command
+    // Then: repo and requestId echo fields are reachable
+    expect(message.command).toBe("loadBranchCleanup");
+    if (message.command === "loadBranchCleanup") {
+      expect(message.repo).toBe("/r");
+      expect(message.requestId).toBe(1);
+    }
+    expect(missingRequestId.requestId).toBeUndefined();
+  });
+
+  it("narrows the ancestry union exhaustively (TC-111)", () => {
+    // Case: TC-111
+    // Given: a switch that enumerates the four ancestry literals
+    const label = (value: BranchCleanupAncestry): string => {
+      switch (value) {
+        case "ancestor":
+          return "a";
+        case "notAncestor":
+          return "n";
+        case "unknown":
+          return "u";
+        case "notSelected":
+          return "s";
+        default: {
+          const exhaustive: never = value;
+          return exhaustive;
+        }
+      }
+    };
+
+    // When/Then: every literal reaches its own case and the default stays unreachable
+    expect(label("ancestor")).toBe("a");
+    expect(label("notAncestor")).toBe("n");
+    expect(label("unknown")).toBe("u");
+    expect(label("notSelected")).toBe("s");
   });
 });

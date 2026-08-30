@@ -478,7 +478,7 @@ body.unableToLoad p {
   top: 0;
   z-index: var(--git-keizu-z-index-controls);
   background-color: var(--vscode-editor-background);
-  padding: 4px 104px 4px 0;
+  padding: 4px 128px 4px 0;
   border-bottom: 1px solid rgba(128, 128, 128, 0.5);
   line-height: 32px;
   text-align: center;
@@ -510,7 +510,8 @@ body.unableToLoad p {
   width: 14px;
   vertical-align: text-top;
 }
-/* Toolbar icon buttons (search / fetch / current / refresh) */
+/* Toolbar icon buttons (branch cleanup / search / fetch / current / refresh) */
+#branchCleanupBtn,
 #searchBtn,
 #fetchBtn,
 #currentBtn,
@@ -522,6 +523,9 @@ body.unableToLoad p {
   margin-top: -10px;
   cursor: pointer;
   user-select: none;
+}
+#branchCleanupBtn {
+  right: 106px;
 }
 #searchBtn {
   right: 82px;
@@ -542,6 +546,12 @@ body.unableToLoad p {
   opacity: 0.4;
   cursor: default;
 }
+#branchCleanupBtn.active {
+  background-color: var(--vscode-inputOption-activeBackground);
+  /* Inset shadow instead of a border keeps the 20px button box unchanged */
+  box-shadow: inset 0 0 0 1px var(--vscode-focusBorder);
+  border-radius: 3px;
+}
 /* Load more */
 #loadMoreCommitsBtn {
   width: 180px;
@@ -549,6 +559,83 @@ body.unableToLoad p {
   margin: 10px auto;
   border-radius: 14px;
   line-height: 28px;
+}
+
+/* -- Branch Cleanup Panel -------------------------------------------------- */
+
+#branchCleanupPanel {
+  flex-shrink: 0;
+  max-height: 40vh;
+  min-height: 0;
+  overflow-x: auto;
+  overflow-y: auto;
+  background-color: var(--vscode-editor-background);
+  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
+  font-size: 13px;
+}
+#branchCleanupPanel[hidden] {
+  display: none;
+}
+.branchCleanupHeader {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 10px;
+}
+.branchCleanupTitle {
+  font-weight: 700;
+}
+.branchCleanupComparison {
+  display: flex;
+  align-items: center;
+  /* Matches the toolbar's label-to-dropdown distance: #branchSelect's 3px margin plus the
+     ~4px word space that flex layout drops */
+  gap: 7px;
+}
+/* .dropdown's top margin compensates the toolbar's 32px line-height; the flex header centers
+   its items itself, so neutralize it here */
+#branchCleanupPanel .dropdown {
+  margin-top: 0;
+}
+.branchCleanupMessage {
+  padding: 4px 10px;
+  opacity: 0.7;
+}
+#branchCleanupPanel table {
+  border-collapse: collapse;
+}
+#branchCleanupPanel th,
+#branchCleanupPanel td {
+  white-space: nowrap;
+  padding: 2px 10px;
+  text-align: left;
+  font-size: 13px;
+}
+#branchCleanupPanel th {
+  position: sticky;
+  top: 0;
+  background-color: var(--vscode-editor-background);
+  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
+}
+#branchCleanupPanel th.branchCleanupActionCell,
+#branchCleanupPanel td.branchCleanupActionCell {
+  position: sticky;
+  right: 0;
+  background-color: var(--vscode-editor-background);
+}
+.branchCleanupActionBtn {
+  display: inline-block;
+  line-height: 18px;
+  padding: 0 8px;
+  margin: 1px 2px;
+  border-radius: 9px;
+}
+.branchCleanupActionBtn.disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.branchCleanupActionBtn.disabled:hover {
+  background-color: rgba(128, 128, 128, 0.1);
 }
 
 /* -- Context Menu ---------------------------------------------------------- */

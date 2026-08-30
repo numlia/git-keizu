@@ -294,6 +294,16 @@ export class GitKeizuView {
                 status: await this.dataSource.deleteTag(msg.repo, msg.tagName)
               });
               break;
+            case "loadBranchCleanup":
+              if (Number.isSafeInteger(msg.requestId) && msg.requestId > 0) {
+                this.sendMessage({
+                  command: "loadBranchCleanup",
+                  repo: msg.repo,
+                  requestId: msg.requestId,
+                  result: await this.dataSource.getBranchCleanup(msg.repo, msg.compareBranch)
+                });
+              }
+              break;
             case "loadBranches": {
               const branchData = await this.dataSource.getBranches(
                 msg.repo,
@@ -653,11 +663,13 @@ export class GitKeizuView {
 				<span id="branchControl"><span class="unselectable">${hostT("Branches:")} </span><div id="branchSelect" class="dropdown"></div></span>
 				<span id="authorControl"><span class="unselectable">${hostT("Authors:")} </span><div id="authorSelect" class="dropdown"></div></span>
 				<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" value="1" checked><span class="customCheckbox"></span>${hostT("Show Remote Branches")}</label>
+				<div id="branchCleanupBtn" title="${hostT("Branch Cleanup")}"></div>
 				<div id="searchBtn" title="${hostT("Search")}"></div>
 				<div id="fetchBtn" title="${hostT("Fetch --prune")}"></div>
 				<div id="currentBtn" title="${hostT("Current")}"></div>
 				<div id="refreshBtn" title="${hostT("Refresh")}"></div>
 			</div>
+			<div id="branchCleanupPanel" hidden></div>
 			<div id="scrollContainer">
 				<div id="scrollShadow"></div>
 				<div id="content">

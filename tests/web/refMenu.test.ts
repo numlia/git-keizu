@@ -45,6 +45,7 @@ import {
   buildRefContextMenuItems,
   checkoutBranchAction,
   parseRemoteRef,
+  showDeleteBranchDialog,
   showPushRemoteDialog
 } from "../../web/refMenu";
 import { escapeHtml, getRepoName, sanitizeBranchNameForPath, sendMessage } from "../../web/utils";
@@ -2206,5 +2207,93 @@ describe("push remote dialog repository handover", () => {
       operationId: "op-2",
       selectedRemote: "origin"
     });
+  });
+});
+
+// S21: showDeleteBranchDialog() export 後の既存 dialog 契約維持
+// @see docs/testing/perspectives/web/refMenu-test/01-branch-actions-01.md
+describe("showDeleteBranchDialog exported contract (S21)", () => {
+  const DELETE_MESSAGE = "Are you sure you want to delete the branch <b><i>feature/x</i></b>?";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("keeps the two unchecked checkboxes and wording when called directly (TC-102)", () => {
+    // Case: TC-102
+    // Given: the exported function and a branch that exists on one remote
+    // When: it is called directly (the branch cleanup panel path)
+    showDeleteBranchDialog("/repo", "feature/x", ["origin"]);
+
+    // Then: showFormDialog runs once with the existing message, both checkboxes
+    // defaulting to false, and the existing action name
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const call = vi.mocked(showFormDialog).mock.calls[0];
+    expect(call[0]).toBe(DELETE_MESSAGE);
+    expect(call[1]).toEqual([
+      { type: "checkbox", name: "Force Delete", value: false },
+      { type: "checkbox", name: "Delete this branch on the remote", value: false }
+    ]);
+    expect(call[2]).toBe("Delete Branch");
+  });
+
+  it("keeps the checkbox dialog for zero remotes when called directly (TC-103)", () => {
+    // Case: TC-103
+    // Given: the exported function and a branch on no remote
+    // When: it is called directly
+    showDeleteBranchDialog("/repo", "feature/x", []);
+
+    // Then: showCheckboxDialog runs once with Force Delete defaulting to false
+    expect(showCheckboxDialog).toHaveBeenCalledTimes(1);
+    expect(showFormDialog).not.toHaveBeenCalled();
+    const call = vi.mocked(showCheckboxDialog).mock.calls[0];
+    expect(call[0]).toBe(DELETE_MESSAGE);
+    expect(call[1]).toBe("Force Delete");
+    expect(call[2]).toBe(false);
+    expect(call[3]).toBe("Delete Branch");
+  });
+
+  it("keeps the deleteBranch payload and recent action on default confirm (TC-104)", () => {
+    // Case: TC-104
+    // Given: the direct dialog from TC-102
+    showDeleteBranchDialog("/repo", "feature/x", ["origin"]);
+    const callback = vi.mocked(showFormDialog).mock.calls[0][3] as (values: string[]) => void;
+
+    // When: the dialog is confirmed with the default (unchecked) values
+    callback(["unchecked", "unchecked"]);
+
+    // Then: the existing payload is sent once and the recent action is recorded
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "deleteBranch",
+      repo: "/repo",
+      branchName: "feature/x",
+      forceDelete: false,
+      deleteOnRemotes: []
+    });
+    expect(recordRecentAction).toHaveBeenCalledWith("/repo", "ref.deleteBranch");
+  });
+
+  it("keeps the context menu path identical to the direct call (TC-105)", () => {
+    // Case: TC-105
+    // Given: the argument snapshot of a direct call
+    showDeleteBranchDialog("/repo", "feature/x", ["origin"]);
+    const directCall = vi.mocked(showFormDialog).mock.calls[0];
+    vi.clearAllMocks();
+
+    // When: the same dialog is opened through the Delete Branch context menu item
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems("/repo", "feature/x", sourceElem, false, "main", [
+      "origin"
+    ]);
+    const deleteItem = findMenuItem(menu, "Delete Branch&#8230;");
+    deleteItem!.onClick();
+
+    // Then: showFormDialog runs once with the same message, inputs, and action name
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const menuCall = vi.mocked(showFormDialog).mock.calls[0];
+    expect(menuCall[0]).toEqual(directCall[0]);
+    expect(menuCall[1]).toEqual(directCall[1]);
+    expect(menuCall[2]).toEqual(directCall[2]);
   });
 });

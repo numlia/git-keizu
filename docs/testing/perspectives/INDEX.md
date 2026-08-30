@@ -1,41 +1,43 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-08-24T21:44:57+09:00
-> Total sources: 46
-> Total physical files: 73
-> Total sections: 482
-> Total cases: 2566
+> Auto-generated: 2026-08-29T12:18:48+09:00
+> Total sources: 48
+> Total physical files: 79
+> Total sections: 504
+> Total cases: 2741
 
 ## Source File -> Perspectives (Forward Lookup)
 
 | Source File | Storage Mode | Perspectives Entry | Shards | Sections | Cases | Last Updated |
 |-------------|--------------|--------------------|--------|----------|-------|--------------|
 | `Dependency automation operational contract` | single-file | `dependency-automation-test.md` | 1 | 1 | 25 | 2026-08-04 |
-| `l10n/web/web.l10n.en.json` | single-file | `l10n/web/web.l10n.en.json-test.md` | 1 | 4 | 13 | 2026-08-23 |
-| `l10n/web/web.l10n.ja.json` | single-file | `l10n/web/web.l10n.ja.json-test.md` | 1 | 5 | 15 | 2026-08-23 |
+| `l10n/web/web.l10n.en.json` | single-file | `l10n/web/web.l10n.en.json-test.md` | 1 | 6 | 18 | 2026-08-29 |
+| `l10n/web/web.l10n.ja.json` | single-file | `l10n/web/web.l10n.ja.json-test.md` | 1 | 7 | 20 | 2026-08-29 |
 | `media/dropdown.css` | single-file | `media/dropdown-test.md` | 1 | 1 | 3 | 2026-08-24 |
 | `media/findwidget.css` | single-file | `media/findwidget-test.md` | 1 | 1 | 3 | 2026-08-24 |
-| `media/main.css` | single-file | `media/main-test.md` | 1 | 1 | 19 | 2026-08-24 |
+| `media/main.css` | single-file | `media/main-test.md` | 1 | 2 | 27 | 2026-08-25 |
 | `package.json` | single-file | `package.json-test.md` | 1 | 3 | 43 | 2026-08-04 |
 | `src/avatarManager.ts` | single-file | `src/avatarManager-test.md` | 1 | 25 | 101 | 2026-07-19 |
+| `src/branchCleanup.ts` | single-file | `src/branchCleanup-test.md` | 1 | 5 | 43 | 2026-08-25 |
 | `src/config.ts` | single-file | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md` | 1 | 14 | 79 | 2026-05-02 |
 | `src/config.ts` | sharded | `src/config-test/INDEX.md` | 4 | 17 | 95 | 2026-07-19 |
 | `src/dataSource.ts` | single-file | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md` | 1 | 25 | 149 | 2026-04-04 |
-| `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 7 | 40 | 257 | 2026-08-08 |
+| `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 8 | 41 | 271 | 2026-08-25 |
 | `src/diffDocProvider.ts` | single-file | `src/diffDocProvider-test.md` | 1 | 7 | 33 | 2026-07-04 |
 | `src/extension.ts` | single-file | `src/extension-test.md` | 1 | 8 | 30 | 2026-07-19 |
 | `src/extensionState.ts` | single-file | `src/extensionState-test.md` | 1 | 14 | 42 | 2026-07-04 |
 | `src/gitExecutable.ts` | single-file | `src/gitExecutable-test.md` | 1 | 1 | 6 | 2026-07-19 |
 | `src/gitGraphView.ts` | single-file | `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md` | 1 | 17 | 60 | 2026-03-20 |
-| `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 6 | 29 | 118 | 2026-08-06 |
-| `src/i18n.ts` | single-file | `src/i18n-test.md` | 1 | 1 | 8 | 2026-08-03 |
+| `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 7 | 30 | 133 | 2026-08-25 |
+| `src/i18n.ts` | single-file | `src/i18n-test.md` | 1 | 2 | 11 | 2026-08-25 |
 | `src/refValidation.ts` | single-file | `src/refValidation-test.md` | 1 | 1 | 19 | 2026-08-03 |
 | `src/repoFileWatcher.ts` | single-file | `src/repoFileWatcher-test.md` | 1 | 10 | 74 | 2026-08-08 |
 | `src/repoManager.ts` | single-file | `src/repoManager-test.md` | 1 | 19 | 108 | 2026-07-19 |
 | `src/statusBarItem.ts` | single-file | `src/statusBarItem-test.md` | 1 | 3 | 13 | 2026-03-22 |
-| `src/types.ts` | single-file | `src/types-test.md` | 1 | 5 | 58 | 2026-08-08 |
+| `src/types.ts` | single-file | `src/types-test.md` | 1 | 6 | 78 | 2026-08-25 |
 | `src/utils.ts` | single-file | `src/utils-test.md` | 1 | 6 | 26 | 2026-08-08 |
 | `src/worktree.ts` | single-file | `src/worktree-test.md` | 1 | 1 | 17 | 2026-08-08 |
+| `web/branchCleanupPanel.ts` | single-file | `web/branchCleanupPanel-test.md` | 1 | 5 | 44 | 2026-08-29 |
 | `web/branchLabels.ts` | single-file | `web/branchLabels-test.md` | 1 | 1 | 17 | 2026-03-21 |
 | `web/commitMenu.ts` | single-file | `web/commitMenu-test.md` | 1 | 11 | 50 | 2026-07-19 |
 | `web/contextMenu.ts` | single-file | `web/contextMenu-test.md` | 1 | 3 | 22 | 2026-05-02 |
@@ -48,11 +50,11 @@
 | `web/graph.ts` | single-file | `web/graph-test.md` | 1 | 18 | 64 | 2026-07-04 |
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 1 | 5 | 2026-05-03 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 10 | 45 | 280 | 2026-08-08 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 11 | 46 | 291 | 2026-08-25 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
-| `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 3 | 12 | 56 | 2026-08-23 |
+| `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 4 | 13 | 59 | 2026-08-25 |
 | `web/refMenu.ts` | single-file | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md` | 1 | 14 | 74 | 2026-07-19 |
-| `web/refMenu.ts` | sharded | `web/refMenu-test/INDEX.md` | 3 | 16 | 88 | 2026-08-06 |
+| `web/refMenu.ts` | sharded | `web/refMenu-test/INDEX.md` | 3 | 17 | 92 | 2026-08-25 |
 | `web/stashMenu.ts` | single-file | `web/stashMenu-test.md` | 1 | 8 | 30 | 2026-04-30 |
 | `web/uncommittedMenu.ts` | single-file | `web/uncommittedMenu-test.md` | 1 | 1 | 3 | 2026-03-09 |
 | `web/utils.ts` | single-file | `web/utils-test.md` | 1 | 5 | 31 | 2026-08-08 |
@@ -117,8 +119,10 @@
 | Feature 050 (pnpm-security-update) (light-spec-plan) | `package.json-test.md` |
 | Feature 051 (remote-checkout-pull) (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | Feature 052 (detached-worktree-display) (light-spec-plan) | `src/dataSource-test/INDEX.md`, `src/repoFileWatcher-test.md`, `src/types-test.md`, `src/utils-test.md`, `src/worktree-test.md`, `web/main-test/INDEX.md`, `web/utils-test.md` |
-| Feature 055-01 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `web/dialogs-test.md`, `web/messageHandler-test/INDEX.md` |
+| Feature 055-01 (light-spec-plan) | `web/dialogs-test.md`, `web/messageHandler-test/INDEX.md` |
 | Feature 055-02 (light-spec-plan) | `media/dropdown-test.md`, `media/findwidget-test.md`, `media/main-test.md` |
+| Feature 055-03 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `src/branchCleanup-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/i18n-test.md`, `src/types-test.md`, `web/branchCleanupPanel-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
+| Feature 055-03 follow-up | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `web/branchCleanupPanel-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
 | test-plan | `web/stashMenu-test.md` |

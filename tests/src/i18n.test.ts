@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
@@ -129,5 +132,58 @@ describe("src i18n helper", () => {
     expect(result).toEqual({ hello: "Hello" });
     expect(mocks.readFile).toHaveBeenCalledTimes(1);
     expect(String(mocks.readFile.mock.calls[0][0])).toContain("web.l10n.en.json");
+  });
+});
+
+// S2: branch cleanup toolbar title の host 英日キー
+// @see docs/testing/perspectives/src/i18n-test.md
+describe("branch cleanup host toolbar title keys", () => {
+  const HOST_TITLE_KEY = "Branch Cleanup";
+
+  function loadHostBundle(fileName: string): Record<string, string> {
+    const jsonPath = resolvePath(process.cwd(), `l10n/${fileName}`);
+    return JSON.parse(readFileSync(jsonPath, "utf-8"));
+  }
+
+  it("provides a non-empty English toolbar title (TC-009)", () => {
+    // Case: TC-009
+    // Given: the English host bundle on disk
+    const messages = loadHostBundle("bundle.l10n.json");
+
+    // When: the toolbar title key is looked up
+    const value = messages[HOST_TITLE_KEY];
+
+    // Then: the key exists with a non-empty English string
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+  });
+
+  it("provides a translated non-empty Japanese toolbar title (TC-010)", () => {
+    // Case: TC-010
+    // Given: the Japanese host bundle on disk
+    const messages = loadHostBundle("bundle.l10n.ja.json");
+
+    // When: the toolbar title key is looked up
+    const value = messages[HOST_TITLE_KEY];
+
+    // Then: the key exists with a non-empty Japanese string that is not the raw key
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+    expect(value).not.toBe(HOST_TITLE_KEY);
+  });
+
+  it("keeps the en and ja host bundle key sets in parity (TC-011)", () => {
+    // Case: TC-011
+    // Given: both host bundles on disk
+    const enKeys = Object.keys(loadHostBundle("bundle.l10n.json"));
+    const jaKeys = Object.keys(loadHostBundle("bundle.l10n.ja.json"));
+
+    // When: the key sets are compared in both directions
+    const missingInJa = enKeys.filter((key) => !jaKeys.includes(key));
+    const missingInEn = jaKeys.filter((key) => !enKeys.includes(key));
+
+    // Then: no key was added to only one locale
+    expect(missingInJa).toEqual([]);
+    expect(missingInEn).toEqual([]);
   });
 });
