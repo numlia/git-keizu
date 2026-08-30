@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] - 2026-08-30
+
+This release marks Git Keizu as a stable release. Git Keizu does not aim to reproduce everything Git can do — it deliberately carries only the operations that belong in a history graph, and leaves out the rest. That scope is now settled, and this release begins adding capabilities the upstream project does not have, starting with Branch Cleanup: a panel that gathers the facts needed to decide whether a local branch can be deleted.
+
+### Added
+
+- **Branch Cleanup panel**: A new toolbar button opens a temporary panel above the graph listing every local branch in the repository, each with the facts needed to judge whether it is still needed: whether it is an ancestor of a comparison branch, how many commits it is ahead and behind that branch, whether its tree differs from the comparison branch's, its upstream state (not set, present, or gone), whether a worktree is using it, and its last commit date. The comparison branch is chosen from a dropdown; left on Automatic, it resolves to the branch `origin/HEAD` points at, then a local `main`, then `master`, then the current branch, and the dropdown shows which branch the automatic choice landed on. No single safe-or-unsafe verdict is given: the facts are shown side by side and the decision stays with you. The panel is closed by default, runs no Git commands until it is opened, and refreshes together with the graph while open.
+- **Acting on a branch from the panel**: Each row offers **Show in Graph**, which filters the graph to that branch alone and scrolls to its tip, and **Delete...**, which opens the existing branch delete dialog — including its remote-deletion checkbox — with Force Delete off by default. Nothing is deleted automatically and no branch is deleted in bulk; every deletion still goes through that dialog one branch at a time. The delete action is not offered for the current branch, a branch a worktree is using, the branch selected for comparison, a row where any fact could not be determined, or while a refresh is in flight.
+- **Partial results instead of a blank panel**: When a comparison fails for one branch, only that row's ancestry and ahead/behind values are reported as unknown; when the worktree lookup fails, only the worktree column is. The panel reports a load failure as a whole only when the branch list itself cannot be read, and the graph behind it is left untouched. When no comparison branch can be resolved — a detached HEAD with no `main` or `master`, or a repository with no commits yet — the comparison columns say so rather than guessing.
+
+### Changed
+
+- **The "not fully merged" explanation now names the reference Git actually checks**: The explanation shown when a normal branch deletion is rejected previously said Git could not confirm the branch was merged into "its upstream branch or the current branch", which reads as though the current branch were an alternative even when an upstream is configured. It now states that Git checks the upstream branch, and the current branch only when no upstream is configured. The explanation also notes that a deletion opened from Branch Cleanup can be rejected even though the panel shows the branch as merged, because the panel's comparison branch and the reference Git checks are not necessarily the same. The guidance about confirming the branch before enabling Force Delete, the collapsible original Git output, and the conditions under which the explanation appears are unchanged.
+
 ## [0.10.1] - 2026-08-25
 
 This release fixes the overlay stacking order in the graph view: dialogs now always appear in front of the find widget instead of being partially hidden behind it.
@@ -539,7 +553,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/numlia/git-keizu/compare/v0.10.1...v1.0.0
 [0.10.1]: https://github.com/numlia/git-keizu/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/numlia/git-keizu/compare/v0.9.1...v0.10.0
 [0.9.1]: https://github.com/numlia/git-keizu/compare/v0.9.0...v0.9.1
