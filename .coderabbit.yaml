@@ -4,7 +4,7 @@
 # Coding conventions are picked up automatically from CLAUDE.md / AGENTS.md,
 # so they are not duplicated here.
 
-language: ja-JP
+language: en-US
 
 reviews:
   auto_review:
