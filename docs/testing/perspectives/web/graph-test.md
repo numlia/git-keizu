@@ -298,3 +298,55 @@
 | TC-062  | `i === vertices.length` で末尾処理中、次の親が非 nullVertex                                         | Boundary - non-null parent breaks inner while                              | `while` 内 `else` 分岐で `break` し、非 nullVertex 親に対して `registerParentProcessed()` は呼ばれない                          | 過剰登録の防止。観測は全 determinePath パス合計の `registerParentProcessed` 呼び出し回数（=親数、過剰登録なし）＋ render 成功で代替（determinePath は private のため per-iteration 観測不可）                                                                                                                                            |
 | TC-063  | 早期 break でエッジ保持後、同一 vertex の残り children を処理                                       | Boundary - pending edge available to remaining children                    | 保留された nullVertex 親エッジが未処理のまま残り、残りの children の経路計算に利用可能である                                    | 保持されたエッジの利用可能性                                                                                                                                                                                                                                                                                                             |
 | TC-064  | `i === vertices.length` かつ `getNextParent() === null`（残り親なし）                               | Boundary - no remaining parents                                            | `while` ループ本体が実行されず、`registerParentProcessed()` が呼ばれない（0回）                                                 | 残り親なし境界                                                                                                                                                                                                                                                                                                                           |
+
+## S19: circle の data-hash と setFileHistoryHighlight() による match / current / dim の描画状態
+
+> Origin: Feature 055-07 (light-spec-plan)
+> Added: 2026-09-08
+> Status: active
+> Supersedes: -
+> Signature: `Graph.setFileHistoryHighlight(highlight: GraphFileHistoryHighlight | null): void` / `Vertex.draw(svg: SVGElement, config: Config, expandOffset: boolean, hash: string, highlightClass: string | null): void`
+> Target Path: `web/graph.ts`（`Graph.render()` と `Vertex.draw()`。実装後に行範囲へ更新）
+> Test File: `tests/web/graph.test.ts`
+
+`Graph` が highlight を保持し、`render()` のたびに svg の `class` と各 circle の `data-hash` / 強調 class を付与する契約の観点（対応プラン §3.9 / §4 Task 6）。行 class の付与は `web/fileHistory-test.md` S4、CSS の値は `media/main-test.md` S3 の責務で本表には含めない。基本 fixture は hash `h0` / `h1` / `h2` の 3 commit を `loadCommits` した mock DOM。
+
+| Case ID | Input / Precondition                                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                             | Notes                     |
+| ------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| TC-065  | 基本 fixture で `render(null)`                                                                        | Normal - data-hash 属性                                                    | 3 つの circle の `getAttribute("data-hash")` がそれぞれ `h0` / `h1` / `h2` で、いずれの `class` にも `fileHistory` を含まず、svg の `class` が `fileHistoryMode` を含まない | highlight なしの既定      |
+| TC-066  | `setFileHistoryHighlight({ matchHashes: new Set(["h0", "h2"]), currentHash: "h0" })` → `render(null)` | Normal - current circle                                                    | `h0` の circle の `class` が `"fileHistoryMatch fileHistoryCurrent"` と `toBe` で一致する                                                                                   | match と current を併記   |
+| TC-067  | 同 highlight                                                                                          | Normal - match circle                                                      | `h2` の circle の `class` が `"fileHistoryMatch"`                                                                                                                           | -                         |
+| TC-068  | 同 highlight                                                                                          | Normal - dim circle                                                        | `h1` の circle の `class` が `"fileHistoryDim"`                                                                                                                             | match 外                  |
+| TC-069  | 同 highlight                                                                                          | Normal - svg の mode class                                                 | svg の `getAttribute("class")` が `"fileHistoryMode"`                                                                                                                       | -                         |
+| TC-070  | `h0` が HEAD（既存 class `current`）で同 highlight                                                    | Normal - 既存 class の先頭維持                                             | `h0` の circle の `class` が `"current fileHistoryMatch fileHistoryCurrent"`（既存 class が先頭）                                                                           | space 区切りで追加        |
+| TC-071  | stash commit を含む fixture で dim になる highlight                                                   | Normal - stash の outer / inner                                            | outer circle の `class` が `"stashOuter fileHistoryDim"`、inner circle が `"stashInner fileHistoryDim"` で、両方の `data-hash` が stash の hash                             | 2 circle とも属性を持つ   |
+| TC-072  | TC-066 の後に `setFileHistoryHighlight(null)` → `render(null)`                                        | Normal - 解除                                                              | svg の `getAttribute("class")` が `""` で、全 circle の `class` から `fileHistory*` が消え、HEAD circle は `"current"` のまま                                               | -                         |
+| TC-073  | `{ matchHashes: new Set(["h0", "h2"]), currentHash: null }`                                           | Boundary - currentHash null                                                | `h0` / `h2` が `"fileHistoryMatch"`、`fileHistoryCurrent` を持つ circle が 0 件、svg は `fileHistoryMode`                                                                   | current なしの match 表示 |
+| TC-074  | `{ matchHashes: new Set(), currentHash: null }`                                                       | Boundary - match 0 件                                                      | 3 circle とも `"fileHistoryDim"` で svg は `fileHistoryMode`                                                                                                                | 全 dim                    |
+| TC-075  | TC-066 の後に `render(null)` をもう一度呼ぶ                                                           | Normal - 再描画での維持                                                    | 2 回目の render 後も class が TC-066〜TC-069 と同じ（highlight は `Graph` が保持）                                                                                          | SVG group 再生成に耐える  |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-07 追加分（S19）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                                                                        |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `data-hash` の欠落（通常 / stash outer / inner）      | TC-065、TC-071                                                                                                                  |
+| 3 状態 class の取り違え・現行 class の上書き          | TC-066〜TC-068、TC-070、TC-071                                                                                                  |
+| svg の mode class 付与・除去漏れ                      | TC-069、TC-072、TC-074                                                                                                          |
+| 解除後に class が残る                                 | TC-072                                                                                                                          |
+| 再描画で highlight が消える                           | TC-075                                                                                                                          |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL） | `null` highlight: TC-065、TC-072。`currentHash: null`: TC-073。空 `Set`: TC-074。maximum / +/-1: excluded(数値閾値が存在しない) |
+| 入力検証×違反パターン                                 | excluded(`GraphFileHistoryHighlight` は型で固定され、`Graph` は値を検証せず描画する)                                            |
+| 外部依存×失敗モード                                   | excluded(SVG 生成は DOM API のみで外部依存なし)                                                                                 |
+| 例外・エラー経路                                      | excluded(描画に throw 経路を追加しない)                                                                                         |
+| 型不正・フォーマット不正                              | excluded(TypeScript の型検査で担保)                                                                                             |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(上表のとおり値を検証しない)
+- Exception: excluded(上表のとおり)
+- External: excluded(上表のとおり)
+- Boundary: TC-073、TC-074
+- Type: excluded(上表のとおり)
+- Normal: TC-065〜TC-072、TC-075
+
+**失敗系/正常系比（煙感知器）**: 正常系9件、失敗系2件。描画状態の観点は class の存在検証が正常系として並ぶ構造で、失敗源は欠落・上書き・残存・再描画に限られることを上表で列挙した。比率合わせのためのケース追加・削除は行わない。

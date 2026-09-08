@@ -400,3 +400,51 @@ branch 名をキーにする `WorktreeMap` では表現できない detached HEA
 - Type: TC-092〜TC-111
 
 **失敗系/正常系比（煙感知器）**: 正常系0件、失敗系20件（TC-092〜TC-111）。S2〜S7 と同じく本セクションの対象は型契約のみで正常実行経路を持たないため、正常系0件はインベントリ欠落ではないことを確認した。
+
+## S9: file history の Request / Response / entry 型契約
+
+> Origin: Feature 055-07 (light-spec-plan)
+> Added: 2026-09-08
+> Status: active
+> Supersedes: -
+> Signature: `FileHistoryChangeType` / `FileHistoryEntry` / `RequestFileHistory` / `ResponseFileHistory`（`RequestMessage` / `ResponseMessage` union へ追加）
+> Target Path: `src/types.ts`（`RequestFetchAvatar` / `ResponseFetchAvatar` の次。実装後に行範囲へ更新）
+> Test File: `tests/src/types.test.ts`
+
+対応プラン §3.4 の型が message protocol へ参加し、`entries: null`（失敗）と `entries: []`（履歴なし）を型で区別する契約の観点（`@ts-expect-error` と代入可否で検証）。runtime の値検証と routing は `src/gitGraphView-test/06-file-history-01.md` S34 と `src/dataSource-test/07-file-history-01.md` S49 の責務で本表には含めない。
+
+| Case ID | Input / Precondition                                                                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                       | Notes                                     |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| TC-112  | `{ hash, parentHashes: [], type: "R", oldFilePath, newFilePath, historicalPath, isMerge: true }` を `FileHistoryEntry` へ代入                       | Type - entry 完全 literal                                                  | 代入がコンパイルでき、`type` に `"A"` / `"M"` / `"D"` / `"R"` の 4 literal をそれぞれ代入できる                                       | -                                         |
+| TC-113  | `type: "T"` の entry literal を代入                                                                                                                 | Type - change type union 外                                                | `@ts-expect-error` が有効（型エラーになる）                                                                                           | `--diff-filter=AMDR` と一致               |
+| TC-114  | `historicalPath` を欠落させた entry literal を代入                                                                                                  | Type - entry 必須 field                                                    | `@ts-expect-error` が有効                                                                                                             | `isMerge` / `parentHashes` 欠落も同じ分岐 |
+| TC-115  | `{ command: "fileHistory", repo: "/r", requestId: 1, anchorHash: "abc", filePath: "src/a.txt" }` を `RequestFileHistory` と `RequestMessage` へ代入 | Type - request union 組み込み                                              | 双方の代入がコンパイルでき、`command === "fileHistory"` で narrowing した分岐で `anchorHash` / `filePath` へアクセスできる            | message protocol への参加                 |
+| TC-116  | `requestId` を欠落させた request literal を代入                                                                                                     | Type - request 必須 field                                                  | `@ts-expect-error` が有効                                                                                                             | echo 用 field の必須化                    |
+| TC-117  | `{ command: "fileHistory", repo, requestId, anchorHash, filePath, entries: null }` を `ResponseFileHistory` と `ResponseMessage` へ代入             | Type - response の null entries                                            | 双方の代入がコンパイルでき、`command === "fileHistory"` で narrowing できる                                                           | 失敗を表す `null`                         |
+| TC-118  | `entries: []` の response literal を代入                                                                                                            | Type - response の空配列                                                   | 代入がコンパイルでき、`entries !== null` で narrowing した分岐で `.length` へアクセスできる（`entries` の型は配列と `null` の union） | `null` と `[]` を型で区別                 |
+| TC-119  | `entries` を欠落させた response literal を代入                                                                                                      | Type - response 必須 field                                                 | `@ts-expect-error` が有効                                                                                                             | optional 化を防ぐ                         |
+| TC-120  | `entries: undefined` の response literal を代入                                                                                                     | Type - undefined の不許容                                                  | `@ts-expect-error` が有効                                                                                                             | `null` のみ許容                           |
+| TC-121  | `switch` で `FileHistoryChangeType` の 4 literal を網羅                                                                                             | Type - exhaustive narrowing                                                | `default` 節で残余値を `never` 型の変数へ代入してもコンパイルできる（列挙漏れがない）                                                 | 表示分岐の網羅性の土台                    |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-07 追加分（S9）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                                                              |
+| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| union 外の change type の受理                         | TC-113、TC-121                                                                                                        |
+| 必須 field の欠落・optional 化                        | TC-114、TC-116、TC-119                                                                                                |
+| `null` と `[]` / `undefined` の同一値化               | TC-117、TC-118、TC-120                                                                                                |
+| message union へ組み込まれない                        | TC-115、TC-117                                                                                                        |
+| 各分岐の negative 側（有効な literal が拒否される）   | TC-112、TC-115、TC-117、TC-118                                                                                        |
+| runtime の値検証・routing の誤り                      | excluded(`src/gitGraphView-test/06-file-history-01.md` S34 と `src/dataSource-test/07-file-history-01.md` S49 の責務) |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL） | excluded(型定義に数値境界がない。`null` / `[]` / `undefined` の可否は TC-117、TC-118、TC-120 に含めて検証)            |
+| 外部依存の失敗・例外送出                              | excluded(型定義のみで外部依存と throw 経路を持たない)                                                                 |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(型エイリアス定義のみで実行時の検証分岐が存在しない)
+- Exception: excluded(同上。throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: excluded(数値境界が存在しない。`null` / `[]` / `undefined` は TC-117、TC-118、TC-120 に含めて検証)
+- Type: TC-112〜TC-121
+
+**失敗系/正常系比（煙感知器）**: 正常系0件、失敗系10件（TC-112〜TC-121）。S2〜S8 と同じく本セクションの対象は型契約のみで正常実行経路を持たないため、正常系0件はインベントリ欠落ではないことを確認した。

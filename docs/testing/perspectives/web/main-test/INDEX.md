@@ -2,12 +2,12 @@
 
 > Source: `web/main.ts`
 > Storage Mode: sharded
-> Generated: 2026-08-25T00:00:00Z
+> Generated: 2026-09-08T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 11
-> Total Sections: 46
-> Total Cases: 291
+> Total Shards: 12
+> Total Sections: 48
+> Total Cases: 317
 
 ## Shards
 
@@ -24,6 +24,7 @@
 | 07-load-count-01.md         | load-count         | 1        | 5     | 2026-05-17   |
 | 08-request-queue-01.md      | request-queue      | 2        | 14    | 2026-08-04   |
 | 09-branch-cleanup-01.md     | branch-cleanup     | 1        | 11    | 2026-08-25   |
+| 10-file-history-01.md       | file-history       | 2        | 26    | 2026-09-08   |
 
 ## Origin Coverage
 
@@ -50,6 +51,7 @@
 | Feature 045 (defensive-fixes) (light-spec-plan)                      | 04-keyboard-selection-01.md                                                 |
 | Feature 052 (detached-worktree-display) (light-spec-plan)            | 01-rendering-02.md                                                          |
 | Feature 055-03 (light-spec-plan)                                     | 09-branch-cleanup-01.md                                                     |
+| Feature 055-07 (light-spec-plan)                                     | 10-file-history-01.md                                                       |
 | test-plan (既存コード網羅)                                           | 04-keyboard-selection-01.md                                                 |
 | フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                                     |
 | フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                                     |
