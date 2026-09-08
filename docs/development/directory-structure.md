@@ -77,6 +77,7 @@ web/
 ├── dropdown.ts           # Dropdown component
 ├── dialogs.ts            # Dialog UI (confirmation, form, error)
 ├── fileTree.ts           # File tree rendering
+├── fileHistory.ts        # File history highlight mode (state, bar, navigation)
 ├── i18n.ts               # Webview localization helper
 ├── contextMenu.ts        # Right-click context menu
 ├── dates.ts              # Date formatting

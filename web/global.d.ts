@@ -129,6 +129,23 @@ declare global {
     openCdvEnabled?: boolean;
   }
 
+  interface GraphFileHistoryHighlight {
+    matchHashes: ReadonlySet<string>;
+    currentHash: string | null;
+  }
+
+  interface FileHistoryExpandedSnapshot {
+    hash: string;
+    compareWithHash: string | null;
+    commitDetails: GG.GitCommitDetails;
+    fileTree: GitFolder;
+  }
+
+  interface FileHistoryRestoreSnapshot {
+    expanded: FileHistoryExpandedSnapshot | null;
+    scrollTop: number;
+  }
+
   interface WebViewState {
     gitRepos: GG.GitRepoSet;
     gitBranches: string[];
