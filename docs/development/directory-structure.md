@@ -46,6 +46,7 @@ src/
 ├── extension.ts          # Entry point (activate/deactivate)
 ├── config.ts             # VS Code settings wrapper
 ├── dataSource.ts         # Git CLI wrapper (spawn-based)
+├── fileHistory.ts        # File history query args, parser, and lineage rules
 ├── gitGraphView.ts       # Webview panel management & message routing
 ├── i18n.ts               # Host l10n wrapper and webview dictionary loader
 ├── repoManager.ts        # Repository auto-discovery & watching
