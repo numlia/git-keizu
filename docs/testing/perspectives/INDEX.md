@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-09-08T16:31:43+09:00
+> Auto-generated: 2026-09-08T18:51:38+09:00
 > Total sources: 50
 > Total physical files: 85
 > Total sections: 532
-> Total cases: 3007
+> Total cases: 3010
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -15,7 +15,7 @@
 | `l10n/web/web.l10n.ja.json` | single-file | `l10n/web/web.l10n.ja.json-test.md` | 1 | 8 | 24 | 2026-09-08 |
 | `media/dropdown.css` | single-file | `media/dropdown-test.md` | 1 | 1 | 3 | 2026-08-24 |
 | `media/findwidget.css` | single-file | `media/findwidget-test.md` | 1 | 1 | 3 | 2026-08-24 |
-| `media/main.css` | single-file | `media/main-test.md` | 1 | 3 | 39 | 2026-09-08 |
+| `media/main.css` | single-file | `media/main-test.md` | 1 | 3 | 42 | 2026-09-08 |
 | `package.json` | single-file | `package.json-test.md` | 1 | 3 | 43 | 2026-08-04 |
 | `src/avatarManager.ts` | single-file | `src/avatarManager-test.md` | 1 | 25 | 101 | 2026-07-19 |
 | `src/branchCleanup.ts` | single-file | `src/branchCleanup-test.md` | 1 | 5 | 43 | 2026-08-25 |

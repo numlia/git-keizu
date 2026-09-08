@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -469,7 +470,7 @@ describe("media/main.css file history declarations (S3)", () => {
     // Case: TC-035
     // Given: the existing mute restore block (commitDetailsOpen)
     const muteRestore = ruleBodiesFor(
-      "#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(n + 3)"
+      "#commitTable tr.commit.mute:not(.fileHistoryDim).commitDetailsOpen td:nth-child(n + 3)"
     );
 
     // When/Then: both fileHistoryMatch selectors are in that same opacity: 1 block
@@ -545,11 +546,114 @@ describe("media/main.css file history declarations (S3)", () => {
       )
     ).toBe(true);
     expect(
-      hasDeclarationFor("#commitTable tr.commit.mute td:nth-child(n + 3)", "opacity: 0.5")
+      hasDeclarationFor(
+        "#commitTable tr.commit.mute:not(.fileHistoryDim) td:nth-child(n + 3)",
+        "opacity: 0.5"
+      )
     ).toBe(true);
     expect(numericZIndexDeclarations(mainCss)).toEqual([]);
     for (const { name, value } of Z_INDEX_VARIABLES) {
       expect(variableDefinition(mainCss, name), `value of ${name}`).toBe(value);
+    }
+  });
+});
+
+// @see docs/testing/perspectives/media/main-test.md
+describe("media/main.css mute and file history applicability (S3)", () => {
+  const createFixture = () => {
+    const style = document.createElement("style");
+    style.textContent = mainCss;
+    document.head.replaceChildren(style);
+    const container = document.createElement("div");
+    container.id = "commitTable";
+    const table = document.createElement("table");
+    const row = table.insertRow();
+    const cells = Array.from({ length: 5 }, () => row.insertCell());
+    const message = document.createElement("span");
+    message.className = "commitMessage";
+    const label = document.createElement("span");
+    label.className = "gitRef";
+    cells[1].append(label, message);
+    container.append(table);
+    document.body.replaceChildren(container);
+    if (style.sheet === null) throw new Error("main.css stylesheet was not loaded");
+    const rules = Array.from(style.sheet.cssRules).filter(
+      (rule): rule is CSSStyleRule => rule.type === CSSRule.STYLE_RULE
+    );
+
+    // Inspect selector applicability, not jsdom's incomplete cascade implementation.
+    const opacityDeclarations = (element: Element): string[] =>
+      rules
+        .filter((rule) => element.matches(rule.selectorText))
+        .map((rule) => rule.style.getPropertyValue("opacity"))
+        .filter((value) => value !== "");
+
+    return { row, cells, message, label, opacityDeclarations };
+  };
+
+  it("applies only cell dimming regardless of mute or active row state (TC-040)", () => {
+    // Case: TC-040
+    // Given: dim rows with optional mute and detail / defensive Find state
+    const { row, cells, message, label, opacityDeclarations } = createFixture();
+    for (const mute of ["", "mute"]) {
+      for (const active of ["", "commitDetailsOpen", "findCurrentCommit"]) {
+        // When: the actual CSS selectors are matched against each row state
+        row.className = `commit fileHistoryDim ${mute} ${active}`;
+        // Then: no competing or child opacity can override or multiply the dim value
+        for (const cell of cells.slice(1)) {
+          expect(opacityDeclarations(cell), row.className).toEqual(["0.3"]);
+        }
+        for (const element of [cells[0], message, label]) {
+          expect(opacityDeclarations(element), row.className).toEqual([]);
+        }
+      }
+    }
+  });
+
+  it("preserves ordinary mute and detail, Find, and match restoration (TC-041)", () => {
+    // Case: TC-041
+    // Given: non-dim muted rows, optionally restored by an active state
+    const { row, cells, message, label, opacityDeclarations } = createFixture();
+    for (const active of [
+      "",
+      "commitDetailsOpen",
+      "findCurrentCommit",
+      "fileHistoryMatch",
+      "fileHistoryMatch fileHistoryCurrent"
+    ]) {
+      // When: the actual CSS selectors are matched against the state
+      row.className = `commit mute ${active}`;
+      // Then: restoration follows ordinary mute and never dims the label or graph cell
+      const expected = active === "" ? ["0.5"] : ["0.5", "1"];
+      for (const element of [message, ...cells.slice(2)]) {
+        expect(opacityDeclarations(element), row.className).toEqual(expected);
+      }
+      for (const element of [cells[0], cells[1], label]) {
+        expect(opacityDeclarations(element), row.className).toEqual([]);
+      }
+    }
+  });
+
+  it("restores mute automatically when file history classes are removed (TC-042)", () => {
+    // Case: TC-042
+    // Given: muted dim, matching, or current rows with optional open details
+    const { row, cells, message, opacityDeclarations } = createFixture();
+    for (const history of [
+      "fileHistoryDim",
+      "fileHistoryMatch",
+      "fileHistoryMatch fileHistoryCurrent"
+    ]) {
+      for (const active of ["", "commitDetailsOpen"]) {
+        row.className = `commit mute ${history} ${active}`;
+        // When: file history exits while mute and detail state remain
+        row.classList.remove("fileHistoryDim", "fileHistoryMatch", "fileHistoryCurrent");
+        // Then: normal mute applies again, with restoration only for open details
+        const expected = active === "" ? ["0.5"] : ["0.5", "1"];
+        for (const element of [message, ...cells.slice(2)]) {
+          expect(opacityDeclarations(element), row.className).toEqual(expected);
+        }
+        expect(opacityDeclarations(cells[1]), row.className).toEqual([]);
+      }
     }
   });
 });

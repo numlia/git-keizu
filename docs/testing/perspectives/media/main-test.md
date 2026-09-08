@@ -144,6 +144,18 @@ panel 自身に `max-height: 40vh`・縦横 overflow・`min-height: 0`・nowrap 
 | TC-038  | `.fileHistoryNote` ルールを抽出する                                                | Normal - 注記の見た目                                                      | `font-style: italic` と `opacity: 0.8` の宣言が存在する                                                                                                                                                                    | -                              |
 | TC-039  | 既存 `.findMatch` / `.findCurrentCommit` / `.mute` の値を抽出する                  | Validation - 既存値の維持                                                  | `rgba(234, 92, 0, 0.1)` / `rgba(234, 92, 0, 0.25)` / `opacity: 0.5` が変わらず、S1 TC-001 の z-index 変数定義と数値直書き 0 件も不変である                                                                                 | 055-02 / Find の契約を壊さない |
 
+### Additive regression cases: dim rows excluded from mute styling
+
+> Updated: 2026-09-08
+
+TC-028–TC-039 remain unchanged. These cases inspect opacity declarations whose selectors match fixture DOM elements; they do not rely on jsdom resolving the CSS cascade or rendering opacity. Dim cells must have only one applicable opacity declaration and their message children none, so mute cannot override or multiply the dim opacity regardless of declaration order.
+
+| Case ID | Input / Precondition                                                                                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                | Notes                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| TC-040  | Dim rows with and without mute, optionally with commitDetailsOpen or findCurrentCommit                                                      | Validation - exclude competing opacity declarations                        | Only opacity 0.3 matches cells 2–5; no opacity declaration matches the message child, branch label, or first cell                              | Effective message opacity remains 0.3. Find combination is defensive: normal UI modes are exclusive |
+| TC-041  | Muted rows without dim, optionally with commitDetailsOpen, findCurrentCommit, fileHistoryMatch, or fileHistoryMatch plus fileHistoryCurrent | Normal - preserve mute and restoration                                     | Message and cells 3–5 match opacity 0.5, followed by opacity 1 when restored; cell 2, branch label, and first cell have no opacity declaration | Existing normal mute and match restoration remain intact                                            |
+| TC-042  | Muted dim or matching/current rows, optionally with commitDetailsOpen; remove file history classes                                          | Normal - restore ordinary mute after mode exit                             | Message and cells 3–5 match opacity 0.5, followed by opacity 1 only when details remain open; cell 2 has no opacity declaration                | Uses actual class removal, retaining mute and detail state                                          |
+
 ### 失敗源インベントリ（include-or-justify）— Feature 055-07 追加分（S3）
 
 | 失敗源                                             | 対応ケースまたは除外理由                                                                                                                                                                                                          |
@@ -160,13 +172,15 @@ panel 自身に `max-height: 40vh`・縦横 overflow・`min-height: 0`・nowrap 
 | 境界値（0 / minimum / maximum / +/-1 / 空 / NULL） | excluded(実行時の数値入力が存在しない。opacity の値は TC-031、TC-034、TC-036、TC-038 の固定値照合で充足。320px 以下の実描画は S2 TC-026 / TC-027 と同じ理由で手動確認に委ね、bar は `flex-wrap: wrap` の宣言存在（TC-029）で担保) |
 | 型不正・フォーマット不正                           | excluded(CSS 宣言は静的テキストで型分岐がなく、宣言 drift は TC-028〜TC-038 の照合で検出)                                                                                                                                         |
 
+Additional failure sources: competing mute opacity on dim cells or message children (TC-040), loss of ordinary mute or restoration (TC-041), and stale dim styling after mode exit (TC-042).
+
 **失敗カテゴリ網羅（diversity floor）**:
 
-- Validation: TC-039
+- Validation: TC-039, TC-040
 - Exception: excluded(上表のとおり throw 経路なし)
 - External: excluded(上表のとおり外部依存なし)
 - Boundary: excluded(上表のとおり)
 - Type: excluded(上表のとおり型分岐なし)
-- Normal: TC-028〜TC-038
+- Normal: TC-028〜TC-038, TC-041, TC-042
 
-**失敗系/正常系比（煙感知器）**: 正常系11件、失敗系1件。静的 CSS 契約は宣言の存在検証が正常系として並ぶ構造で、失敗源は欠落・drift・既存契約の破壊に限られることをインベントリで確認した。比率合わせのためのケース追加・削除は行わない。
+**失敗系/正常系比（煙感知器）**: 正常系13件、失敗系2件。静的 CSS 契約は宣言の存在検証が正常系として並ぶ構造で、失敗源は欠落・drift・既存契約の破壊に限られることをインベントリで確認した。比率合わせのためのケース追加・削除は行わない。

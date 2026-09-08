@@ -223,15 +223,15 @@ body.unableToLoad p {
 #commitTable tr.commit.fileHistoryDim td:nth-child(n + 3) {
   opacity: 0.3;
 }
-/* Muted commits */
-#commitTable tr.commit.mute td:nth-child(2) .commitMessage,
-#commitTable tr.commit.mute td:nth-child(n + 3) {
+/* Dim rows use cell opacity exclusively, including when commit details are open. */
+#commitTable tr.commit.mute:not(.fileHistoryDim) td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute:not(.fileHistoryDim) td:nth-child(n + 3) {
   opacity: 0.5;
 }
-#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(2) .commitMessage,
-#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(n + 3),
-#commitTable tr.commit.mute.findCurrentCommit td:nth-child(2) .commitMessage,
-#commitTable tr.commit.mute.findCurrentCommit td:nth-child(n + 3),
+#commitTable tr.commit.mute:not(.fileHistoryDim).commitDetailsOpen td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute:not(.fileHistoryDim).commitDetailsOpen td:nth-child(n + 3),
+#commitTable tr.commit.mute:not(.fileHistoryDim).findCurrentCommit td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute:not(.fileHistoryDim).findCurrentCommit td:nth-child(n + 3),
 #commitTable tr.commit.mute.fileHistoryMatch td:nth-child(2) .commitMessage,
 #commitTable tr.commit.mute.fileHistoryMatch td:nth-child(n + 3) {
   opacity: 1;
