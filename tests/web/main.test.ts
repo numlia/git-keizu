@@ -948,7 +948,8 @@ function setupTestDOM(): void {
     '<div id="branchCleanupPanel" hidden></div>',
     '<div id="fetchBtn"></div>',
     '<div id="currentBtn"></div>',
-    '<div id="searchBtn"></div>'
+    '<div id="searchBtn"></div>',
+    '<div id="controls"></div>'
   ].join("");
 }
 
