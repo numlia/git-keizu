@@ -185,6 +185,22 @@ export class GitKeizuView {
             case "fetchAvatar":
               this.avatarManager.fetchAvatarImage(msg.email, msg.repo, msg.commits);
               break;
+            case "fileHistory":
+              if (Number.isSafeInteger(msg.requestId) && msg.requestId > 0) {
+                this.sendMessage({
+                  command: "fileHistory",
+                  repo: msg.repo,
+                  requestId: msg.requestId,
+                  anchorHash: msg.anchorHash,
+                  filePath: msg.filePath,
+                  entries: await this.dataSource.getFileHistory(
+                    msg.repo,
+                    msg.anchorHash,
+                    msg.filePath
+                  )
+                });
+              }
+              break;
             case "checkoutBranch": {
               const checkoutResult = await this.dataSource.checkoutBranch(
                 msg.repo,

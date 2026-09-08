@@ -13,6 +13,19 @@ import {
   synthesizeRows
 } from "./branchCleanup";
 import { getConfig } from "./config";
+import {
+  applyLineageRules,
+  applyMergeRules,
+  buildAncestryQueryArgs,
+  buildLineageQueryArgs,
+  buildMergeQueryArgs,
+  FileHistoryRecordGroup,
+  LineageResult,
+  normalizeFileHistoryPath,
+  parseAncestryGraph,
+  parseFileHistoryRecords,
+  resolveFileHistoryEntries
+} from "./fileHistory";
 import { DEFAULT_GIT_PATH, resolveGitExecutable } from "./gitExecutable";
 import { isSafeRemoteName, isValidRefName } from "./refValidation";
 import {
@@ -20,6 +33,7 @@ import {
   BranchCleanupResult,
   CheckoutBranchResult,
   CommitOrdering,
+  FileHistoryEntry,
   GitCommandStatus,
   GitCommit,
   GitCommitDetails,
@@ -59,6 +73,7 @@ const NO_WALK_SORTED_OPTION = "--no-walk=sorted";
 const TAB_SEPARATOR = "\t";
 const VALID_FILE_CHANGE_TYPES: ReadonlySet<string> = new Set(["A", "M", "D", "R"]);
 const BRANCH_COMPARISON_MAX_PARALLEL = 3;
+const FILE_HISTORY_ANCESTRY_MIN_ENTRIES = 2;
 
 export const COMMIT_ORDER_FLAGS: Readonly<Record<CommitOrdering, string>> = {
   date: "--date-order",
@@ -1196,6 +1211,71 @@ export class DataSource {
       compareBranch: compare === null ? null : compare.branchName,
       rows: synthesizeRows(entries, compare, comparisons, worktrees, remoteNames, remoteRefs)
     };
+  }
+
+  /**
+   * Resolve the history of one file from an anchor commit with up to three Git
+   * queries (lineage, merge, ancestry). The merge query runs even when the
+   * lineage has no entries, and the ancestry query only when a birth-merge
+   * candidate exists among at least two entries. Any Git failure, malformed
+   * output or rule violation yields null rather than a partial result.
+   */
+  public async getFileHistory(
+    repo: string,
+    anchorHash: string,
+    filePath: string
+  ): Promise<FileHistoryEntry[] | null> {
+    const requestedPath = normalizeFileHistoryPath(filePath);
+    if (!isValidCommitHash(anchorHash) || requestedPath === null) return null;
+
+    const lineageGroups = await this.queryFileHistoryRecords(
+      buildLineageQueryArgs(anchorHash, requestedPath),
+      repo
+    );
+    if (lineageGroups === null) return null;
+    const lineage = applyLineageRules(lineageGroups, anchorHash, requestedPath);
+    if (lineage === null) return null;
+
+    const boundaryHash = lineage.boundary === null ? null : lineage.boundary.hash;
+    const mergeGroups = await this.queryFileHistoryRecords(
+      buildMergeQueryArgs(anchorHash, boundaryHash, lineage.historicalPaths),
+      repo
+    );
+    if (mergeGroups === null) return null;
+    const lineageHashes = new Set(lineage.entries.map((e) => e.hash));
+    const merge = applyMergeRules(mergeGroups, lineage.historicalPaths, lineageHashes);
+    if (merge === null) return null;
+
+    const needsAncestry =
+      merge.birthCandidateHashes.length > 0 &&
+      lineage.entries.length + merge.entries.length >= FILE_HISTORY_ANCESTRY_MIN_ENTRIES;
+    const ancestry = needsAncestry
+      ? await this.queryFileHistoryAncestry(repo, anchorHash, lineage)
+      : null;
+    if (needsAncestry && ancestry === null) return null;
+
+    return resolveFileHistoryEntries({ requestedPath, lineage, merge, ancestry });
+  }
+
+  private async queryFileHistoryRecords(
+    args: string[],
+    repo: string
+  ): Promise<FileHistoryRecordGroup[] | null> {
+    const result = await this.runGitQuery(args, repo);
+    return result.kind === "error" ? null : parseFileHistoryRecords(result.stdout);
+  }
+
+  private async queryFileHistoryAncestry(
+    repo: string,
+    anchorHash: string,
+    lineage: LineageResult
+  ): Promise<Map<string, string[]> | null> {
+    const boundaryParents = lineage.boundary === null ? [] : lineage.boundary.parentHashes;
+    const result = await this.runGitQuery(
+      buildAncestryQueryArgs(anchorHash, boundaryParents),
+      repo
+    );
+    return result.kind === "error" ? null : parseAncestryGraph(result.stdout);
   }
 
   /**
