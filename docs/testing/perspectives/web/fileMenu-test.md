@@ -28,8 +28,9 @@
 
 > Origin: Feature 027 (commit-file-context-menu) (aidd-spec-tasks-test)
 > Added: 2026-04-04
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S5
 
 **シグネチャ**: `buildFileContextMenuItems(fileRow, expandedCommit, repo): ContextMenuElement[]`
 **テスト対象パス**: `web/fileMenu.ts`
@@ -46,8 +47,9 @@
 
 > Origin: Feature 034 (context-menu-recent-actions) Task 4
 > Added: 2026-05-02
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S5
 > Signature: `buildFileContextMenuItems(fileRow, expandedCommit, repo): ContextMenuElement[]`
 > Target Path: `web/fileMenu.ts`
 
@@ -110,3 +112,48 @@
 - Normal: TC-015〜TC-018、TC-026
 
 **失敗系/正常系比（煙感知器）**: 正常系5件、失敗系8件。表示条件 4 つの否定側と既存 guard を失敗源として列挙し、比 1.6 倍がインベントリから導かれた値であることを確認した。比率合わせのためのケース追加・削除は行わない。
+
+## S5: buildFileContextMenuItems() 4 引数 signature での Open File item の維持
+
+> Origin: Feature 055-07 (light-spec-plan) Task 8
+> Added: 2026-09-08
+> Status: active
+> Supersedes: S2, S3
+> Signature: `buildFileContextMenuItems(fileRow: HTMLElement | null, expandedCommit: FileMenuExpandedCommit | null, repo: string | null, fileHistory: FileHistoryMenuContext): ContextMenuElement[]`
+> Target Path: `web/fileMenu.ts`（`buildFileContextMenuItems()`）
+> Test File: `tests/web/fileMenu.test.ts`
+
+S2 / S3 は 3 引数 signature と「items が `Open File` 1 件」を前提にしており、Task 4 で `fileHistory` 引数が追加され通常 row では 2 件目に `Highlight File History` が並ぶため（S4 TC-015）、期待結果が現行契約と一致しなくなった。本セクションは S2 / S3 の `Open File` 契約を 4 引数 signature の下で再定義する。件数と 2 件目の表示条件は S4、`expandedCommit === null` / `data-newfilepath` 欠落の guard は S4 TC-024 / TC-025、`recentActionId` の付与は S4 TC-026 が担い本表には含めない。基本 fixture は type `M` の row、`{ hash: "abc123def456", compareWithHash: null }`、`{ isStash: false, onHighlightFileHistory: vi.fn() }`。
+
+| Case ID | Input / Precondition                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                     | Notes                |
+| ------- | ------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| TC-028  | 基本 fixture                                      | Normal - Open File の先頭維持                                              | `[0].title === "Open File"` で、title が `Open File` の item が 1 件だけ含まれる                                                    | 旧 TC-007。件数は S4 |
+| TC-029  | type=`D` の deleted file row                      | Boundary - deleted row menu availability                                   | items が空にならず `[0].title === "Open File"` である                                                                               | 旧 TC-008            |
+| TC-030  | 基本 fixture の `[0].onClick()` を実行            | Normal - shared action reuse                                               | `postMessage` が 1 回、payload が icon click と同一構造 `{ command: "openFile", repo, filePath: "src/file.ts", commitHash }` である | 旧 TC-011            |
+| TC-031  | 基本 fixture の `[0].onClick()` を実行            | Normal - record before send                                                | `recordRecentAction(repo, "file.openFile")` が 1 回、`mock.invocationCallOrder` で `postMessage` より先に呼ばれる                   | 旧 TC-013            |
+| TC-032  | expandedCommit が null で menu 自体が生成されない | Validation - guard                                                         | 空配列を返し、`recordRecentAction(...)` の call count が 0                                                                          | 旧 TC-014            |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-07 Task 8 追加分（S5）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                                       |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| `Open File` が先頭から外れる・重複する                | TC-028、TC-029                                                                                 |
+| payload 構造の drift・二重送信                        | TC-030                                                                                         |
+| recent action の記録漏れ・順序逆転                    | TC-031                                                                                         |
+| guard 時の recent action 記録                         | TC-032                                                                                         |
+| 2 件目の表示条件・guard の `[]`・`recentActionId`     | excluded(S4 TC-015〜TC-026 の責務)                                                             |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL） | 0 件: TC-032。`null` context: TC-032。maximum / +/-1: excluded(数値閾値が存在しない)           |
+| 外部依存×失敗モード                                   | excluded(menu 構築は DOM dataset と callback だけで外部依存なし)                               |
+| 例外・エラー経路                                      | excluded(guard は空配列で表現し throw 経路を持たない)                                          |
+| 型不正・フォーマット不正                              | excluded(`FileMenuExpandedCommit` / `FileHistoryMenuContext` の型は TypeScript の型検査で担保) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-032
+- Exception: excluded(上表のとおり throw 経路なし)
+- External: excluded(上表のとおり)
+- Boundary: TC-029
+- Type: excluded(上表のとおり)
+- Normal: TC-028、TC-030、TC-031
+
+**失敗系/正常系比（煙感知器）**: 正常系3件、失敗系2件。S2 / S3 の契約を 4 引数 signature へ写した replacement section で、失敗源は先頭維持・payload・recent action の 3 点に限られることを上表で列挙した。比率合わせのためのケース追加・削除は行わない。

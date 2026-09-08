@@ -1328,3 +1328,222 @@ describe("Graph.determinePath() early break off-screen parent edge", () => {
     expect(getCircleElements().length).toBe(1);
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* S19: circle data-hash and setFileHistoryHighlight()                */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/graph-test.md
+describe("Graph.setFileHistoryHighlight() circle classes (S19)", () => {
+  const THREE_COMMITS = [
+    makeCommit("h0", ["h1"], null),
+    makeCommit("h1", ["h2"], null),
+    makeCommit("h2", [], null)
+  ];
+  const THREE_LOOKUP = { h0: 0, h1: 1, h2: 2 };
+  const HIGHLIGHT: GraphFileHistoryHighlight = {
+    matchHashes: new Set(["h0", "h2"]),
+    currentHash: "h0"
+  };
+  let graph: Graph;
+
+  function svgElement(): MockElement {
+    return allCreatedElements.find((e) => e.tagName === "svg")!;
+  }
+
+  function circlesOf(hash: string): MockElement[] {
+    return getCircleElements().filter((e) => e.getAttribute("data-hash") === hash);
+  }
+
+  function classOf(hash: string): string | null {
+    const circles = circlesOf(hash);
+    expect(circles).toHaveLength(1);
+    return circles[0].getAttribute("class");
+  }
+
+  /** Drop the circles of the previous render so the next render can be inspected alone. */
+  function forgetCircles(): void {
+    allCreatedElements = allCreatedElements.filter((e) => e.tagName !== "circle");
+  }
+
+  beforeEach(() => {
+    allCreatedElements = [];
+    containerElement = createMockElement("div");
+    graph = new Graph("testGraph", DEFAULT_CONFIG);
+  });
+
+  it("sets data-hash on every circle and no mode class without a highlight (TC-065)", () => {
+    // Case: TC-065
+    // Given: three commits and no highlight
+    graph.loadCommits(THREE_COMMITS, null, THREE_LOOKUP);
+
+    // When: the graph is rendered
+    graph.render(null);
+
+    // Then: each circle carries its hash, none has a fileHistory class, the svg has no mode class
+    expect(getCircleElements().map((e) => e.getAttribute("data-hash"))).toEqual(["h0", "h1", "h2"]);
+    for (const hash of ["h0", "h1", "h2"]) {
+      expect(classOf(hash) ?? "").not.toContain("fileHistory");
+    }
+    expect(svgElement().getAttribute("class") ?? "").not.toContain("fileHistoryMode");
+  });
+
+  it("marks the current commit with match and current classes (TC-066)", () => {
+    // Case: TC-066
+    // Given: a highlight with h0 as current
+    graph.loadCommits(THREE_COMMITS, null, THREE_LOOKUP);
+    graph.setFileHistoryHighlight(HIGHLIGHT);
+
+    // When: the graph is rendered
+    graph.render(null);
+
+    // Then: h0 has exactly "fileHistoryMatch fileHistoryCurrent"
+    expect(classOf("h0")).toBe("fileHistoryMatch fileHistoryCurrent");
+  });
+
+  it("marks a non-current match with the match class only (TC-067)", () => {
+    // Case: TC-067
+    // Given: the same highlight
+    graph.loadCommits(THREE_COMMITS, null, THREE_LOOKUP);
+    graph.setFileHistoryHighlight(HIGHLIGHT);
+
+    // When: the graph is rendered
+    graph.render(null);
+
+    // Then: h2 has "fileHistoryMatch"
+    expect(classOf("h2")).toBe("fileHistoryMatch");
+  });
+
+  it("dims commits outside the match set (TC-068)", () => {
+    // Case: TC-068
+    // Given: the same highlight
+    graph.loadCommits(THREE_COMMITS, null, THREE_LOOKUP);
+    graph.setFileHistoryHighlight(HIGHLIGHT);
+
+    // When: the graph is rendered
+    graph.render(null);
+
+    // Then: h1 has "fileHistoryDim"
+    expect(classOf("h1")).toBe("fileHistoryDim");
+  });
+
+  it("puts the mode class on the svg while a highlight is set (TC-069)", () => {
+    // Case: TC-069
+    // Given: the same highlight
+    graph.loadCommits(THREE_COMMITS, null, THREE_LOOKUP);
+    graph.setFileHistoryHighlight(HIGHLIGHT);
+
+    // When: the graph is rendered
+    graph.render(null);
+
+    // Then: the svg class is exactly "fileHistoryMode"
+    expect(svgElement().getAttribute("class")).toBe("fileHistoryMode");
+  });
+
+  it("keeps the existing current class in front of the highlight classes (TC-070)", () => {
+    // Case: TC-070
+    // Given: h0 is HEAD and is the current highlight
+    graph.loadCommits(THREE_COMMITS, "h0", THREE_LOOKUP);
+    graph.setFileHistoryHighlight(HIGHLIGHT);
+
+    // When: the graph is rendered
+    graph.render(null);
+
+    // Then: the HEAD class comes first, space separated
+    expect(classOf("h0")).toBe("current fileHistoryMatch fileHistoryCurrent");
+  });
+
+  it("marks both stash circles with data-hash and the dim class (TC-071)", () => {
+    // Case: TC-071
+    // Given: a stash commit that is outside the match set
+    const commits = [
+      makeCommit("h0", ["h1"], null),
+      makeCommit("h1", ["h2"], { selector: "stash@{0}", baseHash: "h2", untrackedFilesHash: null }),
+      makeCommit("h2", [], null)
+    ];
+    graph.loadCommits(commits, null, THREE_LOOKUP);
+    graph.setFileHistoryHighlight(HIGHLIGHT);
+
+    // When: the graph is rendered
+    graph.render(null);
+
+    // Then: outer and inner circles both carry the hash and the dim class after their own class
+    const stashCircles = circlesOf("h1");
+    expect(stashCircles).toHaveLength(2);
+    expect(stashCircles[0].getAttribute("class")).toBe("stashOuter fileHistoryDim");
+    expect(stashCircles[1].getAttribute("class")).toBe("stashInner fileHistoryDim");
+  });
+
+  it("removes every highlight class after setFileHistoryHighlight(null) (TC-072)", () => {
+    // Case: TC-072
+    // Given: a rendered highlight with h0 as HEAD
+    graph.loadCommits(THREE_COMMITS, "h0", THREE_LOOKUP);
+    graph.setFileHistoryHighlight(HIGHLIGHT);
+    graph.render(null);
+
+    // When: the highlight is cleared and the graph re-rendered
+    graph.setFileHistoryHighlight(null);
+    forgetCircles();
+    graph.render(null);
+
+    // Then: the svg class is empty, HEAD keeps "current", the others have no class
+    expect(svgElement().getAttribute("class")).toBe("");
+    expect(classOf("h0")).toBe("current");
+    expect(classOf("h1")).toBeNull();
+    expect(classOf("h2")).toBeNull();
+  });
+
+  it("renders matches without a current circle when currentHash is null (TC-073)", () => {
+    // Case: TC-073
+    // Given: a highlight without a current hash
+    graph.loadCommits(THREE_COMMITS, null, THREE_LOOKUP);
+    graph.setFileHistoryHighlight({ matchHashes: new Set(["h0", "h2"]), currentHash: null });
+
+    // When: the graph is rendered
+    graph.render(null);
+
+    // Then: h0 / h2 are matches, no circle is current, the svg is in mode
+    expect(classOf("h0")).toBe("fileHistoryMatch");
+    expect(classOf("h2")).toBe("fileHistoryMatch");
+    expect(
+      getCircleElements().filter((e) =>
+        (e.getAttribute("class") ?? "").includes("fileHistoryCurrent")
+      )
+    ).toHaveLength(0);
+    expect(svgElement().getAttribute("class")).toBe("fileHistoryMode");
+  });
+
+  it("dims every circle for an empty match set (TC-074)", () => {
+    // Case: TC-074
+    // Given: an empty match set
+    graph.loadCommits(THREE_COMMITS, null, THREE_LOOKUP);
+    graph.setFileHistoryHighlight({ matchHashes: new Set(), currentHash: null });
+
+    // When: the graph is rendered
+    graph.render(null);
+
+    // Then: all three circles are dim and the svg is in mode
+    for (const hash of ["h0", "h1", "h2"]) {
+      expect(classOf(hash)).toBe("fileHistoryDim");
+    }
+    expect(svgElement().getAttribute("class")).toBe("fileHistoryMode");
+  });
+
+  it("keeps the highlight across a second render (TC-075)", () => {
+    // Case: TC-075
+    // Given: a rendered highlight
+    graph.loadCommits(THREE_COMMITS, null, THREE_LOOKUP);
+    graph.setFileHistoryHighlight(HIGHLIGHT);
+    graph.render(null);
+
+    // When: the graph is rendered again
+    forgetCircles();
+    graph.render(null);
+
+    // Then: the classes are unchanged
+    expect(classOf("h0")).toBe("fileHistoryMatch fileHistoryCurrent");
+    expect(classOf("h2")).toBe("fileHistoryMatch");
+    expect(classOf("h1")).toBe("fileHistoryDim");
+    expect(svgElement().getAttribute("class")).toBe("fileHistoryMode");
+  });
+});

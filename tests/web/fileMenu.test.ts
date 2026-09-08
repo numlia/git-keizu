@@ -6,7 +6,13 @@ vi.mock("../../web/contextMenu", () => ({
 }));
 
 import { recordRecentAction } from "../../web/contextMenu";
-import { buildFileContextMenuItems, resolveFileRow, sendOpenFileAction } from "../../web/fileMenu";
+import {
+  buildFileContextMenuItems,
+  type FileHistoryMenuContext,
+  type FileMenuExpandedCommit,
+  resolveFileRow,
+  sendOpenFileAction
+} from "../../web/fileMenu";
 import { vscode } from "../../web/utils";
 
 /* ------------------------------------------------------------------ */
@@ -15,6 +21,8 @@ import { vscode } from "../../web/utils";
 
 const TEST_REPO = "/path/to/repo";
 const COMMIT_HASH = "abc123def456";
+const OPEN_FILE_TITLE = "Open File";
+const HIGHLIGHT_TITLE = "Highlight File History";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
@@ -30,8 +38,24 @@ function makeFileRow(dataset: Record<string, string> = {}, type = "M"): HTMLElem
   return li;
 }
 
-function makeExpandedCommit(hash = COMMIT_HASH) {
-  return { hash };
+/** A `.gitFile` row whose dataset deliberately lacks `data-type`. */
+function makeUntypedFileRow(dataset: Record<string, string>): HTMLElement {
+  const li = document.createElement("li");
+  li.className = "gitFile gitDiffPossible";
+  for (const [key, value] of Object.entries(dataset)) {
+    li.dataset[key] = value;
+  }
+  return li;
+}
+
+function makeExpandedCommit(hash = COMMIT_HASH): FileMenuExpandedCommit {
+  return { hash, compareWithHash: null };
+}
+
+function makeFileHistoryContext(
+  overrides: Partial<FileHistoryMenuContext> = {}
+): FileHistoryMenuContext {
+  return { isStash: false, onHighlightFileHistory: vi.fn(), ...overrides };
 }
 
 /* ------------------------------------------------------------------ */
@@ -140,79 +164,303 @@ describe("sendOpenFileAction", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* S2: buildFileContextMenuItems() menu item 構築                     */
+/* S4: Highlight File History item の表示条件と callback              */
 /* ------------------------------------------------------------------ */
 
-describe("buildFileContextMenuItems", () => {
+// @see docs/testing/perspectives/web/fileMenu-test.md
+describe("buildFileContextMenuItems Highlight File History item (S4)", () => {
   beforeEach(() => {
     vi.mocked(vscode.postMessage).mockClear();
+    vi.mocked(recordRecentAction).mockClear();
   });
 
-  // TC-007: 有効な row で Open File 1 項目だけ返す
-  it("returns single 'Open File' menu item for valid file row (TC-007)", () => {
-    // Given: a valid .gitFile row with expandedCommit and repo
-    const row = makeFileRow({ newfilepath: "src%2Ffile.ts" });
-    const commit = makeExpandedCommit();
-
-    // When: buildFileContextMenuItems is called
-    const items = buildFileContextMenuItems(row, commit, TEST_REPO);
-
-    // Then: exactly 1 item with title "Open File"
-    expect(items).toHaveLength(1);
-    expect(items[0]).not.toBeNull();
-    expect(items[0]!.title).toBe("Open File");
-  });
-
-  // TC-008: deleted file row でも items が空にならず Open File 1 件を返す
-  it("returns 'Open File' for deleted file row (TC-008)", () => {
-    // Given: a deleted file row (type=D) with data-newfilepath
-    const row = makeFileRow({ newfilepath: "src%2Fdeleted.ts" }, "D");
-    const commit = makeExpandedCommit();
-
-    // When: buildFileContextMenuItems is called
-    const items = buildFileContextMenuItems(row, commit, TEST_REPO);
-
-    // Then: still returns 1 item
-    expect(items).toHaveLength(1);
-    expect(items[0]!.title).toBe("Open File");
-  });
-
-  // TC-009: expandedCommit が null のとき空配列を返す
-  it("returns empty array when expandedCommit is null (TC-009)", () => {
-    // Given: a valid file row but expandedCommit is null
+  it("returns Open File followed by Highlight File History for a modified row (TC-015)", () => {
+    // Case: TC-015
+    // Given: a type M row, a normal commit and a non-stash context
     const row = makeFileRow({ newfilepath: "src%2Ffile.ts" });
 
-    // When: buildFileContextMenuItems is called
-    const items = buildFileContextMenuItems(row, null, TEST_REPO);
+    // When: the menu items are built
+    const items = buildFileContextMenuItems(
+      row,
+      makeExpandedCommit("abc"),
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
 
-    // Then: empty array
+    // Then: exactly two items in the fixed order
+    expect(items).toHaveLength(2);
+    expect(items[0]!.title).toBe(OPEN_FILE_TITLE);
+    expect(items[1]!.title).toBe(HIGHLIGHT_TITLE);
+  });
+
+  it("calls onHighlightFileHistory with the anchor and the decoded path (TC-016)", () => {
+    // Case: TC-016
+    // Given: the base fixture
+    const context = makeFileHistoryContext();
+    const items = buildFileContextMenuItems(
+      makeFileRow({ newfilepath: "src%2Ffile.ts" }),
+      makeExpandedCommit("abc"),
+      TEST_REPO,
+      context
+    );
+
+    // When: the second item is clicked
+    items[1]!.onClick();
+
+    // Then: the callback receives ("abc", "src/file.ts") once and nothing is posted
+    expect(context.onHighlightFileHistory).toHaveBeenCalledTimes(1);
+    expect(context.onHighlightFileHistory).toHaveBeenCalledWith("abc", "src/file.ts");
+    expect(vscode.postMessage).toHaveBeenCalledTimes(0);
+  });
+
+  it("gives the Highlight File History item no recentActionId (TC-017)", () => {
+    // Case: TC-017
+    // Given: the base fixture
+    const items = buildFileContextMenuItems(
+      makeFileRow({ newfilepath: "src%2Ffile.ts" }),
+      makeExpandedCommit("abc"),
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
+
+    // When: the second item is clicked
+    items[1]!.onClick();
+
+    // Then: no recent action id and no recent action recorded
+    expect(items[1]!.recentActionId).toBeUndefined();
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
+  });
+
+  it("offers the item for A, D and R rows (TC-018)", () => {
+    // Case: TC-018
+    // Given: rows of the other allowed change types
+    for (const type of ["A", "D", "R"]) {
+      // When: the menu items are built
+      const items = buildFileContextMenuItems(
+        makeFileRow({ newfilepath: "src%2Ffile.ts" }, type),
+        makeExpandedCommit("abc"),
+        TEST_REPO,
+        makeFileHistoryContext()
+      );
+
+      // Then: two items with the history item second
+      expect(items, type).toHaveLength(2);
+      expect(items[1]!.title).toBe(HIGHLIGHT_TITLE);
+    }
+  });
+
+  it("offers only Open File for a typechange row (TC-019)", () => {
+    // Case: TC-019
+    // Given: a type T row
+    // When: the menu items are built
+    const items = buildFileContextMenuItems(
+      makeFileRow({ newfilepath: "src%2Ffile.ts" }, "T"),
+      makeExpandedCommit("abc"),
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
+
+    // Then: a single Open File item
+    expect(items).toHaveLength(1);
+    expect(items[0]!.title).toBe(OPEN_FILE_TITLE);
+  });
+
+  it("offers only Open File when data-type is missing (TC-020)", () => {
+    // Case: TC-020
+    // Given: a row without data-type
+    // When: the menu items are built
+    const items = buildFileContextMenuItems(
+      makeUntypedFileRow({ newfilepath: "src%2Ffile.ts" }),
+      makeExpandedCommit("abc"),
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
+
+    // Then: a single Open File item
+    expect(items).toHaveLength(1);
+    expect(items[0]!.title).toBe(OPEN_FILE_TITLE);
+  });
+
+  it("offers only Open File for uncommitted changes (TC-021)", () => {
+    // Case: TC-021
+    // Given: the uncommitted changes hash as the expanded commit
+    // When: the menu items are built
+    const items = buildFileContextMenuItems(
+      makeFileRow({ newfilepath: "src%2Ffile.ts" }),
+      makeExpandedCommit("*"),
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
+
+    // Then: a single Open File item
+    expect(items).toHaveLength(1);
+    expect(items[0]!.title).toBe(OPEN_FILE_TITLE);
+  });
+
+  it("offers only Open File for a stash commit (TC-022)", () => {
+    // Case: TC-022
+    // Given: a context flagged as stash
+    // When: the menu items are built
+    const items = buildFileContextMenuItems(
+      makeFileRow({ newfilepath: "src%2Ffile.ts" }),
+      makeExpandedCommit("abc"),
+      TEST_REPO,
+      makeFileHistoryContext({ isStash: true })
+    );
+
+    // Then: a single Open File item
+    expect(items).toHaveLength(1);
+    expect(items[0]!.title).toBe(OPEN_FILE_TITLE);
+  });
+
+  it("offers only Open File in comparison mode (TC-023)", () => {
+    // Case: TC-023
+    // Given: an expanded commit with a compare target
+    // When: the menu items are built
+    const items = buildFileContextMenuItems(
+      makeFileRow({ newfilepath: "src%2Ffile.ts" }),
+      { hash: "abc", compareWithHash: "def" },
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
+
+    // Then: a single Open File item
+    expect(items).toHaveLength(1);
+    expect(items[0]!.title).toBe(OPEN_FILE_TITLE);
+  });
+
+  it("returns an empty array without a commit context (TC-024)", () => {
+    // Case: TC-024
+    // Given: expandedCommit null
+    // When: the menu items are built
+    const items = buildFileContextMenuItems(
+      makeFileRow({ newfilepath: "src%2Ffile.ts" }),
+      null,
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
+
+    // Then: the existing guard still yields []
     expect(items).toEqual([]);
   });
 
-  // TC-010: data-newfilepath 欠落で空配列を返す
-  it("returns empty array when data-newfilepath is missing (TC-010)", () => {
-    // Given: a .gitFile row without data-newfilepath
-    const row = makeFileRow({});
-    const commit = makeExpandedCommit();
+  it("returns an empty array when data-newfilepath is missing (TC-025)", () => {
+    // Case: TC-025
+    // Given: a row without data-newfilepath
+    // When: the menu items are built
+    const items = buildFileContextMenuItems(
+      makeFileRow({}),
+      makeExpandedCommit("abc"),
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
 
-    // When: buildFileContextMenuItems is called
-    const items = buildFileContextMenuItems(row, commit, TEST_REPO);
-
-    // Then: empty array
+    // Then: the existing guard still yields []
     expect(items).toEqual([]);
   });
 
-  // TC-011: menu item の onClick が icon click と同一構造の payload を送る
-  it("onClick sends same payload structure as direct action (TC-011)", () => {
-    // Given: a valid file row and menu items built
-    const row = makeFileRow({ newfilepath: "src%2Ffile.ts" });
-    const commit = makeExpandedCommit();
-    const items = buildFileContextMenuItems(row, commit, TEST_REPO);
+  it("keeps the Open File item's recent action and payload (TC-026)", () => {
+    // Case: TC-026
+    // Given: the base fixture
+    const items = buildFileContextMenuItems(
+      makeFileRow({ newfilepath: "src%2Ffile.ts" }),
+      makeExpandedCommit("abc"),
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
 
-    // When: the menu item's onClick is invoked
+    // When: the first item is clicked
     items[0]!.onClick();
 
-    // Then: payload matches the icon click structure exactly
+    // Then: recentActionId, the recent action record and the openFile payload are unchanged
+    expect(items[0]!.recentActionId).toBe("file.openFile");
+    expect(recordRecentAction).toHaveBeenCalledTimes(1);
+    expect(recordRecentAction).toHaveBeenCalledWith(TEST_REPO, "file.openFile");
+    expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+    expect(vscode.postMessage).toHaveBeenCalledWith({
+      command: "openFile",
+      repo: TEST_REPO,
+      filePath: "src/file.ts",
+      commitHash: "abc"
+    });
+  });
+
+  it("decodes spaces and Japanese characters before the callback (TC-027)", () => {
+    // Case: TC-027
+    // Given: an encoded path with a space and Japanese characters
+    const context = makeFileHistoryContext();
+    const row = makeFileRow({ newfilepath: encodeURIComponent("src/テスト ファイル.ts") });
+
+    // When: the history item is clicked
+    buildFileContextMenuItems(row, makeExpandedCommit("abc"), TEST_REPO, context)[1]!.onClick();
+
+    // Then: the callback receives the fully decoded string
+    expect(context.onHighlightFileHistory).toHaveBeenCalledWith("abc", "src/テスト ファイル.ts");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S5: Open File item の維持（4 引数 signature）                       */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/fileMenu-test.md
+describe("buildFileContextMenuItems Open File item under the 4-argument signature (S5)", () => {
+  beforeEach(() => {
+    vi.mocked(vscode.postMessage).mockClear();
+    vi.mocked(recordRecentAction).mockClear();
+  });
+
+  it("keeps Open File as the first and only Open File item (TC-028)", () => {
+    // Case: TC-028
+    // Given: a valid .gitFile row with expandedCommit and repo
+    const row = makeFileRow({ newfilepath: "src%2Ffile.ts" });
+
+    // When: the menu items are built
+    const items = buildFileContextMenuItems(
+      row,
+      makeExpandedCommit(),
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
+
+    // Then: the first item is Open File and no other item carries that title
+    expect(items[0]!.title).toBe(OPEN_FILE_TITLE);
+    expect(items.filter((item) => item !== null && item.title === OPEN_FILE_TITLE)).toHaveLength(1);
+  });
+
+  it("keeps Open File first for a deleted file row (TC-029)", () => {
+    // Case: TC-029
+    // Given: a deleted file row (type=D) with data-newfilepath
+    const row = makeFileRow({ newfilepath: "src%2Fdeleted.ts" }, "D");
+
+    // When: the menu items are built
+    const items = buildFileContextMenuItems(
+      row,
+      makeExpandedCommit(),
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
+
+    // Then: the menu is not empty and starts with Open File
+    expect(items.length).toBeGreaterThan(0);
+    expect(items[0]!.title).toBe(OPEN_FILE_TITLE);
+  });
+
+  it("sends the same openFile payload as the icon click from the first item (TC-030)", () => {
+    // Case: TC-030
+    // Given: a valid file row and menu items built
+    const row = makeFileRow({ newfilepath: "src%2Ffile.ts" });
+    const items = buildFileContextMenuItems(
+      row,
+      makeExpandedCommit(),
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
+
+    // When: the first item's onClick is invoked
+    items[0]!.onClick();
+
+    // Then: exactly one openFile payload with the icon click structure
     expect(vscode.postMessage).toHaveBeenCalledTimes(1);
     expect(vscode.postMessage).toHaveBeenCalledWith({
       command: "openFile",
@@ -221,61 +469,39 @@ describe("buildFileContextMenuItems", () => {
       commitHash: COMMIT_HASH
     });
   });
-});
 
-describe("buildFileContextMenuItems recent action metadata (S3)", () => {
-  beforeEach(() => {
-    vi.mocked(vscode.postMessage).mockClear();
-    vi.mocked(recordRecentAction).mockClear();
-  });
-
-  it("assigns recentActionId to the Open File item (TC-012)", () => {
-    // Case: TC-012
-    // Given: a valid file row with expanded commit
-    const row = makeFileRow({ newfilepath: "src%2Ffile.ts" });
-    const commit = makeExpandedCommit();
-
-    // When: buildFileContextMenuItems is called
-    const items = buildFileContextMenuItems(row, commit, TEST_REPO);
-
-    // Then: the Open File item is recent-enabled with file.openFile
-    expect(items).toHaveLength(1);
-    expect(items[0]!.recentActionId).toBe("file.openFile");
-  });
-
-  it("records the action before sending openFile when the menu item is clicked (TC-013)", () => {
-    // Case: TC-013
+  it("records the recent action before posting openFile (TC-031)", () => {
+    // Case: TC-031
     // Given: a valid Open File menu item
     const row = makeFileRow({ newfilepath: "src%2Ffile.ts" });
-    const commit = makeExpandedCommit();
-    const items = buildFileContextMenuItems(row, commit, TEST_REPO);
+    const items = buildFileContextMenuItems(
+      row,
+      makeExpandedCommit(),
+      TEST_REPO,
+      makeFileHistoryContext()
+    );
 
-    // When: the menu item is clicked
+    // When: the first item is clicked
     items[0]!.onClick();
 
-    // Then: recordRecentAction runs before the openFile payload is posted
+    // Then: recordRecentAction(repo, "file.openFile") runs once, before the payload is posted
+    expect(recordRecentAction).toHaveBeenCalledTimes(1);
     expect(recordRecentAction).toHaveBeenCalledWith(TEST_REPO, "file.openFile");
-    expect(vscode.postMessage).toHaveBeenCalledWith({
-      command: "openFile",
-      repo: TEST_REPO,
-      filePath: "src/file.ts",
-      commitHash: COMMIT_HASH
-    });
     expect(vi.mocked(recordRecentAction).mock.invocationCallOrder[0]).toBeLessThan(
       vi.mocked(vscode.postMessage).mock.invocationCallOrder[0]
     );
   });
 
-  it("does not record a recent action when guard conditions prevent building the menu (TC-014)", () => {
-    // Case: TC-014
+  it("records no recent action when the menu cannot be built (TC-032)", () => {
+    // Case: TC-032
     // Given: expandedCommit is null so no menu item can be created
     const row = makeFileRow({ newfilepath: "src%2Ffile.ts" });
 
-    // When: buildFileContextMenuItems is called
-    const items = buildFileContextMenuItems(row, null, TEST_REPO);
+    // When: the menu items are built
+    const items = buildFileContextMenuItems(row, null, TEST_REPO, makeFileHistoryContext());
 
     // Then: no menu item exists and no recent action is recorded
     expect(items).toEqual([]);
-    expect(recordRecentAction).not.toHaveBeenCalled();
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
   });
 });

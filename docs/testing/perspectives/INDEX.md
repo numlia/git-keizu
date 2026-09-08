@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-09-08T09:06:22+09:00
+> Auto-generated: 2026-09-08T16:31:43+09:00
 > Total sources: 50
 > Total physical files: 85
-> Total sections: 533
-> Total cases: 3010
+> Total sections: 532
+> Total cases: 3007
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -46,7 +46,7 @@
 | `web/dialogs.ts` | single-file | `web/dialogs-test.md` | 1 | 7 | 38 | 2026-08-23 |
 | `web/dropdown.ts` | single-file | `web/dropdown-test.md` | 1 | 10 | 38 | 2026-03-07 |
 | `web/fileHistory.ts` | single-file | `web/fileHistory-test.md` | 1 | 9 | 57 | 2026-09-08 |
-| `web/fileMenu.ts` | single-file | `web/fileMenu-test.md` | 1 | 4 | 27 | 2026-09-08 |
+| `web/fileMenu.ts` | single-file | `web/fileMenu-test.md` | 1 | 3 | 24 | 2026-09-08 |
 | `web/fileTree.ts` | single-file | `web/fileTree-test.md` | 1 | 4 | 30 | 2026-07-04 |
 | `web/findWidget.ts` | single-file | `web/findWidget-test.md` | 1 | 9 | 39 | 2026-07-19 |
 | `web/graph.ts` | single-file | `web/graph-test.md` | 1 | 19 | 75 | 2026-09-08 |
@@ -100,7 +100,7 @@
 | Feature 023 (worktree-dialog-defaults) (aidd-spec-tasks-test) | `web/commitMenu-test.md` |
 | Feature 024 (worktree-path-normalize) (aidd-spec-tasks-test) | `web/commitMenu-test.md`, `web/utils-test.md` |
 | Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test) | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md`, `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md`, `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md`, `src/config-test/INDEX.md`, `src/utils-test.md`, `web/fileTree-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
-| Feature 027 (commit-file-context-menu) (aidd-spec-tasks-test) | `web/fileMenu-test.md`, `web/main-test/INDEX.md` |
+| Feature 027 (commit-file-context-menu) (aidd-spec-tasks-test) | `web/fileMenu-test.md` |
 | Feature 032 (context-menu-reorg) Task 7 | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, `web/commitMenu-test.md`, `web/contextMenu-test.md`, `web/refMenu-test/INDEX.md`, `web/stashMenu-test.md` |
 | Feature 033 (watch-refresh-scope) Task 1 | `src/dataSource-test/INDEX.md` |
 | Feature 033 (watch-refresh-scope) Task 2 | `src/repoFileWatcher-test.md` |
@@ -108,7 +108,7 @@
 | Feature 034 (context-menu-recent-actions) Task 1 | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md`, `src/config-test/INDEX.md`, `src/gitGraphView-test/INDEX.md` |
 | Feature 034 (context-menu-recent-actions) Task 2 | `src/extensionState-test.md` |
 | Feature 034 (context-menu-recent-actions) Task 3 | `web/contextMenu-test.md` |
-| Feature 034 (context-menu-recent-actions) Task 4 | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, `web/commitMenu-test.md`, `web/fileMenu-test.md`, `web/refMenu-test/INDEX.md` |
+| Feature 034 (context-menu-recent-actions) Task 4 | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, `web/commitMenu-test.md`, `web/refMenu-test/INDEX.md` |
 | Feature 035 (japanese-ui-i18n) Task 8 | `src/i18n-test.md`, `web/dates-test.md`, `web/i18n-test.md` |
 | Feature 037 (delete-branch-recent-actions) Task 4 | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, `web/refMenu-test/INDEX.md` |
 | Feature 039 (show-recent-actions-runtime-sync) (light-spec-plan) | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md`, `src/extension-test.md`, `src/gitGraphView-test/INDEX.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
@@ -126,6 +126,7 @@
 | Feature 055-03 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `src/branchCleanup-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/i18n-test.md`, `src/types-test.md`, `web/branchCleanupPanel-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | Feature 055-03 follow-up | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `web/branchCleanupPanel-test.md` |
 | Feature 055-07 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `src/dataSource-test/INDEX.md`, `src/fileHistory-test.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/fileHistory-test.md`, `web/fileMenu-test.md`, `web/graph-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
+| Feature 055-07 (light-spec-plan) Task 8 | `web/fileMenu-test.md`, `web/main-test/INDEX.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
 | test-plan | `web/stashMenu-test.md` |

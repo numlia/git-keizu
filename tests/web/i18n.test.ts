@@ -752,3 +752,162 @@ describe("comparison auto-resolved label l10n key", () => {
     expect(placeholderSet(japanese[AUTO_RESOLVED_KEY])).toEqual(["{0}"]);
   });
 });
+
+// @see docs/testing/perspectives/l10n/web/web.l10n.en.json-test.md
+// @see docs/testing/perspectives/l10n/web/web.l10n.ja.json-test.md
+describe("file history l10n keys (Feature 055-07)", () => {
+  const FILE_HISTORY_KEYS = [
+    "context.highlightFileHistory",
+    "fileHistory.loading",
+    "fileHistory.position",
+    "fileHistory.previous",
+    "fileHistory.next",
+    "fileHistory.exit",
+    "fileHistory.notInFirstParentDiff",
+    "fileHistory.noResults",
+    "error.fileHistory"
+  ] as const;
+  const POSITION_KEY = "fileHistory.position";
+  const ENGLISH_VALUES: Record<(typeof FILE_HISTORY_KEYS)[number], string> = {
+    "context.highlightFileHistory": "Highlight File History",
+    "fileHistory.loading": "Loading file history ...",
+    "fileHistory.position": "{0} of {1}",
+    "fileHistory.previous": "Previous match",
+    "fileHistory.next": "Next match",
+    "fileHistory.exit": "Exit",
+    "fileHistory.notInFirstParentDiff":
+      "This file's change is not part of the diff against the first parent.",
+    "fileHistory.noResults": "No history was found for this file.",
+    "error.fileHistory": "Unable to load file history"
+  };
+  const JAPANESE_VALUES: Record<(typeof FILE_HISTORY_KEYS)[number], string> = {
+    "context.highlightFileHistory": "ファイル履歴を強調",
+    "fileHistory.loading": "ファイル履歴を読み込み中 ...",
+    "fileHistory.position": "{0} / {1}",
+    "fileHistory.previous": "前の一致",
+    "fileHistory.next": "次の一致",
+    "fileHistory.exit": "解除",
+    "fileHistory.notInFirstParentDiff": "このファイルの変更は第 1 親との差分にはありません",
+    "fileHistory.noResults": "このファイルの履歴が見つかりません",
+    "error.fileHistory": "ファイル履歴を読み込めません"
+  };
+  const EXISTING_KEYS = ["context.openFile", "error.fetch", "find.placeholder", "find.position"];
+
+  function loadBundle(fileName: string): Record<string, string> {
+    const jsonPath = resolve(process.cwd(), "l10n/web", fileName);
+    return JSON.parse(readFileSync(jsonPath, "utf-8")) as Record<string, string>;
+  }
+
+  function placeholderSet(value: string): string[] {
+    return [...value.matchAll(/\{\d+\}/g)].map((match) => match[0]).sort();
+  }
+
+  function pick(bundle: Record<string, string>): Record<string, string | undefined> {
+    return Object.fromEntries(FILE_HISTORY_KEYS.map((key) => [key, bundle[key]]));
+  }
+
+  it("English bundle holds the nine fixed file history values (en l10n TC-021)", () => {
+    // Case: TC-021 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const english = loadBundle("web.l10n.en.json");
+
+    // When: the nine keys are read
+    // Then: every key exists with exactly the fixed wording
+    expect(pick(english)).toEqual(ENGLISH_VALUES);
+  });
+
+  it("English placeholders exist only on the position key (en l10n TC-022)", () => {
+    // Case: TC-022 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const english = loadBundle("web.l10n.en.json");
+
+    // When: the placeholder sets are extracted
+    // Then: position has {0} and {1}; the other eight keys have none
+    expect(placeholderSet(english[POSITION_KEY])).toEqual(["{0}", "{1}"]);
+    for (const key of FILE_HISTORY_KEYS.filter((k) => k !== POSITION_KEY)) {
+      expect(placeholderSet(english[key]), key).toEqual([]);
+    }
+  });
+
+  it("Japanese bundle has all nine keys with matching placeholder sets (en l10n TC-023)", () => {
+    // Case: TC-023 (l10n/web/web.l10n.en.json-test.md)
+    // Given: both bundles on disk
+    const english = loadBundle("web.l10n.en.json");
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When: presence and placeholder sets are compared per key
+    const missingInJa = FILE_HISTORY_KEYS.filter((key) => japanese[key] === undefined);
+
+    // Then: nothing is missing on the Japanese side and every placeholder set matches
+    expect(missingInJa).toEqual([]);
+    for (const key of FILE_HISTORY_KEYS) {
+      expect(placeholderSet(japanese[key]), key).toEqual(placeholderSet(english[key]));
+    }
+  });
+
+  it("English bundle keeps its existing keys and has no empty value (en l10n TC-024)", () => {
+    // Case: TC-024 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const english = loadBundle("web.l10n.en.json");
+
+    // When: existing keys and all values are inspected
+    const emptyKeys = Object.keys(english).filter((key) => english[key] === "");
+
+    // Then: the existing keys are still present and no value is an empty string
+    for (const key of EXISTING_KEYS) {
+      expect(english[key], key).toBeDefined();
+    }
+    expect(emptyKeys).toEqual([]);
+  });
+
+  it("Japanese bundle holds the nine fixed translated values (ja l10n TC-023)", () => {
+    // Case: TC-023 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When: the nine keys are read
+    // Then: every key exists with exactly the fixed wording
+    expect(pick(japanese)).toEqual(JAPANESE_VALUES);
+  });
+
+  it("Japanese placeholders exist only on the position key (ja l10n TC-024)", () => {
+    // Case: TC-024 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When: the placeholder sets are extracted
+    // Then: position has {0} and {1}; the other eight keys have none
+    expect(placeholderSet(japanese[POSITION_KEY])).toEqual(["{0}", "{1}"]);
+    for (const key of FILE_HISTORY_KEYS.filter((k) => k !== POSITION_KEY)) {
+      expect(placeholderSet(japanese[key]), key).toEqual([]);
+    }
+  });
+
+  it("Japanese values are never the raw key (ja l10n TC-025)", () => {
+    // Case: TC-025 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When: each value is compared with its key
+    const untranslated = FILE_HISTORY_KEYS.filter((key) => japanese[key] === key);
+
+    // Then: no key falls back to its own name
+    expect(untranslated).toEqual([]);
+  });
+
+  it("English bundle has all nine keys with matching placeholder sets (ja l10n TC-026)", () => {
+    // Case: TC-026 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: both bundles on disk
+    const english = loadBundle("web.l10n.en.json");
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When: presence and placeholder sets are compared per key
+    const missingInEn = FILE_HISTORY_KEYS.filter((key) => english[key] === undefined);
+
+    // Then: nothing is missing on the English side and every placeholder set matches
+    expect(missingInEn).toEqual([]);
+    for (const key of FILE_HISTORY_KEYS) {
+      expect(placeholderSet(english[key]), key).toEqual(placeholderSet(japanese[key]));
+    }
+  });
+});

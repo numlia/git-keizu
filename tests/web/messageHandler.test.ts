@@ -28,6 +28,7 @@ function createMockGitKeizuView(): GitKeizuViewAPI {
     loadBranchCleanup: vi.fn(),
     loadBranches: vi.fn(),
     loadCommits: vi.fn(),
+    loadFileHistory: vi.fn(),
     loadRepos: vi.fn(),
     refresh: vi.fn(),
     selectRepo: vi.fn(),
@@ -1182,5 +1183,86 @@ describe("handleMessage loadBranchCleanup delegation", () => {
     expect(() => handleMessage(msg, gitKeizu)).not.toThrow();
     expect(gitKeizu.loadBranchCleanup).toHaveBeenCalledTimes(1);
     expect(vi.mocked(gitKeizu.loadBranchCleanup).mock.calls[0][0]).toBe(msg);
+  });
+});
+
+// S18: fileHistory 応答の API 委譲
+// @see docs/testing/perspectives/web/messageHandler-test/05-file-history-01.md
+describe("handleMessage fileHistory delegation (S18)", () => {
+  let gitKeizu: GitKeizuViewAPI;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitKeizu = createMockGitKeizuView();
+  });
+
+  it("delegates the exact response object once (TC-082)", () => {
+    // Case: TC-082
+    // Given: a fileHistory response with entries
+    const msg: ResponseMessage = {
+      command: "fileHistory",
+      repo: "/repo",
+      requestId: 1,
+      anchorHash: "abc",
+      filePath: "src/a.txt",
+      entries: [
+        {
+          hash: "abc",
+          parentHashes: [],
+          type: "M",
+          oldFilePath: "src/a.txt",
+          newFilePath: "src/a.txt",
+          historicalPath: "src/a.txt",
+          isMerge: false
+        }
+      ]
+    };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: loadFileHistory receives the identical object exactly once
+    expect(gitKeizu.loadFileHistory).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(gitKeizu.loadFileHistory).mock.calls[0][0]).toBe(msg);
+  });
+
+  it("delegates a null entries response without interpreting it (TC-083)", () => {
+    // Case: TC-083
+    // Given: a failure response (entries: null)
+    const msg: ResponseMessage = {
+      command: "fileHistory",
+      repo: "/repo",
+      requestId: 2,
+      anchorHash: "abc",
+      filePath: "src/a.txt",
+      entries: null
+    };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: delegated once; no dialog and no refresh from the handler
+    expect(gitKeizu.loadFileHistory).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledTimes(0);
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(0);
+  });
+
+  it("passes a malformed response through without throwing (TC-084)", () => {
+    // Case: TC-084
+    // Given: an entry whose type is outside the union
+    const msg = {
+      command: "fileHistory",
+      repo: "/repo",
+      requestId: 3,
+      anchorHash: "abc",
+      filePath: "src/a.txt",
+      entries: [{ hash: "abc", type: "T" }]
+    } as unknown as ResponseMessage;
+
+    // When: handleMessage is called
+    // Then: no exception escapes and the response is still delegated once
+    expect(() => handleMessage(msg, gitKeizu)).not.toThrow();
+    expect(gitKeizu.loadFileHistory).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(gitKeizu.loadFileHistory).mock.calls[0][0]).toBe(msg);
   });
 });
