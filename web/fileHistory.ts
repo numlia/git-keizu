@@ -1,15 +1,24 @@
 import * as GG from "../src/types";
 import { showErrorDialog } from "./dialogs";
+import {
+  CLASS_FILE_HISTORY_CURRENT,
+  CLASS_FILE_HISTORY_DIM,
+  CLASS_FILE_HISTORY_MATCH,
+  CLASS_FILE_HISTORY_NOTE
+} from "./fileHistoryClasses";
 import { t } from "./i18n";
 import { insertAfter, sendMessage, svgIcons } from "./utils";
 
+export {
+  CLASS_FILE_HISTORY_CURRENT,
+  CLASS_FILE_HISTORY_DIM,
+  CLASS_FILE_HISTORY_MATCH,
+  CLASS_FILE_HISTORY_MODE,
+  CLASS_FILE_HISTORY_NOTE
+} from "./fileHistoryClasses";
+
 /* === Constants === */
 
-export const CLASS_FILE_HISTORY_MATCH = "fileHistoryMatch";
-export const CLASS_FILE_HISTORY_CURRENT = "fileHistoryCurrent";
-export const CLASS_FILE_HISTORY_DIM = "fileHistoryDim";
-export const CLASS_FILE_HISTORY_MODE = "fileHistoryMode";
-export const CLASS_FILE_HISTORY_NOTE = "fileHistoryNote";
 export const FILE_HISTORY_BAR_ID = "fileHistoryBar";
 
 const PATH_ELEMENT_ID = "fileHistoryPath";
