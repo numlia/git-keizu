@@ -10,7 +10,12 @@ import {
 import { getCommitDate } from "./dates";
 import { hideDialog, isDialogActive, showErrorDialog } from "./dialogs";
 import { Dropdown } from "./dropdown";
-import { buildFileContextMenuItems, resolveFileRow, sendOpenFileAction } from "./fileMenu";
+import {
+  buildFileContextMenuItems,
+  type FileHistoryMenuContext,
+  resolveFileRow,
+  sendOpenFileAction
+} from "./fileMenu";
 import {
   alterGitFileTree,
   generateGitFileListHtml,
@@ -388,6 +393,17 @@ class GitKeizuView {
 
   private getCurrentRepoRecentActions(): GG.RecentActionId[] {
     return this.gitRepos[this.currentRepo]?.recentActions ?? [];
+  }
+
+  private buildFileHistoryMenuContext(): FileHistoryMenuContext {
+    const commit =
+      this.expandedCommit !== null
+        ? this.commits[this.commitLookup[this.expandedCommit.hash]]
+        : undefined;
+    return {
+      isStash: commit !== undefined && commit.stash !== null,
+      onHighlightFileHistory: () => {}
+    };
   }
 
   public loadBranches(
@@ -1758,7 +1774,12 @@ class GitKeizuView {
       e.stopPropagation();
       const sourceElem = resolveFileRow(<Element>(<MouseEvent>e).target);
       if (sourceElem === null) return;
-      const items = buildFileContextMenuItems(sourceElem, this.expandedCommit, this.currentRepo);
+      const items = buildFileContextMenuItems(
+        sourceElem,
+        this.expandedCommit,
+        this.currentRepo,
+        this.buildFileHistoryMenuContext()
+      );
       if (items.length === 0) return;
       showContextMenu(<MouseEvent>e, items, sourceElem, this.getCurrentRepoRecentActions());
     });
