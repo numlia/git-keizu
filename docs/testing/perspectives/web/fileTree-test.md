@@ -32,8 +32,9 @@
 
 > Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
 > Added: 2026-04-04
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S5
 
 **シグネチャ**: `buildFileItemHtml(gitFile: GG.GitFileChange): string`（private — generateGitFileListHtml 経由で間接テスト）
 **テスト対象パス**: `web/fileTree.ts`
@@ -88,3 +89,56 @@
 | TC-028  | 中間セグメントが既存 `file` ノード（先に `foo`(file)、次に `foo/bar`）      | Boundary - file to folder replacement                                      | 当該セグメントの `file` ノードが `type==="folder"`・空 `contents` の folder へ差し替えられ、降下が継続する | 修正の肝（同名衝突の解消）           |
 | TC-029  | file→folder 差し替え後、末端の `bar` を追加                                 | Boundary - leaf added under replaced folder                                | 差し替えた folder の `contents["bar"]` に葉 `file` ノードが追加される                                      | 差し替え後の葉登録                   |
 | TC-030  | gitFiles=[`{newFilePath:"foo"}`, `{newFilePath:"foo/bar"}`]（同名衝突入力） | Exception - collision handled without throw                                | `generateGitFileTree` が例外を投げず完了し、結果ツリーで `foo` が `bar` を含む `folder` になる             | 旧実装ではクラッシュしていた回帰防止 |
+
+## S5: buildFileItemHtml() 履歴アイコン描画と判定関数の受け渡し
+
+> Origin: Feature 055-09 (light-spec-plan)
+> Added: 2026-09-13
+> Status: active
+> Supersedes: S2
+> Signature: `generateGitFileListHtml(gitFiles: GitFileChange[], canHighlightFileHistory: FileHistoryActionPredicate): string` / `generateGitFileTreeHtml(folder: GitFolder, gitFiles: GitFileChange[], canHighlightFileHistory: FileHistoryActionPredicate): string`（`buildFileItemHtml()`は非exportで両関数経由）
+> Target Path: `web/fileTree.ts`（`buildFileItemHtml()`・`generateGitFileTreeHtml()`・`generateGitFileListHtml()`。Task 5完了時に行範囲へ更新）
+> Test File: `tests/web/fileTree.test.ts`
+
+S2は`openFile`アイコンだけを前提にし、`D`行では`.gitFileActions`自体を描画しない契約（TC-014）だったが、対応プラン§3.5で`.gitFileAction.openFile`の直後に`.gitFileAction.highlightFileHistory`を並べ、`D`行でも判定関数が`true`なら履歴アイコンだけを描画する契約へ変わったため、S2のアクションアイコン契約を新signatureの下で再定義する。`web/fileTree.ts`は判定関数`FileHistoryActionPredicate`を行ごとに1回呼ぶだけで、uncommitted / stash / 比較表示 / typeの4条件の中身は`web/fileMenu-test.md` S6、`web/main.ts`が渡す関数の形は`web/main-test/06-file-actions-01.md` S54の責務で本表には含めない。基本fixtureは`makeFile()`（`M`、`src/file.ts`、+5 / -2）、`ALLOW = () => true`、`DENY = () => false`。
+
+| Case ID | Input / Precondition                                                                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                  | Notes              |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| TC-031  | list、`M`行、ALLOW                                                                                                                    | Normal - 2アイコンの順序                                                   | `.gitFileActions`の子要素が2個で、`children[0]`が`.gitFileAction.openFile`、`children[1]`が`.gitFileAction.highlightFileHistory` | 順序固定           |
+| TC-032  | list、`M`行、ALLOW                                                                                                                    | Normal - 履歴アイコンの内容                                                | `.highlightFileHistory`の`title`属性が`Highlight File History`で、内側に`.codicon-history`要素がある                             | `svgIcons.history` |
+| TC-033  | list、`D`行、ALLOW                                                                                                                    | Boundary - D行は履歴のみ                                                   | `.gitFileActions`が存在し子要素が1個で`.highlightFileHistory`。`.openFile`は`null`                                               | 旧TC-014の契約変更 |
+| TC-034  | list、`A`行と`R`行、ALLOW                                                                                                             | Normal - 許容typeの網羅                                                    | 両行とも子要素が2個で2個目が`.highlightFileHistory`                                                                              | 旧TC-012 / TC-013  |
+| TC-035  | list、`M`行、DENY                                                                                                                     | Validation - 判定false                                                     | `.openFile`が存在し、`.highlightFileHistory`が`null`、`.gitFileActions`の子要素が1個                                             | 旧TC-011 / TC-015  |
+| TC-036  | list、`D`行、DENY                                                                                                                     | Boundary - アイコン0個                                                     | `.gitFileActions`が`null`                                                                                                        | 現行D行と同じ      |
+| TC-037  | list、`A` / `M` / `D` / `R`の4行、ALLOW                                                                                               | Boundary - 混在                                                            | `.highlightFileHistory`が4個、`.openFile`が3個、`.codicon-go-to-file`が3個                                                       | 旧TC-016           |
+| TC-038  | list、3行、`vi.fn(() => true)`                                                                                                        | Normal - 行ごとの委譲                                                      | 判定関数が3回呼ばれ、各呼出の第1引数がその行の`GitFileChange`と同一参照                                                          | `toBe`             |
+| TC-039  | tree、`generateGitFileTree()`で`src/deep/a.ts`(A) / `src/deep/m.ts`(M) / `src/deep/d.ts`(D) / `src/deep/r.ts`(R)、`vi.fn(() => true)` | Normal - 再帰伝達                                                          | `.highlightFileHistory`が4個、`.openFile`が3個、判定関数が4回呼ばれる                                                            | `src/deep/`配下    |
+| TC-040  | tree、TC-039と同じ4行、DENY                                                                                                           | Validation - 再帰でも非描画                                                | `.highlightFileHistory`が0個、`.openFile`が3個、`.gitFileActions`が3個                                                           | -                  |
+| TC-041  | `M`行と`D`行の同じ入力をlistとtreeで生成、ALLOW                                                                                       | Normal - 表示形式の一致                                                    | `data-newfilepath`が同じ行同士で`.gitFileActions`の`innerHTML`が一致する                                                         | -                  |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-09 追加分（S5）
+
+| 失敗源                                                                                        | 対応ケースまたは除外理由                                                                                  |
+| --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| 全行非描画の手抜き（判定結果を無視して履歴アイコンを出さない）                                | TC-037、TC-039                                                                                            |
+| 判定を`fileTree`内で決める（渡された関数を呼ばない）                                          | TC-038                                                                                                    |
+| 再帰で判定が落ちる（子フォルダへ関数を渡さない）                                              | TC-039、TC-040                                                                                            |
+| `D`行の0個判定（`openFile`なしで`.gitFileActions`を空のまま描画・または履歴アイコンも落とす） | TC-033、TC-036                                                                                            |
+| 順序逆転（`highlightFileHistory`が`openFile`より前に並ぶ）                                    | TC-031                                                                                                    |
+| list / treeの食い違い                                                                         | TC-041                                                                                                    |
+| 4条件の中身・`web/main.ts`が渡す関数の形                                                      | excluded(`web/fileMenu-test.md` S6 / `web/main-test/06-file-actions-01.md` S54の責務)                     |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）                                         | 0個: TC-036、TC-040。1個: TC-033、TC-035。混在4行: TC-037。maximum / +/-1: excluded(数値閾値が存在しない) |
+| 外部依存×失敗モード                                                                           | excluded(HTML生成は引数と`t()`・`svgIcons`の定数だけで外部依存なし)                                       |
+| 例外・エラー経路                                                                              | excluded(判定`false`は非描画で表現しthrow経路を持たない)                                                  |
+| 型不正・フォーマット不正                                                                      | excluded(`FileHistoryActionPredicate` / `GitFileChange`の型はTypeScriptの型検査で担保)                    |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-035、TC-040
+- Exception: excluded(上表のとおりthrow経路なし)
+- External: excluded(上表のとおり)
+- Boundary: TC-033、TC-036、TC-037
+- Type: excluded(上表のとおり)
+- Normal: TC-031、TC-032、TC-034、TC-038、TC-039、TC-041
+
+**失敗系/正常系比（煙感知器）**: 正常系6件、失敗系5件。S2の6 caseを判定関数付きsignatureへ写したreplacement sectionで、失敗源は非描画・判定の自前化・再帰・`D`行・順序・表示形式差に限られることを上表で列挙した。比率合わせのためのケース追加・削除は行わない。
