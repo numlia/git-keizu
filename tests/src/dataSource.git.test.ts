@@ -885,7 +885,19 @@ describe("getFileHistory against real repositories (S50)", () => {
 
     /** Merge that is expected to conflict; the caller resolves and commits. */
     mergeExpectingConflict(branch: string, subject: string): void {
-      expect(() => this.git(["merge", branch, "-m", subject])).toThrow();
+      let stdout: string | null = null;
+      try {
+        this.git(["merge", branch, "-m", subject]);
+      } catch (error: unknown) {
+        stdout = String((error as { stdout?: unknown }).stdout ?? "");
+      }
+      // execFileSync reports only "Command failed: ..." in the error message, so any
+      // Git failure would satisfy a bare toThrow(). Git writes the conflict itself to
+      // stdout (LC_ALL=C above keeps the wording fixed), and the unmerged index
+      // entries confirm the fixture really stopped in the conflicted state.
+      expect(stdout).not.toBeNull();
+      expect(stdout).toContain("Automatic merge failed");
+      expect(this.git(["ls-files", "--unmerged"])).not.toBe("");
     }
 
     subjectOf(hash: string): string {
