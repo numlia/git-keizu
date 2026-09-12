@@ -1361,24 +1361,27 @@ describe("Graph.determinePath() parent listed before its child (S20)", () => {
     expect(getCircleElements().length).toBe(3);
   });
 
-  it("consumes a preceding parent on the merge path (TC-077)", () => {
+  it("consumes the preceding parents of a merge reached through its child (TC-077)", () => {
     // Case: TC-077
-    // Given: merge "c" is listed last although both of its parents are earlier rows
+    // Given: merge "c" is listed last and reached as the parent of "d"; both of its own
+    // parents are earlier rows, so the walk that arrived via "d" ends at the bottom with
+    // "c" holding two unreachable parents
     const graph = new Graph("testGraph", DEFAULT_CONFIG);
     const commits = [
       makeCommit("a", ["b"], null),
       makeCommit("b", [], null),
+      makeCommit("d", ["c"], null),
       makeCommit("c", ["a", "b"], null)
     ];
     const spy = vi.spyOn(Vertex.prototype, "registerParentProcessed");
 
-    // When: loadCommits reaches "c" a second time on the merge path
-    graph.loadCommits(commits, "a", { a: 0, b: 1, c: 2 });
+    // When: loadCommits walks every vertex
+    graph.loadCommits(commits, "a", { a: 0, b: 1, d: 2, c: 3 });
     graph.render(null);
 
-    // Then: both parent edges of "c" are processed exactly once and all rows are drawn
-    expect(spy).toHaveBeenCalledTimes(3);
-    expect(getCircleElements().length).toBe(3);
+    // Then: the four parent edges (a→b, d→c, c→a, c→b) are processed exactly once and all rows are drawn
+    expect(spy).toHaveBeenCalledTimes(4);
+    expect(getCircleElements().length).toBe(4);
   });
 });
 

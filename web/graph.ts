@@ -661,11 +661,6 @@ export class Graph {
           break;
         }
       }
-      // A parent listed before its child can never be reached by walking down,
-      // so mark it processed here or findStart() would return this vertex forever.
-      if (!foundPointToParent) {
-        vertex.registerParentProcessed();
-      }
     } else {
       // Branch is normal
       let branch = new Branch(this.getAvailableColour(startAt));

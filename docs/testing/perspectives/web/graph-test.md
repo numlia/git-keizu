@@ -358,28 +358,28 @@
 > Status: active
 > Supersedes: -
 > Signature: `private determinePath(startAt: number): void`
-> Target Path: `web/graph.ts`（merge 経路の探索ループ直後と、通常経路の末尾 while）
+> Target Path: `web/graph.ts`（通常経路の末尾 while）
 > Test File: `tests/web/graph.test.ts`
 
-`loadCommits()` は「親は必ず子より後ろに並ぶ」前提で頂点を下方向へ辿る。detached worktree の HEAD が読み込み済みコミットの子だった場合など、その前提が崩れた入力では、親に到達しないまま探索が終わり `registerParentProcessed()` が呼ばれず、`findStart()` が同じ頂点を返し続けて webview が「読み込み中」のまま固まっていた。修正では、通常経路は末尾 while で id が自分より小さい親も nullVertex と同様に処理済みへ進め、merge 経路は接続点が見つからずにループを抜けたときに親を処理済みへ進める。データ側の並び替えは `src/dataSource-test/02-branch-worktree-03.md` S47（TC-364〜TC-366）の責務。
+`loadCommits()` は「親は必ず子より後ろに並ぶ」前提で頂点を下方向へ辿る。detached worktree の HEAD が読み込み済みコミットの子だった場合など、その前提が崩れた入力では、親に到達しないまま探索が終わり `registerParentProcessed()` が呼ばれず、`findStart()` が同じ頂点を返し続けて webview が「読み込み中」のまま固まっていた。修正では、通常経路の末尾 while で id が自分より小さい親も nullVertex と同様に処理済みへ進める。merge 経路は 1 周目に `registerUnavailablePoint()` で接続点を登録し 2 周目でそれを見つけるため、もともと自力で終了する（ガード不要）。データ側の並び替えは `src/dataSource-test/02-branch-worktree-03.md` S47（TC-364〜TC-366）の責務。
 
-| Case ID | Input / Precondition                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                  | Notes                                  |
-| ------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | -------------------------------------- |
-| TC-076  | `[a(parent b), b, c(parent a)]`、`c` の唯一の親 `a` が先頭行          | Boundary - preceding parent on the normal path                             | `loadCommits()` が終了し、`registerParentProcessed()` の合計呼び出し回数が 2、circle が 3 件描画 | 末尾 while で id の小さい親を消費      |
-| TC-077  | `[a(parent b), b, c(parents a, b)]`、merge `c` の両親がともに前方の行 | Boundary - preceding parent on the merge path                              | `loadCommits()` が終了し、`registerParentProcessed()` の合計呼び出し回数が 3、circle が 3 件描画 | merge 経路で接続点未発見のまま親を消費 |
+| Case ID | Input / Precondition                                                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                  | Notes                                                     |
+| ------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
+| TC-076  | `[a(parent b), b, c(parent a)]`、`c` の唯一の親 `a` が先頭行                                                       | Boundary - preceding parent on the normal path                             | `loadCommits()` が終了し、`registerParentProcessed()` の合計呼び出し回数が 2、circle が 3 件描画 | 末尾 while で id の小さい親を消費                         |
+| TC-077  | `[a(parent b), b, d(parent c), c(parents a, b)]`、末尾の merge `c` に `d` 経由で到達し、`c` の両親がともに前方の行 | Boundary - preceding parents of a merge reached through its child          | `loadCommits()` が終了し、`registerParentProcessed()` の合計呼び出し回数が 4、circle が 4 件描画 | 子経由で到達した頂点の末尾 while で複数の前方親を連続消費 |
 
 ### 失敗源インベントリ（include-or-justify）— graph-terminate-on-preceding-parent 追加分（S20）
 
-| 失敗源                                                | 対応ケースまたは除外理由                                                                 |
-| ----------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| 通常経路で前方の親を消費せず無限ループ                | TC-076                                                                                   |
-| merge 経路で前方の親を消費せず無限ループ              | TC-077                                                                                   |
-| 前方の親を消費する際に他の親を過剰登録する            | TC-076、TC-077（合計回数 = 親エッジ数で過剰登録なし）                                    |
-| 境界値（0 / minimum / maximum / +/-1 / empty / NULL） | 親なし・nullVertex 親は S18（TC-060、TC-064）の責務。前方親は id 差 1 以上で追加境界なし |
-| 入力検証×違反パターン                                 | excluded(`Graph` は並び順を検証せず描画する。並び替えは S47 の責務)                      |
-| 外部依存×失敗モード                                   | excluded(SVG 生成は DOM API のみで外部依存なし)                                          |
-| 例外・エラー経路                                      | excluded(throw 経路を追加しない。停止しないことを終了と回数で観測する)                   |
-| 型不正・フォーマット不正                              | excluded(TypeScript の型検査で担保)                                                      |
+| 失敗源                                                 | 対応ケースまたは除外理由                                                                 |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------- |
+| 通常経路で前方の親を消費せず無限ループ                 | TC-076                                                                                   |
+| 子経由で到達した頂点の複数の前方親を消費せず無限ループ | TC-077                                                                                   |
+| 前方の親を消費する際に他の親を過剰登録する             | TC-076、TC-077（合計回数 = 親エッジ数で過剰登録なし）                                    |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）  | 親なし・nullVertex 親は S18（TC-060、TC-064）の責務。前方親は id 差 1 以上で追加境界なし |
+| 入力検証×違反パターン                                  | excluded(`Graph` は並び順を検証せず描画する。並び替えは S47 の責務)                      |
+| 外部依存×失敗モード                                    | excluded(SVG 生成は DOM API のみで外部依存なし)                                          |
+| 例外・エラー経路                                       | excluded(throw 経路を追加しない。停止しないことを終了と回数で観測する)                   |
+| 型不正・フォーマット不正                               | excluded(TypeScript の型検査で担保)                                                      |
 
 **失敗カテゴリ網羅（diversity floor）**:
 
