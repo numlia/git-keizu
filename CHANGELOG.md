@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-12
+
+This release adds File History highlighting — pick a file in a commit's details and see every commit in that file's history, renames and merges included, highlighted on the graph you already have — and makes switching back to the Git Keizu tab instant by keeping the view alive while it is hidden.
+
+### Added
+
+- **Highlight File History**: Right-click a file in the details of a normal commit and choose **Highlight File History**. Git Keizu follows that file backwards from the selected commit — through renames, and including the merges that touched it — and highlights the matching commits on the existing graph. No rows are removed and the branch topology is unchanged; commits outside the file's history are dimmed instead. A bar above the graph shows the file path and your position among the highlighted commits, with **Previous** and **Next** buttons that wrap around and centre the commit, and an **Exit** button that restores the commit details and scroll position you started from. Selecting a highlighted commit opens its details as usual with the file's row at that point in history highlighted; when a merge's change to the file is not part of its diff against the first parent, the details say so instead of showing a row. The history only covers commits older than the selected one and tracks a single file at a time. A file that was deleted and later recreated under the same path is treated as a new history, so the older unrelated commits are not highlighted. The action is not offered for uncommitted changes, stash entries, or a two-commit comparison, and the mode ends when you exit it, switch repository, open Find, or the selected commit leaves the loaded history.
+- **The view stays alive while its tab is hidden**: A new `git-keizu.retainContextWhenHidden` setting (default on) keeps the Git Keizu webview alive when its tab moves to the background — for example while a diff opened from the graph is in front. Switching back previously rebuilt the whole page and re-rendered the graph before anything appeared; it now shows the graph immediately and only refreshes its data in the background. If a Git Keizu setting changed, or the workspace went from having repositories to none (or back) in the meantime, the view is rebuilt on return so the change takes effect, and repositories discovered while the tab was hidden appear in the repository dropdown. Turn the setting off to return to the previous behaviour and memory footprint.
+
+### Fixed
+
+- **No redundant re-render after the view is restored from its saved state**: When the view is rebuilt from its saved state — on every tab switch before this release, and now only with `retainContextWhenHidden` off — its first background refresh always re-rendered the entire graph, because worktree information was not part of the saved state and so never matched the fresh result. Worktrees are now saved with the rest of the state, and the graph is left untouched when nothing has changed.
+
 ## [1.0.0] - 2026-08-30
 
 This release marks Git Keizu as a stable release. Git Keizu does not aim to reproduce everything Git can do — it deliberately carries only the operations that belong in a history graph, and leaves out the rest. That scope is now settled, and this release begins adding capabilities the upstream project does not have, starting with Branch Cleanup: a panel that gathers the facts needed to decide whether a local branch can be deleted.
@@ -553,7 +566,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/numlia/git-keizu/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/numlia/git-keizu/compare/v0.10.1...v1.0.0
 [0.10.1]: https://github.com/numlia/git-keizu/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/numlia/git-keizu/compare/v0.9.1...v0.10.0

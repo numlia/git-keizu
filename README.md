@@ -53,6 +53,7 @@ Select a commit to inspect its files and diffs, or Ctrl/Cmd+click a second commi
 - Switch commit files between a folder tree and a flat list.
 - Open working-tree files directly from commit details; renamed files are resolved through Git rename tracking.
 - Navigate commits with the keyboard, follow parent links, and keep comparison state when switching tabs.
+- **Highlight File History** follows a single file backwards from a commit — through renames and the merges that touched it — and highlights its commits on the graph without hiding anything else, with previous/next navigation and the file's row highlighted in each commit's details.
 
 ### Run Git actions from the graph
 
@@ -80,6 +81,7 @@ Create and manage Git worktrees without leaving the graph.
 
 - Recent context-menu actions are remembered per repository, making repeated workflows quicker.
 - Git operations refresh the graph in the background without blanking the view or discarding its state.
+- The view stays alive while its tab is in the background, so switching back to Git Keizu is immediate (`retainContextWhenHidden`, on by default).
 - Multiple repositories, configurable keyboard shortcuts, optional avatars, graph colours, date formats, and dialog defaults are supported.
 
 ## Requirements
