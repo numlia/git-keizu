@@ -56,31 +56,32 @@ export class GitKeizuView {
   private reposChangedWhileHidden: boolean = false;
   private currentRepo: string | null = null;
 
-  public static createOrShow(
+  public static async createOrShow(
     extensionPath: string,
     dataSource: DataSource,
     extensionState: ExtensionState,
     avatarManager: AvatarManager,
     repoManager: RepoManager,
     rootUri?: vscode.Uri
-  ) {
+  ): Promise<void> {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
 
+    if (rootUri !== undefined) {
+      extensionState.setLastActiveRepo(getPathFromUri(rootUri));
+      // The first render reads the registered repo set, so the SCM repo must be registered
+      // before the panel exists; otherwise a workspace whose root is not a repo gets the
+      // "unable to load" page.
+      await repoManager.registerRepoFromUri(rootUri);
+    }
+
     if (GitKeizuView.currentPanel) {
-      if (rootUri !== undefined) {
-        extensionState.setLastActiveRepo(getPathFromUri(rootUri));
-      }
       GitKeizuView.currentPanel.panel.reveal(column);
       if (rootUri !== undefined) {
         GitKeizuView.currentPanel.selectRepoFromUri(rootUri, repoManager);
       }
       return;
-    }
-
-    if (rootUri !== undefined) {
-      extensionState.setLastActiveRepo(getPathFromUri(rootUri));
     }
 
     // The panel option is fixed at creation, so the same value must drive the re-show behaviour.
