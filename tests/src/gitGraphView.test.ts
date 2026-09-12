@@ -35,8 +35,14 @@ const mocks = vi.hoisted(() => ({
   addTag: vi.fn(),
   resolveRefToHash: vi.fn(),
   reveal: vi.fn(),
+  retainContextWhenHidden: vi.fn((): boolean => true),
   panelDisposeHandler: null as (() => void) | null,
   panelViewStateHandler: null as (() => void) | null,
+  configChangeHandler: {
+    current: null as
+      | ((event: { affectsConfiguration: (section: string) => boolean }) => void)
+      | null
+  },
   messageHandler: { current: null as ((msg: unknown) => Promise<void>) | null },
   watcherCallback: { current: null as (() => void) | null }
 }));
@@ -71,7 +77,15 @@ vi.mock("vscode", () => ({
     file: vi.fn((p: string) => ({ fsPath: p, toString: () => p }))
   },
   ViewColumn: { One: 1 },
-  commands: { executeCommand: mocks.executeCommand }
+  commands: { executeCommand: mocks.executeCommand },
+  workspace: {
+    onDidChangeConfiguration: vi.fn(
+      (handler: (event: { affectsConfiguration: (section: string) => boolean }) => void) => {
+        mocks.configChangeHandler.current = handler;
+        return { dispose: vi.fn() };
+      }
+    )
+  }
 }));
 
 vi.mock("node:crypto", () => ({
@@ -103,6 +117,7 @@ vi.mock("../../src/config", () => ({
     muteCommitsMergeCommits: () => true,
     muteCommitsNotAncestorsOfHead: () => false,
     commitOrdering: () => "date",
+    retainContextWhenHidden: mocks.retainContextWhenHidden,
     showCurrentBranchByDefault: () => false,
     showRecentActions: () => true,
     dialogDefaults: () => ({
@@ -4839,5 +4854,223 @@ describe("GitKeizuView fileHistory routing (S34)", () => {
     expect(mocks.getFileHistory).toHaveBeenCalledTimes(1);
     expect(mocks.getFileHistory).toHaveBeenCalledWith(TEST_REPO, "zz", "src/a.txt");
     expect(fileHistoryResponses()[0].entries).toBeNull();
+  });
+});
+
+describe("GitKeizuView retainContextWhenHidden (S35)", () => {
+  let loadWebviewMessagesMock: ReturnType<
+    typeof vi.mocked<typeof import("../../src/i18n").loadWebviewMessages>
+  >;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    mocks.panelViewStateHandler = null;
+    GitKeizuView.currentPanel = undefined;
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    const i18nModule = await import("../../src/i18n");
+    loadWebviewMessagesMock = vi.mocked(i18nModule.loadWebviewMessages);
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+    mocks.retainContextWhenHidden.mockReturnValue(true);
+  });
+
+  type PanelMock = { visible: boolean; webview: { html: string } };
+  type ViewCallback = (repos: Record<string, unknown>, numRepos: number) => void;
+  let capturedViewCallback: ViewCallback | null = null;
+
+  async function createPanel(): Promise<PanelMock> {
+    capturedViewCallback = null;
+    const mockDataSource = {} as unknown as DataSource;
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn((callback: ViewCallback) => {
+        capturedViewCallback = callback;
+      }),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+    const panelMock = vi.mocked(vscode.window.createWebviewPanel).mock.results[0]
+      .value as PanelMock;
+    // The initial HTML is produced asynchronously; wait for it so later counts are stable.
+    await vi.waitFor(() => expect(panelMock.webview.html).not.toBe(""));
+    return panelMock;
+  }
+
+  function changeConfiguration(section: string): void {
+    expect(mocks.configChangeHandler.current).not.toBeNull();
+    mocks.configChangeHandler.current?.({
+      affectsConfiguration: (candidate: string) => candidate === section
+    });
+  }
+
+  function hideThenShow(panelMock: PanelMock): void {
+    panelMock.visible = false;
+    mocks.panelViewStateHandler?.();
+    panelMock.visible = true;
+    mocks.panelViewStateHandler?.();
+  }
+
+  it("creates the panel with retainContextWhenHidden enabled by the setting (TC-364)", async () => {
+    // Given: the setting is enabled
+    mocks.retainContextWhenHidden.mockReturnValue(true);
+
+    // When: the panel is created
+    await createPanel();
+
+    // Then: the option is passed to createWebviewPanel
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
+      "git-keizu",
+      "Git Keizu",
+      1,
+      expect.objectContaining({ retainContextWhenHidden: true })
+    );
+  });
+
+  it("creates the panel without retaining context when the setting is disabled (TC-365)", async () => {
+    // Given: the setting is disabled
+    mocks.retainContextWhenHidden.mockReturnValue(false);
+
+    // When: the panel is created
+    await createPanel();
+
+    // Then: the option is passed as false
+    expect(vscode.window.createWebviewPanel).toHaveBeenCalledWith(
+      "git-keizu",
+      "Git Keizu",
+      1,
+      expect.objectContaining({ retainContextWhenHidden: false })
+    );
+  });
+
+  it("sends a refresh instead of rebuilding the HTML when shown again with context retained (TC-366)", async () => {
+    // Given: a retained panel whose initial HTML has been generated once
+    mocks.retainContextWhenHidden.mockReturnValue(true);
+    const panelMock = await createPanel();
+    expect(loadWebviewMessagesMock).toHaveBeenCalledTimes(1);
+
+    // When: the panel is hidden and then shown again
+    hideThenShow(panelMock);
+
+    // Then: only a refresh message is posted and the HTML is not regenerated
+    expect(mocks.postMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.postMessage).toHaveBeenCalledWith({ command: "refresh" });
+    expect(loadWebviewMessagesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rebuilds the HTML when shown again without retained context (TC-367)", async () => {
+    // Given: a non-retained panel whose initial HTML has been generated once
+    mocks.retainContextWhenHidden.mockReturnValue(false);
+    const panelMock = await createPanel();
+    expect(loadWebviewMessagesMock).toHaveBeenCalledTimes(1);
+
+    // When: the panel is hidden and then shown again
+    hideThenShow(panelMock);
+
+    // Then: the HTML is generated a second time and no refresh message is posted
+    await vi.waitFor(() => expect(loadWebviewMessagesMock).toHaveBeenCalledTimes(2));
+    expect(mocks.postMessage).not.toHaveBeenCalled();
+  });
+
+  it("rebuilds the retained webview when a git-keizu setting changed since it was rendered (TC-372)", async () => {
+    // Given: a retained panel and a git-keizu setting change while it is hidden
+    mocks.retainContextWhenHidden.mockReturnValue(true);
+    const panelMock = await createPanel();
+    panelMock.visible = false;
+    mocks.panelViewStateHandler?.();
+    changeConfiguration("git-keizu");
+
+    // When: the panel is shown again
+    panelMock.visible = true;
+    mocks.panelViewStateHandler?.();
+
+    // Then: the HTML is regenerated so the new setting values reach the webview, and no refresh is sent
+    await vi.waitFor(() => expect(loadWebviewMessagesMock).toHaveBeenCalledTimes(2));
+    expect(mocks.postMessage).not.toHaveBeenCalled();
+  });
+
+  it("keeps the soft refresh when only an unrelated setting changed (TC-373)", async () => {
+    // Given: a retained panel and a change outside the git-keizu section while it is hidden
+    mocks.retainContextWhenHidden.mockReturnValue(true);
+    const panelMock = await createPanel();
+    panelMock.visible = false;
+    mocks.panelViewStateHandler?.();
+    changeConfiguration("editor");
+
+    // When: the panel is shown again
+    panelMock.visible = true;
+    mocks.panelViewStateHandler?.();
+
+    // Then: only the refresh is sent and the HTML is not regenerated
+    expect(mocks.postMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.postMessage).toHaveBeenCalledWith({ command: "refresh" });
+    expect(loadWebviewMessagesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("sends the repo set discovered while hidden before refreshing the retained webview (TC-374)", async () => {
+    // Given: a retained, hidden panel and a repository discovered in the meantime
+    mocks.retainContextWhenHidden.mockReturnValue(true);
+    const panelMock = await createPanel();
+    panelMock.visible = false;
+    mocks.panelViewStateHandler?.();
+    const reposWithNew = { [TEST_REPO]: "Test Repo", "/test/other": "Other Repo" };
+    mocks.getRepos.mockReturnValue(reposWithNew);
+    expect(capturedViewCallback).not.toBeNull();
+    capturedViewCallback?.(reposWithNew, 2);
+    expect(mocks.postMessage).not.toHaveBeenCalled();
+
+    // When: the panel is shown again
+    panelMock.visible = true;
+    mocks.panelViewStateHandler?.();
+
+    // Then: loadRepos with the current set is posted first, then the refresh, without an HTML rebuild
+    expect(mocks.postMessage).toHaveBeenCalledTimes(2);
+    expect(mocks.postMessage).toHaveBeenNthCalledWith(1, {
+      command: "loadRepos",
+      repos: reposWithNew,
+      lastActiveRepo: null
+    });
+    expect(mocks.postMessage).toHaveBeenNthCalledWith(2, { command: "refresh" });
+    expect(loadWebviewMessagesMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("rebuilds the retained webview when the last repository disappeared while hidden (TC-375)", async () => {
+    // Given: a retained, hidden panel whose only repository is removed in the meantime
+    mocks.retainContextWhenHidden.mockReturnValue(true);
+    const panelMock = await createPanel();
+    panelMock.visible = false;
+    mocks.panelViewStateHandler?.();
+    mocks.getRepos.mockReturnValue({});
+    capturedViewCallback?.({}, 0);
+
+    // When: the panel is shown again
+    panelMock.visible = true;
+    mocks.panelViewStateHandler?.();
+
+    // Then: the page is rebuilt (the graph page cannot show the zero-repo state) and no refresh is sent
+    await vi.waitFor(() => expect(loadWebviewMessagesMock).toHaveBeenCalledTimes(2));
+    expect(mocks.postMessage).not.toHaveBeenCalled();
   });
 });

@@ -162,6 +162,7 @@ declare global {
     findWidgetState: FindWidgetState | null;
     selectedAuthors: string[];
     scrollTop?: number;
+    worktrees?: GG.WorktreeCollection;
   }
 }
 

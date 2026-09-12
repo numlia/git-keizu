@@ -20,6 +20,7 @@
   "config.loadMoreCommits.description": "Specifies the number of commits to load when the \"Load More Commits\" button is pressed (only shown when more commits are available).",
   "config.maxDepthOfRepoSearch.description": "Specifies the maximum depth of subfolders to search when discovering repositories in the workspace.",
   "config.showCurrentBranchByDefault.description": "Show the current branch by default when Git Keizu is opened. Default: false (show all branches)",
+  "config.retainContextWhenHidden.description": "Keep the Git Keizu view alive when its tab is hidden (e.g. moved to a background tab). Switching back to the tab is then immediate, at the cost of a higher memory footprint while the view is open.",
   "config.showStatusBarItem.description": "Show a Status Bar item which opens Git Keizu when clicked.",
   "config.showUncommittedChanges.description": "Show the uncommitted changes row in the graph. When set to false, Git Keizu skips reading uncommitted status during graph loads.",
   "config.tabIconColourTheme.enum.colour": "Show a colour icon which suits most Visual Studio Code colour themes",

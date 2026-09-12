@@ -61,6 +61,7 @@ describe("Config fallback defaults vs package.json", () => {
       ["TC-048", "loadMoreCommitsAutomatically", (c) => c.loadMoreCommitsAutomatically()],
       ["TC-049", "maxDepthOfRepoSearch", (c) => c.maxDepthOfRepoSearch()],
       ["TC-050", "showCurrentBranchByDefault", (c) => c.showCurrentBranchByDefault()],
+      ["TC-368", "retainContextWhenHidden", (c) => c.retainContextWhenHidden()],
       ["TC-051", "showStatusBarItem", (c) => c.showStatusBarItem()],
       ["TC-052", "showUncommittedChanges", (c) => c.showUncommittedChanges()],
       ["TC-053", "tabIconColourTheme", (c) => c.tabIconColourTheme()],

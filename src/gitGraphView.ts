@@ -27,6 +27,7 @@ import {
 } from "./types";
 import { abbrevCommit, copyToClipboard, getPathFromUri, openFile } from "./utils";
 
+const CONFIG_SECTION = "git-keizu";
 const CSS_COLOR_VAR_PREFIX = "--git-keizu-color";
 const DEFAULT_PUSH_REMOTE = "origin";
 const INVALID_REF_NAME_MESSAGE = "Invalid ref name.";
@@ -45,9 +46,14 @@ export class GitKeizuView {
   private readonly extensionState: ExtensionState;
   private readonly repoFileWatcher: RepoFileWatcher;
   private readonly repoManager: RepoManager;
+  private readonly retainContextWhenHidden: boolean;
   private disposables: vscode.Disposable[] = [];
   private isGraphViewLoaded: boolean = false;
   private isPanelVisible: boolean = true;
+  // The retained webview keeps the config and repo set it was rendered with; these flags record
+  // what changed since then so a reveal can decide between a soft refresh and a full rebuild.
+  private configChangedSinceRender: boolean = false;
+  private reposChangedWhileHidden: boolean = false;
   private currentRepo: string | null = null;
 
   public static createOrShow(
@@ -77,12 +83,15 @@ export class GitKeizuView {
       extensionState.setLastActiveRepo(getPathFromUri(rootUri));
     }
 
+    // The panel option is fixed at creation, so the same value must drive the re-show behaviour.
+    const retainContextWhenHidden = getConfig().retainContextWhenHidden();
     const panel = vscode.window.createWebviewPanel(
       "git-keizu",
       "Git Keizu",
       column || vscode.ViewColumn.One,
       {
         enableScripts: true,
+        retainContextWhenHidden: retainContextWhenHidden,
         localResourceRoots: [
           vscode.Uri.file(path.join(extensionPath, "media")),
           vscode.Uri.file(path.join(extensionPath, "out"))
@@ -96,7 +105,8 @@ export class GitKeizuView {
       dataSource,
       extensionState,
       avatarManager,
-      repoManager
+      repoManager,
+      retainContextWhenHidden
     );
   }
 
@@ -106,10 +116,12 @@ export class GitKeizuView {
     dataSource: DataSource,
     extensionState: ExtensionState,
     avatarManager: AvatarManager,
-    repoManager: RepoManager
+    repoManager: RepoManager,
+    retainContextWhenHidden: boolean
   ) {
     this.panel = panel;
     this.extensionPath = extensionPath;
+    this.retainContextWhenHidden = retainContextWhenHidden;
     this.avatarManager = avatarManager;
     this.dataSource = dataSource;
     this.extensionState = extensionState;
@@ -130,12 +142,26 @@ export class GitKeizuView {
       () => {
         if (this.panel.visible !== this.isPanelVisible) {
           if (this.panel.visible) {
-            this.update();
+            if (this.canReuseRetainedWebview()) {
+              this.refreshRetainedWebview();
+            } else {
+              this.update();
+            }
           } else {
             this.currentRepo = null;
             this.repoFileWatcher.stop();
           }
           this.isPanelVisible = this.panel.visible;
+        }
+      },
+      null,
+      this.disposables
+    );
+
+    vscode.workspace.onDidChangeConfiguration(
+      (event) => {
+        if (event.affectsConfiguration(CONFIG_SECTION)) {
+          this.configChangedSinceRender = true;
         }
       },
       null,
@@ -148,8 +174,11 @@ export class GitKeizuView {
       }
     });
     this.repoManager.registerViewCallback((repos: GitRepoSet, numRepos: number) => {
-      if (!this.panel.visible) return;
-      if ((numRepos === 0 && this.isGraphViewLoaded) || (numRepos > 0 && !this.isGraphViewLoaded)) {
+      if (!this.panel.visible) {
+        this.reposChangedWhileHidden = true;
+        return;
+      }
+      if (this.isGraphViewStale(numRepos)) {
         this.update();
       } else {
         this.respondLoadRepos(repos);
@@ -629,7 +658,32 @@ export class GitKeizuView {
   }
 
   private async update() {
+    this.configChangedSinceRender = false;
+    this.reposChangedWhileHidden = false;
     this.panel.webview.html = await this.getHtmlForWebview();
+  }
+
+  // The graph page and the "unable to load" page are different HTML, so crossing the zero-repo
+  // boundary always needs a rebuild.
+  private isGraphViewStale(numRepos: number): boolean {
+    return (numRepos === 0 && this.isGraphViewLoaded) || (numRepos > 0 && !this.isGraphViewLoaded);
+  }
+
+  private canReuseRetainedWebview(): boolean {
+    return (
+      this.retainContextWhenHidden &&
+      !this.configChangedSinceRender &&
+      !this.isGraphViewStale(Object.keys(this.repoManager.getRepos()).length)
+    );
+  }
+
+  // The retained webview still holds its DOM and state, so it only needs the data it missed.
+  private refreshRetainedWebview() {
+    if (this.reposChangedWhileHidden) {
+      this.reposChangedWhileHidden = false;
+      this.respondLoadRepos(this.repoManager.getRepos());
+    }
+    this.sendMessage({ command: "refresh" });
   }
 
   private async getHtmlForWebview() {

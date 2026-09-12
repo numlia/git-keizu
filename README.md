@@ -113,6 +113,7 @@ All settings are under the `git-keizu.*` namespace.
 | `loadMoreCommitsAutomatically`          | `true`         | Automatically load more commits when scrolling to the bottom                          |
 | `openNewTabEditorGroup`                 | `Active`       | Editor group for "Open File" in commit details: `Active`, `Beside`, `One`–`Nine`      |
 | `maxDepthOfRepoSearch`                  | `0`            | Maximum depth of subfolders to search for repositories                                |
+| `retainContextWhenHidden`               | `true`         | Keep the view alive while its tab is hidden so switching back is immediate            |
 | `showCurrentBranchByDefault`            | `false`        | Show only the current branch when the graph is opened                                 |
 | `showStatusBarItem`                     | `true`         | Show a Status Bar item to open Git Keizu                                              |
 | `menu.showRecentActions`                | `true`         | Show a "Recent" section at the top of context menus when recent actions are available |
