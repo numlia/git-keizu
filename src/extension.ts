@@ -33,7 +33,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           rootUri = candidate;
         }
       }
-      GitKeizuView.createOrShow(
+      return GitKeizuView.createOrShow(
         context.extensionPath,
         dataSource,
         extensionState,
