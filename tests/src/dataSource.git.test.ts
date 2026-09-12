@@ -4,7 +4,7 @@ import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("vscode", () => ({
   workspace: {
@@ -39,7 +39,7 @@ vi.mock("../../src/worktree", async (importOriginal) => {
 });
 
 import { DataSource } from "../../src/dataSource";
-import type { BranchCleanupResult } from "../../src/types";
+import type { BranchCleanupResult, FileHistoryEntry } from "../../src/types";
 import { parseWorktreeList } from "../../src/worktree";
 
 const MAIN_BRANCH = "main";
@@ -831,5 +831,650 @@ describe("getBranchCleanup Git orchestration (S48)", () => {
       expect(row.aheadBehind).toEqual({ kind: "notSelected" });
     }
     expect(callsWithArgs((args) => args[0] === "rev-list")).toHaveLength(0);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S50: getFileHistory() against real repositories                    */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/src/dataSource-test/07-file-history-01.md
+describe("getFileHistory against real repositories (S50)", () => {
+  const CUR = "src/current-name.txt";
+  const LEG = "src/legacy-name.txt";
+  const F = "src/f.txt";
+  const FIXED_DATE_BASE = 1_700_000_000;
+  const roots: string[] = [];
+
+  /**
+   * Git driver for one fixture repository: every invocation goes through
+   * execFileSync with an argument array, a fixed author / committer date that
+   * advances by one second per call, and LC_ALL=C.
+   */
+  class FixtureRepo {
+    private tick = 0;
+    constructor(public readonly dir: string) {}
+
+    git(args: string[]): string {
+      this.tick++;
+      const date = `${FIXED_DATE_BASE + this.tick} +0000`;
+      return cp
+        .execFileSync("git", args, {
+          cwd: this.dir,
+          encoding: "utf8",
+          stdio: ["ignore", "pipe", "pipe"],
+          env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date, LC_ALL: "C" }
+        })
+        .trim();
+    }
+
+    async write(rel: string, content: string): Promise<void> {
+      const full = path.join(this.dir, rel);
+      await fs.mkdir(path.dirname(full), { recursive: true });
+      await fs.writeFile(full, content);
+    }
+
+    async append(rel: string, line: string): Promise<void> {
+      await fs.appendFile(path.join(this.dir, rel), `${line}\n`);
+    }
+
+    async commitAll(subject: string): Promise<void> {
+      this.git(["add", "-A"]);
+      this.git(["commit", "-m", subject]);
+    }
+
+    /** Merge that is expected to conflict; the caller resolves and commits. */
+    mergeExpectingConflict(branch: string, subject: string): void {
+      let stdout: string | null = null;
+      try {
+        this.git(["merge", branch, "-m", subject]);
+      } catch (error: unknown) {
+        stdout = String((error as { stdout?: unknown }).stdout ?? "");
+      }
+      // execFileSync reports only "Command failed: ..." in the error message, so any
+      // Git failure would satisfy a bare toThrow(). Git writes the conflict itself to
+      // stdout (LC_ALL=C above keeps the wording fixed), and the unmerged index
+      // entries confirm the fixture really stopped in the conflicted state.
+      expect(stdout).not.toBeNull();
+      expect(stdout).toContain("Automatic merge failed");
+      expect(this.git(["ls-files", "--unmerged"])).not.toBe("");
+    }
+
+    subjectOf(hash: string): string {
+      return this.git(["log", "--format=%s", "-1", hash]);
+    }
+
+    hashOf(subject: string): string {
+      const line = this.git(["log", "--all", "--format=%H %s"])
+        .split("\n")
+        .find((l) => l.substring(41) === subject);
+      if (line === undefined) throw new Error(`no commit with subject ${subject}`);
+      return line.substring(0, 40);
+    }
+  }
+
+  async function initFixture(name: string): Promise<FixtureRepo> {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), `git-keizu-055-07-${name}-`));
+    roots.push(root);
+    const repo = new FixtureRepo(root);
+    repo.git(["init", "-b", MAIN_BRANCH, "."]);
+    repo.git(["config", "user.email", "test@example.com"]);
+    repo.git(["config", "user.name", "Test User"]);
+    repo.git(["config", "commit.gpgsign", "false"]);
+    repo.git(["config", "merge.ff", "false"]);
+    return repo;
+  }
+
+  afterAll(async () => {
+    for (const root of roots) await fs.rm(root, { recursive: true, force: true });
+  });
+
+  const numberedLines = (prefix: string, count: number): string =>
+    `${Array.from({ length: count }, (_, i) => `${prefix} ${i}`).join("\n")}\n`;
+
+  interface ExpectedEntry {
+    subject: string;
+    type: string;
+    isMerge: boolean;
+    historicalPath: string;
+  }
+
+  const E = (
+    subject: string,
+    type: string,
+    isMerge: boolean,
+    historicalPath: string
+  ): ExpectedEntry => ({ subject, type, isMerge, historicalPath });
+
+  const bySubject = (a: ExpectedEntry, b: ExpectedEntry): number =>
+    a.subject.localeCompare(b.subject);
+
+  /** Resolve each entry's subject via git log and compare as an order-independent set. */
+  async function expectHistory(
+    repo: FixtureRepo,
+    anchorSubject: string,
+    filePath: string,
+    expected: ExpectedEntry[]
+  ): Promise<FileHistoryEntry[]> {
+    const result = await new DataSource().getFileHistory(
+      repo.dir,
+      repo.hashOf(anchorSubject),
+      filePath
+    );
+    expect(result).not.toBeNull();
+    const actual = result!
+      .map((e) => E(repo.subjectOf(e.hash), e.type, e.isMerge, e.historicalPath))
+      .sort(bySubject);
+    expect(actual).toEqual([...expected].sort(bySubject));
+    expect(result).toHaveLength(expected.length);
+    return result!;
+  }
+
+  function expectNotIncluded(
+    repo: FixtureRepo,
+    result: FileHistoryEntry[],
+    subjects: string[]
+  ): void {
+    const hashes = result.map((e) => e.hash);
+    for (const subject of subjects) {
+      expect(hashes).not.toContain(repo.hashOf(subject));
+    }
+  }
+
+  /** base -> update legacy -> unrelated main -> feature rename + edit -> --no-ff merge -> fix -> delete -> recreate */
+  async function buildSimilarFamily(
+    kind: "similar" | "dissimilar" | "conflict"
+  ): Promise<FixtureRepo> {
+    const repo = await initFixture(kind);
+    await repo.write(LEG, numberedLines("line", 3));
+    await repo.commitAll("base: add legacy file");
+    await repo.append(LEG, "legacy");
+    await repo.commitAll("feat: update legacy file");
+    await repo.write("README.md", "readme\n");
+    await repo.commitAll("docs: unrelated main change");
+    repo.git(["branch", "feature", repo.hashOf("feat: update legacy file")]);
+    repo.git(["checkout", "feature"]);
+    repo.git(["mv", LEG, CUR]);
+    await repo.commitAll("refactor: rename tracked file");
+    if (kind === "similar") {
+      await repo.append(CUR, "feature");
+    } else {
+      await repo.write(CUR, numberedLines("different content", 8));
+    }
+    await repo.commitAll("feat: update renamed file");
+    repo.git(["checkout", MAIN_BRANCH]);
+    if (kind === "conflict") {
+      await repo.append(LEG, "main");
+      await repo.commitAll("feat: main edits legacy before merge");
+      repo.mergeExpectingConflict("feature", "merge: rename feature");
+      repo.git(["rm", "-f", LEG]);
+      await repo.write(CUR, "resolved\n");
+      repo.git(["add", "-A"]);
+      repo.git(["commit", "--no-edit", "-m", "merge: rename feature"]);
+    } else {
+      repo.git(["merge", "feature", "-m", "merge: rename feature"]);
+    }
+    await repo.append(CUR, "fix");
+    await repo.commitAll("fix: update file after merge");
+    repo.git(["rm", CUR]);
+    await repo.commitAll("refactor: delete tracked file");
+    await repo.write(CUR, "recreated\n");
+    await repo.commitAll("feat: recreate same path");
+    return repo;
+  }
+
+  /** init -> branch <b> unrelated -> main unrelated -> --no-commit merge with a tree edit. */
+  async function unrelatedDiamond(
+    repo: FixtureRepo,
+    branch: string,
+    branchSubject: string,
+    mainSubject: string,
+    edit: () => Promise<void>,
+    mergeSubject: string
+  ): Promise<void> {
+    repo.git(["branch", branch]);
+    repo.git(["checkout", branch]);
+    await repo.write(`${branch}.txt`, `${branch}\n`);
+    await repo.commitAll(branchSubject);
+    repo.git(["checkout", MAIN_BRANCH]);
+    await repo.write(`${mainSubject.replace(/[^a-z0-9]/g, "-")}.txt`, `${mainSubject}\n`);
+    await repo.commitAll(mainSubject);
+    repo.git(["merge", "--no-commit", branch]);
+    await edit();
+    repo.git(["add", "-A"]);
+    repo.git(["commit", "-m", mergeSubject]);
+  }
+
+  const SIMILAR_TAIL: ExpectedEntry[] = [
+    E("feat: update renamed file", "M", false, CUR),
+    E("refactor: rename tracked file", "R", false, CUR),
+    E("feat: update legacy file", "M", false, LEG),
+    E("base: add legacy file", "A", false, LEG)
+  ];
+  const RECREATED_HEAD: ExpectedEntry[] = [E("feat: recreate same path", "A", false, CUR)];
+
+  describe("similar fixture", () => {
+    let repo: FixtureRepo;
+
+    beforeAll(async () => {
+      repo = await buildSimilarFamily("similar");
+    });
+
+    it("returns six entries with a rename merge for the anchor (TC-347)", async () => {
+      // Case: TC-347
+      // Given: the similar fixture
+      // When: the history of src/current-name.txt is requested from fix: update file after merge
+      const result = await expectHistory(repo, "fix: update file after merge", CUR, [
+        E("fix: update file after merge", "M", false, CUR),
+        E("merge: rename feature", "R", true, CUR),
+        ...SIMILAR_TAIL
+      ]);
+
+      // Then: the rename entry carries the legacy -> current paths
+      const rename = result.find(
+        (e) => repo.subjectOf(e.hash) === "refactor: rename tracked file"
+      )!;
+      expect(rename.oldFilePath).toBe(LEG);
+      expect(rename.newFilePath).toBe(CUR);
+      expect(rename.historicalPath).toBe(CUR);
+    });
+
+    it("returns only the recreate commit for the recreated HEAD (TC-348)", async () => {
+      // Case: TC-348
+      // Given: the similar fixture whose HEAD recreates the path
+      // When: the history is requested from feat: recreate same path
+      const result = await expectHistory(repo, "feat: recreate same path", CUR, RECREATED_HEAD);
+
+      // Then: the single entry is a non-merge A and nothing older than the delete is included
+      expect(result[0].isMerge).toBe(false);
+      expectNotIncluded(repo, result, [
+        "refactor: delete tracked file",
+        "fix: update file after merge",
+        "base: add legacy file"
+      ]);
+    });
+
+    it("includes the anchor's own D when the delete commit is the anchor (TC-349)", async () => {
+      // Case: TC-349
+      // Given: the similar fixture
+      // When: the history is requested from refactor: delete tracked file
+      // Then: seven entries: the D plus the six of TC-347
+      await expectHistory(repo, "refactor: delete tracked file", CUR, [
+        E("refactor: delete tracked file", "D", false, CUR),
+        E("fix: update file after merge", "M", false, CUR),
+        E("merge: rename feature", "R", true, CUR),
+        ...SIMILAR_TAIL
+      ]);
+    });
+  });
+
+  describe("dissimilar fixture", () => {
+    let repo: FixtureRepo;
+
+    beforeAll(async () => {
+      repo = await buildSimilarFamily("dissimilar");
+    });
+
+    it("returns the merge as A when the rename is not detected (TC-350)", async () => {
+      // Case: TC-350
+      // Given: the dissimilar fixture (8-line rewrite after the rename)
+      // When: the history is requested from the anchor
+      const result = await expectHistory(repo, "fix: update file after merge", CUR, [
+        E("fix: update file after merge", "M", false, CUR),
+        E("merge: rename feature", "A", true, CUR),
+        ...SIMILAR_TAIL
+      ]);
+
+      // Then: the merge entry has old = new = current
+      const merge = result.find((e) => e.isMerge)!;
+      expect(merge.oldFilePath).toBe(CUR);
+      expect(merge.newFilePath).toBe(CUR);
+    });
+
+    it("returns only the recreate commit for the recreated HEAD (TC-351)", async () => {
+      // Case: TC-351
+      // Given: the dissimilar fixture
+      // When/Then: HEAD yields the single non-merge A
+      await expectHistory(repo, "feat: recreate same path", CUR, RECREATED_HEAD);
+    });
+  });
+
+  describe("conflict fixture", () => {
+    let repo: FixtureRepo;
+
+    beforeAll(async () => {
+      repo = await buildSimilarFamily("conflict");
+    });
+
+    it("returns seven entries including the main-side legacy edit (TC-352)", async () => {
+      // Case: TC-352
+      // Given: the conflict fixture (both parents differ from the merge)
+      // When/Then: seven entries with the merge folded into one A entry
+      await expectHistory(repo, "fix: update file after merge", CUR, [
+        E("fix: update file after merge", "M", false, CUR),
+        E("merge: rename feature", "A", true, CUR),
+        E("feat: main edits legacy before merge", "M", false, LEG),
+        ...SIMILAR_TAIL
+      ]);
+    });
+
+    it("returns only the recreate commit for the recreated HEAD (TC-353)", async () => {
+      // Case: TC-353
+      // Given: the conflict fixture
+      // When/Then: HEAD yields the single non-merge A
+      await expectHistory(repo, "feat: recreate same path", CUR, RECREATED_HEAD);
+    });
+  });
+
+  it("returns six entries when rename detection and conflict resolution share the merge (TC-354)", async () => {
+    // Case: TC-354
+    // Given: base (6 lines) -> feature rename + edit -> main edits legacy -> conflict merge keeping both lines
+    const repo = await initFixture("conflict-similar");
+    await repo.write(LEG, numberedLines("line", 6));
+    await repo.commitAll("base: add legacy file");
+    repo.git(["checkout", "-b", "feature"]);
+    repo.git(["mv", LEG, CUR]);
+    await repo.commitAll("refactor: rename tracked file");
+    await repo.append(CUR, "feature");
+    await repo.commitAll("feat: update renamed file");
+    repo.git(["checkout", MAIN_BRANCH]);
+    await repo.append(LEG, "main");
+    await repo.commitAll("feat: main edits legacy");
+    repo.mergeExpectingConflict("feature", "merge: rename feature");
+    await repo.write(CUR, `${numberedLines("line", 6)}feature\nmain\n`);
+    repo.git(["add", "-A"]);
+    repo.git(["commit", "--no-edit", "-m", "merge: rename feature"]);
+    await repo.append(CUR, "fix");
+    await repo.commitAll("fix: update file after merge");
+
+    // When/Then: six entries with an R merge
+    await expectHistory(repo, "fix: update file after merge", CUR, [
+      E("fix: update file after merge", "M", false, CUR),
+      E("merge: rename feature", "R", true, CUR),
+      E("feat: update renamed file", "M", false, CUR),
+      E("refactor: rename tracked file", "R", false, CUR),
+      E("feat: main edits legacy", "M", false, LEG),
+      E("base: add legacy file", "A", false, LEG)
+    ]);
+  });
+
+  it("does not return a merge that never touches the historical paths (TC-355)", async () => {
+    // Case: TC-355
+    // Given: the unrelated-merge fixture with merge: unrelated other in the history
+    const repo = await initFixture("unrelated-merge");
+    await repo.write(LEG, numberedLines("line", 6));
+    await repo.commitAll("base: add legacy file");
+    repo.git(["checkout", "-b", "feature"]);
+    repo.git(["mv", LEG, CUR]);
+    await repo.commitAll("refactor: rename tracked file");
+    await repo.append(CUR, "feature");
+    await repo.commitAll("feat: update renamed file");
+    repo.git(["checkout", MAIN_BRANCH]);
+    repo.git(["merge", "feature", "-m", "merge: rename feature"]);
+    repo.git(["checkout", "-b", "other"]);
+    await repo.write("other.txt", "other\n");
+    await repo.commitAll("other: add other file");
+    repo.git(["checkout", MAIN_BRANCH]);
+    await repo.write("main-only.txt", "main only\n");
+    await repo.commitAll("main: add main-only file");
+    repo.git(["merge", "other", "-m", "merge: unrelated other"]);
+    await repo.append(CUR, "fix");
+    await repo.commitAll("fix: update file after merge");
+
+    // When: the history is requested from the anchor
+    const result = await expectHistory(repo, "fix: update file after merge", CUR, [
+      E("fix: update file after merge", "M", false, CUR),
+      E("merge: rename feature", "R", true, CUR),
+      E("feat: update renamed file", "M", false, CUR),
+      E("refactor: rename tracked file", "R", false, CUR),
+      E("base: add legacy file", "A", false, LEG)
+    ]);
+
+    // Then: the unrelated merge is absent
+    expectNotIncluded(repo, result, ["merge: unrelated other"]);
+  });
+
+  describe("evil fixture", () => {
+    let repo: FixtureRepo;
+
+    beforeAll(async () => {
+      repo = await initFixture("evil");
+      await repo.write(F, "f 0\n");
+      await repo.commitAll("old incarnation: add f");
+      await repo.append(F, "f 1");
+      await repo.commitAll("old incarnation: edit f");
+      repo.git(["rm", F]);
+      await repo.commitAll("old incarnation: delete f");
+      repo.git(["branch", "feature"]);
+      await repo.write("a.txt", "a\n");
+      await repo.commitAll("main: unrelated a");
+      repo.git(["checkout", "feature"]);
+      await repo.write("b.txt", "b\n");
+      await repo.commitAll("feature: unrelated b");
+      repo.git(["checkout", MAIN_BRANCH]);
+      repo.git(["merge", "--no-commit", "feature"]);
+      await repo.write(F, "f 0\n");
+      repo.git(["add", "-A"]);
+      repo.git(["commit", "-m", "evil merge: creates f"]);
+      await repo.append(F, "new");
+      await repo.commitAll("edit new f");
+    });
+
+    it("excludes the old incarnation recreated by the evil merge (TC-356)", async () => {
+      // Case: TC-356
+      // Given: the evil fixture
+      // When: the history is requested from edit new f
+      const result = await expectHistory(repo, "edit new f", F, [
+        E("edit new f", "M", false, F),
+        E("evil merge: creates f", "A", true, F)
+      ]);
+
+      // Then: none of the old incarnation commits are present
+      expectNotIncluded(repo, result, [
+        "old incarnation: add f",
+        "old incarnation: edit f",
+        "old incarnation: delete f"
+      ]);
+    });
+
+    it("returns the birth merge itself when it is the anchor (CE1) (TC-357)", async () => {
+      // Case: TC-357
+      // Given: the evil fixture with zero lineage entries for the merge anchor
+      // When/Then: the merge query still runs and yields the single A* entry
+      await expectHistory(repo, "evil merge: creates f", F, [
+        E("evil merge: creates f", "A", true, F)
+      ]);
+    });
+  });
+
+  it("returns a birth merge for a path that never existed before (CE2) (TC-358)", async () => {
+    // Case: TC-358
+    // Given: init -> x: unrelated -> main: unrelated -> merge creating src/f.txt
+    const repo = await initFixture("ce2");
+    await repo.write("a.txt", "a\n");
+    await repo.commitAll("init");
+    await unrelatedDiamond(
+      repo,
+      "x",
+      "x: unrelated",
+      "main: unrelated",
+      () => repo.write(F, "f 0\n"),
+      "birth merge: creates f"
+    );
+
+    // When/Then: the single A* entry
+    await expectHistory(repo, "birth merge: creates f", F, [
+      E("birth merge: creates f", "A", true, F)
+    ]);
+  });
+
+  describe("CE3 fixture", () => {
+    let repo: FixtureRepo;
+
+    beforeAll(async () => {
+      repo = await initFixture("ce3");
+      await repo.write("a.txt", "a\n");
+      await repo.commitAll("init");
+      await repo.write(F, "f 0\n");
+      await repo.commitAll("old incarnation: add f");
+      // One edit inside the old incarnation so TC-363 can observe its exclusion as well.
+      await repo.append(F, "f 1");
+      await repo.commitAll("old incarnation: edit f");
+      await unrelatedDiamond(
+        repo,
+        "p",
+        "p: unrelated",
+        "main: unrelated 1",
+        async () => {
+          repo.git(["rm", F]);
+        },
+        "delete merge: removes f"
+      );
+      await unrelatedDiamond(
+        repo,
+        "q",
+        "q: unrelated",
+        "main: unrelated 2",
+        () => repo.write(F, "f 0\n"),
+        "recreate merge: creates f"
+      );
+      await repo.append(F, "new");
+      await repo.commitAll("edit new f");
+    });
+
+    it("excludes the old incarnation deleted and recreated by merges (CE3) (TC-359)", async () => {
+      // Case: TC-359
+      // Given: the CE3 fixture
+      // When: the history is requested from edit new f
+      const result = await expectHistory(repo, "edit new f", F, [
+        E("edit new f", "M", false, F),
+        E("recreate merge: creates f", "A", true, F)
+      ]);
+
+      // Then: the old incarnation and the delete merge are excluded
+      expectNotIncluded(repo, result, [
+        "old incarnation: add f",
+        "old incarnation: edit f",
+        "delete merge: removes f"
+      ]);
+    });
+
+    it("keeps the anchor when it is itself the valid birth candidate (CE7) (TC-363)", async () => {
+      // Case: TC-363
+      // Given: the CE3 fixture
+      // When: the history is requested from recreate merge: creates f
+      const result = await expectHistory(repo, "recreate merge: creates f", F, [
+        E("recreate merge: creates f", "A", true, F)
+      ]);
+
+      // Then: the old incarnation and delete merge are excluded
+      expectNotIncluded(repo, result, [
+        "old incarnation: add f",
+        "old incarnation: edit f",
+        "delete merge: removes f"
+      ]);
+    });
+  });
+
+  it("returns a merge TREESAME to its first parent as an M* entry (CE4) (TC-360)", async () => {
+    // Case: TC-360
+    // Given: base -> feature edit / main edit -> conflict resolved with the main content
+    const repo = await initFixture("ce4");
+    await repo.write(F, numberedLines("line", 3));
+    await repo.commitAll("base: add f");
+    repo.git(["checkout", "-b", "feature"]);
+    await repo.append(F, "feature");
+    await repo.commitAll("feature: edit f");
+    repo.git(["checkout", MAIN_BRANCH]);
+    await repo.append(F, "main");
+    await repo.commitAll("main: edit f");
+    repo.mergeExpectingConflict("feature", "merge: keep main");
+    repo.git(["checkout", "--ours", F]);
+    repo.git(["add", "-A"]);
+    repo.git(["commit", "--no-edit", "-m", "merge: keep main"]);
+    await repo.append(F, "after");
+    await repo.commitAll("edit f after merge");
+    const merge = repo.hashOf("merge: keep main");
+
+    // When: the first parent diff and the history are inspected
+    const firstParentDiff = repo.git(["diff", `${merge}^`, merge, "--name-status"]);
+    const result = await expectHistory(repo, "edit f after merge", F, [
+      E("edit f after merge", "M", false, F),
+      E("merge: keep main", "M", true, F),
+      E("main: edit f", "M", false, F),
+      E("feature: edit f", "M", false, F),
+      E("base: add f", "A", false, F)
+    ]);
+
+    // Then: the CDV-style first parent diff is empty while the merge is still an M* entry
+    expect(firstParentDiff).toBe("");
+    const mergeEntry = result.find((e) => e.hash === merge)!;
+    expect(mergeEntry.type).toBe("M");
+    expect(mergeEntry.isMerge).toBe(true);
+  });
+
+  it("keeps an invalid candidate on a reused legacy path without excluding (CE5) (TC-361)", async () => {
+    // Case: TC-361
+    // Given: similar base -> rename merge -> merge that reuses the legacy path for a new file
+    const repo = await initFixture("ce5");
+    await repo.write(LEG, numberedLines("line", 3));
+    await repo.commitAll("base: add legacy file");
+    await repo.append(LEG, "legacy");
+    await repo.commitAll("feat: update legacy file");
+    repo.git(["checkout", "-b", "feature"]);
+    repo.git(["mv", LEG, CUR]);
+    await repo.commitAll("refactor: rename tracked file");
+    await repo.append(CUR, "feature");
+    await repo.commitAll("feat: update renamed file");
+    repo.git(["checkout", MAIN_BRANCH]);
+    repo.git(["merge", "feature", "-m", "merge: rename feature"]);
+    await unrelatedDiamond(
+      repo,
+      "reuse",
+      "reuse: unrelated x",
+      "main: unrelated y",
+      () => repo.write(LEG, "reuse 0\n"),
+      "reuse merge: creates legacy path"
+    );
+    await repo.append(CUR, "fix");
+    await repo.commitAll("fix: update current after reuse");
+
+    // When/Then: seven entries, the reuse merge stays as A* and base A remains
+    await expectHistory(repo, "fix: update current after reuse", CUR, [
+      E("fix: update current after reuse", "M", false, CUR),
+      E("merge: rename feature", "R", true, CUR),
+      E("feat: update renamed file", "M", false, CUR),
+      E("refactor: rename tracked file", "R", false, CUR),
+      E("feat: update legacy file", "M", false, LEG),
+      E("base: add legacy file", "A", false, LEG),
+      E("reuse merge: creates legacy path", "A", true, LEG)
+    ]);
+  });
+
+  it("accepts a rename source birth merge without a boundary (CE6) (TC-362)", async () => {
+    // Case: TC-362
+    // Given: init -> merge creating legacy -> git mv to current -> fix
+    const repo = await initFixture("ce6");
+    await repo.write("a.txt", "a\n");
+    await repo.commitAll("init");
+    await unrelatedDiamond(
+      repo,
+      "x",
+      "x: unrelated",
+      "main: unrelated",
+      () => repo.write(LEG, numberedLines("line", 3)),
+      "birth merge: creates legacy"
+    );
+    repo.git(["mv", LEG, CUR]);
+    await repo.commitAll("refactor: rename tracked file");
+    await repo.append(CUR, "fix");
+    await repo.commitAll("fix: edit current");
+
+    // When/Then: three entries with the birth merge on the legacy path
+    await expectHistory(repo, "fix: edit current", CUR, [
+      E("fix: edit current", "M", false, CUR),
+      E("refactor: rename tracked file", "R", false, CUR),
+      E("birth merge: creates legacy", "A", true, LEG)
+    ]);
   });
 });

@@ -3,6 +3,7 @@ import type {
   GitCommitNode,
   GitFileChange,
   GitRepoSet,
+  ResponseFileHistory,
   ResponseLoadBranchCleanup,
   ResponseMessage,
   WorktreeCollection
@@ -30,6 +31,7 @@ export interface GitKeizuViewAPI {
     authors?: string[],
     worktrees?: WorktreeCollection
   ): void;
+  loadFileHistory(response: ResponseFileHistory): void;
   loadRepos(repos: GitRepoSet, lastActiveRepo: string | null): void;
   refresh(mode: RefreshMode): void;
   selectRepo(repo: string): void;
@@ -143,6 +145,9 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       break;
     case "fetchAvatar":
       gitKeizu.loadAvatar(msg.email, msg.image);
+      break;
+    case "fileHistory":
+      gitKeizu.loadFileHistory(msg);
       break;
     case "loadBranchCleanup":
       gitKeizu.loadBranchCleanup(msg);

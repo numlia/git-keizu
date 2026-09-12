@@ -2,12 +2,12 @@
 
 > Source: `web/messageHandler.ts`
 > Storage Mode: sharded
-> Generated: 2026-08-25T00:00:00Z
+> Generated: 2026-09-08T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 4
-> Total Sections: 13
-> Total Cases: 59
+> Total Shards: 5
+> Total Sections: 14
+> Total Cases: 62
 
 ## Shards
 
@@ -17,6 +17,7 @@
 | 02-worktree-and-details-01.md    | worktree-and-details    | 6        | 21    | 2026-07-19   |
 | 03-git-operation-responses-01.md | git-operation-responses | 2        | 12    | 2026-08-06   |
 | 04-branch-cleanup-01.md          | branch-cleanup          | 1        | 3     | 2026-08-25   |
+| 05-file-history-01.md            | file-history            | 1        | 3     | 2026-09-08   |
 
 ## Origin Coverage
 
@@ -34,4 +35,5 @@
 | Feature 051 (remote-checkout-pull) (light-spec-plan)                   | 03-git-operation-responses-01.md |
 | Feature 055-01 (light-spec-plan)                                       | 01-basic-responses-01.md         |
 | Feature 055-03 (light-spec-plan)                                       | 04-branch-cleanup-01.md          |
+| Feature 055-07 (light-spec-plan)                                       | 05-file-history-01.md            |
 | フェーズ2 修正 M13 (commit-details-file-tree-guard)                    | 02-worktree-and-details-01.md    |

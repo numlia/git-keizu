@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   rebaseBranch: vi.fn(),
   deleteBranch: vi.fn(),
   getBranchCleanup: vi.fn(),
+  getFileHistory: vi.fn(),
   getCommits: vi.fn(),
   executeCommand: vi.fn(),
   encodeDiffDocUri: vi.fn(),
@@ -4622,5 +4623,221 @@ describe("GitKeizuView branch cleanup routing and mount (S33)", () => {
     expect(sentMessages("refresh")).toHaveLength(1);
     expect(sentMessages("loadBranchCleanup")).toHaveLength(0);
     expect(mocks.getBranchCleanup).not.toHaveBeenCalled();
+  });
+});
+
+// @see docs/testing/perspectives/src/gitGraphView-test/06-file-history-01.md
+describe("GitKeizuView fileHistory routing (S34)", () => {
+  const FILE_HISTORY_ENTRIES = [
+    {
+      hash: "a".repeat(40),
+      parentHashes: [],
+      type: "A",
+      oldFilePath: "src/a.txt",
+      newFilePath: "src/a.txt",
+      historicalPath: "src/a.txt",
+      isMerge: false
+    }
+  ];
+
+  function fileHistoryRequest(overrides: Record<string, unknown>): Record<string, unknown> {
+    return {
+      command: "fileHistory",
+      repo: TEST_REPO,
+      requestId: 5,
+      anchorHash: "abc",
+      filePath: "src/a.txt",
+      ...overrides
+    };
+  }
+
+  function fileHistoryResponses(): Record<string, unknown>[] {
+    return sentMessages("fileHistory") as unknown as Record<string, unknown>[];
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitKeizuView.currentPanel = undefined;
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.getFileHistory.mockResolvedValue(FILE_HISTORY_ENTRIES);
+
+    const mockDataSource = { getFileHistory: mocks.getFileHistory } as unknown as DataSource;
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  it("ignores a request for an unregistered repository (TC-173)", async () => {
+    // Case: TC-173
+    // Given: a request whose repo is not registered
+    // When: the message is received
+    await mocks.messageHandler.current!(
+      fileHistoryRequest({ repo: "/not/registered", requestId: 1 })
+    );
+
+    // Then: neither the DataSource nor postMessage is called
+    expect(mocks.getFileHistory).toHaveBeenCalledTimes(0);
+    expect(mocks.postMessage).toHaveBeenCalledTimes(0);
+  });
+
+  it("ignores requestId 0 (TC-174)", async () => {
+    // Case: TC-174
+    // Given: requestId 0
+    // When: the message is received
+    await mocks.messageHandler.current!(fileHistoryRequest({ requestId: 0 }));
+
+    // Then: no call and no response
+    expect(mocks.getFileHistory).toHaveBeenCalledTimes(0);
+    expect(mocks.postMessage).toHaveBeenCalledTimes(0);
+  });
+
+  it("ignores a negative requestId (TC-175)", async () => {
+    // Case: TC-175
+    // Given: requestId -1
+    // When: the message is received
+    await mocks.messageHandler.current!(fileHistoryRequest({ requestId: -1 }));
+
+    // Then: no call and no response
+    expect(mocks.getFileHistory).toHaveBeenCalledTimes(0);
+    expect(mocks.postMessage).toHaveBeenCalledTimes(0);
+  });
+
+  it("ignores a non-integer requestId (TC-176)", async () => {
+    // Case: TC-176
+    // Given: requestId 1.5
+    // When: the message is received
+    await mocks.messageHandler.current!(fileHistoryRequest({ requestId: 1.5 }));
+
+    // Then: no call and no response
+    expect(mocks.getFileHistory).toHaveBeenCalledTimes(0);
+    expect(mocks.postMessage).toHaveBeenCalledTimes(0);
+  });
+
+  it("ignores a requestId above the safe integer range (TC-177)", async () => {
+    // Case: TC-177
+    // Given: requestId MAX_SAFE_INTEGER + 1
+    // When: the message is received
+    await mocks.messageHandler.current!(
+      fileHistoryRequest({ requestId: Number.MAX_SAFE_INTEGER + 1 })
+    );
+
+    // Then: no call and no response
+    expect(mocks.getFileHistory).toHaveBeenCalledTimes(0);
+    expect(mocks.postMessage).toHaveBeenCalledTimes(0);
+  });
+
+  it("serves the minimum valid requestId 1 (TC-178)", async () => {
+    // Case: TC-178
+    // Given: requestId 1
+    // When: the message is received
+    await mocks.messageHandler.current!(fileHistoryRequest({ requestId: 1 }));
+
+    // Then: the DataSource runs once and one fileHistory response is posted
+    expect(mocks.getFileHistory).toHaveBeenCalledTimes(1);
+    expect(mocks.postMessage).toHaveBeenCalledTimes(1);
+    expect(fileHistoryResponses()).toHaveLength(1);
+    expect(fileHistoryResponses()[0].requestId).toBe(1);
+  });
+
+  it("serves requestId MAX_SAFE_INTEGER and echoes it (TC-179)", async () => {
+    // Case: TC-179
+    // Given: requestId Number.MAX_SAFE_INTEGER
+    // When: the message is received
+    await mocks.messageHandler.current!(fileHistoryRequest({ requestId: Number.MAX_SAFE_INTEGER }));
+
+    // Then: the DataSource runs once and the response carries the same value
+    expect(mocks.getFileHistory).toHaveBeenCalledTimes(1);
+    expect(fileHistoryResponses()).toHaveLength(1);
+    expect(fileHistoryResponses()[0].requestId).toBe(Number.MAX_SAFE_INTEGER);
+  });
+
+  it("delegates repo, anchorHash and filePath unchanged to the DataSource (TC-180)", async () => {
+    // Case: TC-180
+    // Given: a registered repo request with requestId 5
+    // When: the message is received
+    await mocks.messageHandler.current!(fileHistoryRequest({}));
+
+    // Then: getFileHistory is called once with the raw arguments
+    expect(mocks.getFileHistory).toHaveBeenCalledTimes(1);
+    expect(mocks.getFileHistory).toHaveBeenCalledWith(TEST_REPO, "abc", "src/a.txt");
+  });
+
+  it("echoes the four request fields on the response (TC-181)", async () => {
+    // Case: TC-181
+    // Given: the same request
+    // When: the message is received
+    await mocks.messageHandler.current!(fileHistoryRequest({}));
+
+    // Then: repo, requestId, anchorHash and filePath match the request
+    const response = fileHistoryResponses()[0];
+    expect(response.repo).toBe(TEST_REPO);
+    expect(response.requestId).toBe(5);
+    expect(response.anchorHash).toBe("abc");
+    expect(response.filePath).toBe("src/a.txt");
+  });
+
+  it("forwards the entries array by reference (TC-182)", async () => {
+    // Case: TC-182
+    // Given: the DataSource resolves an entries array
+    // When: the message is received
+    await mocks.messageHandler.current!(fileHistoryRequest({}));
+
+    // Then: the response entries are the very same array
+    expect(fileHistoryResponses()[0].entries).toBe(FILE_HISTORY_ENTRIES);
+  });
+
+  it("passes null entries through without collapsing them (TC-183)", async () => {
+    // Case: TC-183
+    // Given: the DataSource resolves null
+    mocks.getFileHistory.mockResolvedValue(null);
+
+    // When: the message is received
+    await mocks.messageHandler.current!(fileHistoryRequest({}));
+
+    // Then: exactly one response with entries === null
+    expect(mocks.postMessage).toHaveBeenCalledTimes(1);
+    expect(fileHistoryResponses()[0].entries).toBeNull();
+  });
+
+  it("leaves hash validation to the DataSource (TC-184)", async () => {
+    // Case: TC-184
+    // Given: an invalid anchor hash and a DataSource that returns null for it
+    mocks.getFileHistory.mockResolvedValue(null);
+
+    // When: the message is received
+    await mocks.messageHandler.current!(fileHistoryRequest({ anchorHash: "zz" }));
+
+    // Then: the hash is passed through unchanged and the null result is echoed
+    expect(mocks.getFileHistory).toHaveBeenCalledTimes(1);
+    expect(mocks.getFileHistory).toHaveBeenCalledWith(TEST_REPO, "zz", "src/a.txt");
+    expect(fileHistoryResponses()[0].entries).toBeNull();
   });
 });

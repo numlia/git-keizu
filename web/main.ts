@@ -10,7 +10,17 @@ import {
 import { getCommitDate } from "./dates";
 import { hideDialog, isDialogActive, showErrorDialog } from "./dialogs";
 import { Dropdown } from "./dropdown";
-import { buildFileContextMenuItems, resolveFileRow, sendOpenFileAction } from "./fileMenu";
+import {
+  CLASS_FILE_HISTORY_CURRENT,
+  CLASS_FILE_HISTORY_NOTE,
+  FileHistoryController
+} from "./fileHistory";
+import {
+  buildFileContextMenuItems,
+  type FileHistoryMenuContext,
+  resolveFileRow,
+  sendOpenFileAction
+} from "./fileMenu";
 import {
   alterGitFileTree,
   generateGitFileListHtml,
@@ -136,6 +146,7 @@ class GitKeizuView {
 
   private graph: Graph;
   private findWidget: FindWidget;
+  private fileHistory: FileHistoryController;
   private config: Config;
   private moreCommitsAvailable: boolean = false;
   private showRemoteBranches: boolean = true;
@@ -181,6 +192,7 @@ class GitKeizuView {
     this.footerElem = document.getElementById("footer")!;
     this.scrollContainerElem = document.getElementById("scrollContainer")!;
     this.repoDropdown = new Dropdown("repoSelect", true, t("toolbar.repos"), (value) => {
+      this.fileHistory.onRepositoryChanged();
       this.currentRepo = value;
       this.branchCleanupPanel.selectRepository(value);
       this.maxCommits = this.config.initialLoadCommits;
@@ -259,7 +271,7 @@ class GitKeizuView {
     const searchBtnElem = document.getElementById("searchBtn")!;
     searchBtnElem.innerHTML = svgIcons.search;
     searchBtnElem.addEventListener("click", () => {
-      this.findWidget.show(true);
+      this.openFindWidget();
     });
     this.findWidget = new FindWidget({
       getCommits: () => this.commits,
@@ -277,6 +289,25 @@ class GitKeizuView {
         this.expandedCommit !== null &&
         this.expandedCommit.hash === hash &&
         this.expandedCommit.compareWithHash === compareWithHash
+    });
+    this.fileHistory = new FileHistoryController({
+      getCommits: () => this.commits,
+      getCommitId: (hash) =>
+        typeof this.commitLookup[hash] === "number" ? this.commitLookup[hash] : null,
+      getCurrentRepo: () => this.currentRepo,
+      getExpandedCommit: () => this.expandedCommit,
+      getScrollTop: () => this.scrollContainerElem.scrollTop,
+      setScrollTop: (scrollTop) => {
+        this.scrollContainerElem.scrollTop = scrollTop;
+      },
+      hideCommitDetails: () => this.hideCommitDetails(),
+      restoreExpandedCommit: (snapshot) => this.restoreExpandedCommit(snapshot),
+      scrollToCommit: (hash, alwaysCenterCommit) => this.scrollToCommit(hash, alwaysCenterCommit),
+      closeFindWidget: () => this.findWidget.close(),
+      setGraphHighlight: (highlight) => {
+        this.graph.setFileHistoryHighlight(highlight);
+        this.renderGraph();
+      }
     });
     document.addEventListener("keydown", (e) => this.handleKeyboardShortcut(e));
     this.observeWindowSizeChanges();
@@ -344,6 +375,7 @@ class GitKeizuView {
     let repoPaths = Object.keys(repos),
       changedRepo = false;
     if (repos[this.currentRepo] === undefined) {
+      this.fileHistory.onRepositoryChanged();
       this.currentRepo =
         lastActiveRepo !== null && repos[lastActiveRepo] !== undefined
           ? lastActiveRepo
@@ -375,6 +407,7 @@ class GitKeizuView {
       return;
     }
 
+    this.fileHistory.onRepositoryChanged();
     this.currentRepo = repo;
     this.branchCleanupPanel.selectRepository(repo);
     const repoPaths = Object.keys(this.gitRepos);
@@ -388,6 +421,25 @@ class GitKeizuView {
 
   private getCurrentRepoRecentActions(): GG.RecentActionId[] {
     return this.gitRepos[this.currentRepo]?.recentActions ?? [];
+  }
+
+  private buildFileHistoryMenuContext(): FileHistoryMenuContext {
+    const commit =
+      this.expandedCommit !== null
+        ? this.commits[this.commitLookup[this.expandedCommit.hash]]
+        : undefined;
+    return {
+      isStash: commit !== undefined && commit.stash !== null,
+      onHighlightFileHistory: (anchorHash, filePath) =>
+        this.fileHistory.request(anchorHash, filePath)
+    };
+  }
+
+  private openFindWidget() {
+    if (this.fileHistory.isActive() || this.fileHistory.isPending()) {
+      this.fileHistory.exit(true);
+    }
+    this.findWidget.show(true);
   }
 
   public loadBranches(
@@ -555,6 +607,10 @@ class GitKeizuView {
 
   public loadBranchCleanup(response: GG.ResponseLoadBranchCleanup) {
     this.branchCleanupPanel.handleResponse(response);
+  }
+
+  public loadFileHistory(response: GG.ResponseFileHistory) {
+    this.fileHistory.handleResponse(response);
   }
 
   /* Branch Cleanup Panel */
@@ -743,6 +799,7 @@ class GitKeizuView {
     this.renderGraph();
     this.findWidget.setInputEnabled(true);
     this.findWidget.refresh();
+    this.fileHistory.onCommitsRendered();
   }
   private renderGraph() {
     let colHeadersElem = document.getElementById("tableColHeaders");
@@ -940,6 +997,7 @@ class GitKeizuView {
       const mouseEvent = <MouseEvent>e;
       let sourceElem = <HTMLElement>(<Element>e.target).closest(".commit")!;
       const clickedHash = sourceElem.dataset.hash!;
+      this.fileHistory.handleCommitRowClick(clickedHash);
       const isModifierClick = mouseEvent.ctrlKey || mouseEvent.metaKey;
 
       if (isModifierClick && this.expandedCommit !== null) {
@@ -1364,7 +1422,7 @@ class GitKeizuView {
 
     if (key === keybindings.find) {
       e.preventDefault();
-      this.findWidget.show(true);
+      this.openFindWidget();
     } else if (key === keybindings.refresh) {
       e.preventDefault();
       this.refresh("hard");
@@ -1592,7 +1650,58 @@ class GitKeizuView {
       this.hideCommitDetails();
     });
     this.bindFileViewListeners();
+    this.applyFileHistoryToFileRows();
     this.bindParentHashListeners();
+  }
+  private findCommitRowByHash(hash: string): HTMLElement | null {
+    return document.querySelector<HTMLElement>(`.commit[data-hash="${hash}"]`);
+  }
+  private restoreExpandedCommit(snapshot: FileHistoryExpandedSnapshot): boolean {
+    const srcElem = this.findCommitRowByHash(snapshot.hash);
+    if (srcElem === null) return false;
+    const compareWithSrcElem =
+      snapshot.compareWithHash !== null ? this.findCommitRowByHash(snapshot.compareWithHash) : null;
+    this.expandedCommit = {
+      id: parseInt(srcElem.dataset.id!, 10),
+      hash: snapshot.hash,
+      srcElem,
+      compareWithHash: snapshot.compareWithHash,
+      compareWithSrcElem,
+      commitDetails: snapshot.commitDetails,
+      fileTree: snapshot.fileTree,
+      loading: false
+    };
+    if (compareWithSrcElem !== null) compareWithSrcElem.classList.add("compareTarget");
+    this.showCommitDetails(snapshot.commitDetails, snapshot.fileTree);
+    return true;
+  }
+  private applyFileHistoryToFileRows() {
+    if (
+      !this.fileHistory.isActive() ||
+      this.expandedCommit === null ||
+      this.expandedCommit.compareWithHash !== null
+    )
+      return;
+    const historicalPath = this.fileHistory.getHistoricalPathFor(this.expandedCommit.hash);
+    if (historicalPath === null) return;
+    const detailsElem = document.getElementById("commitDetails");
+    if (detailsElem === null) return;
+    const fileRows = Array.from(detailsElem.querySelectorAll<HTMLElement>(".gitFile"));
+    const matchedRow = fileRows.find(
+      (row) =>
+        row.dataset.newfilepath !== undefined &&
+        decodeURIComponent(row.dataset.newfilepath) === historicalPath
+    );
+    if (matchedRow !== undefined) {
+      matchedRow.classList.add(CLASS_FILE_HISTORY_CURRENT);
+      return;
+    }
+    const toggleElem = document.getElementById("fileViewToggle");
+    if (toggleElem === null) return;
+    const noteElem = document.createElement("div");
+    noteElem.className = CLASS_FILE_HISTORY_NOTE;
+    noteElem.textContent = t("fileHistory.notInFirstParentDiff");
+    insertAfter(noteElem, toggleElem);
   }
   private buildCompareSummaryHtml(compareWithHash: string): string {
     const order = this.getCommitOrder(this.expandedCommit!.hash, compareWithHash);
@@ -1709,6 +1818,7 @@ class GitKeizuView {
         this.expandedCommit.fileTree!
       );
       this.bindFileViewListeners();
+      this.applyFileHistoryToFileRows();
     }
     sendMessage({
       command: "saveRepoState",
@@ -1758,7 +1868,12 @@ class GitKeizuView {
       e.stopPropagation();
       const sourceElem = resolveFileRow(<Element>(<MouseEvent>e).target);
       if (sourceElem === null) return;
-      const items = buildFileContextMenuItems(sourceElem, this.expandedCommit, this.currentRepo);
+      const items = buildFileContextMenuItems(
+        sourceElem,
+        this.expandedCommit,
+        this.currentRepo,
+        this.buildFileHistoryMenuContext()
+      );
       if (items.length === 0) return;
       showContextMenu(<MouseEvent>e, items, sourceElem, this.getCurrentRepoRecentActions());
     });

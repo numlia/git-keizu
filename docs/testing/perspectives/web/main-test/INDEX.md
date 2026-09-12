@@ -2,12 +2,12 @@
 
 > Source: `web/main.ts`
 > Storage Mode: sharded
-> Generated: 2026-08-25T00:00:00Z
+> Generated: 2026-09-08T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 11
-> Total Sections: 46
-> Total Cases: 291
+> Total Shards: 12
+> Total Sections: 48
+> Total Cases: 318
 
 ## Shards
 
@@ -20,10 +20,11 @@
 | 04-keyboard-selection-01.md | keyboard-selection | 9        | 52    | 2026-07-19   |
 | 05-state-response-01.md     | state-response     | 10       | 38    | 2026-05-10   |
 | 05-state-response-02.md     | state-response     | 4        | 22    | 2026-07-04   |
-| 06-file-actions-01.md       | file-actions       | 2        | 12    | 2026-04-04   |
+| 06-file-actions-01.md       | file-actions       | 2        | 12    | 2026-09-08   |
 | 07-load-count-01.md         | load-count         | 1        | 5     | 2026-05-17   |
 | 08-request-queue-01.md      | request-queue      | 2        | 14    | 2026-08-04   |
 | 09-branch-cleanup-01.md     | branch-cleanup     | 1        | 11    | 2026-08-25   |
+| 10-file-history-01.md       | file-history       | 2        | 27    | 2026-09-12   |
 
 ## Origin Coverage
 
@@ -50,6 +51,8 @@
 | Feature 045 (defensive-fixes) (light-spec-plan)                      | 04-keyboard-selection-01.md                                                 |
 | Feature 052 (detached-worktree-display) (light-spec-plan)            | 01-rendering-02.md                                                          |
 | Feature 055-03 (light-spec-plan)                                     | 09-branch-cleanup-01.md                                                     |
+| Feature 055-07 (light-spec-plan)                                     | 10-file-history-01.md                                                       |
+| Feature 055-07 (light-spec-plan) Task 8                              | 06-file-actions-01.md                                                       |
 | test-plan (既存コード網羅)                                           | 04-keyboard-selection-01.md                                                 |
 | フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                                     |
 | フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                                     |

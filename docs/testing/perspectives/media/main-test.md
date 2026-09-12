@@ -116,3 +116,71 @@ panel 自身に `max-height: 40vh`・縦横 overflow・`min-height: 0`・nowrap 
 - Normal: TC-020〜TC-024
 
 **失敗系/正常系比（煙感知器）**: 正常系5件（TC-020〜TC-024）、失敗系3件（TC-025〜TC-027）。静的 CSS 契約は宣言の存在検証が正常系として並ぶ構造で、失敗源は再混入・実描画の縮退に限られることをインベントリで確認した。比率合わせのためのケース追加・削除は行わない。
+
+## S3: file history bar・match / current / dim・graph opacity・ファイル行強調の宣言契約
+
+> Origin: Feature 055-07 (light-spec-plan)
+> Added: 2026-09-08
+> Status: active
+> Supersedes: -
+> Signature: `#fileHistoryBar` / `#fileHistoryPath` / `tr.commit.fileHistoryMatch` / `.fileHistoryCurrent` / `.fileHistoryDim` / `svg.fileHistoryMode` / `.gitFile.fileHistoryCurrent` / `.fileHistoryNote` の宣言
+> Target Path: `media/main.css`（Find match 宣言群・mute 復帰 selector 群・`#controls` 直後・`.gitFile` 直後。実装後に行範囲へ更新）
+> Test File: `tests/web/overlayLayers.test.ts`
+
+対応プラン §3.9 の宣言が存在し、既存の `.findMatch` / `.findCurrentCommit` / `.mute` の値を変えない静的 CSS 契約の観点（`readFileSync` で文字列として読み宣言テキストを照合する。jsdom は layout を解決しない）。class の動的付与は `web/fileHistory-test.md` S4 と `web/graph-test.md` S19 の責務で本表には含めない。
+
+| Case ID | Input / Precondition                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                            | Notes                          |
+| ------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| TC-028  | `#fileHistoryBar` ルールを抽出する                                                 | Normal - 既定は非表示                                                      | `display: none` の宣言が存在する                                                                                                                                                                                           | `active` なしは隠す            |
+| TC-029  | `#fileHistoryBar.active` ルールを抽出する                                          | Normal - flex 表示                                                         | `display: flex` と `flex-wrap: wrap` の宣言が存在し、`flex-shrink: 0` を含む                                                                                                                                               | 狭幅で折り返す                 |
+| TC-030  | `#fileHistoryPath` ルールを抽出する                                                | Normal - path の縮退と折返し                                               | `min-width: 0` と `overflow-wrap: anywhere` の宣言が存在する                                                                                                                                                               | 長い path で bar が溢れない    |
+| TC-031  | `#fileHistoryBar.loading #fileHistoryPrev` / `#fileHistoryNext` のルールを抽出する | Normal - loading 中の無効化                                                | `pointer-events: none` と `opacity: 0.4` の宣言が存在する                                                                                                                                                                  | exit だけ有効                  |
+| TC-032  | `tr.commit.fileHistoryMatch td` の宣言を抽出する                                   | Normal - match 背景                                                        | `.findMatch` と同じ宣言 block に `fileHistoryMatch` selector が含まれ、値が `rgba(234, 92, 0, 0.1)`                                                                                                                        | selector の group 化           |
+| TC-033  | `tr.commit.fileHistoryCurrent td` の宣言を抽出する                                 | Normal - current 背景と focus ring                                         | `.findCurrentCommit` と同じ block に `fileHistoryCurrent` selector が含まれ値が `rgba(234, 92, 0, 0.25)`、`tr.commit.fileHistoryCurrent td:first-child` に `box-shadow: inset 2px 0 var(--vscode-focusBorder)` が存在する  | theme 変数を参照               |
+| TC-034  | `tr.commit.fileHistoryDim` の宣言を抽出する                                        | Normal - dim の opacity                                                    | `td:nth-child(2)` と `td:nth-child(n + 3)` に `opacity: 0.3` が存在する                                                                                                                                                    | 行は残す                       |
+| TC-035  | mute 復帰 selector 群（opacity 1 の block）を抽出する                              | Normal - mute より match を優先                                            | `tr.commit.mute.fileHistoryMatch td:nth-child(2) .commitMessage` と `td:nth-child(n + 3)` の 2 selector が `opacity: 1` の block に含まれる                                                                                | 既存 block へ追加              |
+| TC-036  | `svg.fileHistoryMode` 配下の宣言を抽出する                                         | Normal - graph の opacity                                                  | `path.shaddow` / `path.line` / `circle.fileHistoryDim` に `opacity: 0.45`、`circle.fileHistoryMatch` に `opacity: 1`、`circle.fileHistoryCurrent` に `stroke: var(--vscode-focusBorder)` と `stroke-width: 2px` が存在する | -                              |
+| TC-037  | `.gitFile.fileHistoryCurrent` ルールを抽出する                                     | Normal - ファイル行の強調                                                  | `background-color: rgba(234, 92, 0, 0.25)` の宣言が存在する                                                                                                                                                                | CDV の一致行                   |
+| TC-038  | `.fileHistoryNote` ルールを抽出する                                                | Normal - 注記の見た目                                                      | `font-style: italic` と `opacity: 0.8` の宣言が存在する                                                                                                                                                                    | -                              |
+| TC-039  | 既存 `.findMatch` / `.findCurrentCommit` / `.mute` の値を抽出する                  | Validation - 既存値の維持                                                  | `rgba(234, 92, 0, 0.1)` / `rgba(234, 92, 0, 0.25)` / `opacity: 0.5` が変わらず、S1 TC-001 の z-index 変数定義と数値直書き 0 件も不変である                                                                                 | 055-02 / Find の契約を壊さない |
+
+### Additive regression cases: dim rows excluded from mute styling
+
+> Updated: 2026-09-08
+
+TC-028–TC-039 remain unchanged. These cases inspect opacity declarations whose selectors match fixture DOM elements; they do not rely on jsdom resolving the CSS cascade or rendering opacity. Dim cells must have only one applicable opacity declaration and their message children none, so mute cannot override or multiply the dim opacity regardless of declaration order.
+
+| Case ID | Input / Precondition                                                                                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                | Notes                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| TC-040  | Dim rows with and without mute, optionally with commitDetailsOpen or findCurrentCommit                                                      | Validation - exclude competing opacity declarations                        | Only opacity 0.3 matches cells 2–5; no opacity declaration matches the message child, branch label, or first cell                              | Effective message opacity remains 0.3. Find combination is defensive: normal UI modes are exclusive |
+| TC-041  | Muted rows without dim, optionally with commitDetailsOpen, findCurrentCommit, fileHistoryMatch, or fileHistoryMatch plus fileHistoryCurrent | Normal - preserve mute and restoration                                     | Message and cells 3–5 match opacity 0.5, followed by opacity 1 when restored; cell 2, branch label, and first cell have no opacity declaration | Existing normal mute and match restoration remain intact                                            |
+| TC-042  | Muted dim or matching/current rows, optionally with commitDetailsOpen; remove file history classes                                          | Normal - restore ordinary mute after mode exit                             | Message and cells 3–5 match opacity 0.5, followed by opacity 1 only when details remain open; cell 2 has no opacity declaration                | Uses actual class removal, retaining mute and detail state                                          |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-07 追加分（S3）
+
+| 失敗源                                             | 対応ケースまたは除外理由                                                                                                                                                                                                          |
+| -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| bar の非表示・flex・折返し宣言の欠落               | TC-028〜TC-030                                                                                                                                                                                                                    |
+| loading 中に prev / next が押せる                  | TC-031                                                                                                                                                                                                                            |
+| match / current / dim の宣言欠落・値の drift       | TC-032〜TC-034、TC-037、TC-038                                                                                                                                                                                                    |
+| mute に負けて match が薄くなる                     | TC-035                                                                                                                                                                                                                            |
+| graph の opacity・focus ring の欠落                | TC-036                                                                                                                                                                                                                            |
+| 既存 Find / mute / z-index 契約の破壊              | TC-039                                                                                                                                                                                                                            |
+| 入力検証×違反パターン                              | excluded(静的 CSS 契約で入力を受け取る経路が存在しない)                                                                                                                                                                           |
+| 外部依存×失敗モード                                | excluded(CSS 読込失敗は `readFileSync` の例外としてテスト基盤が検出する)                                                                                                                                                          |
+| 例外・エラー経路                                   | excluded(CSS 宣言に throw 経路が存在しない)                                                                                                                                                                                       |
+| 境界値（0 / minimum / maximum / +/-1 / 空 / NULL） | excluded(実行時の数値入力が存在しない。opacity の値は TC-031、TC-034、TC-036、TC-038 の固定値照合で充足。320px 以下の実描画は S2 TC-026 / TC-027 と同じ理由で手動確認に委ね、bar は `flex-wrap: wrap` の宣言存在（TC-029）で担保) |
+| 型不正・フォーマット不正                           | excluded(CSS 宣言は静的テキストで型分岐がなく、宣言 drift は TC-028〜TC-038 の照合で検出)                                                                                                                                         |
+
+Additional failure sources: competing mute opacity on dim cells or message children (TC-040), loss of ordinary mute or restoration (TC-041), and stale dim styling after mode exit (TC-042).
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-039, TC-040
+- Exception: excluded(上表のとおり throw 経路なし)
+- External: excluded(上表のとおり外部依存なし)
+- Boundary: excluded(上表のとおり)
+- Type: excluded(上表のとおり型分岐なし)
+- Normal: TC-028〜TC-038, TC-041, TC-042
+
+**失敗系/正常系比（煙感知器）**: 正常系13件、失敗系2件。静的 CSS 契約は宣言の存在検証が正常系として並ぶ構造で、失敗源は欠落・drift・既存契約の破壊に限られることをインベントリで確認した。比率合わせのためのケース追加・削除は行わない。

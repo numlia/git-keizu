@@ -11,13 +11,17 @@ import {
   BranchCleanupWorktree,
   CheckoutBranchResult,
   DetachedWorktreeInfo,
+  FileHistoryChangeType,
+  FileHistoryEntry,
   PushTarget,
   RemoteBranchTarget,
   RequestCheckoutBranch,
+  RequestFileHistory,
   RequestLoadBranchCleanup,
   RequestMessage,
   RequestPush,
   ResponseCheckoutBranch,
+  ResponseFileHistory,
   ResponseLoadBranchCleanup,
   ResponseLoadCommits,
   ResponseMessage,
@@ -1309,5 +1313,196 @@ describe("branch cleanup fact unions", () => {
     expect(label("notAncestor")).toBe("n");
     expect(label("unknown")).toBe("u");
     expect(label("notSelected")).toBe("s");
+  });
+});
+
+// @see docs/testing/perspectives/src/types-test.md
+describe("file history message and entry contract (S9)", () => {
+  const ENTRY: FileHistoryEntry = {
+    hash: "abc",
+    parentHashes: [],
+    type: "R",
+    oldFilePath: "src/old.txt",
+    newFilePath: "src/a.txt",
+    historicalPath: "src/a.txt",
+    isMerge: true
+  };
+
+  it("accepts a complete entry literal and every change type (TC-112)", () => {
+    // Case: TC-112
+    // Given: a full FileHistoryEntry literal
+    // When: each of the four change type literals is assigned
+    const types: FileHistoryChangeType[] = ["A", "M", "D", "R"];
+    const entries: FileHistoryEntry[] = types.map((type) => ({ ...ENTRY, type }));
+
+    // Then: the literal compiles and the four entries keep their types
+    expect(ENTRY.type).toBe("R");
+    expect(entries.map((e) => e.type)).toEqual(["A", "M", "D", "R"]);
+  });
+
+  it("rejects a change type outside the union (TC-113)", () => {
+    // Case: TC-113
+    // Given: a `T` (typechange) status
+    // @ts-expect-error T is not part of --diff-filter=AMDR
+    const invalid: FileHistoryEntry = { ...ENTRY, type: "T" };
+
+    // When/Then: the assignment is a type error and the value is not one of the four literals
+    expect(["A", "M", "D", "R"]).not.toContain(invalid.type);
+  });
+
+  it("requires historicalPath on the entry (TC-114)", () => {
+    // Case: TC-114
+    // Given: an entry literal without historicalPath
+    // @ts-expect-error historicalPath is mandatory
+    const missing: FileHistoryEntry = {
+      hash: "abc",
+      parentHashes: [],
+      type: "M",
+      oldFilePath: "src/a.txt",
+      newFilePath: "src/a.txt",
+      isMerge: false
+    };
+
+    // When/Then: the field is absent at runtime
+    expect(missing.historicalPath).toBeUndefined();
+  });
+
+  it("joins the request into the RequestMessage union (TC-115)", () => {
+    // Case: TC-115
+    // Given: a complete request assigned to both types
+    const request: RequestFileHistory = {
+      command: "fileHistory",
+      repo: "/r",
+      requestId: 1,
+      anchorHash: "abc",
+      filePath: "src/a.txt"
+    };
+    const message: RequestMessage = request;
+
+    // When: the union is narrowed by command
+    // Then: anchorHash and filePath are reachable
+    expect(message.command).toBe("fileHistory");
+    if (message.command === "fileHistory") {
+      expect(message.anchorHash).toBe("abc");
+      expect(message.filePath).toBe("src/a.txt");
+    }
+  });
+
+  it("requires requestId on the request (TC-116)", () => {
+    // Case: TC-116
+    // Given: a request literal without requestId
+    // @ts-expect-error requestId is mandatory for the freshness echo
+    const missing: RequestFileHistory = {
+      command: "fileHistory",
+      repo: "/r",
+      anchorHash: "abc",
+      filePath: "src/a.txt"
+    };
+
+    // When/Then: the field is absent at runtime
+    expect(missing.requestId).toBeUndefined();
+  });
+
+  it("accepts entries: null on the response and joins the ResponseMessage union (TC-117)", () => {
+    // Case: TC-117
+    // Given: a failure response assigned to both types
+    const response: ResponseFileHistory = {
+      command: "fileHistory",
+      repo: "/r",
+      requestId: 1,
+      anchorHash: "abc",
+      filePath: "src/a.txt",
+      entries: null
+    };
+    const message: ResponseMessage = response;
+
+    // When: the union is narrowed by command
+    // Then: the echo fields and the null entries are reachable
+    expect(message.command).toBe("fileHistory");
+    if (message.command === "fileHistory") {
+      expect(message.entries).toBeNull();
+      expect(message.requestId).toBe(1);
+    }
+  });
+
+  it("accepts entries: [] and narrows to the array branch (TC-118)", () => {
+    // Case: TC-118
+    // Given: a no-history response
+    const response: ResponseFileHistory = {
+      command: "fileHistory",
+      repo: "/r",
+      requestId: 2,
+      anchorHash: "abc",
+      filePath: "src/a.txt",
+      entries: []
+    };
+
+    // When: entries is narrowed against null
+    // Then: length is reachable and equals 0 (distinct from null)
+    expect(response.entries).not.toBeNull();
+    if (response.entries !== null) {
+      expect(response.entries.length).toBe(0);
+    }
+  });
+
+  it("requires entries on the response (TC-119)", () => {
+    // Case: TC-119
+    // Given: a response literal without entries
+    // @ts-expect-error entries must not be optional
+    const missing: ResponseFileHistory = {
+      command: "fileHistory",
+      repo: "/r",
+      requestId: 1,
+      anchorHash: "abc",
+      filePath: "src/a.txt"
+    };
+
+    // When/Then: the field is absent at runtime
+    expect(missing.entries).toBeUndefined();
+  });
+
+  it("rejects entries: undefined (TC-120)", () => {
+    // Case: TC-120
+    // Given: a response literal with undefined entries
+    const invalid: ResponseFileHistory = {
+      command: "fileHistory",
+      repo: "/r",
+      requestId: 1,
+      anchorHash: "abc",
+      filePath: "src/a.txt",
+      // @ts-expect-error only null is allowed as the failure marker
+      entries: undefined
+    };
+
+    // When/Then: the runtime value is undefined, not null
+    expect(invalid.entries).toBeUndefined();
+    expect(invalid.entries).not.toBeNull();
+  });
+
+  it("narrows the change type union exhaustively (TC-121)", () => {
+    // Case: TC-121
+    // Given: a switch that enumerates the four change type literals
+    const label = (value: FileHistoryChangeType): string => {
+      switch (value) {
+        case "A":
+          return "added";
+        case "M":
+          return "modified";
+        case "D":
+          return "deleted";
+        case "R":
+          return "renamed";
+        default: {
+          const exhaustive: never = value;
+          return exhaustive;
+        }
+      }
+    };
+
+    // When/Then: every literal reaches its own case and the default stays unreachable
+    expect(label("A")).toBe("added");
+    expect(label("M")).toBe("modified");
+    expect(label("D")).toBe("deleted");
+    expect(label("R")).toBe("renamed");
   });
 });

@@ -282,3 +282,46 @@ branch cleanup panel の表示に使う英語キー集合（title、comparison�
 - Normal: TC-019
 
 **失敗系/正常系比（煙感知器）**: 正常系1件（TC-019）、失敗系1件（TC-020）。件数が同数のため再導出したが、単一キーの静的 locale の失敗源は欠落・drift・placeholder・parity に限られ、上表のとおり充足されていることを確認した。
+
+## S8: file history の英語キー 9 件
+
+> Origin: Feature 055-07 (light-spec-plan)
+> Added: 2026-09-08
+> Status: active
+> Supersedes: -
+> Signature: 追加キー `context.highlightFileHistory` / `fileHistory.loading` / `fileHistory.position` / `fileHistory.previous` / `fileHistory.next` / `fileHistory.exit` / `fileHistory.notInFirstParentDiff` / `fileHistory.noResults` / `error.fileHistory`
+> Target Path: `l10n/web/web.l10n.en.json`
+> Test File: `tests/web/i18n.test.ts`
+
+対応プラン §3.10 の 9 key が en bundle に存在し、値が固定値と完全一致し、placeholder 集合が ja と一致することを検証する additive section。キーの利用箇所（menu / bar / error dialog / 注記）は `web/fileMenu-test.md` S4 と `web/fileHistory-test.md` S1〜S3、`web/main-test/10-file-history-01.md` S51 の責務。
+
+| Case ID | Input / Precondition                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                         | Notes                         |
+| ------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| TC-021  | en bundle から 9 key を読み込む                                         | Normal - 9 key の固定値                                                    | 9 key がすべて存在し、値が `Highlight File History` / `Loading file history ...` / `{0} of {1}` / `Previous match` / `Next match` / `Exit` / `This file's change is not part of the diff against the first parent.` / `No history was found for this file.` / `Unable to load file history` と `toEqual` で完全一致する | 完全一致により非空も担保      |
+| TC-022  | `fileHistory.position` の値から `{数字}` 形式 placeholder を抽出する    | Normal - placeholder 集合                                                  | 集合が `{0}` と `{1}` の 2 件で、他の 8 key の placeholder 集合が空である                                                                                                                                                                                                                                               | 位置表示のみ引数を持つ        |
+| TC-023  | en / ja 両 bundle を読み込み、9 key の存在と placeholder 集合を比較する | Validation - locale parity                                                 | ja bundle に 9 key がすべて存在し（欠落 0 件）、key ごとの placeholder 集合が両 locale で一致する                                                                                                                                                                                                                       | 片 locale / placeholder drift |
+| TC-024  | en bundle の全 key 集合を読み込む                                       | Validation - 既存 key の維持                                               | 9 key 追加後も既存 key（`context.openFile`、`error.fetch`、`find.*` など）が欠落せず、bundle 全体で値が空文字列の key が 0 件である                                                                                                                                                                                     | 追加による誤削除を防ぐ        |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-07 追加分（S8）
+
+| 失敗源                                        | 対応ケースまたは除外理由                                                    |
+| --------------------------------------------- | --------------------------------------------------------------------------- |
+| en 側のキー欠落・固定値からの drift           | TC-021                                                                      |
+| placeholder の欠落・過剰                      | TC-022                                                                      |
+| 片 locale だけの追加 / placeholder 不一致     | TC-023（ja 側は `web.l10n.ja.json-test.md` S9 TC-026 と対で担保）           |
+| 追加時の既存 key 誤削除・空値                 | TC-024                                                                      |
+| キーの利用分岐の欠落                          | excluded(利用 owner の責務。上記参照)                                       |
+| 境界値（0 / minimum / maximum / +/-1 / NULL） | excluded(静的 JSON に数値境界が存在しない。empty は TC-021 / TC-024 で充足) |
+| 外部依存の失敗・例外送出                      | excluded(bundle は静的データで外部依存も throw 経路も持たない)              |
+| 不正な型・形式                                | excluded(値は JSON string で型分岐が存在しない)                             |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-023、TC-024
+- Exception: excluded(JSON 読み込みの失敗はテスト基盤で検出され、bundle 自体に例外分岐はない)
+- External: excluded(外部依存なし)
+- Boundary: excluded(数値境界が存在しない。empty は TC-021 / TC-024 で充足)
+- Type: excluded(値は JSON string で型分岐が存在しない)
+- Normal: TC-021、TC-022
+
+**失敗系/正常系比（煙感知器）**: 正常系2件（TC-021、TC-022）、失敗系2件（TC-023、TC-024）。件数が同数のため再導出したが、静的 JSON データの失敗源は drift・placeholder・parity・誤削除に限られ、上表のとおりすべて充足されていることを確認した。

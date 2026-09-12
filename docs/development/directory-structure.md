@@ -46,6 +46,7 @@ src/
 ├── extension.ts          # Entry point (activate/deactivate)
 ├── config.ts             # VS Code settings wrapper
 ├── dataSource.ts         # Git CLI wrapper (spawn-based)
+├── fileHistory.ts        # File history query args, parser, and lineage rules
 ├── gitGraphView.ts       # Webview panel management & message routing
 ├── i18n.ts               # Host l10n wrapper and webview dictionary loader
 ├── repoManager.ts        # Repository auto-discovery & watching
@@ -76,6 +77,8 @@ web/
 ├── dropdown.ts           # Dropdown component
 ├── dialogs.ts            # Dialog UI (confirmation, form, error)
 ├── fileTree.ts           # File tree rendering
+├── fileHistory.ts        # File history highlight mode (state, bar, navigation)
+├── fileHistoryClasses.ts # File history CSS class names (shared, side-effect free)
 ├── i18n.ts               # Webview localization helper
 ├── contextMenu.ts        # Right-click context menu
 ├── dates.ts              # Date formatting

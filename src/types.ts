@@ -393,6 +393,34 @@ export interface ResponseFetchAvatar {
   image: string;
 }
 
+export type FileHistoryChangeType = "A" | "M" | "D" | "R";
+
+export interface FileHistoryEntry {
+  hash: string;
+  parentHashes: string[];
+  type: FileHistoryChangeType;
+  oldFilePath: string;
+  newFilePath: string;
+  historicalPath: string;
+  isMerge: boolean;
+}
+
+export interface RequestFileHistory {
+  command: "fileHistory";
+  repo: string;
+  requestId: number;
+  anchorHash: string;
+  filePath: string;
+}
+export interface ResponseFileHistory {
+  command: "fileHistory";
+  repo: string;
+  requestId: number;
+  anchorHash: string;
+  filePath: string;
+  entries: FileHistoryEntry[] | null;
+}
+
 export interface RequestLoadBranchCleanup {
   command: "loadBranchCleanup";
   repo: string;
@@ -769,6 +797,7 @@ export type RequestMessage =
   | RequestDropStash
   | RequestFetch
   | RequestFetchAvatar
+  | RequestFileHistory
   | RequestPull
   | RequestPush
   | RequestLoadBranchCleanup
@@ -812,6 +841,7 @@ export type ResponseMessage =
   | ResponseDropStash
   | ResponseFetch
   | ResponseFetchAvatar
+  | ResponseFileHistory
   | ResponsePull
   | ResponsePush
   | ResponseLoadBranchCleanup

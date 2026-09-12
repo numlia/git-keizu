@@ -32,6 +32,16 @@ vi.mock("../../src/gitExecutable", () => ({
 
 import { getConfig } from "../../src/config";
 import { COMMIT_ORDER_FLAGS, DataSource } from "../../src/dataSource";
+import {
+  applyLineageRules,
+  applyMergeRules,
+  buildAncestryQueryArgs,
+  buildLineageQueryArgs,
+  buildMergeQueryArgs,
+  parseAncestryGraph,
+  parseFileHistoryRecords,
+  resolveFileHistoryEntries
+} from "../../src/fileHistory";
 import { type CommitOrdering, type GitStash, UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 
 const SEP = "XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb";
@@ -5714,5 +5724,440 @@ describe("renameBranch ref name guard (S40)", () => {
     expect(result).toBeNull();
     expect(spawnMock).toHaveBeenCalledTimes(1);
     expect(spawnMock.mock.calls[0][1]).toEqual(["branch", "-m", "old", "feature/renamed"]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S49: getFileHistory() Git args, call counts and failure isolation  */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/src/dataSource-test/07-file-history-01.md
+describe("getFileHistory spawn orchestration (S49)", () => {
+  const CUR = "src/current-name.txt";
+  const LEG = "src/legacy-name.txt";
+  const F = "src/f.txt";
+  const FH = (n: number): string => n.toString(16).padStart(40, "0");
+  const ANCHOR = FH(0xa1);
+  const spawnMock = vi.mocked(cp.spawn);
+  let ds: DataSource;
+
+  interface SpawnStep {
+    stdout: string;
+    exitCode?: number;
+  }
+
+  /** Answer the n-th spawn with the n-th step; extra spawns fail with exit 1. */
+  function installSpawnSequence(steps: SpawnStep[]): void {
+    let index = 0;
+    spawnMock.mockImplementation((() => {
+      const step = steps[index] ?? { stdout: "", exitCode: 1 };
+      index++;
+      return createMockProcess(step.stdout, step.exitCode ?? 0);
+    }) as typeof cp.spawn);
+  }
+
+  function spawnArgs(callIndex: number): string[] {
+    return spawnMock.mock.calls[callIndex][1] as string[];
+  }
+
+  function fileHistoryRecord(hash: string, parents: string[], ...entries: string[][]): string {
+    const body = entries.map((e) => `${e.join("\0")}\0`).join("");
+    return `\x1e${hash}\0${parents.join(" ")}\0\0\n${body}`;
+  }
+
+  /** similar-shaped lineage: fix(anchor) M cur -> upd M cur -> rename R -> updLeg M leg -> base A leg */
+  const similar = {
+    upd: FH(0xb1),
+    ren: FH(0xb2),
+    updLeg: FH(0xb3),
+    base: FH(0xb4),
+    mergeHash: FH(0xb5),
+    docs: FH(0xb6)
+  };
+  const similarLineage = [
+    fileHistoryRecord(ANCHOR, [similar.mergeHash], ["M", CUR]),
+    fileHistoryRecord(similar.upd, [similar.ren], ["M", CUR]),
+    fileHistoryRecord(similar.ren, [similar.updLeg], ["R100", LEG, CUR]),
+    fileHistoryRecord(similar.updLeg, [similar.base], ["M", LEG]),
+    fileHistoryRecord(similar.base, [], ["A", LEG])
+  ].join("");
+  const similarMerge = fileHistoryRecord(
+    similar.mergeHash,
+    [similar.docs, similar.upd],
+    ["R077", LEG, CUR]
+  );
+
+  /** CE3-shaped stdout: anchor M f, old A f (boundary); recreate A* and delete D* merges. */
+  const ce3 = {
+    recreate: FH(0xc1),
+    mainU2: FH(0xc2),
+    q: FH(0xc3),
+    deleteMerge: FH(0xc4),
+    mainU1: FH(0xc5),
+    p: FH(0xc6),
+    oldAdd: FH(0xc7),
+    init: FH(0xc8)
+  };
+  const ce3Lineage = [
+    fileHistoryRecord(ANCHOR, [ce3.recreate], ["M", F]),
+    fileHistoryRecord(ce3.oldAdd, [ce3.init], ["A", F])
+  ].join("");
+  const ce3Merge = [
+    fileHistoryRecord(ce3.recreate, [ce3.mainU2, ce3.q], ["A", F]),
+    fileHistoryRecord(ce3.recreate, [ce3.mainU2, ce3.q], ["A", F]),
+    fileHistoryRecord(ce3.deleteMerge, [ce3.mainU1, ce3.p], ["D", F]),
+    fileHistoryRecord(ce3.deleteMerge, [ce3.mainU1, ce3.p], ["D", F])
+  ].join("");
+  const ce3Ancestry = [
+    `${ANCHOR} ${ce3.recreate}`,
+    `${ce3.recreate} ${ce3.mainU2} ${ce3.q}`,
+    `${ce3.mainU2} ${ce3.deleteMerge}`,
+    `${ce3.q} ${ce3.deleteMerge}`,
+    `${ce3.deleteMerge} ${ce3.mainU1} ${ce3.p}`,
+    `${ce3.mainU1} ${ce3.oldAdd}`,
+    `${ce3.p} ${ce3.oldAdd}`,
+    `${ce3.oldAdd} ${ce3.init}`
+  ].join("\n");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  it("returns null without spawning for an invalid anchor hash (TC-327)", async () => {
+    // Case: TC-327
+    // Given: an anchor that fails isValidCommitHash
+    installSpawnSequence([]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, "zz", "src/a.txt");
+
+    // Then: null and no Git process
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("returns null without spawning for a path with a parent component (TC-328)", async () => {
+    // Case: TC-328
+    // Given: a path that normalizeFileHistoryPath rejects
+    installSpawnSequence([]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, "a/../b");
+
+    // Then: null and no Git process
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("runs the lineage query with the built args, cwd and LC_ALL=C (TC-329)", async () => {
+    // Case: TC-329
+    // Given: empty lineage and merge output
+    installSpawnSequence([{ stdout: "" }, { stdout: "" }]);
+
+    // When: the history is requested
+    await ds.getFileHistory(REPO, ANCHOR, "src/a.txt");
+
+    // Then: the first spawn uses the exact lineage args with repo cwd and the C locale
+    expect(spawnArgs(0)).toEqual(buildLineageQueryArgs(ANCHOR, "src/a.txt"));
+    const options = spawnMock.mock.calls[0][2] as { cwd: string; env: Record<string, string> };
+    expect(options.cwd).toBe(REPO);
+    expect(options.env.LC_ALL).toBe("C");
+  });
+
+  it("passes the normalized path to Git (TC-330)", async () => {
+    // Case: TC-330
+    // Given: a backslash path
+    installSpawnSequence([{ stdout: "" }, { stdout: "" }]);
+
+    // When: the history is requested
+    await ds.getFileHistory(REPO, ANCHOR, "src\\a.txt");
+
+    // Then: the last lineage arg is the normalized path
+    const args = spawnArgs(0);
+    expect(args[args.length - 1]).toBe("src/a.txt");
+  });
+
+  it("still runs the merge query and returns [] when both outputs are empty (TC-331)", async () => {
+    // Case: TC-331
+    // Given: no lineage records and no merge records
+    installSpawnSequence([{ stdout: "" }, { stdout: "" }]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, "src/a.txt");
+
+    // Then: two spawns, boundary-less merge args, and an empty array (not null)
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+    expect(spawnArgs(1)).toEqual(buildMergeQueryArgs(ANCHOR, null, ["src/a.txt"]));
+    expect(result).toEqual([]);
+  });
+
+  it("adds ^boundary to the merge args when the lineage stops at a D (TC-332)", async () => {
+    // Case: TC-332
+    // Given: a lineage that stops at a non-anchor delete commit
+    const del = FH(0xd1);
+    const older = FH(0xd2);
+    const lineage = [
+      fileHistoryRecord(ANCHOR, [del], ["M", F]),
+      fileHistoryRecord(del, [older], ["D", F]),
+      fileHistoryRecord(older, [], ["A", F])
+    ].join("");
+    installSpawnSequence([{ stdout: lineage }, { stdout: "" }]);
+
+    // When: the history is requested
+    await ds.getFileHistory(REPO, ANCHOR, F);
+
+    // Then: the merge args carry exactly one ^<boundary> element
+    const mergeArgs = spawnArgs(1);
+    expect(mergeArgs).toEqual(buildMergeQueryArgs(ANCHOR, del, [F]));
+    expect(mergeArgs.filter((a) => a === `^${del}`)).toHaveLength(1);
+  });
+
+  it("passes the historical path set in insertion order (TC-333)", async () => {
+    // Case: TC-333
+    // Given: the similar lineage containing a rename
+    installSpawnSequence([{ stdout: similarLineage }, { stdout: similarMerge }]);
+
+    // When: the history is requested
+    await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+    // Then: everything after -- is [current, legacy]
+    const mergeArgs = spawnArgs(1);
+    expect(mergeArgs.slice(mergeArgs.indexOf("--") + 1)).toEqual([CUR, LEG]);
+  });
+
+  it("returns null after one spawn when the lineage query fails (TC-334)", async () => {
+    // Case: TC-334
+    // Given: exit 1 for the lineage query
+    installSpawnSequence([{ stdout: "", exitCode: 1 }]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+    // Then: null and the merge query never runs
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null after one spawn when the lineage output is malformed (TC-335)", async () => {
+    // Case: TC-335
+    // Given: stdout starting with garbage
+    installSpawnSequence([{ stdout: "x" }]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+    // Then: null after the lineage spawn only
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null after one spawn when the lineage rules fail (TC-336)", async () => {
+    // Case: TC-336
+    // Given: a lineage record that does not touch the tracked path
+    installSpawnSequence([{ stdout: fileHistoryRecord(ANCHOR, [FH(1)], ["M", "other.txt"]) }]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+    // Then: null after the lineage spawn only
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns null instead of the lineage partial result when the merge query fails (TC-337)", async () => {
+    // Case: TC-337
+    // Given: a valid lineage and exit 1 for the merge query
+    installSpawnSequence([
+      { stdout: fileHistoryRecord(ANCHOR, [FH(1)], ["M", CUR]) },
+      { stdout: "", exitCode: 1 }
+    ]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+    // Then: null after two spawns
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns null when the merge output is malformed (TC-338)", async () => {
+    // Case: TC-338
+    // Given: a valid lineage and malformed merge stdout
+    installSpawnSequence([
+      { stdout: fileHistoryRecord(ANCHOR, [FH(1)], ["M", CUR]) },
+      { stdout: "x" }
+    ]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+    // Then: null after two spawns
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("returns null when the merge output contains a single parent record (TC-339)", async () => {
+    // Case: TC-339
+    // Given: a merge record with one parent
+    installSpawnSequence([
+      { stdout: fileHistoryRecord(ANCHOR, [FH(1)], ["M", CUR]) },
+      { stdout: fileHistoryRecord(FH(2), [FH(3)], ["M", CUR]) }
+    ]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+    // Then: null after two spawns
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs the ancestry query with one ^ per boundary parent (TC-340)", async () => {
+    // Case: TC-340
+    // Given: a birth candidate, two or more entries, and a boundary with one parent
+    installSpawnSequence([{ stdout: ce3Lineage }, { stdout: ce3Merge }, { stdout: ce3Ancestry }]);
+
+    // When: the history is requested
+    await ds.getFileHistory(REPO, ANCHOR, F);
+
+    // Then: the third spawn uses the built ancestry args with exactly one ^ element
+    expect(spawnMock).toHaveBeenCalledTimes(3);
+    expect(spawnArgs(2)).toEqual(buildAncestryQueryArgs(ANCHOR, [ce3.init]));
+    expect(spawnArgs(2).filter((a) => a.startsWith("^"))).toHaveLength(1);
+  });
+
+  it("runs the ancestry query without ^ when there is no boundary (TC-341)", async () => {
+    // Case: TC-341
+    // Given: the CE6 shape: lineage reaches the end, birth merge on the legacy path
+    const ren = FH(0xe1);
+    const birth = FH(0xe2);
+    const mainU = FH(0xe3);
+    const x = FH(0xe4);
+    const init = FH(0xe5);
+    const lineage = [
+      fileHistoryRecord(ANCHOR, [ren], ["M", CUR]),
+      fileHistoryRecord(ren, [birth], ["R100", LEG, CUR])
+    ].join("");
+    const merge = [
+      fileHistoryRecord(birth, [mainU, x], ["A", LEG]),
+      fileHistoryRecord(birth, [mainU, x], ["A", LEG])
+    ].join("");
+    const ancestry = [
+      `${ANCHOR} ${ren}`,
+      `${ren} ${birth}`,
+      `${birth} ${mainU} ${x}`,
+      `${mainU} ${init}`,
+      `${x} ${init}`,
+      init
+    ].join("\n");
+    installSpawnSequence([{ stdout: lineage }, { stdout: merge }, { stdout: ancestry }]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+    // Then: the third spawn is rev-list --parents <anchor> with no ^ and three entries return
+    expect(spawnMock).toHaveBeenCalledTimes(3);
+    expect(spawnArgs(2)).toEqual(["rev-list", "--parents", ANCHOR]);
+    expect(result).toHaveLength(3);
+  });
+
+  it("skips the ancestry query when the total is one entry (TC-342)", async () => {
+    // Case: TC-342
+    // Given: no lineage entries and a single birth merge (CE1 / CE2 shape)
+    const mainU = FH(0xf1);
+    const x = FH(0xf2);
+    const merge = [
+      fileHistoryRecord(ANCHOR, [mainU, x], ["A", F]),
+      fileHistoryRecord(ANCHOR, [mainU, x], ["A", F])
+    ].join("");
+    installSpawnSequence([{ stdout: "" }, { stdout: merge }]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, F);
+
+    // Then: two spawns and one A merge entry
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+    expect(result).toHaveLength(1);
+    expect(result![0]).toMatchObject({ hash: ANCHOR, type: "A", isMerge: true, historicalPath: F });
+  });
+
+  it("skips the ancestry query when there is no birth candidate (TC-343)", async () => {
+    // Case: TC-343
+    // Given: the similar shape with six entries and no candidate
+    installSpawnSequence([{ stdout: similarLineage }, { stdout: similarMerge }]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+    // Then: two spawns and the plain lineage + merge concatenation
+    expect(spawnMock).toHaveBeenCalledTimes(2);
+    const lineage = applyLineageRules(parseFileHistoryRecords(similarLineage)!, ANCHOR, CUR)!;
+    const merge = applyMergeRules(
+      parseFileHistoryRecords(similarMerge)!,
+      lineage.historicalPaths,
+      new Set(lineage.entries.map((e) => e.hash))
+    )!;
+    expect(result).toEqual([...lineage.entries, ...merge.entries]);
+    expect(result).toHaveLength(6);
+  });
+
+  it("returns null when the ancestry query fails (TC-344)", async () => {
+    // Case: TC-344
+    // Given: exit 1 for the ancestry query
+    installSpawnSequence([
+      { stdout: ce3Lineage },
+      { stdout: ce3Merge },
+      { stdout: "", exitCode: 1 }
+    ]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, F);
+
+    // Then: null after three spawns
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns null when the ancestry output has an invalid token (TC-345)", async () => {
+    // Case: TC-345
+    // Given: a `zz` token in the rev-list output
+    installSpawnSequence([
+      { stdout: ce3Lineage },
+      { stdout: ce3Merge },
+      { stdout: `${ANCHOR} zz` }
+    ]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, F);
+
+    // Then: null after three spawns
+    expect(result).toBeNull();
+    expect(spawnMock).toHaveBeenCalledTimes(3);
+  });
+
+  it("returns the resolved CE3 entries end to end (TC-346)", async () => {
+    // Case: TC-346
+    // Given: the CE3 lineage, merge and ancestry stdout
+    installSpawnSequence([{ stdout: ce3Lineage }, { stdout: ce3Merge }, { stdout: ce3Ancestry }]);
+
+    // When: the history is requested
+    const result = await ds.getFileHistory(REPO, ANCHOR, F);
+
+    // Then: the result equals resolveFileHistoryEntries() (2 entries, old A and delete merge gone)
+    const lineage = applyLineageRules(parseFileHistoryRecords(ce3Lineage)!, ANCHOR, F)!;
+    const merge = applyMergeRules(
+      parseFileHistoryRecords(ce3Merge)!,
+      lineage.historicalPaths,
+      new Set(lineage.entries.map((e) => e.hash))
+    )!;
+    const expected = resolveFileHistoryEntries({
+      requestedPath: F,
+      lineage,
+      merge,
+      ancestry: parseAncestryGraph(ce3Ancestry)
+    });
+    expect(result).toEqual(expected);
+    expect(result!.map((e) => e.hash)).toEqual([ANCHOR, ce3.recreate]);
   });
 });

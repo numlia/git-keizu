@@ -207,23 +207,47 @@ body.unableToLoad p {
 #commitTable tr.commit.compareTarget:hover td {
   background-color: rgba(255, 167, 36, 0.25);
 }
-/* Find match highlight */
-#commitTable tr.commit.findMatch td {
+/* Find match highlight (shared by find / file history) */
+#commitTable tr.commit.findMatch td,
+#commitTable tr.commit.fileHistoryMatch td {
   background-color: rgba(234, 92, 0, 0.1);
 }
-#commitTable tr.commit.findCurrentCommit td {
+#commitTable tr.commit.findCurrentCommit td,
+#commitTable tr.commit.fileHistoryCurrent td {
   background-color: rgba(234, 92, 0, 0.25);
 }
-/* Muted commits */
-#commitTable tr.commit.mute td:nth-child(2) .commitMessage,
-#commitTable tr.commit.mute td:nth-child(n + 3) {
+#commitTable tr.commit.fileHistoryCurrent td:first-child {
+  box-shadow: inset 2px 0 var(--vscode-focusBorder);
+}
+#commitTable tr.commit.fileHistoryDim td:nth-child(2),
+#commitTable tr.commit.fileHistoryDim td:nth-child(n + 3) {
+  opacity: 0.3;
+}
+/* Dim rows use cell opacity exclusively, including when commit details are open. */
+#commitTable tr.commit.mute:not(.fileHistoryDim) td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute:not(.fileHistoryDim) td:nth-child(n + 3) {
   opacity: 0.5;
 }
-#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(2) .commitMessage,
-#commitTable tr.commit.mute.commitDetailsOpen td:nth-child(n + 3),
-#commitTable tr.commit.mute.findCurrentCommit td:nth-child(2) .commitMessage,
-#commitTable tr.commit.mute.findCurrentCommit td:nth-child(n + 3) {
+#commitTable tr.commit.mute:not(.fileHistoryDim).commitDetailsOpen td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute:not(.fileHistoryDim).commitDetailsOpen td:nth-child(n + 3),
+#commitTable tr.commit.mute:not(.fileHistoryDim).findCurrentCommit td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute:not(.fileHistoryDim).findCurrentCommit td:nth-child(n + 3),
+#commitTable tr.commit.mute.fileHistoryMatch td:nth-child(2) .commitMessage,
+#commitTable tr.commit.mute.fileHistoryMatch td:nth-child(n + 3) {
   opacity: 1;
+}
+/* File history graph emphasis */
+#commitGraph svg.fileHistoryMode path.shaddow,
+#commitGraph svg.fileHistoryMode path.line,
+#commitGraph svg.fileHistoryMode circle.fileHistoryDim {
+  opacity: 0.45;
+}
+#commitGraph svg.fileHistoryMode circle.fileHistoryMatch {
+  opacity: 1;
+}
+#commitGraph svg.fileHistoryMode circle.fileHistoryCurrent {
+  stroke: var(--vscode-focusBorder);
+  stroke-width: 2px;
 }
 
 /* -- Commit Details View --------------------------------------------------- */
@@ -399,6 +423,14 @@ body.unableToLoad p {
   cursor: pointer;
   padding: 0 2px;
 }
+.gitFile.fileHistoryCurrent {
+  background-color: rgba(234, 92, 0, 0.25);
+}
+.fileHistoryNote {
+  font-style: italic;
+  opacity: 0.8;
+  padding: 2px 0;
+}
 /* Avatar */
 .commit .avatar > img {
   display: inline-block;
@@ -492,6 +524,29 @@ body.unableToLoad p {
 }
 #controls label {
   cursor: pointer;
+}
+/* File history bar (inserted after #controls) */
+#fileHistoryBar {
+  display: none;
+}
+#fileHistoryBar.active {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
+  flex-shrink: 0;
+}
+#fileHistoryPath {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#fileHistoryBar.loading #fileHistoryPrev,
+#fileHistoryBar.loading #fileHistoryNext {
+  opacity: 0.4;
+  pointer-events: none;
 }
 #repoControl,
 #branchControl,

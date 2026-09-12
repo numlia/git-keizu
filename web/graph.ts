@@ -1,4 +1,17 @@
+import {
+  CLASS_FILE_HISTORY_CURRENT,
+  CLASS_FILE_HISTORY_DIM,
+  CLASS_FILE_HISTORY_MATCH,
+  CLASS_FILE_HISTORY_MODE
+} from "./fileHistoryClasses";
+
 export const NULL_VERTEX_ID = -1;
+const CLASS_FILE_HISTORY_MATCH_CURRENT = `${CLASS_FILE_HISTORY_MATCH} ${CLASS_FILE_HISTORY_CURRENT}`;
+
+function withHighlightClass(baseClass: string, highlightClass: string | null): string {
+  if (highlightClass === null) return baseClass;
+  return baseClass === "" ? highlightClass : `${baseClass} ${highlightClass}`;
+}
 
 interface UnavailablePoint {
   connectsTo: VertexOrNull;
@@ -279,7 +292,13 @@ export class Vertex {
   public setStash() {
     this._isStash = true;
   }
-  public draw(svg: SVGElement, config: Config, expandOffset: boolean) {
+  public draw(
+    svg: SVGElement,
+    config: Config,
+    expandOffset: boolean,
+    hash: string,
+    highlightClass: string | null
+  ) {
     if (this.onBranch === null) return;
 
     let colour = this.isCommitted
@@ -294,14 +313,16 @@ export class Vertex {
       outerCircle.setAttribute("cy", cy);
       outerCircle.setAttribute("r", "4");
       outerCircle.setAttribute("fill", colour);
-      outerCircle.setAttribute("class", "stashOuter");
+      outerCircle.setAttribute("data-hash", hash);
+      outerCircle.setAttribute("class", withHighlightClass("stashOuter", highlightClass));
       svg.appendChild(outerCircle);
 
       let innerCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
       innerCircle.setAttribute("cx", cx);
       innerCircle.setAttribute("cy", cy);
       innerCircle.setAttribute("r", "2");
-      innerCircle.setAttribute("class", "stashInner");
+      innerCircle.setAttribute("data-hash", hash);
+      innerCircle.setAttribute("class", withHighlightClass("stashInner", highlightClass));
       innerCircle.setAttribute("stroke", colour);
       svg.appendChild(innerCircle);
     } else {
@@ -309,10 +330,12 @@ export class Vertex {
       circle.setAttribute("cx", cx);
       circle.setAttribute("cy", cy);
       circle.setAttribute("r", "4");
+      circle.setAttribute("data-hash", hash);
       if (this.isCurrent) {
-        circle.setAttribute("class", "current");
+        circle.setAttribute("class", withHighlightClass("current", highlightClass));
         circle.setAttribute("stroke", colour);
       } else {
+        if (highlightClass !== null) circle.setAttribute("class", highlightClass);
         circle.setAttribute("fill", colour);
       }
       svg.appendChild(circle);
@@ -335,6 +358,7 @@ export class Graph {
   private availableColours: number[] = [];
   private commits: GG.GitCommitNode[] = [];
   private commitLookup: { [hash: string]: number } = {};
+  private fileHistoryHighlight: GraphFileHistoryHighlight | null = null;
 
   constructor(id: string, config: Config) {
     this.config = config;
@@ -409,17 +433,39 @@ export class Graph {
     }
   }
 
+  public setFileHistoryHighlight(highlight: GraphFileHistoryHighlight | null): void {
+    this.fileHistoryHighlight = highlight;
+  }
+
+  private getFileHistoryHighlightClass(hash: string): string | null {
+    const highlight = this.fileHistoryHighlight;
+    if (highlight === null) return null;
+    if (highlight.currentHash === hash) return CLASS_FILE_HISTORY_MATCH_CURRENT;
+    return highlight.matchHashes.has(hash) ? CLASS_FILE_HISTORY_MATCH : CLASS_FILE_HISTORY_DIM;
+  }
+
   public render(expandedCommit: ExpandedCommit | null) {
     let group = <SVGGElement>document.createElementNS("http://www.w3.org/2000/svg", "g"),
       i,
       width = this.getWidth();
     group.setAttribute("mask", "url(#GraphMask)");
+    this.svg.setAttribute(
+      "class",
+      this.fileHistoryHighlight !== null ? CLASS_FILE_HISTORY_MODE : ""
+    );
 
     for (i = 0; i < this.branches.length; i++) {
       this.branches[i].draw(group, this.config, expandedCommit !== null ? expandedCommit.id : -1);
     }
     for (i = 0; i < this.vertices.length; i++) {
-      this.vertices[i].draw(group, this.config, expandedCommit !== null && i > expandedCommit.id);
+      const hash = this.commits[i].hash;
+      this.vertices[i].draw(
+        group,
+        this.config,
+        expandedCommit !== null && i > expandedCommit.id,
+        hash,
+        this.getFileHistoryHighlightClass(hash)
+      );
     }
 
     if (this.svgGroup !== null) this.svg.removeChild(this.svgGroup);

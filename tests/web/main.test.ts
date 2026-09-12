@@ -8,8 +8,32 @@ import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 /* Hoisted mocks (shared references for mock factories + assertions)  */
 /* ------------------------------------------------------------------ */
 
-const { mockFindWidgetInstance, capturedConfig, mockMutedResult, mockGraphNavigation } = vi.hoisted(
-  () => ({
+const {
+  mockFindWidgetInstance,
+  capturedConfig,
+  mockMutedResult,
+  mockGraphNavigation,
+  mockGraphHighlight,
+  mockFileHistoryInstance,
+  capturedFileHistoryCallbacks,
+  mockFileHistoryConstructor
+} = vi.hoisted(() => {
+  const capturedFileHistoryCallbacks = {
+    ref: null as Record<string, (...args: never[]) => unknown> | null
+  };
+  const mockFileHistoryInstance = {
+    request: vi.fn(),
+    handleResponse: vi.fn(),
+    onCommitsRendered: vi.fn(),
+    onRepositoryChanged: vi.fn(),
+    handleCommitRowClick: vi.fn(),
+    exit: vi.fn(),
+    isActive: vi.fn((): boolean => false),
+    isPending: vi.fn((): boolean => false),
+    getCurrentHash: vi.fn((): string | null => null),
+    getHistoricalPathFor: vi.fn((): string | null => null)
+  };
+  return {
     capturedConfig: { ref: null as Record<string, unknown> | null },
     mockMutedResult: { value: [] as boolean[] },
     mockGraphNavigation: {
@@ -18,6 +42,19 @@ const { mockFindWidgetInstance, capturedConfig, mockMutedResult, mockGraphNaviga
       getAlternativeParentIndex: vi.fn((): number => -1),
       getAlternativeChildIndex: vi.fn((): number => -1)
     },
+    mockGraphHighlight: {
+      render: vi.fn(),
+      setFileHistoryHighlight: vi.fn()
+    },
+    mockFileHistoryInstance,
+    capturedFileHistoryCallbacks,
+    // A hoisted constructor keeps its call history across vi.resetModules() re-imports.
+    mockFileHistoryConstructor: vi.fn(function (
+      callbacks: Record<string, (...args: never[]) => unknown>
+    ) {
+      capturedFileHistoryCallbacks.ref = callbacks;
+      return mockFileHistoryInstance;
+    }),
     mockFindWidgetInstance: {
       show: vi.fn(),
       close: vi.fn(),
@@ -34,8 +71,18 @@ const { mockFindWidgetInstance, capturedConfig, mockMutedResult, mockGraphNaviga
       restoreState: vi.fn(),
       getCurrentHash: vi.fn(() => null)
     }
-  })
-);
+  };
+});
+
+/* ------------------------------------------------------------------ */
+/* Mock: fileHistory module (controller is observed, not executed)   */
+/* ------------------------------------------------------------------ */
+
+vi.mock("../../web/fileHistory", () => ({
+  CLASS_FILE_HISTORY_CURRENT: "fileHistoryCurrent",
+  CLASS_FILE_HISTORY_NOTE: "fileHistoryNote",
+  FileHistoryController: mockFileHistoryConstructor
+}));
 
 /* ------------------------------------------------------------------ */
 /* Mock: dialogs module (prevents document.getElementById side effect) */
@@ -85,7 +132,7 @@ vi.mock("../../web/graph", () => ({
     capturedConfig.ref = config;
     return {
       loadCommits: vi.fn(),
-      render: vi.fn(),
+      render: mockGraphHighlight.render,
       clear: vi.fn(),
       getVertexColour: vi.fn(() => 0),
       getMutedCommits: vi.fn(() => mockMutedResult.value),
@@ -95,7 +142,8 @@ vi.mock("../../web/graph", () => ({
       getAlternativeChildIndex: mockGraphNavigation.getAlternativeChildIndex,
       getWidth: vi.fn(() => 100),
       getHeight: vi.fn(() => 500),
-      limitMaxWidth: vi.fn()
+      limitMaxWidth: vi.fn(),
+      setFileHistoryHighlight: mockGraphHighlight.setFileHistoryHighlight
     };
   })
 }));
@@ -948,7 +996,8 @@ function setupTestDOM(): void {
     '<div id="branchCleanupPanel" hidden></div>',
     '<div id="fetchBtn"></div>',
     '<div id="currentBtn"></div>',
-    '<div id="searchBtn"></div>'
+    '<div id="searchBtn"></div>',
+    '<div id="controls"></div>'
   ].join("");
 }
 
@@ -6097,145 +6146,138 @@ describe("file row context menu handler", () => {
   const DELETED_FILE_HTML =
     '<table><tr class="gitFile D" data-oldfilepath="src%2Fdeleted.ts" data-newfilepath="src%2Fdeleted.ts" data-type="D"><td></td></tr></table>';
 
-  // TC-207: tree 表示の .gitFile 行を右クリックで showContextMenu が呼ばれる
-  it("shows context menu with single 'Open File' item on tree row right click (TC-207)", () => {
+  // @see docs/testing/perspectives/web/main-test/06-file-actions-01.md
+  function rightClickFirstFileRow(): Element {
+    const fileRow = document.querySelector(".gitFile");
+    expect(fileRow).not.toBeNull();
+    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    return fileRow!;
+  }
+
+  function shownMenuItems(): ContextMenuElement[] {
+    expect(liveShowContextMenu).toHaveBeenCalledTimes(1);
+    return vi.mocked(liveShowContextMenu).mock.calls[0][1];
+  }
+
+  it("shows the two-item menu on a tree row right click (TC-342)", () => {
+    // Case: TC-342
     // Given: a commit is expanded with a tree view file list
     expandCommitWithFiles(COMMIT_HASH_1, TREE_FILE_HTML);
 
     // When: the .gitFile row is right-clicked
-    const fileRow = document.querySelector(".gitFile");
-    expect(fileRow).not.toBeNull();
-    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    const fileRow = rightClickFirstFileRow();
 
-    // Then: showContextMenu is called with 1 item titled "Open File"
-    expect(liveShowContextMenu).toHaveBeenCalledTimes(1);
-    const items = vi.mocked(liveShowContextMenu).mock.calls[0][1];
-    expect(items).toHaveLength(1);
-    expect(items[0]).not.toBeNull();
+    // Then: showContextMenu runs once with the row as sourceElem and the fixed two items
+    const items = shownMenuItems();
+    expect(items).toHaveLength(2);
     expect(items[0]!.title).toBe("Open File");
-    // sourceElem is the .gitFile row
-    const sourceElem = vi.mocked(liveShowContextMenu).mock.calls[0][2];
-    expect(sourceElem).toBe(fileRow);
+    expect(items[1]!.title).toBe("Highlight File History");
+    expect(vi.mocked(liveShowContextMenu).mock.calls[0][2]).toBe(fileRow);
   });
 
-  // TC-208: list 表示の .gitFile 行を右クリックでも同じ menu が出る
-  it("shows context menu with single 'Open File' item on list row right click (TC-208)", () => {
+  it("shows the same two-item menu on a list row right click (TC-343)", () => {
+    // Case: TC-343
     // Given: a commit is expanded with a list view file list
     expandCommitWithFiles(COMMIT_HASH_1, LIST_FILE_HTML);
 
     // When: the .gitFile row is right-clicked
-    const fileRow = document.querySelector(".gitFile");
-    expect(fileRow).not.toBeNull();
-    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    rightClickFirstFileRow();
 
-    // Then: showContextMenu is called with the same single-item menu
-    expect(liveShowContextMenu).toHaveBeenCalledTimes(1);
-    const items = vi.mocked(liveShowContextMenu).mock.calls[0][1];
-    expect(items).toHaveLength(1);
+    // Then: the same two-item menu is passed
+    const items = shownMenuItems();
+    expect(items).toHaveLength(2);
     expect(items[0]!.title).toBe("Open File");
+    expect(items[1]!.title).toBe("Highlight File History");
   });
 
-  // TC-209: right click 時に preventDefault/stopPropagation が適用され viewDiff が送られない
-  it("prevents default and does not send viewDiff on right click (TC-209)", () => {
+  it("prevents default and does not send viewDiff on right click (TC-344)", () => {
+    // Case: TC-344
     // Given: a commit is expanded with a gitDiffPossible file row
     expandCommitWithFiles(COMMIT_HASH_1, TREE_FILE_HTML);
 
     // When: the .gitFile row is right-clicked
-    const fileRow = document.querySelector(".gitFile");
-    expect(fileRow).not.toBeNull();
-    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    document.querySelector(".gitFile")!.dispatchEvent(event);
 
-    // Then: viewDiff is not sent via postMessage
+    // Then: the default action is prevented and viewDiff is not sent
+    expect(event.defaultPrevented).toBe(true);
     expect(liveVscode.postMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({ command: "viewDiff" })
     );
   });
 
-  // TC-210: deleted file row でも showContextMenu が呼ばれ items は 1 件
-  it("shows context menu for deleted file row without openFile icon (TC-210)", () => {
-    // Given: a commit is expanded with a deleted file row (no .openFile icon)
+  it("shows the two-item menu for a deleted file row without an openFile icon (TC-345)", () => {
+    // Case: TC-345
+    // Given: a commit is expanded with a deleted file row (type D, no .openFile icon)
     expandCommitWithFiles(COMMIT_HASH_1, DELETED_FILE_HTML);
 
     // When: the deleted .gitFile row is right-clicked
-    const fileRow = document.querySelector(".gitFile");
-    expect(fileRow).not.toBeNull();
-    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    rightClickFirstFileRow();
 
-    // Then: showContextMenu is still called with 1 item
-    expect(liveShowContextMenu).toHaveBeenCalledTimes(1);
-    const items = vi.mocked(liveShowContextMenu).mock.calls[0][1];
-    expect(items).toHaveLength(1);
+    // Then: showContextMenu is still called and D keeps both items
+    const items = shownMenuItems();
+    expect(items).toHaveLength(2);
     expect(items[0]!.title).toBe("Open File");
+    expect(items[1]!.title).toBe("Highlight File History");
   });
 
-  // TC-211: menu item の onClick で openFile payload が送られ viewDiff は送られない
-  it("sends openFile payload when menu item onClick is invoked (TC-211)", () => {
-    // Given: a commit is expanded and right-click menu is shown
+  it("sends openFile payload when the Open File item is selected (TC-346)", () => {
+    // Case: TC-346
+    // Given: a commit is expanded and the right-click menu is shown
     expandCommitWithFiles(COMMIT_HASH_1, TREE_FILE_HTML);
-    const fileRow = document.querySelector(".gitFile");
-    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    rightClickFirstFileRow();
 
-    // When: the menu item's onClick is invoked
-    const items = vi.mocked(liveShowContextMenu).mock.calls[0][1];
-    items[0]!.onClick();
+    // When: the Open File item's onClick is invoked
+    shownMenuItems()[0]!.onClick();
 
-    // Then: openFile payload is sent
+    // Then: the openFile payload is sent and viewDiff is not
     expect(liveVscode.postMessage).toHaveBeenCalledWith({
       command: "openFile",
       repo: TEST_REPO,
       filePath: "src/file.ts",
       commitHash: COMMIT_HASH_1
     });
-    // And viewDiff is not sent
     expect(liveVscode.postMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({ command: "viewDiff" })
     );
   });
 
-  // TC-212: expandedCommit が null の状態では showContextMenu が呼ばれない
-  it("does not show context menu when expandedCommit is null (TC-212)", () => {
+  it("does not show a context menu when expandedCommit is null (TC-347)", () => {
+    // Case: TC-347
     // Given: a commit is expanded then collapsed (expandedCommit becomes null)
     expandCommitWithFiles(COMMIT_HASH_1, TREE_FILE_HTML);
     clickCommit(COMMIT_HASH_1);
     vi.clearAllMocks();
+    const container = document.getElementById("commitTable")!;
+    const li = document.createElement("li");
+    li.className = "gitFile M";
+    li.dataset.newfilepath = "src%2Ffile.ts";
+    container.appendChild(li);
 
-    // Inject a .gitFile element manually for testing
-    const container = document.getElementById("commitTable");
-    if (container) {
-      const li = document.createElement("li");
-      li.className = "gitFile M";
-      li.dataset.newfilepath = "src%2Ffile.ts";
-      container.appendChild(li);
-    }
+    // When: the injected .gitFile row is right-clicked without an expanded commit
+    li.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
 
-    // When: the .gitFile row is right-clicked (but expandedCommit is null)
-    const fileRow = document.querySelector(".gitFile");
-    if (fileRow) {
-      fileRow.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
-    }
-
-    // Then: showContextMenu is not called and no message is sent
+    // Then: showContextMenu is not called and no openFile message is sent
     expect(liveShowContextMenu).not.toHaveBeenCalled();
     expect(liveVscode.postMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({ command: "openFile" })
     );
   });
 
-  // TC-213: items が Open File のみで divider や追加 action を含まない
-  it("menu items contain only 'Open File' with no dividers or extras (TC-213)", () => {
-    // Given: a valid file row with expanded commit
+  it("passes exactly Open File and Highlight File History with no dividers (TC-348)", () => {
+    // Case: TC-348
+    // Given: a valid file row with an expanded commit
     expandCommitWithFiles(COMMIT_HASH_1, TREE_FILE_HTML);
 
     // When: the .gitFile row is right-clicked
-    const fileRow = document.querySelector(".gitFile");
-    expect(fileRow).not.toBeNull();
-    fileRow!.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    rightClickFirstFileRow();
 
-    // Then: items array has exactly 1 non-null element and no dividers
-    const items = vi.mocked(liveShowContextMenu).mock.calls[0][1];
-    expect(items).toHaveLength(1);
-    expect(items.every((item) => item !== null)).toBe(true);
-    expect(items[0]!.title).toBe("Open File");
+    // Then: the items are exactly the two titles in order, with no null divider
+    const items = shownMenuItems();
+    expect(items.map((item) => (item === null ? null : item.title))).toEqual([
+      "Open File",
+      "Highlight File History"
+    ]);
   });
 });
 
@@ -7397,5 +7439,684 @@ describe("Branch cleanup panel wiring (S49)", () => {
     // Then: the exported showDeleteBranchDialog runs once with the exact arguments
     expect(freshShowDeleteBranchDialog).toHaveBeenCalledTimes(1);
     expect(freshShowDeleteBranchDialog).toHaveBeenCalledWith("/repo", "feature/x", ["origin"]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S50 / S51: file history controller wiring and CDV file rows        */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/main-test/10-file-history-01.md
+describe("File history integration (S50 / S51)", () => {
+  const STASH_HASH = "eee555eee555eee5";
+  const OTHER_REPO = "/test/other-repo";
+  const FILE_HISTORY_NOTE_TEXT =
+    "This file's change is not part of the diff against the first parent.";
+  const HISTORICAL_PATH = "src/a.txt";
+  const MATCH_TREE_HTML =
+    '<table><tr class="gitFile M gitDiffPossible" data-oldfilepath="src%2Fa.txt" data-newfilepath="src%2Fa.txt" data-type="M"><td>a</td></tr></table>';
+  const OTHER_TREE_HTML =
+    '<table><tr class="gitFile M gitDiffPossible" data-oldfilepath="src%2Fb.txt" data-newfilepath="src%2Fb.txt" data-type="M"><td>b</td></tr></table>';
+  const MATCH_LIST_HTML =
+    '<ul class="gitFolderContents"><li class="gitFile M gitDiffPossible" data-oldfilepath="src%2Fa.txt" data-newfilepath="src%2Fa.txt" data-type="M">a</li></ul>';
+  const OTHER_LIST_HTML =
+    '<ul class="gitFolderContents"><li class="gitFile M gitDiffPossible" data-oldfilepath="src%2Fb.txt" data-newfilepath="src%2Fb.txt" data-type="M">b</li></ul>';
+  const FILE_HISTORY_CALLBACK_NAMES = [
+    "getCommits",
+    "getCommitId",
+    "getCurrentRepo",
+    "getExpandedCommit",
+    "getScrollTop",
+    "setScrollTop",
+    "hideCommitDetails",
+    "restoreExpandedCommit",
+    "scrollToCommit",
+    "closeFindWidget",
+    "setGraphHighlight"
+  ];
+  const EMPTY_FILE_TREE: GitFolder = {
+    type: "folder",
+    name: "",
+    folderPath: "",
+    contents: {},
+    open: true
+  };
+  const COMMITS_WITH_STASH: GitCommitNode[] = [
+    ...MOCK_COMMITS,
+    {
+      hash: STASH_HASH,
+      parentHashes: [COMMIT_HASH_3],
+      author: "Dave",
+      email: "dave@test.com",
+      date: 1700003000,
+      message: "WIP on main",
+      refs: [],
+      stash: { selector: "stash@{0}", baseHash: COMMIT_HASH_3, untrackedFilesHash: null }
+    }
+  ];
+
+  let liveVscode: typeof vscode;
+  let liveFileTreeHtml: typeof generateGitFileTreeHtml;
+  let liveFileListHtml: typeof generateGitFileListHtml;
+  let liveBuildFileContextMenuItems: ReturnType<typeof vi.fn>;
+  let liveKeydownHandler: (event: KeyboardEvent) => void;
+  let constructorCallsDuringImport = 0;
+
+  function callbacks(): Record<string, (...args: never[]) => unknown> {
+    expect(capturedFileHistoryCallbacks.ref).not.toBeNull();
+    return capturedFileHistoryCallbacks.ref!;
+  }
+
+  function postedCommands(): string[] {
+    return vi
+      .mocked(liveVscode.postMessage)
+      .mock.calls.map((call) => (call[0] as { command: string }).command);
+  }
+
+  function postMessageOrderOf(command: string): number {
+    const index = postedCommands().indexOf(command);
+    expect(index).toBeGreaterThanOrEqual(0);
+    return vi.mocked(liveVscode.postMessage).mock.invocationCallOrder[index];
+  }
+
+  function loadCommitsWithStash(): void {
+    dispatchMessage({
+      command: "loadCommits",
+      commits: COMMITS_WITH_STASH,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+  }
+
+  function expandCommitWithTree(hash: string, treeHtml: string): void {
+    vi.mocked(liveFileTreeHtml).mockReturnValueOnce(treeHtml);
+    clickCommit(hash);
+    dispatchMessage({ command: "commitDetails", commitDetails: makeCommitDetails(hash) });
+  }
+
+  function currentFileRows(): NodeListOf<Element> {
+    return document.querySelectorAll(".gitFile.fileHistoryCurrent");
+  }
+
+  function notes(): NodeListOf<Element> {
+    return document.querySelectorAll(".fileHistoryNote");
+  }
+
+  function resetFileHistoryMocks(): void {
+    mockFileHistoryInstance.isActive.mockReturnValue(false);
+    mockFileHistoryInstance.isPending.mockReturnValue(false);
+    mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(null);
+  }
+
+  beforeAll(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    capturedRepoCallback = null;
+    capturedBranchCallback = null;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    liveVscode = utilsMod.vscode;
+    vi.mocked(liveVscode.getState).mockReturnValueOnce(null);
+
+    const fileTreeMod = await import("../../web/fileTree");
+    liveFileTreeHtml = fileTreeMod.generateGitFileTreeHtml;
+    liveFileListHtml = fileTreeMod.generateGitFileListHtml;
+
+    // The real fileMenu builder is wrapped so the arguments passed by main.ts can be observed.
+    vi.doMock("../../web/fileMenu", async (importOriginal) => {
+      const actual = await importOriginal<typeof import("../../web/fileMenu")>();
+      return { ...actual, buildFileContextMenuItems: vi.fn(actual.buildFileContextMenuItems) };
+    });
+    const fileMenuMod = await import("../../web/fileMenu");
+    liveBuildFileContextMenuItems = vi.mocked(
+      fileMenuMod.buildFileContextMenuItems
+    ) as unknown as ReturnType<typeof vi.fn>;
+
+    // Earlier describes left their own keydown listeners on document; capture the one this
+    // import registers so TC-324 can drive only the current view instance.
+    const addListenerSpy = vi.spyOn(document, "addEventListener");
+    const constructorCallsBefore = mockFileHistoryConstructor.mock.calls.length;
+    await import("../../web/main");
+    constructorCallsDuringImport =
+      mockFileHistoryConstructor.mock.calls.length - constructorCallsBefore;
+    const keydownRegistration = addListenerSpy.mock.calls.find((call) => call[0] === "keydown");
+    addListenerSpy.mockRestore();
+    expect(keydownRegistration).toBeDefined();
+    liveKeydownHandler = keydownRegistration![1] as (event: KeyboardEvent) => void;
+    loadTestCommits();
+  });
+
+  beforeEach(() => {
+    resetCommitState();
+    resetFileHistoryMocks();
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.doUnmock("../../web/fileMenu");
+  });
+
+  describe("controller wiring (S50)", () => {
+    it("constructs the controller once with the eleven callbacks (TC-316)", () => {
+      // Case: TC-316
+      // Given: the module bootstrap constructed the view once
+      // Then: exactly one controller with the eleven named callbacks
+      expect(constructorCallsDuringImport).toBe(1);
+      const wired = callbacks();
+      expect(Object.keys(wired).sort()).toEqual([...FILE_HISTORY_CALLBACK_NAMES].sort());
+      for (const name of FILE_HISTORY_CALLBACK_NAMES) {
+        expect(typeof wired[name], name).toBe("function");
+      }
+    });
+
+    it("resolves getCommitId to the lookup index or null (TC-317)", () => {
+      // Case: TC-317
+      // Given: the loaded commits
+      const wired = callbacks();
+
+      // When: a known and an unknown hash are resolved
+      const known = (wired.getCommitId as (hash: string) => number | null)(COMMIT_HASH_2);
+      const unknown = (wired.getCommitId as (hash: string) => number | null)("zzz");
+
+      // Then: a numeric index for the known hash, null (not undefined) for the unknown one
+      expect(known).toBe(1);
+      expect(typeof known).toBe("number");
+      expect(unknown).toBeNull();
+    });
+
+    it("forwards setGraphHighlight to the graph and re-renders it (TC-318)", () => {
+      // Case: TC-318
+      // Given: a highlight object
+      const highlight = { matchHashes: new Set([COMMIT_HASH_1]), currentHash: COMMIT_HASH_1 };
+
+      // When: the wired callback runs
+      (callbacks().setGraphHighlight as (h: GraphFileHistoryHighlight) => void)(highlight);
+
+      // Then: graph.setFileHistoryHighlight receives the same object once, then graph.render runs once
+      expect(mockGraphHighlight.setFileHistoryHighlight).toHaveBeenCalledTimes(1);
+      expect(mockGraphHighlight.setFileHistoryHighlight).toHaveBeenCalledWith(highlight);
+      expect(mockGraphHighlight.render).toHaveBeenCalledTimes(1);
+      expect(mockGraphHighlight.setFileHistoryHighlight.mock.invocationCallOrder[0]).toBeLessThan(
+        mockGraphHighlight.render.mock.invocationCallOrder[0]
+      );
+    });
+
+    it("calls onCommitsRendered once after the table is re-rendered (TC-319)", () => {
+      // Case: TC-319
+      // Given: a loadCommits response
+      // When: render() completes
+      let rowsAtHook = 0;
+      mockFileHistoryInstance.onCommitsRendered.mockImplementationOnce(() => {
+        rowsAtHook = document.querySelectorAll(".commit").length;
+      });
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+
+      // Then: the hook runs once and sees the regenerated rows
+      expect(mockFileHistoryInstance.onCommitsRendered).toHaveBeenCalledTimes(1);
+      expect(rowsAtHook).toBe(MOCK_COMMITS.length);
+    });
+
+    it("does not call onCommitsRendered for the loading render (TC-320)", () => {
+      // Case: TC-320
+      // Given: a branch dropdown change that only triggers renderShowLoading()
+      // When: the callback fires
+      capturedBranchCallback!([]);
+
+      // Then: the hook is not called
+      expect(mockFileHistoryInstance.onCommitsRendered).toHaveBeenCalledTimes(0);
+      loadTestCommits();
+    });
+
+    it("calls onRepositoryChanged before the loadBranches request on dropdown change (TC-321)", () => {
+      // Case: TC-321
+      // Given: the repo dropdown callback
+      // When: the current repo is re-selected
+      capturedRepoCallback!(TEST_REPO);
+
+      // Then: the hook runs once, before the loadBranches request is posted
+      expect(mockFileHistoryInstance.onRepositoryChanged).toHaveBeenCalledTimes(1);
+      expect(mockFileHistoryInstance.onRepositoryChanged.mock.invocationCallOrder[0]).toBeLessThan(
+        postMessageOrderOf("loadBranches")
+      );
+      loadTestCommits();
+    });
+
+    it("calls onRepositoryChanged once from selectRepo (TC-322)", () => {
+      // Case: TC-322
+      // Given: a selectRepo message for the registered repo
+      // When: it is handled
+      dispatchMessage({ command: "selectRepo", repo: TEST_REPO });
+
+      // Then: the hook runs once
+      expect(mockFileHistoryInstance.onRepositoryChanged).toHaveBeenCalledTimes(1);
+      loadTestCommits();
+    });
+
+    it("calls onRepositoryChanged when loadRepos replaces the current repo (TC-349)", () => {
+      // Case: TC-349
+      // Given: a repo set that no longer contains the current repo
+      // When: loadRepos delivers it
+      dispatchMessage({
+        command: "loadRepos",
+        repos: { [OTHER_REPO]: { columnWidths: null } },
+        lastActiveRepo: null
+      });
+
+      // Then: the hook runs once, before the hard refresh posts its loadBranches request
+      expect(mockFileHistoryInstance.onRepositoryChanged).toHaveBeenCalledTimes(1);
+      expect(mockFileHistoryInstance.onRepositoryChanged.mock.invocationCallOrder[0]).toBeLessThan(
+        postMessageOrderOf("loadBranches")
+      );
+
+      dispatchMessage({
+        command: "loadRepos",
+        repos: { [TEST_REPO]: { columnWidths: null } },
+        lastActiveRepo: TEST_REPO
+      });
+      loadTestCommits();
+    });
+
+    it("exits the mode before showing the find widget (TC-323)", () => {
+      // Case: TC-323
+      // Given: an active file history mode
+      mockFileHistoryInstance.isActive.mockReturnValue(true);
+
+      // When: the search button is clicked
+      document
+        .getElementById("searchBtn")!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+      // Then: exit(true) runs once before findWidget.show(true)
+      expect(mockFileHistoryInstance.exit).toHaveBeenCalledTimes(1);
+      expect(mockFileHistoryInstance.exit).toHaveBeenCalledWith(true);
+      expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
+      expect(mockFileHistoryInstance.exit.mock.invocationCallOrder[0]).toBeLessThan(
+        mockFindWidgetInstance.show.mock.invocationCallOrder[0]
+      );
+    });
+
+    it("exits a pending request when the find keybinding is pressed (TC-324)", () => {
+      // Case: TC-324
+      // Given: only a pending request
+      mockFileHistoryInstance.isPending.mockReturnValue(true);
+
+      // When: the find keybinding reaches this view's keydown handler
+      liveKeydownHandler(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }));
+
+      // Then: exit(true) once and show(true) once
+      expect(mockFileHistoryInstance.exit).toHaveBeenCalledTimes(1);
+      expect(mockFileHistoryInstance.exit).toHaveBeenCalledWith(true);
+      expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(1);
+      expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
+    });
+
+    it("opens the find widget without exit outside the mode (TC-325)", () => {
+      // Case: TC-325
+      // Given: neither active nor pending
+      // When: the search button is clicked
+      document
+        .getElementById("searchBtn")!
+        .dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+      // Then: no exit and one show(true)
+      expect(mockFileHistoryInstance.exit).toHaveBeenCalledTimes(0);
+      expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(1);
+      expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
+    });
+
+    it("calls handleCommitRowClick before the commitDetails request (TC-326)", () => {
+      // Case: TC-326
+      // Given: a rendered commit row
+      // When: it is clicked
+      clickCommit(COMMIT_HASH_2);
+
+      // Then: the hook runs once with the hash, before the commitDetails request is posted
+      expect(mockFileHistoryInstance.handleCommitRowClick).toHaveBeenCalledTimes(1);
+      expect(mockFileHistoryInstance.handleCommitRowClick).toHaveBeenCalledWith(COMMIT_HASH_2);
+      expect(mockFileHistoryInstance.handleCommitRowClick.mock.invocationCallOrder[0]).toBeLessThan(
+        postMessageOrderOf("commitDetails")
+      );
+    });
+
+    it("does not call handleCommitRowClick for the uncommitted changes row (TC-327)", () => {
+      // Case: TC-327
+      // Given: an uncommitted changes row
+      dispatchMessage({
+        command: "loadCommits",
+        commits: [
+          {
+            hash: UNCOMMITTED_CHANGES_HASH,
+            parentHashes: [COMMIT_HASH_1],
+            author: "*",
+            email: "",
+            date: 1700004000,
+            message: "Uncommitted Changes",
+            refs: [],
+            stash: null
+          },
+          ...MOCK_COMMITS
+        ],
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true
+      });
+      vi.clearAllMocks();
+
+      // When: the uncommitted row is clicked
+      clickUnsavedChanges();
+
+      // Then: the hook is not called while the existing request still goes out
+      expect(mockFileHistoryInstance.handleCommitRowClick).toHaveBeenCalledTimes(0);
+      expect(liveVscode.postMessage).toHaveBeenCalled();
+    });
+
+    it("passes the expanded commit, repo and a non-stash context to the file menu (TC-328)", () => {
+      // Case: TC-328
+      // Given: a normal commit expanded with a file row
+      expandCommitWithTree(COMMIT_HASH_1, MATCH_TREE_HTML);
+      vi.clearAllMocks();
+
+      // When: the file row is right-clicked
+      document
+        .querySelector(".gitFile")!
+        .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+      // Then: the builder is called once with expandedCommit, currentRepo and the context shape
+      expect(liveBuildFileContextMenuItems).toHaveBeenCalledTimes(1);
+      const args = liveBuildFileContextMenuItems.mock.calls[0];
+      expect(args[1]).toBe(callbacks().getExpandedCommit());
+      expect(args[2]).toBe(TEST_REPO);
+      expect(args[3].isStash).toBe(false);
+      expect(typeof args[3].onHighlightFileHistory).toBe("function");
+    });
+
+    it("flags a stash commit in the file menu context (TC-329)", () => {
+      // Case: TC-329
+      // Given: a stash commit expanded with a file row
+      loadCommitsWithStash();
+      expandCommitWithTree(STASH_HASH, MATCH_TREE_HTML);
+      vi.clearAllMocks();
+
+      // When: the file row is right-clicked
+      document
+        .querySelector(".gitFile")!
+        .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+
+      // Then: isStash is true
+      expect(liveBuildFileContextMenuItems).toHaveBeenCalledTimes(1);
+      expect(liveBuildFileContextMenuItems.mock.calls[0][3].isStash).toBe(true);
+    });
+
+    it("connects onHighlightFileHistory to controller.request (TC-330)", () => {
+      // Case: TC-330
+      // Given: the context passed for a normal commit
+      expandCommitWithTree(COMMIT_HASH_1, MATCH_TREE_HTML);
+      vi.clearAllMocks();
+      document
+        .querySelector(".gitFile")!
+        .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+      const context = liveBuildFileContextMenuItems.mock.calls[0][3];
+
+      // When: the callback is invoked
+      context.onHighlightFileHistory("h", "p");
+
+      // Then: controller.request("h", "p") runs once
+      expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(1);
+      expect(mockFileHistoryInstance.request).toHaveBeenCalledWith("h", "p");
+    });
+
+    it("delegates loadFileHistory to handleResponse with the same object (TC-331)", () => {
+      // Case: TC-331
+      // Given: a fileHistory response message
+      const response = {
+        command: "fileHistory",
+        repo: TEST_REPO,
+        requestId: 1,
+        anchorHash: COMMIT_HASH_1,
+        filePath: HISTORICAL_PATH,
+        entries: []
+      };
+
+      // When: it is dispatched through the message handler
+      dispatchMessage(response);
+
+      // Then: handleResponse receives the identical object once
+      expect(mockFileHistoryInstance.handleResponse).toHaveBeenCalledTimes(1);
+      expect(mockFileHistoryInstance.handleResponse.mock.calls[0][0]).toBe(response);
+    });
+  });
+
+  describe("restoreExpandedCommit() (S51)", () => {
+    function restore(snapshot: FileHistoryExpandedSnapshot): boolean {
+      return (callbacks().restoreExpandedCommit as (s: FileHistoryExpandedSnapshot) => boolean)(
+        snapshot
+      );
+    }
+
+    function expanded(): ExpandedCommit | null {
+      return (callbacks().getExpandedCommit as () => ExpandedCommit | null)();
+    }
+
+    it("re-resolves the row and shows the details from the snapshot (TC-332)", () => {
+      // Case: TC-332
+      // Given: a rendered row for the snapshot hash
+      const details = makeCommitDetails(COMMIT_HASH_1);
+
+      // When: the snapshot is restored
+      const result = restore({
+        hash: COMMIT_HASH_1,
+        compareWithHash: null,
+        commitDetails: details,
+        fileTree: EMPTY_FILE_TREE
+      });
+
+      // Then: true, details after the row, srcElem is the current DOM row, values from the snapshot
+      expect(result).toBe(true);
+      const row = document.querySelector<HTMLElement>(`.commit[data-hash="${COMMIT_HASH_1}"]`)!;
+      expect(row.nextElementSibling!.id).toBe("commitDetails");
+      const state = expanded()!;
+      expect(state.srcElem).toBe(row);
+      expect(state.commitDetails).toBe(details);
+      expect(state.fileTree).toBe(EMPTY_FILE_TREE);
+      expect(state.loading).toBe(false);
+    });
+
+    it("re-resolves the compare row and marks it (TC-333)", () => {
+      // Case: TC-333
+      // Given: rows for both the snapshot hash and the compare hash
+      // When: the snapshot is restored
+      const result = restore({
+        hash: COMMIT_HASH_1,
+        compareWithHash: COMMIT_HASH_2,
+        commitDetails: makeCommitDetails(COMMIT_HASH_1),
+        fileTree: EMPTY_FILE_TREE
+      });
+
+      // Then: the compare row gets compareTarget and is the compareWithSrcElem
+      expect(result).toBe(true);
+      const compareRow = document.querySelector<HTMLElement>(
+        `.commit[data-hash="${COMMIT_HASH_2}"]`
+      )!;
+      expect(compareRow.classList.contains("compareTarget")).toBe(true);
+      expect(expanded()!.compareWithSrcElem).toBe(compareRow);
+      expect(expanded()!.compareWithHash).toBe(COMMIT_HASH_2);
+    });
+
+    it("restores the details alone when the compare row is unloaded (TC-334)", () => {
+      // Case: TC-334
+      // Given: a compare hash that is not rendered
+      // When: the snapshot is restored
+      const result = restore({
+        hash: COMMIT_HASH_1,
+        compareWithHash: "0000000000000000",
+        commitDetails: makeCommitDetails(COMMIT_HASH_1),
+        fileTree: EMPTY_FILE_TREE
+      });
+
+      // Then: true, compareWithSrcElem null, no compareTarget row, details shown
+      expect(result).toBe(true);
+      expect(expanded()!.compareWithSrcElem).toBeNull();
+      expect(document.querySelectorAll(".compareTarget")).toHaveLength(0);
+      expect(document.getElementById("commitDetails")).not.toBeNull();
+    });
+
+    it("returns false and leaves the DOM alone when the row is missing (TC-335)", () => {
+      // Case: TC-335
+      // Given: a snapshot hash that is not rendered
+      const tableBefore = document.getElementById("commitTable")!.innerHTML;
+      const expandedBefore = expanded();
+
+      // When: the snapshot is restored
+      const result = restore({
+        hash: "0000000000000000",
+        compareWithHash: null,
+        commitDetails: makeCommitDetails("0000000000000000"),
+        fileTree: EMPTY_FILE_TREE
+      });
+
+      // Then: false, no details element, expandedCommit and table unchanged
+      expect(result).toBe(false);
+      expect(document.getElementById("commitDetails")).toBeNull();
+      expect(expanded()).toBe(expandedBefore);
+      expect(document.getElementById("commitTable")!.innerHTML).toBe(tableBefore);
+    });
+  });
+
+  describe("applyFileHistoryToFileRows() (S51)", () => {
+    it("highlights the file row whose decoded path matches the historical path (TC-336)", () => {
+      // Case: TC-336
+      // Given: active mode and a historical path that matches the encoded data-newfilepath
+      mockFileHistoryInstance.isActive.mockReturnValue(true);
+      mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
+
+      // When: the commit details view opens
+      expandCommitWithTree(COMMIT_HASH_1, MATCH_TREE_HTML);
+
+      // Then: the matching row gets fileHistoryCurrent and no note is inserted
+      expect(mockFileHistoryInstance.getHistoricalPathFor).toHaveBeenCalledWith(COMMIT_HASH_1);
+      const row = document.querySelector('.gitFile[data-newfilepath="src%2Fa.txt"]')!;
+      expect(row.classList.contains("fileHistoryCurrent")).toBe(true);
+      expect(currentFileRows()).toHaveLength(1);
+      expect(notes()).toHaveLength(0);
+    });
+
+    it("inserts the first parent diff note after the view toggle when no row matches (TC-337)", () => {
+      // Case: TC-337
+      // Given: active mode and a CDV without the historical path
+      mockFileHistoryInstance.isActive.mockReturnValue(true);
+      mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
+
+      // When: the commit details view opens
+      expandCommitWithTree(COMMIT_HASH_1, OTHER_TREE_HTML);
+
+      // Then: exactly one note with the fixed text directly after #fileViewToggle, no highlighted row
+      const noteList = notes();
+      expect(noteList).toHaveLength(1);
+      expect(noteList[0].textContent).toBe(FILE_HISTORY_NOTE_TEXT);
+      expect(document.getElementById("fileViewToggle")!.nextElementSibling).toBe(noteList[0]);
+      expect(currentFileRows()).toHaveLength(0);
+    });
+
+    it("re-applies the highlight and keeps a single note after the view toggle (TC-338)", () => {
+      // Case: TC-338
+      // Given: active mode with a matching tree and list
+      mockFileHistoryInstance.isActive.mockReturnValue(true);
+      mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
+      vi.mocked(liveFileListHtml).mockReturnValueOnce(MATCH_LIST_HTML);
+      expandCommitWithTree(COMMIT_HASH_1, MATCH_TREE_HTML);
+
+      // When: the view is toggled to the list
+      document.getElementById("fileViewToggle")!.click();
+
+      // Then: the list row is highlighted again and there is no note
+      expect(currentFileRows()).toHaveLength(1);
+      expect(notes()).toHaveLength(0);
+
+      // Given: a non-matching tree and list after a reset
+      resetCommitState();
+      resetFileHistoryMocks();
+      mockFileHistoryInstance.isActive.mockReturnValue(true);
+      mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
+      vi.mocked(liveFileTreeHtml).mockReturnValueOnce(OTHER_TREE_HTML);
+      vi.mocked(liveFileListHtml).mockReturnValueOnce(OTHER_LIST_HTML);
+      expandCommitWithTree(COMMIT_HASH_1, OTHER_TREE_HTML);
+      expect(notes()).toHaveLength(1);
+
+      // When: the view is toggled again
+      document.getElementById("fileViewToggle")!.click();
+
+      // Then: still exactly one note right after the toggle and no highlighted row
+      expect(notes()).toHaveLength(1);
+      expect(document.getElementById("fileViewToggle")!.nextElementSibling).toBe(notes()[0]);
+      expect(currentFileRows()).toHaveLength(0);
+    });
+
+    it("applies nothing for a commit without a historical path (TC-339)", () => {
+      // Case: TC-339
+      // Given: active mode but getHistoricalPathFor returns null
+      mockFileHistoryInstance.isActive.mockReturnValue(true);
+
+      // When: the commit details view opens
+      expandCommitWithTree(COMMIT_HASH_1, MATCH_TREE_HTML);
+
+      // Then: no highlighted row and no note
+      expect(currentFileRows()).toHaveLength(0);
+      expect(notes()).toHaveLength(0);
+    });
+
+    it("applies nothing in comparison mode (TC-340)", () => {
+      // Case: TC-340
+      // Given: active mode and an expanded commit compared with another commit
+      mockFileHistoryInstance.isActive.mockReturnValue(true);
+      mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
+      vi.mocked(liveFileTreeHtml).mockReturnValue(MATCH_TREE_HTML);
+      expandCommitWithTree(COMMIT_HASH_1, MATCH_TREE_HTML);
+      clickCommit(COMMIT_HASH_2, { ctrlKey: true });
+
+      // When: the comparison response renders the file list
+      dispatchMessage({
+        command: "compareCommits",
+        fileChanges: [
+          {
+            oldFilePath: HISTORICAL_PATH,
+            newFilePath: HISTORICAL_PATH,
+            type: "M",
+            additions: 1,
+            deletions: 0
+          }
+        ],
+        fromHash: COMMIT_HASH_1,
+        toHash: COMMIT_HASH_2
+      });
+      vi.mocked(liveFileTreeHtml).mockReset();
+      vi.mocked(liveFileTreeHtml).mockReturnValue("<table></table>");
+
+      // Then: the details are open but no row is highlighted and no note is inserted
+      expect(document.getElementById("commitDetails")).not.toBeNull();
+      expect(currentFileRows()).toHaveLength(0);
+      expect(notes()).toHaveLength(0);
+    });
+
+    it("applies nothing while the mode is inactive (TC-341)", () => {
+      // Case: TC-341
+      // Given: inactive mode even though a historical path would resolve
+      mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
+
+      // When: the commit details view opens
+      expandCommitWithTree(COMMIT_HASH_1, MATCH_TREE_HTML);
+
+      // Then: no highlighted row and no note
+      expect(currentFileRows()).toHaveLength(0);
+      expect(notes()).toHaveLength(0);
+    });
   });
 });
