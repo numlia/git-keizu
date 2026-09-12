@@ -4298,6 +4298,119 @@ describe("getWorktrees collection and pinned detached commits (S47)", () => {
     // Then: the response field carries both sides of the porcelain-derived collection
     expect(result.worktrees).toEqual(BRANCH_AND_DETACHED_COLLECTION);
   });
+
+  it("inserts a pinned commit before its parent at the head of the window (TC-364)", async () => {
+    // Case: TC-364
+    // Given: the pinned commit D is a child of A, the first row of the normal log
+    setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a"),
+        makeCommitLine(HASH_B, "", "B", "b@t.com", 2, "b")
+      ),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, HASH_A, "D", "d@t.com", 4, "d"))
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: D precedes A so that every parent still follows its child
+    expect(result.commits.map((commit) => commit.hash)).toEqual([HASH_D, HASH_A, HASH_B]);
+  });
+
+  it("inserts a pinned commit directly before a parent inside the window (TC-365)", async () => {
+    // Case: TC-365
+    // Given: the pinned commit D is a child of B, the second row of the normal log
+    setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a"),
+        makeCommitLine(HASH_B, HASH_C, "B", "b@t.com", 2, "b"),
+        makeCommitLine(HASH_C, "", "C", "c@t.com", 1, "c")
+      ),
+      pinnedOutput: makeLogOutput(makeCommitLine(HASH_D, HASH_B, "D", "d@t.com", 4, "d"))
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: D sits between A and B, and the normal rows keep their relative order
+    expect(result.commits.map((commit) => commit.hash)).toEqual([HASH_A, HASH_D, HASH_B, HASH_C]);
+  });
+
+  it("inserts a pinned merge commit before the earliest of its loaded parents (TC-366)", async () => {
+    // Case: TC-366
+    // Given: the pinned merge commit D has parents B and A, and A is the first row
+    setupDetachedSpawn({
+      porcelain: BRANCH_AND_DETACHED_PORCELAIN,
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_C, "A", "a@t.com", 3, "a"),
+        makeCommitLine(HASH_B, HASH_C, "B", "b@t.com", 2, "b"),
+        makeCommitLine(HASH_C, "", "C", "c@t.com", 1, "c")
+      ),
+      pinnedOutput: makeLogOutput(
+        makeCommitLine(HASH_D, `${HASH_B} ${HASH_A}`, "D", "d@t.com", 4, "d")
+      )
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: D precedes A (the earliest loaded parent), not only B
+    expect(result.commits.map((commit) => commit.hash)).toEqual([HASH_D, HASH_A, HASH_B, HASH_C]);
+    expect(result.commits[0].parentHashes).toEqual([HASH_B, HASH_A]);
+  });
+
+  it("keeps a pinned child before its pinned parent when the child is listed first (TC-367)", async () => {
+    // Case: TC-367
+    // Given: two detached heads C (child of D) and D (child of A), both outside the window,
+    // and the pinned query lists the child C before its parent D
+    setupDetachedSpawn({
+      porcelain: detachedPorcelain([
+        { path: "/home/user/wt-c", head: HASH_C },
+        { path: "/home/user/wt-d", head: HASH_D }
+      ]),
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a"),
+        makeCommitLine(HASH_B, "", "B", "b@t.com", 2, "b")
+      ),
+      pinnedOutput: makeLogOutput(
+        makeCommitLine(HASH_C, HASH_D, "C", "c@t.com", 5, "c"),
+        makeCommitLine(HASH_D, HASH_A, "D", "d@t.com", 4, "d")
+      )
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the chain C -> D -> A keeps every child before its parent
+    expect(result.commits.map((commit) => commit.hash)).toEqual([HASH_C, HASH_D, HASH_A, HASH_B]);
+  });
+
+  it("keeps a pinned child before its pinned parent when the parent is listed first (TC-368)", async () => {
+    // Case: TC-368
+    // Given: the same two detached heads, with the pinned query listing the parent D first
+    setupDetachedSpawn({
+      porcelain: detachedPorcelain([
+        { path: "/home/user/wt-c", head: HASH_C },
+        { path: "/home/user/wt-d", head: HASH_D }
+      ]),
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a"),
+        makeCommitLine(HASH_B, "", "B", "b@t.com", 2, "b")
+      ),
+      pinnedOutput: makeLogOutput(
+        makeCommitLine(HASH_D, HASH_A, "D", "d@t.com", 4, "d"),
+        makeCommitLine(HASH_C, HASH_D, "C", "c@t.com", 5, "c")
+      )
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the result does not depend on the pinned query order
+    expect(result.commits.map((commit) => commit.hash)).toEqual([HASH_C, HASH_D, HASH_A, HASH_B]);
+  });
 });
 
 describe("getRepositoryStateWatchPaths", () => {

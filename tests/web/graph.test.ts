@@ -1330,6 +1330,62 @@ describe("Graph.determinePath() early break off-screen parent edge", () => {
 });
 
 /* ------------------------------------------------------------------ */
+/* S20: determinePath() terminates when a parent precedes its child   */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/graph-test.md
+describe("Graph.determinePath() parent listed before its child (S20)", () => {
+  beforeEach(() => {
+    allCreatedElements = [];
+    containerElement = createMockElement("div");
+    vi.clearAllMocks();
+  });
+
+  it("consumes a preceding parent on the normal branch path (TC-076)", () => {
+    // Case: TC-076
+    // Given: commit "c" is listed last although its only parent "a" is the first row
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [
+      makeCommit("a", ["b"], null),
+      makeCommit("b", [], null),
+      makeCommit("c", ["a"], null)
+    ];
+    const spy = vi.spyOn(Vertex.prototype, "registerParentProcessed");
+
+    // When: loadCommits walks every vertex
+    graph.loadCommits(commits, "a", { a: 0, b: 1, c: 2 });
+    graph.render(null);
+
+    // Then: each parent edge is processed exactly once and all rows are drawn
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(getCircleElements().length).toBe(3);
+  });
+
+  it("consumes the preceding parents of a merge reached through its child (TC-077)", () => {
+    // Case: TC-077
+    // Given: merge "c" is listed last and reached as the parent of "d"; both of its own
+    // parents are earlier rows, so the walk that arrived via "d" ends at the bottom with
+    // "c" holding two unreachable parents
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [
+      makeCommit("a", ["b"], null),
+      makeCommit("b", [], null),
+      makeCommit("d", ["c"], null),
+      makeCommit("c", ["a", "b"], null)
+    ];
+    const spy = vi.spyOn(Vertex.prototype, "registerParentProcessed");
+
+    // When: loadCommits walks every vertex
+    graph.loadCommits(commits, "a", { a: 0, b: 1, d: 2, c: 3 });
+    graph.render(null);
+
+    // Then: the four parent edges (a→b, d→c, c→a, c→b) are processed exactly once and all rows are drawn
+    expect(spy).toHaveBeenCalledTimes(4);
+    expect(getCircleElements().length).toBe(4);
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /* S19: circle data-hash and setFileHistoryHighlight()                */
 /* ------------------------------------------------------------------ */
 
