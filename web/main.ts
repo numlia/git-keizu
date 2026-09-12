@@ -343,7 +343,9 @@ class GitKeizuView {
           prevState.commits,
           prevState.commitHead,
           prevState.moreCommitsAvailable,
-          true
+          true,
+          undefined,
+          prevState.worktrees
         );
         if (typeof prevState.scrollTop === "number") {
           this.scrollContainerElem.scrollTop = prevState.scrollTop;
@@ -770,7 +772,8 @@ class GitKeizuView {
       expandedCommit: this.expandedCommit,
       findWidgetState: this.findWidget.getState(),
       selectedAuthors: this.selectedAuthors,
-      scrollTop: this.scrollContainerElem.scrollTop
+      scrollTop: this.scrollContainerElem.scrollTop,
+      worktrees: this.worktrees
     });
   }
 

@@ -8120,3 +8120,83 @@ describe("File history integration (S50 / S51)", () => {
     });
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* Worktrees in the saved webview state (Feature 056)                 */
+/* ------------------------------------------------------------------ */
+
+describe("GitKeizuView worktrees in saved state", () => {
+  const MAIN_WORKTREE = {
+    branches: { main: { path: "/test/repo", isMain: true } },
+    detached: []
+  };
+
+  async function importFreshMain(prevState: Record<string, unknown> | null): Promise<void> {
+    vi.resetModules();
+    setupTestDOM();
+    setupViewState();
+    const { vscode: freshVscode } = await import("../../web/utils");
+    vi.mocked(freshVscode.getState).mockReturnValueOnce(
+      prevState as unknown as ReturnType<typeof freshVscode.getState>
+    );
+    mockGraphHighlight.render.mockClear();
+    await import("../../web/main");
+  }
+
+  function respondWithMainWorktree(): void {
+    dispatchMessage({
+      command: "loadBranches",
+      branches: ["main"],
+      head: "main",
+      hard: false,
+      isRepo: true
+    });
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: false,
+      worktrees: MAIN_WORKTREE
+    });
+  }
+
+  it("saves the worktree collection received with the commits (TC-369)", async () => {
+    // Given: a fresh view without a previous state
+    await importFreshMain(null);
+    const { vscode: freshVscode } = await import("../../web/utils");
+
+    // When: the commits arrive together with a worktree collection
+    respondWithMainWorktree();
+
+    // Then: the last saved state carries that collection
+    const lastCall = vi.mocked(freshVscode.setState).mock.calls.at(-1);
+    expect(lastCall).toBeDefined();
+    const savedState = lastCall![0] as WebViewState;
+    expect(savedState.worktrees).toEqual(MAIN_WORKTREE);
+  });
+
+  it("does not re-render when the restored worktrees match the soft response (TC-370)", async () => {
+    // Given: a previous state that already holds the main worktree
+    await importFreshMain({ ...MOCK_PREV_STATE, worktrees: MAIN_WORKTREE });
+    expect(mockGraphHighlight.render).toHaveBeenCalledTimes(1);
+
+    // When: the soft refresh answers with identical commits and worktrees
+    respondWithMainWorktree();
+
+    // Then: the restored render is the only one
+    expect(mockGraphHighlight.render).toHaveBeenCalledTimes(1);
+  });
+
+  it("re-renders once when a legacy state has no worktrees (TC-371)", async () => {
+    // Given: a previous state saved before worktrees were persisted
+    await importFreshMain({ ...MOCK_PREV_STATE, worktrees: undefined });
+    expect(mockGraphHighlight.render).toHaveBeenCalledTimes(1);
+
+    // When: the soft refresh answers with the main worktree
+    respondWithMainWorktree();
+
+    // Then: the worktree difference triggers a second render
+    expect(mockGraphHighlight.render).toHaveBeenCalledTimes(2);
+  });
+});
