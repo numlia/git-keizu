@@ -661,6 +661,11 @@ export class Graph {
           break;
         }
       }
+      // A parent listed before its child can never be reached by walking down,
+      // so mark it processed here or findStart() would return this vertex forever.
+      if (!foundPointToParent) {
+        vertex.registerParentProcessed();
+      }
     } else {
       // Branch is normal
       let branch = new Branch(this.getAvailableColour(startAt));
@@ -687,9 +692,12 @@ export class Graph {
       // Process remaining nullVertex parents only when the loop reached the end.
       // An early break means an off-screen parent edge is still pending for the
       // remaining children of the current vertex and must not be marked processed.
+      // A parent listed before its child (id below the vertex) is equally
+      // unreachable by walking down, so it is consumed here as well.
       if (i === this.vertices.length) {
         while (vertex.getNextParent() !== null) {
-          if (vertex.getNextParent()!.getId() === NULL_VERTEX_ID) {
+          const nextParentId = vertex.getNextParent()!.getId();
+          if (nextParentId === NULL_VERTEX_ID || nextParentId < vertex.getId()) {
             vertex.registerParentProcessed();
           } else {
             break;

@@ -1330,6 +1330,59 @@ describe("Graph.determinePath() early break off-screen parent edge", () => {
 });
 
 /* ------------------------------------------------------------------ */
+/* S20: determinePath() terminates when a parent precedes its child   */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/graph-test.md
+describe("Graph.determinePath() parent listed before its child (S20)", () => {
+  beforeEach(() => {
+    allCreatedElements = [];
+    containerElement = createMockElement("div");
+    vi.clearAllMocks();
+  });
+
+  it("consumes a preceding parent on the normal branch path (TC-076)", () => {
+    // Case: TC-076
+    // Given: commit "c" is listed last although its only parent "a" is the first row
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [
+      makeCommit("a", ["b"], null),
+      makeCommit("b", [], null),
+      makeCommit("c", ["a"], null)
+    ];
+    const spy = vi.spyOn(Vertex.prototype, "registerParentProcessed");
+
+    // When: loadCommits walks every vertex
+    graph.loadCommits(commits, "a", { a: 0, b: 1, c: 2 });
+    graph.render(null);
+
+    // Then: each parent edge is processed exactly once and all rows are drawn
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(getCircleElements().length).toBe(3);
+  });
+
+  it("consumes a preceding parent on the merge path (TC-077)", () => {
+    // Case: TC-077
+    // Given: merge "c" is listed last although both of its parents are earlier rows
+    const graph = new Graph("testGraph", DEFAULT_CONFIG);
+    const commits = [
+      makeCommit("a", ["b"], null),
+      makeCommit("b", [], null),
+      makeCommit("c", ["a", "b"], null)
+    ];
+    const spy = vi.spyOn(Vertex.prototype, "registerParentProcessed");
+
+    // When: loadCommits reaches "c" a second time on the merge path
+    graph.loadCommits(commits, "a", { a: 0, b: 1, c: 2 });
+    graph.render(null);
+
+    // Then: both parent edges of "c" are processed exactly once and all rows are drawn
+    expect(spy).toHaveBeenCalledTimes(3);
+    expect(getCircleElements().length).toBe(3);
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /* S19: circle data-hash and setFileHistoryHighlight()                */
 /* ------------------------------------------------------------------ */
 
