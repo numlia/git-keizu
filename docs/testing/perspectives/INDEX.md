@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-09-12T14:47:13+09:00
+> Auto-generated: 2026-09-12T17:07:11+09:00
 > Total sources: 50
 > Total physical files: 88
-> Total sections: 536
-> Total cases: 3030
+> Total sections: 537
+> Total cases: 3042
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -20,16 +20,16 @@
 | `src/avatarManager.ts` | single-file | `src/avatarManager-test.md` | 1 | 25 | 101 | 2026-07-19 |
 | `src/branchCleanup.ts` | single-file | `src/branchCleanup-test.md` | 1 | 5 | 43 | 2026-08-25 |
 | `src/config.ts` | single-file | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md` | 1 | 14 | 79 | 2026-05-02 |
-| `src/config.ts` | sharded | `src/config-test/INDEX.md` | 5 | 18 | 96 | 2026-09-12 |
+| `src/config.ts` | sharded | `src/config-test/INDEX.md` | 5 | 19 | 98 | 2026-09-12 |
 | `src/dataSource.ts` | single-file | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md` | 1 | 25 | 149 | 2026-04-04 |
 | `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 9 | 43 | 313 | 2026-09-12 |
 | `src/diffDocProvider.ts` | single-file | `src/diffDocProvider-test.md` | 1 | 7 | 33 | 2026-07-04 |
-| `src/extension.ts` | single-file | `src/extension-test.md` | 1 | 8 | 30 | 2026-07-19 |
+| `src/extension.ts` | single-file | `src/extension-test.md` | 1 | 9 | 32 | 2026-09-12 |
 | `src/extensionState.ts` | single-file | `src/extensionState-test.md` | 1 | 14 | 42 | 2026-07-04 |
 | `src/fileHistory.ts` | single-file | `src/fileHistory-test.md` | 1 | 8 | 80 | 2026-09-08 |
 | `src/gitExecutable.ts` | single-file | `src/gitExecutable-test.md` | 1 | 1 | 6 | 2026-07-19 |
 | `src/gitGraphView.ts` | single-file | `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md` | 1 | 17 | 60 | 2026-03-20 |
-| `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 9 | 32 | 153 | 2026-09-12 |
+| `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 9 | 31 | 161 | 2026-09-12 |
 | `src/i18n.ts` | single-file | `src/i18n-test.md` | 1 | 2 | 11 | 2026-08-25 |
 | `src/refValidation.ts` | single-file | `src/refValidation-test.md` | 1 | 1 | 19 | 2026-08-03 |
 | `src/repoFileWatcher.ts` | single-file | `src/repoFileWatcher-test.md` | 1 | 10 | 74 | 2026-08-08 |
@@ -128,6 +128,7 @@
 | Feature 055-07 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `src/dataSource-test/INDEX.md`, `src/fileHistory-test.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/fileHistory-test.md`, `web/fileMenu-test.md`, `web/graph-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
 | Feature 055-07 (light-spec-plan) Task 8 | `web/fileMenu-test.md`, `web/main-test/INDEX.md` |
 | Feature 056 (retain-context-when-hidden) issue #48 | `src/config-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `web/main-test/INDEX.md` |
+| Feature 057 (multi-repo-single-folder-workspace) issue #49 | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/gitGraphView-test/INDEX.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
 | test-plan | `web/stashMenu-test.md` |
@@ -150,7 +151,6 @@
 | フェーズ2 修正 M3 (detached-head-detection) | `src/dataSource-test/INDEX.md` |
 | フェーズ2 修正 M3 (spawn-locale-lc-all-c) | `src/dataSource-test/INDEX.md` |
 | フェーズ2 修正 M5 (message-handler-try-finally-unmute) | `src/gitGraphView-test/INDEX.md` |
-| フェーズ2 修正 M6 (reveal-persist-last-active-repo) | `src/gitGraphView-test/INDEX.md` |
 | フェーズ2 修正 M7 (avatar-request-timeout-destroy) | `src/avatarManager-test.md` |
 | フェーズ2 修正 M8 (rate-limit-headerless-requeue) | `src/avatarManager-test.md` |
 | フェーズ2 修正 M9/M10 (diff-uri-roundtrip-cachekey) | `src/diffDocProvider-test.md` |

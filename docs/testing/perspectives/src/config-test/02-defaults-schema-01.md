@@ -110,3 +110,39 @@
 | TC-078  | `menu.showRecentActions` 設定未指定                  | Normal - default                                                           | `showRecentActions()` が `true` を返す                                                                          | 新規設定のデフォルト |
 | TC-079  | `menu.showRecentActions = false`                     | Normal - explicit false                                                    | `showRecentActions()` が `false` を返す                                                                         | 描画のみ OFF         |
 | TC-080  | fallback getter と `package.json` default の整合確認 | Normal - cross-check                                                       | `tests/src/config-defaults.test.ts` で `showRecentActions()` の fallback 値が `package.json` default と一致する | static default 整合  |
+
+## S21: maxDepthOfRepoSearch() 既定値 1 と明示設定の透過
+
+> Origin: Feature 057 (multi-repo-single-folder-workspace) issue #49
+> Added: 2026-09-12
+> Status: active
+> Supersedes: -
+> Signature: `maxDepthOfRepoSearch(): number`
+> Target Path: `src/config.ts:178-180`
+> Test File: `tests/src/config-defaults.test.ts`
+
+S10 TC-049は両値の一致だけを見るため`0 === 0`でも通る。本セクションは既定値の具体値を固定する。探索の深さの解釈はrepoManager ownerの責務で本表には含めない。
+
+| Case ID | Input / Precondition                                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                      | Notes                  |
+| ------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| TC-369  | `get`モックがフォールバック値をそのまま返す状態で`getConfig().maxDepthOfRepoSearch()`を呼ぶ | Normal - 既定値の具体値                                                    | 戻り値が数値`1`と`toBe`で一致し、`package.json`の`git-keizu.maxDepthOfRepoSearch.default`も数値`1`と`toBe`で一致する | 両側を具体値で固定     |
+| TC-370  | `get`モックが`"maxDepthOfRepoSearch"`キーに対して`0`を返す（他キーはフォールバック）        | Boundary - 明示設定0の維持                                                 | `getConfig().maxDepthOfRepoSearch()`が数値`0`を返す                                                                  | 明示設定を上書きしない |
+
+### 失敗源インベントリ（include-or-justify）— Feature 057 追加分（S21）
+
+| 失敗源                                                           | 対応ケースまたは除外理由                        |
+| ---------------------------------------------------------------- | ----------------------------------------------- |
+| フォールバックだけ変更して`package.json`を忘れる（またはその逆） | TC-369                                          |
+| 明示設定の上書き                                                 | TC-370                                          |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）            | 0: TC-370。それ以外はexcluded(getterに分岐なし) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(getterに分岐なし)
+- Exception: excluded(getterに分岐なし)
+- External: excluded(`workspaceConfiguration.get()`は既定値契約でthrowしない既存挙動)
+- Boundary: TC-370
+- Type: excluded(型はスキーマに委ねる)
+- Normal: TC-369
+
+**失敗系/正常系比（煙感知器）**: 正常系1件（TC-369）、失敗系1件（TC-370）。既定値の具体値変更のみで、失敗源は上表で網羅済みであることを確認した。

@@ -10,8 +10,9 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S36
 
 **テスト対象パス**: `src/gitGraphView.ts`
 
@@ -119,8 +120,9 @@
 
 > Origin: フェーズ2 修正 M6 (reveal-persist-last-active-repo)
 > Added: 2026-07-04T02:44:58Z
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S36
 > Signature: `public static createOrShow(...)`（`currentPanel` 既存かつ `rootUri !== undefined` の reveal 経路）
 > Target Path: `src/gitGraphView.ts:52-58`
 
@@ -190,3 +192,59 @@
 数値・空値境界（0 / minimum / maximum / +/-1 / empty / NULL）は、本セクションの対象が文字列エスケープ契約であり仕様上意味を持たないため対象外とする（意味のある境界は `</script>` 部分文字列の TC-107/TC-109 で充足）。
 
 **失敗系/正常系比（煙感知器）**: 正常系2件（TC-106、TC-108）、失敗系2件（TC-107、TC-109）。件数が同数のためインベントリを再導出したが、本変更の失敗源は上表のとおりすべて対応ケースまたは除外理由で充足されており、追加すべき失敗系ケースはないことを確認した（エスケープ契約のため失敗系は Boundary のみとなる）。
+
+## S36: createOrShow() rootUri 登録待ちとパネル生成 / reveal / 兄弟登録の最終状態
+
+> Origin: Feature 057 (multi-repo-single-folder-workspace) issue #49
+> Added: 2026-09-12
+> Status: active
+> Supersedes: S6, S23
+> Signature: `public static async createOrShow(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, rootUri?: vscode.Uri): Promise<void>`
+> Target Path: `src/gitGraphView.ts`（`createOrShow()`。現行59-110行。修正後に更新）
+> Test File: `tests/src/gitGraphView.test.ts`
+
+`rootUri`指定時は`setLastActiveRepo()`→`await registerRepoFromUri()`→`currentPanel`判定の順に進む。`Promise`完了はパネル生成または`reveal`までを表し、HTML完成を含まない。初回HTML生成中の兄弟登録はHTML再生成を許容し、完成後は`loadRepos`のみを送る。`registerRepoFromUri()`内部の判定はrepoManager owner、`git-keizu.view`ハンドラの`rootUri`解決はextension owner、webview側の初期選択は`web/main.ts` ownerの責務で本表には含めない。定数は`SCM_REPO = "/scm/repo/path"`、`TEST_REPO = "/test/repo"`、`SIBLING_REPO = "/scm/sibling"`とする。
+
+| Case ID | Input / Precondition                                                                                                                                                                                                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                              | Notes                              |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| TC-376  | `currentPanel`なし、`getRepos()`が`{}`、`rootUri`（`fsPath: SCM_REPO`）指定。`registerRepoFromUri`は手動resolveのdeferredを返し、resolve時に`getRepos()`の戻りを`{ [SCM_REPO]: { columnWidths: null } }`へ切り替える                                                  | Boundary - 登録完了前後のパネル生成                                        | resolve前は`createWebviewPanel`が0回。resolveして`await createOrShow()`が完了した後に1回。`vi.waitFor`で`webview.html`が空でなくなるまで待ち、HTMLに`unableToLoad`を含まず`id="repoSelect"`を含む。埋め込み`viewState.repos`のキーに`SCM_REPO`があり、`viewState.lastActiveRepo`が`SCM_REPO` | 登録前にパネルを作らない           |
+| TC-377  | TC-376と同条件                                                                                                                                                                                                                                                        | Normal - 登録引数                                                          | `registerRepoFromUri`が`rootUri`と同一参照（`toBe`）で1回呼ばれる                                                                                                                                                                                                                            | -                                  |
+| TC-378  | TC-376と同条件                                                                                                                                                                                                                                                        | Normal - lastActiveRepo記録の順序                                          | `setLastActiveRepo`が`SCM_REPO`で1回、`invocationCallOrder`が`registerRepoFromUri`より小さい                                                                                                                                                                                                 | 登録より前に記録                   |
+| TC-379  | `currentPanel`なし、`rootUri`未指定                                                                                                                                                                                                                                   | Boundary - rootUriなし（初回）                                             | `registerRepoFromUri`0回、`setLastActiveRepo`0回、`await createOrShow()`後に`createWebviewPanel`1回                                                                                                                                                                                          | コマンドパレット起動               |
+| TC-380  | `currentPanel`あり（`rootUri`なしで生成）、`rootUri`未指定で再呼び出し                                                                                                                                                                                                | Boundary - rootUriなし（既存パネル）                                       | `registerRepoFromUri`0回、`setLastActiveRepo`0回、`reveal`1回、`selectRepo`メッセージ0件、`createWebviewPanel`の追加呼び出し0回                                                                                                                                                              | 旧S6 TC-018・S23 TC-087相当        |
+| TC-381  | `currentPanel`あり、`getRepos()`が`{ [TEST_REPO], [SCM_REPO] }`（登録済み）、`rootUri`指定。`registerRepoFromUri`はdeferred                                                                                                                                           | Normal - 既存パネルの登録待ちとreveal順序                                  | `setLastActiveRepo`が`SCM_REPO`で1回。`registerRepoFromUri`が1回（登録済みでも呼ぶ）。resolve前は`reveal`0回・`selectRepo`0件。resolve後に`reveal`1回、`{ command: "selectRepo", repo: SCM_REPO }`が1件。`setLastActiveRepo`の`invocationCallOrder`が`reveal`より小さい                      | 旧S6 TC-016・S23 TC-086/TC-088相当 |
+| TC-382  | `currentPanel`あり、`getRepos()`が`{ [TEST_REPO] }`（未登録）、`rootUri`指定。`registerRepoFromUri`はresolve時に`getRepos()`を`{ [TEST_REPO], [SCM_REPO] }`へ切り替える                                                                                               | Normal - 未登録リポジトリの初回登録                                        | `registerRepoFromUri`が合計1回（`selectRepoFromUri()`からの2回目が無い）、`{ command: "selectRepo", repo: SCM_REPO }`が1件                                                                                                                                                                   | 旧S6 TC-017相当                    |
+| TC-383  | `currentPanel`なし、`getRepos()`が`{}`のまま（非リポジトリ）、`rootUri`指定。`registerRepoFromUri`はresolveしても`getRepos()`を変えない                                                                                                                               | Boundary - 登録されなかったrootUri（0件）                                  | `createWebviewPanel`1回。`vi.waitFor`後のHTMLに`unableToLoad`を含む                                                                                                                                                                                                                          | 登録0件                            |
+| TC-384  | `currentPanel`なし、同じ`rootUri`で`createOrShow`を2回連続で呼び、独立したdeferred d1・d2を返す。d1→d2の順にresolve（各resolve時に`getRepos()`を`{ [SCM_REPO] }`へ）                                                                                                  | Boundary - 連打（呼び出し順の完了）                                        | 両`Promise`完了後、`registerRepoFromUri`2回、`createWebviewPanel`1回、`reveal`1回                                                                                                                                                                                                            | パネル二重生成なし                 |
+| TC-385  | TC-384と同条件でd2→d1の順にresolve                                                                                                                                                                                                                                    | Boundary - 連打（逆順の完了）                                              | `registerRepoFromUri`2回、`createWebviewPanel`1回、`reveal`1回                                                                                                                                                                                                                               | 完了順に依存しない                 |
+| TC-386  | `currentPanel`なし、`rootUri`指定。`registerRepoFromUri`が`Error("register failed")`でreject                                                                                                                                                                          | External - 登録reject（初回）                                              | `createOrShow()`が`"register failed"`でreject（`rejects.toThrow`）、`createWebviewPanel`0回                                                                                                                                                                                                  | catchしない                        |
+| TC-387  | `currentPanel`あり、`rootUri`指定。`registerRepoFromUri`が`Error("register failed")`でreject                                                                                                                                                                          | External - 登録reject（既存パネル）                                        | `createOrShow()`が`"register failed"`でreject、`reveal`0回、`selectRepo`0件                                                                                                                                                                                                                  | catchしない                        |
+| TC-388  | `currentPanel`なし、`getRepos()`が`{ [TEST_REPO] }`、非リポジトリの`rootUri`（`SCM_REPO`）指定。`registerRepoFromUri`はresolveしても`getRepos()`を変えない                                                                                                            | Boundary - 非リポジトリrootUriと既存登録1件                                | HTMLに`id="repoSelect"`を含み、埋め込み`viewState.repos`のキーが`[TEST_REPO]`のみ、`viewState.lastActiveRepo`が`SCM_REPO`                                                                                                                                                                    | 未登録パスがlastActiveRepoに残る   |
+| TC-389  | TC-376と同条件で、`loadWebviewMessages`をdeferredで止める。`registerRepoFromUri`のresolve後、`registerViewCallback`で捕捉したcallbackを`({ [SCM_REPO], [SIBLING_REPO] }, 2)`で呼び（`getRepos()`も2件へ切り替え）、その後`loadWebviewMessages`のdeferredをresolveする | Normal - HTML生成中の兄弟登録                                              | `loadWebviewMessages`が2回呼ばれ、`vi.waitFor`で待った最終HTMLの埋め込み`viewState.repos`のキーが`[SCM_REPO, SIBLING_REPO]`（`sort`後の比較）、`postMessage`に`loadRepos`は0件                                                                                                               | HTML再生成を許容                   |
+| TC-390  | TC-376と同条件でHTML完成（`webview.html`が空でない）まで待った後、捕捉したcallbackを`({ [SCM_REPO], [SIBLING_REPO] }, 2)`で呼ぶ                                                                                                                                       | Normal - HTML完成後の兄弟登録                                              | `postMessage`に`{ command: "loadRepos", repos: { [SCM_REPO], [SIBLING_REPO] }, lastActiveRepo: SCM_REPO }`が1件、`loadWebviewMessages`の呼び出し回数は1のまま                                                                                                                                | HTML再生成なし                     |
+
+### 失敗源インベントリ（include-or-justify）— Feature 057 追加分（S36）
+
+| 失敗源                                                                 | 対応ケースまたは除外理由                                              |
+| ---------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| 登録前のパネル生成（非リポジトリ判定でunable-to-loadページになる）     | TC-376                                                                |
+| 登録引数違い（`rootUri`以外を渡す）                                    | TC-377                                                                |
+| `lastActiveRepo`の記録順序（登録後に記録する）                         | TC-378                                                                |
+| `rootUri`なしで登録・記録が走る                                        | TC-379、TC-380                                                        |
+| 既存パネルの登録漏れ・reveal順序（登録完了前にreveal・selectRepoする） | TC-381、TC-382                                                        |
+| 非リポジトリ`rootUri`                                                  | TC-383、TC-388                                                        |
+| 連打（パネル二重生成・完了順依存）                                     | TC-384、TC-385                                                        |
+| 登録reject（握りつぶし・パネル生成の継続）                             | TC-386、TC-387                                                        |
+| 生成中・完成後の兄弟登録（最終HTML・`loadRepos`の欠落）                | TC-389、TC-390                                                        |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）                  | 0件: TC-383、未指定: TC-379、TC-380、1件: TC-388、2回: TC-384、TC-385 |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(`rootUri`は`Uri`型で、拒否分岐を持たない)
+- Exception: excluded(`createOrShow()`内でthrow・catchを追加しない。rejectはExternalで扱う)
+- External: TC-386、TC-387
+- Boundary: TC-376、TC-379、TC-380、TC-383、TC-384、TC-385、TC-388
+- Type: excluded(型はコンパイル時に保証)
+- Normal: TC-377、TC-378、TC-381、TC-382、TC-389、TC-390
+
+**失敗系/正常系比（煙感知器）**: 正常系6件（TC-377、TC-378、TC-381、TC-382、TC-389、TC-390）、失敗系9件（Boundary 7件 + External 2件）。失敗源は登録待ち・パネル生成・reveal・兄弟登録の4系統を上表で網羅したことを確認した。比率合わせのためのケース追加は行わない。
