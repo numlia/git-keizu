@@ -10,10 +10,11 @@
 
 > Origin: Feature 055-07 (light-spec-plan)
 > Added: 2026-09-08
+> Updated: 2026-09-12
 > Status: active
 > Supersedes: -
-> Signature: `GitKeizuView` constructor の `new FileHistoryController(callbacks)` / `render()` / repo dropdown change・`selectRepo()` / private `openFindWidget(): void` / `.commit` click handler / private `buildFileHistoryMenuContext(): FileHistoryMenuContext` / `public loadFileHistory(response: ResponseFileHistory): void`
-> Target Path: `web/main.ts`（constructor・`render()`・`selectRepo()`・`openFindWidget()`・click handler・`buildFileHistoryMenuContext()`。実装後に行範囲へ更新）
+> Signature: `GitKeizuView` constructor の `new FileHistoryController(callbacks)` / `render()` / repo dropdown change・`selectRepo()`・`loadRepos()` / private `openFindWidget(): void` / `.commit` click handler / private `buildFileHistoryMenuContext(): FileHistoryMenuContext` / `public loadFileHistory(response: ResponseFileHistory): void`
+> Target Path: `web/main.ts`（constructor・`render()`・`selectRepo()`・`loadRepos()`・`openFindWidget()`・click handler・`buildFileHistoryMenuContext()`。実装後に行範囲へ更新）
 > Test File: `tests/web/main.test.ts`
 
 `../../web/fileHistory` を `vi.mock` して controller の method 呼出を観測する配線の観点（対応プラン §4 Task 7 実装内容 2〜8、11）。状態機械の分岐は `web/fileHistory-test.md`、menu item の表示条件は `web/fileMenu-test.md` S4 の責務で本表には含めない。
@@ -27,6 +28,7 @@
 | TC-320  | `renderShowLoading()` だけが呼ばれる                                   | Boundary - loading 描画                                                    | `onCommitsRendered` の call count が 0                                                                                                                                                                                                                                                                     | `renderShowLoading()` では呼ばない  |
 | TC-321  | repo dropdown の change で別 repo を選ぶ                               | Normal - dropdown 切替 hook                                                | `onRepositoryChanged` が 1 回呼ばれ、その呼出が `loadCommits` request の `postMessage` より先である                                                                                                                                                                                                        | `currentRepo` 更新の直前            |
 | TC-322  | `selectRepo(<別 repo>)` を呼ぶ                                         | Normal - selectRepo hook                                                   | `onRepositoryChanged` が 1 回呼ばれる                                                                                                                                                                                                                                                                      | -                                   |
+| TC-349  | `loadRepos()` が現在の repo を含まない repo set を受け取る             | Normal - repo 消失時の hook                                                | `onRepositoryChanged` が 1 回呼ばれ、その呼出が `refresh("hard")` の `loadBranches` request の `postMessage` より先である                                                                                                                                                                                  | `currentRepo` 置換の直前            |
 | TC-323  | `isActive()` が `true` を返す状態で `#searchBtn` を click              | Normal - Find 起動時の解除                                                 | `exit(true)` が 1 回呼ばれ、`mock.invocationCallOrder` で `findWidget.show(true)` より先である                                                                                                                                                                                                             | `openFindWidget()`                  |
 | TC-324  | `isPending()` だけが `true` の状態で find keybinding の keydown        | Normal - pending 中の Find 起動                                            | `exit(true)` が 1 回、`findWidget.show(true)` が 1 回呼ばれる                                                                                                                                                                                                                                              | 2 つ目の呼出箇所                    |
 | TC-325  | `isActive()` / `isPending()` がともに `false` で `#searchBtn` を click | Boundary - mode 外の Find                                                  | `exit` の call count が 0 で `findWidget.show(true)` が 1 回呼ばれる                                                                                                                                                                                                                                       | 既存挙動維持                        |
@@ -66,7 +68,7 @@ controller は mock のまま、`restoreExpandedCommit` と `applyFileHistoryToF
 
 | 失敗源                                                              | 対応ケースまたは除外理由                                                                                                                               |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| hook の未接続・順序逆転（render / repo 切替 / Find / 行 click）     | TC-319、TC-321〜TC-324、TC-326                                                                                                                         |
+| hook の未接続・順序逆転（render / repo 切替 / Find / 行 click）     | TC-319、TC-321〜TC-324、TC-326、TC-349                                                                                                                 |
 | hook の過剰呼出（loading 描画 / uncommitted 行 / mode 外）          | TC-320、TC-325、TC-327                                                                                                                                 |
 | callback の誤配線（`getCommitId` の `undefined`、graph 再描画漏れ） | TC-317、TC-318                                                                                                                                         |
 | stash 判定・context 引数の欠落                                      | TC-328、TC-329                                                                                                                                         |
@@ -88,6 +90,6 @@ controller は mock のまま、`restoreExpandedCommit` と `applyFileHistoryToF
 - External: excluded(上表のとおり)
 - Boundary: TC-320、TC-325、TC-327、TC-334、TC-341
 - Type: excluded(引数の型は `src/types-test.md` S9 と TypeScript の型検査で担保)
-- Normal: TC-316〜TC-319、TC-321〜TC-324、TC-326、TC-328〜TC-333、TC-336〜TC-338
+- Normal: TC-316〜TC-319、TC-321〜TC-324、TC-326、TC-328〜TC-333、TC-336〜TC-338、TC-349
 
-**失敗系/正常系比（煙感知器）**: 正常系18件、失敗系8件。配線の観点は「呼ばれること」の正常系が構造的に多く、失敗源は未接続・過剰呼出・DOM 不在・mode 外に限られることを上表で列挙した。比率合わせのためのケース追加・削除は行わない。
+**失敗系/正常系比（煙感知器）**: 正常系19件、失敗系8件。配線の観点は「呼ばれること」の正常系が構造的に多く、失敗源は未接続・過剰呼出・DOM 不在・mode 外に限られることを上表で列挙した。比率合わせのためのケース追加・削除は行わない。

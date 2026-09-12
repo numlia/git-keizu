@@ -375,6 +375,7 @@ class GitKeizuView {
     let repoPaths = Object.keys(repos),
       changedRepo = false;
     if (repos[this.currentRepo] === undefined) {
+      this.fileHistory.onRepositoryChanged();
       this.currentRepo =
         lastActiveRepo !== null && repos[lastActiveRepo] !== undefined
           ? lastActiveRepo

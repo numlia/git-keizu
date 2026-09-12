@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-09-08T18:51:38+09:00
+> Auto-generated: 2026-09-12T10:08:30+09:00
 > Total sources: 50
 > Total physical files: 85
 > Total sections: 532
-> Total cases: 3010
+> Total cases: 3011
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -52,7 +52,7 @@
 | `web/graph.ts` | single-file | `web/graph-test.md` | 1 | 19 | 75 | 2026-09-08 |
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 1 | 5 | 2026-05-03 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 12 | 48 | 317 | 2026-09-08 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 12 | 48 | 318 | 2026-09-12 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
 | `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 14 | 62 | 2026-09-08 |
 | `web/refMenu.ts` | single-file | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md` | 1 | 14 | 74 | 2026-07-19 |

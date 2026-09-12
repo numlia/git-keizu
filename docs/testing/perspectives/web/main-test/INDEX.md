@@ -7,7 +7,7 @@
 > Test Framework: Vitest
 > Total Shards: 12
 > Total Sections: 48
-> Total Cases: 317
+> Total Cases: 318
 
 ## Shards
 
@@ -24,7 +24,7 @@
 | 07-load-count-01.md         | load-count         | 1        | 5     | 2026-05-17   |
 | 08-request-queue-01.md      | request-queue      | 2        | 14    | 2026-08-04   |
 | 09-branch-cleanup-01.md     | branch-cleanup     | 1        | 11    | 2026-08-25   |
-| 10-file-history-01.md       | file-history       | 2        | 26    | 2026-09-08   |
+| 10-file-history-01.md       | file-history       | 2        | 27    | 2026-09-12   |
 
 ## Origin Coverage
 

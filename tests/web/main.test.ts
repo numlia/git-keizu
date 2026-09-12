@@ -7449,6 +7449,7 @@ describe("Branch cleanup panel wiring (S49)", () => {
 // @see docs/testing/perspectives/web/main-test/10-file-history-01.md
 describe("File history integration (S50 / S51)", () => {
   const STASH_HASH = "eee555eee555eee5";
+  const OTHER_REPO = "/test/other-repo";
   const FILE_HISTORY_NOTE_TEXT =
     "This file's change is not part of the diff against the first parent.";
   const HISTORICAL_PATH = "src/a.txt";
@@ -7697,6 +7698,30 @@ describe("File history integration (S50 / S51)", () => {
 
       // Then: the hook runs once
       expect(mockFileHistoryInstance.onRepositoryChanged).toHaveBeenCalledTimes(1);
+      loadTestCommits();
+    });
+
+    it("calls onRepositoryChanged when loadRepos replaces the current repo (TC-349)", () => {
+      // Case: TC-349
+      // Given: a repo set that no longer contains the current repo
+      // When: loadRepos delivers it
+      dispatchMessage({
+        command: "loadRepos",
+        repos: { [OTHER_REPO]: { columnWidths: null } },
+        lastActiveRepo: null
+      });
+
+      // Then: the hook runs once, before the hard refresh posts its loadBranches request
+      expect(mockFileHistoryInstance.onRepositoryChanged).toHaveBeenCalledTimes(1);
+      expect(mockFileHistoryInstance.onRepositoryChanged.mock.invocationCallOrder[0]).toBeLessThan(
+        postMessageOrderOf("loadBranches")
+      );
+
+      dispatchMessage({
+        command: "loadRepos",
+        repos: { [TEST_REPO]: { columnWidths: null } },
+        lastActiveRepo: TEST_REPO
+      });
       loadTestCommits();
     });
 
