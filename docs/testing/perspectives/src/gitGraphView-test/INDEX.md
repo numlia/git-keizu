@@ -2,12 +2,12 @@
 
 > Source: `src/gitGraphView.ts`
 > Storage Mode: sharded
-> Generated: 2026-09-08T00:00:00Z
+> Generated: 2026-09-12T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 8
-> Total Sections: 31
-> Total Cases: 145
+> Total Shards: 9
+> Total Sections: 32
+> Total Cases: 149
 
 ## Shards
 
@@ -21,6 +21,7 @@
 | 04-context-menu-recent-actions-01.md | context-menu-recent-actions | 2        | 3     | 2026-05-10   |
 | 05-branch-cleanup-01.md              | branch-cleanup              | 1        | 15    | 2026-08-25   |
 | 06-file-history-01.md                | file-history                | 1        | 12    | 2026-09-08   |
+| 07-retain-context-01.md              | retain-context              | 1        | 4     | 2026-09-12   |
 
 ## Origin Coverage
 
@@ -46,6 +47,7 @@
 | Feature 051 (remote-checkout-pull) (light-spec-plan)                   | 01-message-routing-03.md                            |
 | Feature 055-03 (light-spec-plan)                                       | 05-branch-cleanup-01.md                             |
 | Feature 055-07 (light-spec-plan)                                       | 06-file-history-01.md                               |
+| Feature 056 (retain-context-when-hidden) issue #48                     | 07-retain-context-01.md                             |
 | test-plan (既存コード網羅)                                             | 01-message-routing-01.md                            |
 | フェーズ2 修正 M5 (message-handler-try-finally-unmute)                 | 02-state-lifecycle-01.md                            |
 | フェーズ2 修正 M6 (reveal-persist-last-active-repo)                    | 02-state-lifecycle-01.md                            |

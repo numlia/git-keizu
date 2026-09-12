@@ -2,12 +2,12 @@
 
 > Source: `web/main.ts`
 > Storage Mode: sharded
-> Generated: 2026-09-08T00:00:00Z
+> Generated: 2026-09-12T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 12
-> Total Sections: 48
-> Total Cases: 318
+> Total Shards: 13
+> Total Sections: 49
+> Total Cases: 321
 
 ## Shards
 
@@ -25,6 +25,7 @@
 | 08-request-queue-01.md      | request-queue      | 2        | 14    | 2026-08-04   |
 | 09-branch-cleanup-01.md     | branch-cleanup     | 1        | 11    | 2026-08-25   |
 | 10-file-history-01.md       | file-history       | 2        | 27    | 2026-09-12   |
+| 11-state-persistence-01.md  | state-persistence  | 1        | 3     | 2026-09-12   |
 
 ## Origin Coverage
 
@@ -53,6 +54,7 @@
 | Feature 055-03 (light-spec-plan)                                     | 09-branch-cleanup-01.md                                                     |
 | Feature 055-07 (light-spec-plan)                                     | 10-file-history-01.md                                                       |
 | Feature 055-07 (light-spec-plan) Task 8                              | 06-file-actions-01.md                                                       |
+| Feature 056 (retain-context-when-hidden) issue #48                   | 11-state-persistence-01.md                                                  |
 | test-plan (既存コード網羅)                                           | 04-keyboard-selection-01.md                                                 |
 | フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                                     |
 | フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                                     |
