@@ -175,6 +175,28 @@ function findPinnedInsertIndex(commits: GitCommit[], pinnedCommit: GitCommit): n
   return firstParentIndex === -1 ? commits.length : firstParentIndex;
 }
 
+/**
+ * Order pinned commits so that a pinned parent is inserted before its pinned
+ * child. Each insertion goes before the commit's earliest loaded parent, so a
+ * child inserted while its parent is still pending would be left behind that
+ * parent once the parent is inserted. History is acyclic, so a commit without
+ * pending parents always exists; the fallback only guards malformed input.
+ */
+function orderPinnedParentsFirst(pinnedCommits: GitCommit[]): GitCommit[] {
+  const ordered: GitCommit[] = [];
+  const pending = [...pinnedCommits];
+  while (pending.length > 0) {
+    const index = pending.findIndex(
+      (commit) =>
+        !commit.parentHashes.some((parentHash) =>
+          pending.some((other) => other.hash === parentHash)
+        )
+    );
+    ordered.push(...pending.splice(index === -1 ? 0 : index, 1));
+  }
+  return ordered;
+}
+
 export class DataSource {
   private gitPath: string = DEFAULT_GIT_PATH;
   private gitLogFormat!: string;
@@ -248,9 +270,12 @@ export class DataSource {
     if (moreCommitsAvailable) commits.pop();
 
     const knownHashes = new Set(commits.map((commit) => commit.hash));
-    for (const pinnedCommit of pinnedCommits) {
-      if (knownHashes.has(pinnedCommit.hash)) continue;
+    const pendingPinnedCommits = pinnedCommits.filter((pinnedCommit) => {
+      if (knownHashes.has(pinnedCommit.hash)) return false;
       knownHashes.add(pinnedCommit.hash);
+      return true;
+    });
+    for (const pinnedCommit of orderPinnedParentsFirst(pendingPinnedCommits)) {
       commits.splice(findPinnedInsertIndex(commits, pinnedCommit), 0, pinnedCommit);
     }
 

@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-09-12T13:52:58+09:00
+> Auto-generated: 2026-09-12T14:47:13+09:00
 > Total sources: 50
 > Total physical files: 88
 > Total sections: 536
-> Total cases: 3028
+> Total cases: 3030
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -22,7 +22,7 @@
 | `src/config.ts` | single-file | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md` | 1 | 14 | 79 | 2026-05-02 |
 | `src/config.ts` | sharded | `src/config-test/INDEX.md` | 5 | 18 | 96 | 2026-09-12 |
 | `src/dataSource.ts` | single-file | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md` | 1 | 25 | 149 | 2026-04-04 |
-| `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 9 | 43 | 311 | 2026-09-12 |
+| `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 9 | 43 | 313 | 2026-09-12 |
 | `src/diffDocProvider.ts` | single-file | `src/diffDocProvider-test.md` | 1 | 7 | 33 | 2026-07-04 |
 | `src/extension.ts` | single-file | `src/extension-test.md` | 1 | 8 | 30 | 2026-07-19 |
 | `src/extensionState.ts` | single-file | `src/extensionState-test.md` | 1 | 14 | 42 | 2026-07-04 |

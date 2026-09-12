@@ -45,6 +45,8 @@
 | TC-364  | 通常 log が A, B の順で返り、pinned commit D の親が先頭行 A である                                           | Normal - child of the head row                                             | 返却 `commits` の hash 列が `[D, A, B]` である（D が A の直前に入る）                                                                                                                                   | 親より前に子を置きグラフの無限ループを防ぐ  |
 | TC-365  | 通常 log が A, B, C の順で返り、pinned commit D の親が 2 行目の B である                                     | Boundary - parent inside the window                                        | 返却 `commits` の hash 列が `[A, D, B, C]` である（通常列内部の相対順は変わらない）                                                                                                                     | 挿入位置は親の直前                          |
 | TC-366  | 通常 log が A, B, C の順で返り、pinned merge commit D の親が `[B, A]`（A が先頭行）                          | Boundary - merge picks the earliest parent                                 | 返却 `commits` の hash 列が `[D, A, B, C]` で、D の `parentHashes` が `[B, A]` のままである                                                                                                             | 複数親は最も先頭側の親の直前                |
+| TC-367  | 通常窓外の detached HEAD が C（親 D）と D（親 A、A は先頭行）の 2 件で、pinned query が子 C を先に返す       | Boundary - pinned chain, child listed first                                | 返却 `commits` の hash 列が `[C, D, A, B]` である（C が D より前に残る）                                                                                                                                | pinned 同士は親を先に挿入する               |
+| TC-368  | TC-367 と同じ 2 件で、pinned query が親 D を先に返す                                                         | Boundary - pinned chain, parent listed first                               | 返却 `commits` の hash 列が `[C, D, A, B]` である（pinned query の順序に依存しない）                                                                                                                    | 順序非依存                                  |
 
 ### 失敗源インベントリ（include-or-justify）— Feature 052 追加分（S47）
 
@@ -65,6 +67,7 @@
 | detached main を pinned 対象から外す                                      | TC-311                                                                                                                                       |
 | 応答 field の形状が collection になっていない                             | TC-312                                                                                                                                       |
 | 親が通常列にある pinned commit を末尾へ置き、子が親より後ろに並ぶ         | TC-364、TC-365、TC-366                                                                                                                       |
+| pinned 同士の親子で、子を先に挿入して親の後ろに取り残す                   | TC-367、TC-368                                                                                                                               |
 | 境界値（0 / empty）                                                       | TC-295（detached 0 件）、TC-293 / TC-309（空 collection）                                                                                    |
 | 境界値（maximum / +/-1）                                                  | TC-305（`maxCommits + 1` 件）、TC-306（`maxCommits` 以下）                                                                                   |
 | 境界値（minimum / NULL）                                                  | excluded(`maxCommits` の下限は既存 S21 / `web/main-test/07-load-count-01.md` の責務。`worktrees` は必須の collection で `null` を取り得ない) |
@@ -79,7 +82,7 @@
 - Validation: TC-300、TC-301
 - Exception: TC-293、TC-308
 - External: TC-309
-- Boundary: TC-295、TC-296、TC-299、TC-303、TC-304、TC-305、TC-306、TC-365、TC-366
+- Boundary: TC-295、TC-296、TC-299、TC-303、TC-304、TC-305、TC-306、TC-365、TC-366、TC-367、TC-368
 - Type: excluded(引数と戻り値の型契約は `src/types-test.md` S7 の責務。runtime の値検証は TC-301 で担保)
 
-**失敗系/正常系比（煙感知器）**: 正常系 10 件（TC-292、TC-294、TC-297、TC-298、TC-302、TC-307、TC-310、TC-311、TC-312、TC-364）、失敗系 14 件（TC-293、TC-295、TC-296、TC-299、TC-300、TC-301、TC-303〜TC-306、TC-308、TC-309、TC-365、TC-366）。比 1.4 で近接（差 1 以内）ではないため、インベントリ再導出は不要と判断した。
+**失敗系/正常系比（煙感知器）**: 正常系 10 件（TC-292、TC-294、TC-297、TC-298、TC-302、TC-307、TC-310、TC-311、TC-312、TC-364）、失敗系 16 件（TC-293、TC-295、TC-296、TC-299、TC-300、TC-301、TC-303〜TC-306、TC-308、TC-309、TC-365〜TC-368）。比 1.6 で近接（差 1 以内）ではないため、インベントリ再導出は不要と判断した。

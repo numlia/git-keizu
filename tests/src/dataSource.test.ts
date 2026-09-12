@@ -4360,6 +4360,57 @@ describe("getWorktrees collection and pinned detached commits (S47)", () => {
     expect(result.commits.map((commit) => commit.hash)).toEqual([HASH_D, HASH_A, HASH_B, HASH_C]);
     expect(result.commits[0].parentHashes).toEqual([HASH_B, HASH_A]);
   });
+
+  it("keeps a pinned child before its pinned parent when the child is listed first (TC-367)", async () => {
+    // Case: TC-367
+    // Given: two detached heads C (child of D) and D (child of A), both outside the window,
+    // and the pinned query lists the child C before its parent D
+    setupDetachedSpawn({
+      porcelain: detachedPorcelain([
+        { path: "/home/user/wt-c", head: HASH_C },
+        { path: "/home/user/wt-d", head: HASH_D }
+      ]),
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a"),
+        makeCommitLine(HASH_B, "", "B", "b@t.com", 2, "b")
+      ),
+      pinnedOutput: makeLogOutput(
+        makeCommitLine(HASH_C, HASH_D, "C", "c@t.com", 5, "c"),
+        makeCommitLine(HASH_D, HASH_A, "D", "d@t.com", 4, "d")
+      )
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the chain C -> D -> A keeps every child before its parent
+    expect(result.commits.map((commit) => commit.hash)).toEqual([HASH_C, HASH_D, HASH_A, HASH_B]);
+  });
+
+  it("keeps a pinned child before its pinned parent when the parent is listed first (TC-368)", async () => {
+    // Case: TC-368
+    // Given: the same two detached heads, with the pinned query listing the parent D first
+    setupDetachedSpawn({
+      porcelain: detachedPorcelain([
+        { path: "/home/user/wt-c", head: HASH_C },
+        { path: "/home/user/wt-d", head: HASH_D }
+      ]),
+      logOutput: makeLogOutput(
+        makeCommitLine(HASH_A, HASH_B, "A", "a@t.com", 3, "a"),
+        makeCommitLine(HASH_B, "", "B", "b@t.com", 2, "b")
+      ),
+      pinnedOutput: makeLogOutput(
+        makeCommitLine(HASH_D, HASH_A, "D", "d@t.com", 4, "d"),
+        makeCommitLine(HASH_C, HASH_D, "C", "c@t.com", 5, "c")
+      )
+    });
+
+    // When: getCommits is called
+    const result = await ds.getCommits(REPO, [], 10, false, [], "date");
+
+    // Then: the result does not depend on the pinned query order
+    expect(result.commits.map((commit) => commit.hash)).toEqual([HASH_C, HASH_D, HASH_A, HASH_B]);
+  });
 });
 
 describe("getRepositoryStateWatchPaths", () => {
