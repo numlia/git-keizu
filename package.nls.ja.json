@@ -20,6 +20,7 @@
   "config.loadMoreCommits.description": "\"Load More Commits\" ボタンを押したときに読み込むコミット数を指定します (追加コミットがある場合のみ表示されます)。",
   "config.maxDepthOfRepoSearch.description": "ワークスペース内のリポジトリを検出するときに検索するサブフォルダーの最大深度を指定します。",
   "config.showCurrentBranchByDefault.description": "Git Keizu を開いたとき、デフォルトで現在のブランチを表示します。デフォルト: false (すべてのブランチを表示)",
+  "config.retainContextWhenHidden.description": "Git Keizu のタブが非表示になっても（バックグラウンドタブへ移動した場合など）ビューの状態を保持します。タブへ戻った際の表示が即時になりますが、ビューを開いている間のメモリ使用量は増えます。",
   "config.showStatusBarItem.description": "クリックすると Git Keizu を開くステータスバー項目を表示します。",
   "config.showUncommittedChanges.description": "グラフに未コミット変更行を表示します。false の場合、Git Keizu はグラフ読み込み時に未コミット状態の読み取りをスキップします。",
   "config.tabIconColourTheme.enum.colour": "多くの Visual Studio Code カラーテーマに合うカラーアイコンを表示します",

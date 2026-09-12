@@ -45,6 +45,7 @@ export class GitKeizuView {
   private readonly extensionState: ExtensionState;
   private readonly repoFileWatcher: RepoFileWatcher;
   private readonly repoManager: RepoManager;
+  private readonly retainContextWhenHidden: boolean;
   private disposables: vscode.Disposable[] = [];
   private isGraphViewLoaded: boolean = false;
   private isPanelVisible: boolean = true;
@@ -77,12 +78,15 @@ export class GitKeizuView {
       extensionState.setLastActiveRepo(getPathFromUri(rootUri));
     }
 
+    // The panel option is fixed at creation, so the same value must drive the re-show behaviour.
+    const retainContextWhenHidden = getConfig().retainContextWhenHidden();
     const panel = vscode.window.createWebviewPanel(
       "git-keizu",
       "Git Keizu",
       column || vscode.ViewColumn.One,
       {
         enableScripts: true,
+        retainContextWhenHidden: retainContextWhenHidden,
         localResourceRoots: [
           vscode.Uri.file(path.join(extensionPath, "media")),
           vscode.Uri.file(path.join(extensionPath, "out"))
@@ -96,7 +100,8 @@ export class GitKeizuView {
       dataSource,
       extensionState,
       avatarManager,
-      repoManager
+      repoManager,
+      retainContextWhenHidden
     );
   }
 
@@ -106,10 +111,12 @@ export class GitKeizuView {
     dataSource: DataSource,
     extensionState: ExtensionState,
     avatarManager: AvatarManager,
-    repoManager: RepoManager
+    repoManager: RepoManager,
+    retainContextWhenHidden: boolean
   ) {
     this.panel = panel;
     this.extensionPath = extensionPath;
+    this.retainContextWhenHidden = retainContextWhenHidden;
     this.avatarManager = avatarManager;
     this.dataSource = dataSource;
     this.extensionState = extensionState;
@@ -130,7 +137,12 @@ export class GitKeizuView {
       () => {
         if (this.panel.visible !== this.isPanelVisible) {
           if (this.panel.visible) {
-            this.update();
+            if (this.retainContextWhenHidden) {
+              // The webview still holds its DOM and state, so only its data needs refreshing.
+              this.sendMessage({ command: "refresh" });
+            } else {
+              this.update();
+            }
           } else {
             this.currentRepo = null;
             this.repoFileWatcher.stop();

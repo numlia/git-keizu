@@ -179,6 +179,10 @@ class Config {
     return this.workspaceConfiguration.get("maxDepthOfRepoSearch", 0);
   }
 
+  public retainContextWhenHidden(): boolean {
+    return this.workspaceConfiguration.get("retainContextWhenHidden", true);
+  }
+
   public showCurrentBranchByDefault() {
     return this.workspaceConfiguration.get("showCurrentBranchByDefault", false);
   }
