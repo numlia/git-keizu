@@ -286,3 +286,39 @@
 - Normal: TC-392
 
 **失敗系/正常系比（煙感知器）**: 正常系1件（TC-392）、失敗系2件（Boundary 1件 + External 1件）。比率合わせのためのケース追加は行わない。
+
+## S38: createOrShow() 登録待ち中に閉じられたパネルを作り直さない
+
+> Origin: Feature 057 (multi-repo-single-folder-workspace) issue #49 PR #60 レビュー指摘
+> Added: 2026-09-12
+> Status: active
+> Supersedes: -
+> Signature: `public static createOrShow(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, rootUri?: vscode.Uri): Promise<void>`
+> Target Path: `src/gitGraphView.ts`（`open()`）
+> Test File: `tests/src/gitGraphView.test.ts`
+
+呼び出し時点の`currentPanel`を対象パネルとして記録し、登録待ちの間にそのパネルが閉じられた（`dispose()`で`currentPanel`が対象と一致しなくなった）場合は、パネル生成・`reveal`・`selectRepo`のいずれも行わずに`Promise`を完了させる。閉じた後に始まった呼び出しは対象パネルを持たないため、通常どおりパネルを生成する。定数はS36と同じ。
+
+| Case ID | Input / Precondition                                                                                                                                                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                           | Notes                            |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| TC-394  | `currentPanel`あり（`getRepos()`が`{ [TEST_REPO] }`）、`SCM_REPO`の`rootUri`指定で`registerRepoFromUri`はdeferred。resolve前に`currentPanel.dispose()`で閉じ、その後resolve（`getRepos()`を`{ [TEST_REPO], [SCM_REPO] }`へ） | Boundary - 登録待ち中のパネル閉鎖                                          | `Promise`完了後、`currentPanel`が`undefined`のまま、`createWebviewPanel`0回、`reveal`0回、`selectRepo`0件 | 閉じたタブを作り直さない         |
+| TC-395  | TC-394と同条件で閉じた直後に`SIBLING_REPO`の`rootUri`で2回目を呼ぶ（deferred d2）。d1→d2の順にresolve（d2で`{ [TEST_REPO], [SCM_REPO], [SIBLING_REPO] }`へ）                                                                 | Normal - 閉鎖後の再呼び出し                                                | `createWebviewPanel`1回（2回目の呼び出しによる）、`reveal`0回、`getLastActiveRepo()`が`SIBLING_REPO`      | 停止した呼び出しは後続を妨げない |
+
+### 失敗源インベントリ（include-or-justify）— PR #60 レビュー対応分（S38）
+
+| 失敗源                                                                                     | 対応ケースまたは除外理由                   |
+| ------------------------------------------------------------------------------------------ | ------------------------------------------ |
+| 登録待ち中に閉じたパネルを作り直す                                                         | TC-394                                     |
+| 停止した呼び出しが後続のパネル生成を妨げる、または古い呼び出しが新しいパネルを`reveal`する | TC-395                                     |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）                                      | 閉鎖前に完了する通常経路はS36 TC-381が所有 |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(`rootUri`は`Uri`型で、拒否分岐を持たない)
+- Exception: excluded(`open()`内でthrow・catchを追加しない)
+- External: excluded(登録rejectはS36 TC-386 / TC-387とS37 TC-393が所有)
+- Boundary: TC-394
+- Type: excluded(型はコンパイル時に保証)
+- Normal: TC-395
+
+**失敗系/正常系比（煙感知器）**: 正常系1件（TC-395）、失敗系1件（Boundary 1件）。比率合わせのためのケース追加は行わない。

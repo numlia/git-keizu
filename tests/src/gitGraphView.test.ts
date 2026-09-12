@@ -1304,6 +1304,10 @@ describe("GitKeizuView createOrShow registration await (S36)", () => {
     return { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
   }
 
+  function createSiblingUri(): import("vscode").Uri {
+    return { fsPath: SIBLING_REPO } as unknown as import("vscode").Uri;
+  }
+
   /** Make registerRepoFromUri return a manually resolved promise for its next call. */
   function deferNextRegistration(): Deferred {
     const deferred = createDeferred();
@@ -1631,10 +1635,6 @@ describe("GitKeizuView createOrShow registration await (S36)", () => {
   });
 
   describe("GitKeizuView createOrShow invocation order (S37)", () => {
-    function createSiblingUri(): import("vscode").Uri {
-      return { fsPath: SIBLING_REPO } as unknown as import("vscode").Uri;
-    }
-
     it("selects the later repo when its registration completes first (TC-391)", async () => {
       // Case: TC-391
       // Given: no panel and two calls for different repos, each waiting on its own registration
@@ -1695,6 +1695,56 @@ describe("GitKeizuView createOrShow registration await (S36)", () => {
       // Then: the earlier call rejects, the later call still creates the panel without a reveal
       await expect(firstPending).rejects.toThrow(REGISTER_FAILED_MESSAGE);
       await secondPending;
+      expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
+      expect(mocks.reveal).toHaveBeenCalledTimes(0);
+      expect(deps.mockExtensionState.getLastActiveRepo()).toBe(SIBLING_REPO);
+    });
+  });
+
+  describe("GitKeizuView createOrShow panel closed during registration (S38)", () => {
+    it("does not reopen a panel closed while its registration was pending (TC-394)", async () => {
+      // Case: TC-394
+      // Given: an existing panel and a call whose registration is pending
+      const deps = createDeps({ [TEST_REPO]: REPO_STATE });
+      await show(deps);
+      vi.clearAllMocks();
+      const registration = deferNextRegistration();
+      const pending = show(deps, createRootUri());
+
+      // When: the user closes the panel before the registration completes
+      GitKeizuView.currentPanel!.dispose();
+      completeRegistration(registration, { [TEST_REPO]: REPO_STATE, [SCM_REPO]: REPO_STATE });
+      await pending;
+
+      // Then: the open is dropped: no new panel, no reveal, no selectRepo
+      expect(GitKeizuView.currentPanel).toBeUndefined();
+      expect(createWebviewPanelMock).toHaveBeenCalledTimes(0);
+      expect(mocks.reveal).toHaveBeenCalledTimes(0);
+      expect(sentMessages("selectRepo")).toHaveLength(0);
+    });
+
+    it("lets a call made after the close create a fresh panel while the stale call is dropped (TC-395)", async () => {
+      // Case: TC-395
+      // Given: an existing panel, a pending call targeting it, and the panel then being closed
+      const deps = createDeps({ [TEST_REPO]: REPO_STATE });
+      await show(deps);
+      vi.clearAllMocks();
+      const stale = deferNextRegistration();
+      const fresh = deferNextRegistration();
+      const stalePending = show(deps, createRootUri());
+      GitKeizuView.currentPanel!.dispose();
+
+      // When: a new call starts after the close and both registrations complete in call order
+      const freshPending = show(deps, createSiblingUri());
+      completeRegistration(stale, { [TEST_REPO]: REPO_STATE, [SCM_REPO]: REPO_STATE });
+      completeRegistration(fresh, {
+        [TEST_REPO]: REPO_STATE,
+        [SCM_REPO]: REPO_STATE,
+        [SIBLING_REPO]: REPO_STATE
+      });
+      await Promise.all([stalePending, freshPending]);
+
+      // Then: only the fresh call creates a panel, nothing is revealed, and the fresh repo is recorded
       expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
       expect(mocks.reveal).toHaveBeenCalledTimes(0);
       expect(deps.mockExtensionState.getLastActiveRepo()).toBe(SIBLING_REPO);

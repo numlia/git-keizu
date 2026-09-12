@@ -6,8 +6,8 @@
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 9
-> Total Sections: 32
-> Total Cases: 164
+> Total Sections: 33
+> Total Cases: 166
 
 ## Shards
 
@@ -16,7 +16,7 @@
 | 01-message-routing-01.md             | message-routing             | 9        | 27    | 2026-05-17   |
 | 01-message-routing-02.md             | message-routing             | 1        | 7     | 2026-07-04   |
 | 01-message-routing-03.md             | message-routing             | 3        | 26    | 2026-08-06   |
-| 02-state-lifecycle-01.md             | state-lifecycle             | 10       | 44    | 2026-09-12   |
+| 02-state-lifecycle-01.md             | state-lifecycle             | 11       | 46    | 2026-09-12   |
 | 03-worktree-actions-01.md            | worktree-actions            | 4        | 22    | 2026-07-19   |
 | 04-context-menu-recent-actions-01.md | context-menu-recent-actions | 2        | 3     | 2026-05-10   |
 | 05-branch-cleanup-01.md              | branch-cleanup              | 1        | 15    | 2026-08-25   |

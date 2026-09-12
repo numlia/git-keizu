@@ -93,6 +93,9 @@ export class GitKeizuView {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
+    // The panel this call would reveal. If the user closes it while the registration below is
+    // pending, the open is dropped instead of reopening a tab that was closed on purpose.
+    const targetPanel = GitKeizuView.currentPanel;
 
     if (rootUri !== undefined) {
       extensionState.setLastActiveRepo(getPathFromUri(rootUri));
@@ -105,6 +108,10 @@ export class GitKeizuView {
       } catch {
         // The earlier open already delivered its failure to its own caller.
       }
+    }
+
+    if (targetPanel !== undefined && GitKeizuView.currentPanel !== targetPanel) {
+      return;
     }
 
     if (GitKeizuView.currentPanel) {
