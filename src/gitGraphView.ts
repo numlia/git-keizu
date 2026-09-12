@@ -27,6 +27,7 @@ import {
 } from "./types";
 import { abbrevCommit, copyToClipboard, getPathFromUri, openFile } from "./utils";
 
+const CONFIG_SECTION = "git-keizu";
 const CSS_COLOR_VAR_PREFIX = "--git-keizu-color";
 const DEFAULT_PUSH_REMOTE = "origin";
 const INVALID_REF_NAME_MESSAGE = "Invalid ref name.";
@@ -49,6 +50,10 @@ export class GitKeizuView {
   private disposables: vscode.Disposable[] = [];
   private isGraphViewLoaded: boolean = false;
   private isPanelVisible: boolean = true;
+  // The retained webview keeps the config and repo set it was rendered with; these flags record
+  // what changed since then so a reveal can decide between a soft refresh and a full rebuild.
+  private configChangedSinceRender: boolean = false;
+  private reposChangedWhileHidden: boolean = false;
   private currentRepo: string | null = null;
 
   public static createOrShow(
@@ -137,9 +142,8 @@ export class GitKeizuView {
       () => {
         if (this.panel.visible !== this.isPanelVisible) {
           if (this.panel.visible) {
-            if (this.retainContextWhenHidden) {
-              // The webview still holds its DOM and state, so only its data needs refreshing.
-              this.sendMessage({ command: "refresh" });
+            if (this.canReuseRetainedWebview()) {
+              this.refreshRetainedWebview();
             } else {
               this.update();
             }
@@ -154,14 +158,27 @@ export class GitKeizuView {
       this.disposables
     );
 
+    vscode.workspace.onDidChangeConfiguration(
+      (event) => {
+        if (event.affectsConfiguration(CONFIG_SECTION)) {
+          this.configChangedSinceRender = true;
+        }
+      },
+      null,
+      this.disposables
+    );
+
     this.repoFileWatcher = new RepoFileWatcher(() => {
       if (this.panel.visible) {
         this.sendMessage({ command: "refresh" });
       }
     });
     this.repoManager.registerViewCallback((repos: GitRepoSet, numRepos: number) => {
-      if (!this.panel.visible) return;
-      if ((numRepos === 0 && this.isGraphViewLoaded) || (numRepos > 0 && !this.isGraphViewLoaded)) {
+      if (!this.panel.visible) {
+        this.reposChangedWhileHidden = true;
+        return;
+      }
+      if (this.isGraphViewStale(numRepos)) {
         this.update();
       } else {
         this.respondLoadRepos(repos);
@@ -641,7 +658,32 @@ export class GitKeizuView {
   }
 
   private async update() {
+    this.configChangedSinceRender = false;
+    this.reposChangedWhileHidden = false;
     this.panel.webview.html = await this.getHtmlForWebview();
+  }
+
+  // The graph page and the "unable to load" page are different HTML, so crossing the zero-repo
+  // boundary always needs a rebuild.
+  private isGraphViewStale(numRepos: number): boolean {
+    return (numRepos === 0 && this.isGraphViewLoaded) || (numRepos > 0 && !this.isGraphViewLoaded);
+  }
+
+  private canReuseRetainedWebview(): boolean {
+    return (
+      this.retainContextWhenHidden &&
+      !this.configChangedSinceRender &&
+      !this.isGraphViewStale(Object.keys(this.repoManager.getRepos()).length)
+    );
+  }
+
+  // The retained webview still holds its DOM and state, so it only needs the data it missed.
+  private refreshRetainedWebview() {
+    if (this.reposChangedWhileHidden) {
+      this.reposChangedWhileHidden = false;
+      this.respondLoadRepos(this.repoManager.getRepos());
+    }
+    this.sendMessage({ command: "refresh" });
   }
 
   private async getHtmlForWebview() {
