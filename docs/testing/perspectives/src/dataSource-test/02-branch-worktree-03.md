@@ -10,13 +10,14 @@
 
 > Origin: Feature 052 (detached-worktree-display) (light-spec-plan)
 > Added: 2026-08-08
+> Updated: 2026-09-12
 > Status: active
 > Supersedes: S22
 > Signature: `getWorktrees(repo: string): Promise<WorktreeCollection>` / `getCommits(repo, branches, maxCommits, showRemoteBranches, authors, commitOrdering)`
 > Target Path: `src/dataSource.ts`（`getWorktrees()` と `getCommits()` の pinned query / 統合。実装後に行範囲へ更新）
 > Test File: `tests/src/dataSource.test.ts`
 
-`getWorktrees()` の戻り値と失敗時 fallback を `WorktreeMap` / `{}` から `WorktreeCollection` / `{ branches: {}, detached: [] }` へ変え、`getCommits()` で worktree 取得を先行させたうえで、通常表示窓の外にある detached HEAD を `git log --no-walk=sorted` の別 query（pinned query）から取得して通常コミット列の末尾へ統合する変更。旧 S22 は戻り値が flat map、失敗時 fallback が `{}` であることを固定していたため supersede する。porcelain の分類規則は `src/worktree-test.md` S2、hash 値域は `src/utils-test.md` S7、ラベル描画は `web/main-test/01-rendering-02.md` S48 の責務。通常 log の `--max-count` / order flag / branch 引数の構成そのものは既存 S21 の責務で変更しない。
+`getWorktrees()` の戻り値と失敗時 fallback を `WorktreeMap` / `{}` から `WorktreeCollection` / `{ branches: {}, detached: [] }` へ変え、`getCommits()` で worktree 取得を先行させたうえで、通常表示窓の外にある detached HEAD を `git log --no-walk=sorted` の別 query（pinned query）から取得して通常コミット列の末尾へ統合する変更。2026-09-12 の更新で、pinned commit の親が通常列に存在する場合はその親（複数なら最も先頭側）の直前へ挿入する規則を追加した。末尾へ足したままだと子が親より後ろに並び、`web/graph.ts` の `determinePath()` が終了せず webview が「読み込み中」のまま固まるため（TC-364〜TC-366）。旧 S22 は戻り値が flat map、失敗時 fallback が `{}` であることを固定していたため supersede する。porcelain の分類規則は `src/worktree-test.md` S2、hash 値域は `src/utils-test.md` S7、ラベル描画は `web/main-test/01-rendering-02.md` S48 の責務。通常 log の `--max-count` / order flag / branch 引数の構成そのものは既存 S21 の責務で変更しない。
 
 | Case ID | Input / Precondition                                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                         | Notes                                       |
 | ------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
@@ -41,6 +42,9 @@
 | TC-310  | uncommitted changes あり、stash あり、pinned commit が ref を持つ状態で `getCommits()` を実行                | Normal - merge before post-processing                                      | 返却 `commits` の先頭が uncommitted changes 行、stash 行が既存位置に挿入され、末尾の pinned commit に `refs` が付与されている                                                                           | 統合を node 化・stash・ref 付与より前に行う |
 | TC-311  | `detached` に `isMain: true` の entry（detached main worktree）が 1 件だけある                               | Normal - detached main pinned                                              | その `head` が pinned args の revision に含まれる                                                                                                                                                       | 4.4 のラベル非表示とは独立に pinned 対象    |
 | TC-312  | detached 1 件を返す worktree query 込みで `getCommits()` を実行                                              | Normal - response collection shape                                         | 返却値の `worktrees` が `branches` と `detached` を持つ collection で、porcelain 由来の値と `toEqual` で一致する                                                                                        | 応答 field の形状                           |
+| TC-364  | 通常 log が A, B の順で返り、pinned commit D の親が先頭行 A である                                           | Normal - child of the head row                                             | 返却 `commits` の hash 列が `[D, A, B]` である（D が A の直前に入る）                                                                                                                                   | 親より前に子を置きグラフの無限ループを防ぐ  |
+| TC-365  | 通常 log が A, B, C の順で返り、pinned commit D の親が 2 行目の B である                                     | Boundary - parent inside the window                                        | 返却 `commits` の hash 列が `[A, D, B, C]` である（通常列内部の相対順は変わらない）                                                                                                                     | 挿入位置は親の直前                          |
+| TC-366  | 通常 log が A, B, C の順で返り、pinned merge commit D の親が `[B, A]`（A が先頭行）                          | Boundary - merge picks the earliest parent                                 | 返却 `commits` の hash 列が `[D, A, B, C]` で、D の `parentHashes` が `[B, A]` のままである                                                                                                             | 複数親は最も先頭側の親の直前                |
 
 ### 失敗源インベントリ（include-or-justify）— Feature 052 追加分（S47）
 
@@ -60,6 +64,7 @@
 | 統合を node 化・stash・ref 付与より後に行う                               | TC-310                                                                                                                                       |
 | detached main を pinned 対象から外す                                      | TC-311                                                                                                                                       |
 | 応答 field の形状が collection になっていない                             | TC-312                                                                                                                                       |
+| 親が通常列にある pinned commit を末尾へ置き、子が親より後ろに並ぶ         | TC-364、TC-365、TC-366                                                                                                                       |
 | 境界値（0 / empty）                                                       | TC-295（detached 0 件）、TC-293 / TC-309（空 collection）                                                                                    |
 | 境界値（maximum / +/-1）                                                  | TC-305（`maxCommits + 1` 件）、TC-306（`maxCommits` 以下）                                                                                   |
 | 境界値（minimum / NULL）                                                  | excluded(`maxCommits` の下限は既存 S21 / `web/main-test/07-load-count-01.md` の責務。`worktrees` は必須の collection で `null` を取り得ない) |
@@ -74,7 +79,7 @@
 - Validation: TC-300、TC-301
 - Exception: TC-293、TC-308
 - External: TC-309
-- Boundary: TC-295、TC-296、TC-299、TC-303、TC-304、TC-305、TC-306
+- Boundary: TC-295、TC-296、TC-299、TC-303、TC-304、TC-305、TC-306、TC-365、TC-366
 - Type: excluded(引数と戻り値の型契約は `src/types-test.md` S7 の責務。runtime の値検証は TC-301 で担保)
 
-**失敗系/正常系比（煙感知器）**: 正常系 9 件（TC-292、TC-294、TC-297、TC-298、TC-302、TC-307、TC-310、TC-311、TC-312）、失敗系 12 件（TC-293、TC-295、TC-296、TC-299、TC-300、TC-301、TC-303〜TC-306、TC-308、TC-309）。比 1.33 で近接（差 1 以内）ではないため、インベントリ再導出は不要と判断した。
+**失敗系/正常系比（煙感知器）**: 正常系 10 件（TC-292、TC-294、TC-297、TC-298、TC-302、TC-307、TC-310、TC-311、TC-312、TC-364）、失敗系 14 件（TC-293、TC-295、TC-296、TC-299、TC-300、TC-301、TC-303〜TC-306、TC-308、TC-309、TC-365、TC-366）。比 1.4 で近接（差 1 以内）ではないため、インベントリ再導出は不要と判断した。
