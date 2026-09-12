@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.2] - 2026-09-12
+
+This release makes Git Keizu work in a folder that is not itself a Git repository but contains several repositories side by side, such as a parent folder holding a few projects opened as one workspace.
+
+### Fixed
+
+- **The graph opens from the Source Control buttons in a multi-repository folder**: When VS Code listed several repositories under one workspace folder, every Git Keizu button in the Source Control view showed **Unable to load Git Keizu** instead of the graph (#49). The repository behind the pressed button was not registered before the view was first rendered, so the view saw no repositories at all. The button's repository is now registered before the panel is created or revealed, the graph opens with that repository selected, and the command palette and the repository dropdown work in the same folder. When several buttons are pressed in quick succession the most recently pressed repository ends up selected, and a view closed while a button press is still being processed is not reopened.
+
+### Changed
+
+- **Repositories directly under the workspace folder are discovered by default**: The default of `git-keizu.maxDepthOfRepoSearch` is now `1` instead of `0`, so a workspace whose root folder is not a repository lists the repositories one level below it in the repository dropdown as soon as the startup scan finishes. A root folder that is itself a repository is unaffected, and an explicit value in your settings is still respected. Repositories nested deeper than one level still need a higher value or can be opened from their Source Control button.
+
 ## [1.1.1] - 2026-09-12
 
 This release fixes a hang that left the view on the loading spinner whenever a detached-HEAD worktree was checked out on a commit newer than the loaded history.
@@ -574,7 +586,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.1.1...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.1.2...HEAD
+[1.1.2]: https://github.com/numlia/git-keizu/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/numlia/git-keizu/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/numlia/git-keizu/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/numlia/git-keizu/compare/v0.10.1...v1.0.0
