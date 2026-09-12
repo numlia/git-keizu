@@ -163,6 +163,18 @@ function collectDetachedHeads(worktrees: WorktreeCollection): string[] {
   return [...heads];
 }
 
+/**
+ * A pinned commit normally goes after the loaded window, but when one of its
+ * parents is already loaded it must precede that parent: the graph walks from a
+ * child down to its parents and never terminates if a parent comes first.
+ */
+function findPinnedInsertIndex(commits: GitCommit[], pinnedCommit: GitCommit): number {
+  const firstParentIndex = commits.findIndex((commit) =>
+    pinnedCommit.parentHashes.includes(commit.hash)
+  );
+  return firstParentIndex === -1 ? commits.length : firstParentIndex;
+}
+
 export class DataSource {
   private gitPath: string = DEFAULT_GIT_PATH;
   private gitLogFormat!: string;
@@ -239,7 +251,7 @@ export class DataSource {
     for (const pinnedCommit of pinnedCommits) {
       if (knownHashes.has(pinnedCommit.hash)) continue;
       knownHashes.add(pinnedCommit.hash);
-      commits.push(pinnedCommit);
+      commits.splice(findPinnedInsertIndex(commits, pinnedCommit), 0, pinnedCommit);
     }
 
     if (refData.head !== null) {
