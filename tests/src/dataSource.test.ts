@@ -5774,12 +5774,13 @@ describe("getFileHistory spawn orchestration (S49)", () => {
     mergeHash: FH(0xb5),
     docs: FH(0xb6)
   };
-  const similarLineage =
-    fileHistoryRecord(ANCHOR, [similar.mergeHash], ["M", CUR]) +
-    fileHistoryRecord(similar.upd, [similar.ren], ["M", CUR]) +
-    fileHistoryRecord(similar.ren, [similar.updLeg], ["R100", LEG, CUR]) +
-    fileHistoryRecord(similar.updLeg, [similar.base], ["M", LEG]) +
-    fileHistoryRecord(similar.base, [], ["A", LEG]);
+  const similarLineage = [
+    fileHistoryRecord(ANCHOR, [similar.mergeHash], ["M", CUR]),
+    fileHistoryRecord(similar.upd, [similar.ren], ["M", CUR]),
+    fileHistoryRecord(similar.ren, [similar.updLeg], ["R100", LEG, CUR]),
+    fileHistoryRecord(similar.updLeg, [similar.base], ["M", LEG]),
+    fileHistoryRecord(similar.base, [], ["A", LEG])
+  ].join("");
   const similarMerge = fileHistoryRecord(
     similar.mergeHash,
     [similar.docs, similar.upd],
@@ -5797,14 +5798,16 @@ describe("getFileHistory spawn orchestration (S49)", () => {
     oldAdd: FH(0xc7),
     init: FH(0xc8)
   };
-  const ce3Lineage =
-    fileHistoryRecord(ANCHOR, [ce3.recreate], ["M", F]) +
-    fileHistoryRecord(ce3.oldAdd, [ce3.init], ["A", F]);
-  const ce3Merge =
-    fileHistoryRecord(ce3.recreate, [ce3.mainU2, ce3.q], ["A", F]) +
-    fileHistoryRecord(ce3.recreate, [ce3.mainU2, ce3.q], ["A", F]) +
-    fileHistoryRecord(ce3.deleteMerge, [ce3.mainU1, ce3.p], ["D", F]) +
-    fileHistoryRecord(ce3.deleteMerge, [ce3.mainU1, ce3.p], ["D", F]);
+  const ce3Lineage = [
+    fileHistoryRecord(ANCHOR, [ce3.recreate], ["M", F]),
+    fileHistoryRecord(ce3.oldAdd, [ce3.init], ["A", F])
+  ].join("");
+  const ce3Merge = [
+    fileHistoryRecord(ce3.recreate, [ce3.mainU2, ce3.q], ["A", F]),
+    fileHistoryRecord(ce3.recreate, [ce3.mainU2, ce3.q], ["A", F]),
+    fileHistoryRecord(ce3.deleteMerge, [ce3.mainU1, ce3.p], ["D", F]),
+    fileHistoryRecord(ce3.deleteMerge, [ce3.mainU1, ce3.p], ["D", F])
+  ].join("");
   const ce3Ancestry = [
     `${ANCHOR} ${ce3.recreate}`,
     `${ce3.recreate} ${ce3.mainU2} ${ce3.q}`,
@@ -5894,10 +5897,11 @@ describe("getFileHistory spawn orchestration (S49)", () => {
     // Given: a lineage that stops at a non-anchor delete commit
     const del = FH(0xd1);
     const older = FH(0xd2);
-    const lineage =
-      fileHistoryRecord(ANCHOR, [del], ["M", F]) +
-      fileHistoryRecord(del, [older], ["D", F]) +
-      fileHistoryRecord(older, [], ["A", F]);
+    const lineage = [
+      fileHistoryRecord(ANCHOR, [del], ["M", F]),
+      fileHistoryRecord(del, [older], ["D", F]),
+      fileHistoryRecord(older, [], ["A", F])
+    ].join("");
     installSpawnSequence([{ stdout: lineage }, { stdout: "" }]);
 
     // When: the history is requested
@@ -6031,12 +6035,14 @@ describe("getFileHistory spawn orchestration (S49)", () => {
     const mainU = FH(0xe3);
     const x = FH(0xe4);
     const init = FH(0xe5);
-    const lineage =
-      fileHistoryRecord(ANCHOR, [ren], ["M", CUR]) +
-      fileHistoryRecord(ren, [birth], ["R100", LEG, CUR]);
-    const merge =
-      fileHistoryRecord(birth, [mainU, x], ["A", LEG]) +
-      fileHistoryRecord(birth, [mainU, x], ["A", LEG]);
+    const lineage = [
+      fileHistoryRecord(ANCHOR, [ren], ["M", CUR]),
+      fileHistoryRecord(ren, [birth], ["R100", LEG, CUR])
+    ].join("");
+    const merge = [
+      fileHistoryRecord(birth, [mainU, x], ["A", LEG]),
+      fileHistoryRecord(birth, [mainU, x], ["A", LEG])
+    ].join("");
     const ancestry = [
       `${ANCHOR} ${ren}`,
       `${ren} ${birth}`,
@@ -6061,9 +6067,10 @@ describe("getFileHistory spawn orchestration (S49)", () => {
     // Given: no lineage entries and a single birth merge (CE1 / CE2 shape)
     const mainU = FH(0xf1);
     const x = FH(0xf2);
-    const merge =
-      fileHistoryRecord(ANCHOR, [mainU, x], ["A", F]) +
-      fileHistoryRecord(ANCHOR, [mainU, x], ["A", F]);
+    const merge = [
+      fileHistoryRecord(ANCHOR, [mainU, x], ["A", F]),
+      fileHistoryRecord(ANCHOR, [mainU, x], ["A", F])
+    ].join("");
     installSpawnSequence([{ stdout: "" }, { stdout: merge }]);
 
     // When: the history is requested

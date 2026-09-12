@@ -374,10 +374,11 @@ describe("parseFileHistoryRecords (S3)", () => {
   it("folds consecutive records of one hash into one group in output order (TC-022)", () => {
     // Case: TC-022
     // Given: two records of h1 with two entries each, then one record of p1
-    const stdout =
-      rec(h1, [p1, p2], ["A", F], ["M", OTHER]) +
-      rec(h1, [p1, p2], ["D", F], ["M", OTHER]) +
-      rec(p1, [p2], ["M", F]);
+    const stdout = [
+      rec(h1, [p1, p2], ["A", F], ["M", OTHER]),
+      rec(h1, [p1, p2], ["D", F], ["M", OTHER]),
+      rec(p1, [p2], ["M", F])
+    ].join("");
 
     // When: the output is parsed
     const groups = parseFileHistoryRecords(stdout);
@@ -1260,12 +1261,13 @@ describe("measured fixture composition (S8)", () => {
     const updRenamed = H(0x14);
     const mergeHash = H(0x15);
     const fix = H(0x16);
-    const lineageStdout =
-      rec(fix, [mergeHash], ["M", CUR]) +
-      rec(updRenamed, [rename], ["M", CUR]) +
-      rec(rename, [updLegacy], ["R100", LEG, CUR]) +
-      rec(updLegacy, [base], ["M", LEG]) +
-      rec(base, [], ["A", LEG]);
+    const lineageStdout = [
+      rec(fix, [mergeHash], ["M", CUR]),
+      rec(updRenamed, [rename], ["M", CUR]),
+      rec(rename, [updLegacy], ["R100", LEG, CUR]),
+      rec(updLegacy, [base], ["M", LEG]),
+      rec(base, [], ["A", LEG])
+    ].join("");
     const mergeStdout = rec(mergeHash, [docs, updRenamed], ["R077", LEG, CUR]);
 
     // When: the pipeline runs
@@ -1293,13 +1295,16 @@ describe("measured fixture composition (S8)", () => {
     const unrelB = H(0x24);
     const evil = H(0x25);
     const editNew = H(0x26);
-    const lineageStdout =
-      rec(editNew, [evil], ["M", F]) +
-      rec(delF, [editF], ["D", F]) +
-      rec(editF, [addF], ["M", F]) +
-      rec(addF, [], ["A", F]);
-    const mergeStdout =
-      rec(evil, [unrelA, unrelB], ["A", F]) + rec(evil, [unrelA, unrelB], ["A", F]);
+    const lineageStdout = [
+      rec(editNew, [evil], ["M", F]),
+      rec(delF, [editF], ["D", F]),
+      rec(editF, [addF], ["M", F]),
+      rec(addF, [], ["A", F])
+    ].join("");
+    const mergeStdout = [
+      rec(evil, [unrelA, unrelB], ["A", F]),
+      rec(evil, [unrelA, unrelB], ["A", F])
+    ].join("");
     const ancestryStdout = graphOf([
       [editNew, evil],
       [evil, unrelA, unrelB],
@@ -1328,11 +1333,12 @@ describe("measured fixture composition (S8)", () => {
     recreate: H(0x47),
     editNew: H(0x48)
   };
-  const ce3MergeStdout =
-    rec(ce3.recreate, [ce3.mU2, ce3.qU], ["A", F]) +
-    rec(ce3.recreate, [ce3.mU2, ce3.qU], ["A", F]) +
-    rec(ce3.delMerge, [ce3.mU1, ce3.pU], ["D", F]) +
-    rec(ce3.delMerge, [ce3.mU1, ce3.pU], ["D", F]);
+  const ce3MergeStdout = [
+    rec(ce3.recreate, [ce3.mU2, ce3.qU], ["A", F]),
+    rec(ce3.recreate, [ce3.mU2, ce3.qU], ["A", F]),
+    rec(ce3.delMerge, [ce3.mU1, ce3.pU], ["D", F]),
+    rec(ce3.delMerge, [ce3.mU1, ce3.pU], ["D", F])
+  ].join("");
   const ce3GraphBelowRecreate = [
     [ce3.recreate, ce3.mU2, ce3.qU],
     [ce3.mU2, ce3.delMerge],
@@ -1346,8 +1352,10 @@ describe("measured fixture composition (S8)", () => {
   it("resolves CE3 to edit new f and the recreate merge only (TC-077)", () => {
     // Case: TC-077
     // Given: the measured CE3 stdout (delete by merge, recreate by merge)
-    const lineageStdout =
-      rec(ce3.editNew, [ce3.recreate], ["M", F]) + rec(ce3.addF, [ce3.init], ["A", F]);
+    const lineageStdout = [
+      rec(ce3.editNew, [ce3.recreate], ["M", F]),
+      rec(ce3.addF, [ce3.init], ["A", F])
+    ].join("");
     const ancestryStdout = graphOf([[ce3.editNew, ce3.recreate], ...ce3GraphBelowRecreate]);
 
     // When: the pipeline runs
@@ -1376,16 +1384,18 @@ describe("measured fixture composition (S8)", () => {
       reuseMerge: H(0x67),
       fix: H(0x68)
     };
-    const lineageStdout =
-      rec(c.fix, [c.reuseMerge], ["M", CUR]) +
-      rec(c.updRenamed, [c.rename], ["M", CUR]) +
-      rec(c.rename, [c.updLegacy], ["R100", LEG, CUR]) +
-      rec(c.updLegacy, [c.base], ["M", LEG]) +
-      rec(c.base, [], ["A", LEG]);
-    const mergeStdout =
-      rec(c.reuseMerge, [c.mUY, c.reuseX], ["A", LEG]) +
-      rec(c.reuseMerge, [c.mUY, c.reuseX], ["A", LEG]) +
-      rec(c.mergeRF, [c.updLegacy, c.updRenamed], ["R077", LEG, CUR]);
+    const lineageStdout = [
+      rec(c.fix, [c.reuseMerge], ["M", CUR]),
+      rec(c.updRenamed, [c.rename], ["M", CUR]),
+      rec(c.rename, [c.updLegacy], ["R100", LEG, CUR]),
+      rec(c.updLegacy, [c.base], ["M", LEG]),
+      rec(c.base, [], ["A", LEG])
+    ].join("");
+    const mergeStdout = [
+      rec(c.reuseMerge, [c.mUY, c.reuseX], ["A", LEG]),
+      rec(c.reuseMerge, [c.mUY, c.reuseX], ["A", LEG]),
+      rec(c.mergeRF, [c.updLegacy, c.updRenamed], ["R077", LEG, CUR])
+    ].join("");
     const ancestryStdout = graphOf([
       [c.fix, c.reuseMerge],
       [c.reuseMerge, c.mUY, c.reuseX],
@@ -1424,10 +1434,14 @@ describe("measured fixture composition (S8)", () => {
       rename: H(0x74),
       fix: H(0x75)
     };
-    const lineageStdout =
-      rec(c.fix, [c.rename], ["M", CUR]) + rec(c.rename, [c.birth], ["R100", LEG, CUR]);
-    const mergeStdout =
-      rec(c.birth, [c.mU, c.xU], ["A", LEG]) + rec(c.birth, [c.mU, c.xU], ["A", LEG]);
+    const lineageStdout = [
+      rec(c.fix, [c.rename], ["M", CUR]),
+      rec(c.rename, [c.birth], ["R100", LEG, CUR])
+    ].join("");
+    const mergeStdout = [
+      rec(c.birth, [c.mU, c.xU], ["A", LEG]),
+      rec(c.birth, [c.mU, c.xU], ["A", LEG])
+    ].join("");
     const ancestryStdout = graphOf([
       [c.fix, c.rename],
       [c.rename, c.birth],
