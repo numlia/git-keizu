@@ -83,6 +83,7 @@ Create and manage Git worktrees without leaving the graph.
 - Git operations refresh the graph in the background without blanking the view or discarding its state.
 - The view stays alive while its tab is in the background, so switching back to Git Keizu is immediate (`retainContextWhenHidden`, on by default).
 - Multiple repositories, configurable keyboard shortcuts, optional avatars, graph colours, date formats, and dialog defaults are supported.
+- A workspace folder that holds several repositories side by side works too: repositories one level below the folder are discovered automatically, and each Source Control button opens the graph on its own repository.
 
 ## Requirements
 
