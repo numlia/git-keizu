@@ -42,6 +42,9 @@ export class GitKeizuView {
   // registration checks resolve, and the most recently pressed repository must end up selected
   // regardless of which check finishes first.
   private static lastOpen: Promise<void> = Promise.resolve();
+  // Bumped whenever a panel is closed so that an open still waiting on its registration or on
+  // an earlier open does not recreate a tab the user closed in the meantime.
+  private static panelCloseCount = 0;
 
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionPath: string;
@@ -109,9 +112,7 @@ export class GitKeizuView {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
-    // The panel this call would reveal. If the user closes it while the registration below is
-    // pending, the open is dropped instead of reopening a tab that was closed on purpose.
-    const targetPanel = GitKeizuView.currentPanel;
+    const panelCloseCountAtStart = GitKeizuView.panelCloseCount;
 
     if (rootUri !== undefined) {
       extensionState.setLastActiveRepo(getPathFromUri(rootUri));
@@ -122,7 +123,9 @@ export class GitKeizuView {
       await previousOpen;
     }
 
-    if (targetPanel !== undefined && GitKeizuView.currentPanel !== targetPanel) {
+    // A panel was closed while this call was waiting: drop the open rather than reopening a tab
+    // the user closed on purpose.
+    if (GitKeizuView.panelCloseCount !== panelCloseCountAtStart) {
       return;
     }
 
@@ -698,6 +701,7 @@ export class GitKeizuView {
 
   public dispose() {
     GitKeizuView.currentPanel = undefined;
+    GitKeizuView.panelCloseCount += 1;
     this.panel.dispose();
     this.avatarManager.deregisterView();
     this.repoFileWatcher.stop();

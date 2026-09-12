@@ -1777,6 +1777,32 @@ describe("GitKeizuView createOrShow registration await (S36)", () => {
       expect(deps.mockExtensionState.getLastActiveRepo()).toBe(SIBLING_REPO);
     });
   });
+
+  describe("GitKeizuView createOrShow queued open after a panel close (S40)", () => {
+    it("does not recreate a panel that a predecessor created and the user then closed (TC-397)", async () => {
+      // Case: TC-397
+      // Given: no panel and two pending opens started before any panel existed
+      const deps = createDeps();
+      const first = deferNextRegistration();
+      const second = deferNextRegistration();
+      const firstPending = show(deps, createRootUri());
+      const secondPending = show(deps, createSiblingUri());
+
+      // When: the first open creates the panel, the user closes it, then the second completes
+      completeRegistration(first, { [SCM_REPO]: REPO_STATE });
+      await firstPending;
+      expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
+      GitKeizuView.currentPanel!.dispose();
+      completeRegistration(second, { [SCM_REPO]: REPO_STATE, [SIBLING_REPO]: REPO_STATE });
+      await secondPending;
+
+      // Then: the second open is dropped: no second panel, no reveal, no selectRepo
+      expect(GitKeizuView.currentPanel).toBeUndefined();
+      expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
+      expect(mocks.reveal).toHaveBeenCalledTimes(0);
+      expect(sentMessages("selectRepo")).toHaveLength(0);
+    });
+  });
 });
 
 describe("GitKeizuView viewState keybindings and loadMoreCommitsAutomatically (S7)", () => {
