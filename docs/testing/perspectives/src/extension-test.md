@@ -30,7 +30,7 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `(arg?: unknown) => void`
+**シグネチャ**: `(arg?: unknown) => Promise<void>`
 **テスト対象パス**: `src/extension.ts:21-41`
 
 | Case ID | Input / Precondition                                                                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                  | Notes            |
