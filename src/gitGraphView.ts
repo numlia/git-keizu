@@ -38,6 +38,10 @@ const UNREGISTERED_REMOTE_MESSAGE = "The selected remote is not registered in th
 
 export class GitKeizuView {
   public static currentPanel: GitKeizuView | undefined;
+  // Opens are applied in invocation order: several SCM buttons can be pressed before their
+  // registration checks resolve, and the most recently pressed repository must end up selected
+  // regardless of which check finishes first.
+  private static lastOpen: Promise<void> = Promise.resolve();
 
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionPath: string;
@@ -56,7 +60,29 @@ export class GitKeizuView {
   private reposChangedWhileHidden: boolean = false;
   private currentRepo: string | null = null;
 
-  public static async createOrShow(
+  public static createOrShow(
+    extensionPath: string,
+    dataSource: DataSource,
+    extensionState: ExtensionState,
+    avatarManager: AvatarManager,
+    repoManager: RepoManager,
+    rootUri?: vscode.Uri
+  ): Promise<void> {
+    const currentOpen = GitKeizuView.open(
+      GitKeizuView.lastOpen,
+      extensionPath,
+      dataSource,
+      extensionState,
+      avatarManager,
+      repoManager,
+      rootUri
+    );
+    GitKeizuView.lastOpen = currentOpen;
+    return currentOpen;
+  }
+
+  private static async open(
+    previousOpen: Promise<void>,
     extensionPath: string,
     dataSource: DataSource,
     extensionState: ExtensionState,
@@ -74,6 +100,11 @@ export class GitKeizuView {
       // before the panel exists; otherwise a workspace whose root is not a repo gets the
       // "unable to load" page.
       await repoManager.registerRepoFromUri(rootUri);
+      try {
+        await previousOpen;
+      } catch {
+        // The earlier open already delivered its failure to its own caller.
+      }
     }
 
     if (GitKeizuView.currentPanel) {

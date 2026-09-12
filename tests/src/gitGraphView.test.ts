@@ -1629,6 +1629,77 @@ describe("GitKeizuView createOrShow registration await (S36)", () => {
     ]);
     expect(loadWebviewMessagesMock).toHaveBeenCalledTimes(1);
   });
+
+  describe("GitKeizuView createOrShow invocation order (S37)", () => {
+    function createSiblingUri(): import("vscode").Uri {
+      return { fsPath: SIBLING_REPO } as unknown as import("vscode").Uri;
+    }
+
+    it("selects the later repo when its registration completes first (TC-391)", async () => {
+      // Case: TC-391
+      // Given: no panel and two calls for different repos, each waiting on its own registration
+      const deps = createDeps();
+      const first = deferNextRegistration();
+      const second = deferNextRegistration();
+      const firstPending = show(deps, createRootUri());
+      const secondPending = show(deps, createSiblingUri());
+
+      // When: the second registration completes before the first
+      completeRegistration(second, { [SIBLING_REPO]: REPO_STATE });
+      completeRegistration(first, { [SCM_REPO]: REPO_STATE, [SIBLING_REPO]: REPO_STATE });
+      await Promise.all([firstPending, secondPending]);
+
+      // Then: one panel, one reveal, and the later repo is the one selected and recorded
+      expect(mockRegisterRepoFromUri).toHaveBeenCalledTimes(2);
+      expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
+      expect(mocks.reveal).toHaveBeenCalledTimes(1);
+      expect(sentMessages("selectRepo")).toEqual([{ command: "selectRepo", repo: SIBLING_REPO }]);
+      expect(deps.mockExtensionState.getLastActiveRepo()).toBe(SIBLING_REPO);
+    });
+
+    it("selects the later repo when registrations complete in call order (TC-392)", async () => {
+      // Case: TC-392
+      // Given: no panel and two calls for different repos, each waiting on its own registration
+      const deps = createDeps();
+      const first = deferNextRegistration();
+      const second = deferNextRegistration();
+      const firstPending = show(deps, createRootUri());
+      const secondPending = show(deps, createSiblingUri());
+
+      // When: the registrations complete in call order
+      completeRegistration(first, { [SCM_REPO]: REPO_STATE });
+      completeRegistration(second, { [SCM_REPO]: REPO_STATE, [SIBLING_REPO]: REPO_STATE });
+      await Promise.all([firstPending, secondPending]);
+
+      // Then: the outcome matches the reverse-order case
+      expect(mockRegisterRepoFromUri).toHaveBeenCalledTimes(2);
+      expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
+      expect(mocks.reveal).toHaveBeenCalledTimes(1);
+      expect(sentMessages("selectRepo")).toEqual([{ command: "selectRepo", repo: SIBLING_REPO }]);
+      expect(deps.mockExtensionState.getLastActiveRepo()).toBe(SIBLING_REPO);
+    });
+
+    it("lets the later call open the panel when the earlier registration fails (TC-393)", async () => {
+      // Case: TC-393
+      // Given: no panel, an earlier call whose registration rejects, and a later call that succeeds
+      const deps = createDeps();
+      const first = deferNextRegistration();
+      const second = deferNextRegistration();
+      const firstPending = show(deps, createRootUri());
+      const secondPending = show(deps, createSiblingUri());
+
+      // When: the earlier registration rejects and the later one completes
+      first.reject(new Error(REGISTER_FAILED_MESSAGE));
+      completeRegistration(second, { [SIBLING_REPO]: REPO_STATE });
+
+      // Then: the earlier call rejects, the later call still creates the panel without a reveal
+      await expect(firstPending).rejects.toThrow(REGISTER_FAILED_MESSAGE);
+      await secondPending;
+      expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
+      expect(mocks.reveal).toHaveBeenCalledTimes(0);
+      expect(deps.mockExtensionState.getLastActiveRepo()).toBe(SIBLING_REPO);
+    });
+  });
 });
 
 describe("GitKeizuView viewState keybindings and loadMoreCommitsAutomatically (S7)", () => {

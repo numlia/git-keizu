@@ -248,3 +248,41 @@
 - Normal: TC-377、TC-378、TC-381、TC-382、TC-389、TC-390
 
 **失敗系/正常系比（煙感知器）**: 正常系6件（TC-377、TC-378、TC-381、TC-382、TC-389、TC-390）、失敗系9件（Boundary 7件 + External 2件）。失敗源は登録待ち・パネル生成・reveal・兄弟登録の4系統を上表で網羅したことを確認した。比率合わせのためのケース追加は行わない。
+
+## S37: createOrShow() 異なる rootUri の連続呼び出しを呼び出し順に適用する
+
+> Origin: Feature 057 (multi-repo-single-folder-workspace) issue #49 PR #60 レビュー指摘
+> Added: 2026-09-12
+> Status: active
+> Supersedes: -
+> Signature: `public static createOrShow(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, rootUri?: vscode.Uri): Promise<void>`
+> Target Path: `src/gitGraphView.ts`（`createOrShow()`と`open()`）
+> Test File: `tests/src/gitGraphView.test.ts`
+
+登録待ち（`registerRepoFromUri()`）は呼び出しごとに並行して走らせ、その後のパネル生成 / `reveal` / `selectRepo`（適用）だけを呼び出し順に直列化する。先行呼び出しの登録がrejectしても後続の適用は止めない（rejectは先行呼び出しの呼び出し元へ伝播済み）。S36の連打ケース（TC-384 / TC-385）は同一`rootUri`の回数だけを見ており、本セクションは異なる`rootUri`で最後に押したリポジトリが選択・記録されることを固定する。定数はS36と同じ。
+
+| Case ID | Input / Precondition                                                                                                                                                                                                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                            | Notes                              |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| TC-391  | `currentPanel`なし、`getRepos()`が`{}`。`SCM_REPO`の`rootUri`→`SIBLING_REPO`の`rootUri`の順に`createOrShow`を呼び、独立したdeferred d1・d2を返す。d2を先にresolve（`getRepos()`を`{ [SIBLING_REPO] }`へ）、次にd1をresolve（`{ [SCM_REPO], [SIBLING_REPO] }`へ） | Boundary - 逆順の完了（異なるrootUri）                                     | 両`Promise`完了後、`registerRepoFromUri`2回、`createWebviewPanel`1回、`reveal`1回、`selectRepo`メッセージが`{ command: "selectRepo", repo: SIBLING_REPO }`の1件のみ、`getLastActiveRepo()`が`SIBLING_REPO` | 最後に押したリポジトリが選択される |
+| TC-392  | TC-391と同条件でd1→d2の順にresolve（d1で`{ [SCM_REPO] }`、d2で`{ [SCM_REPO], [SIBLING_REPO] }`へ）                                                                                                                                                               | Normal - 呼び出し順の完了（異なるrootUri）                                 | TC-391と同じ                                                                                                                                                                                               | 完了順に依存しない                 |
+| TC-393  | TC-391と同条件でd1を`Error("register failed")`でreject、d2をresolve（`{ [SIBLING_REPO] }`へ）                                                                                                                                                                    | External - 先行呼び出しの登録reject                                        | 1回目の`Promise`が`"register failed"`でreject。2回目は完了し、`createWebviewPanel`1回、`reveal`0回、`getLastActiveRepo()`が`SIBLING_REPO`                                                                  | 先行のrejectで後続を止めない       |
+
+### 失敗源インベントリ（include-or-justify）— PR #60 レビュー対応分（S37）
+
+| 失敗源                                                 | 対応ケースまたは除外理由                                |
+| ------------------------------------------------------ | ------------------------------------------------------- |
+| 完了順で適用し、先に押したリポジトリが最後に選択される | TC-391                                                  |
+| 直列化により呼び出し順の完了で結果が変わる             | TC-392                                                  |
+| 先行呼び出しのrejectが後続の適用を止める               | TC-393                                                  |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）  | 2回: TC-391、TC-392。0回・1回はS36 TC-379〜TC-383が所有 |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(`rootUri`は`Uri`型で、拒否分岐を持たない)
+- Exception: excluded(追加したcatchは先行呼び出しのrejectを後続へ波及させないためのもので、Externalの TC-393 で検証する)
+- External: TC-393
+- Boundary: TC-391
+- Type: excluded(型はコンパイル時に保証)
+- Normal: TC-392
+
+**失敗系/正常系比（煙感知器）**: 正常系1件（TC-392）、失敗系2件（Boundary 1件 + External 1件）。比率合わせのためのケース追加は行わない。
