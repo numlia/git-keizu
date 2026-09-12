@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.1] - 2026-09-12
+
+This release fixes a hang that left the view on the loading spinner whenever a detached-HEAD worktree was checked out on a commit newer than the loaded history.
+
+### Fixed
+
+- **View no longer hangs on a detached worktree checked out above the loaded history**: Since 0.9.0 the HEAD of a detached-HEAD worktree is shown in the graph even when it lies outside the loaded history. When that HEAD was a child of a loaded commit — for example an unmerged pull request commit checked out on top of `main` — the pinned row was placed after its parent, and the graph layout never finished, so the view stayed on **Loading ...** with no error. Pinned rows are now placed directly before their parent, so the commit appears above `main` as expected. When two detached worktrees are stacked on each other outside the loaded history, the child is likewise kept above its parent regardless of the order Git reports them in. As a safety net, the graph layout now also finishes on any input where a parent precedes its child instead of looping forever.
+
 ## [1.1.0] - 2026-09-12
 
 This release adds File History highlighting — pick a file in a commit's details and see every commit in that file's history, renames and merges included, highlighted on the graph you already have — and makes switching back to the Git Keizu tab instant by keeping the view alive while it is hidden.
@@ -566,7 +574,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.1.1...HEAD
+[1.1.1]: https://github.com/numlia/git-keizu/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/numlia/git-keizu/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/numlia/git-keizu/compare/v0.10.1...v1.0.0
 [0.10.1]: https://github.com/numlia/git-keizu/compare/v0.10.0...v0.10.1
