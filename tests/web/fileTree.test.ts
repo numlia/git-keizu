@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import type { GitFileChange } from "../../src/types";
 import {
@@ -224,110 +224,247 @@ describe("generateGitFileListHtml", () => {
     expect(items[0].classList.contains("gitFile")).toBe(true);
     expect(items[0].classList.contains("M")).toBe(true);
   });
+});
 
-  // S2: アクションアイコン（ファイルを開く）の条件付きレンダリング
+/* ------------------------------------------------------------------ */
+/* S5: buildFileItemHtml file history action (fileTree-test.md)        */
+/* ------------------------------------------------------------------ */
 
-  // TC-011: 変更ファイルにアクションアイコンが表示される
-  it("renders open-file action icon for modified file (TC-011)", () => {
-    // Given: a modified file (type "M")
-    const files = [makeFile({ type: "M" })];
+const ALLOW: FileHistoryActionPredicate = () => true;
+const DENY: FileHistoryActionPredicate = () => false;
+const HIGHLIGHT_TITLE = "Highlight File History";
 
-    // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
-    const fragment = parseHtml(html);
+/** `A` / `D` / `M` / `R` rows under `src/deep/`, already in tree traversal order. */
+function makeDeepFiles(): GitFileChange[] {
+  return [
+    makeFile({
+      oldFilePath: "src/deep/a.ts",
+      newFilePath: "src/deep/a.ts",
+      type: "A",
+      additions: null,
+      deletions: null
+    }),
+    makeFile({
+      oldFilePath: "src/deep/d.ts",
+      newFilePath: "src/deep/d.ts",
+      type: "D",
+      additions: null,
+      deletions: null
+    }),
+    makeFile({ oldFilePath: "src/deep/m.ts", newFilePath: "src/deep/m.ts", type: "M" }),
+    makeFile({
+      oldFilePath: "src/deep/old.ts",
+      newFilePath: "src/deep/r.ts",
+      type: "R",
+      additions: 0,
+      deletions: 0
+    })
+  ];
+}
 
-    // Then: action icon with openFile class is present
-    const actionIcon = fragment.querySelector(".gitFileAction.openFile");
-    expect(actionIcon).not.toBeNull();
+function actionsOf(fragment: ParentNode, newFilePath: string): Element | null {
+  const row = fragment.querySelector(`li[data-newfilepath="${encodeURIComponent(newFilePath)}"]`);
+  expect(row).not.toBeNull();
+  return row!.querySelector(".gitFileActions");
+}
+
+// @see docs/testing/perspectives/web/fileTree-test.md
+describe("buildFileItemHtml file history action (S5)", () => {
+  it("renders openFile then highlightFileHistory for a modified row (TC-031)", () => {
+    // Case: TC-031
+    // Given: a list with one M row and an allowing predicate
+    const files = [makeFile()];
+
+    // When: the list HTML is generated
+    const fragment = parseHtml(generateGitFileListHtml(files, ALLOW));
+
+    // Then: .gitFileActions has exactly two children in the fixed order
+    const actions = fragment.querySelector(".gitFileActions");
+    expect(actions).not.toBeNull();
+    expect(actions!.children).toHaveLength(2);
+    expect(actions!.children[0].matches(".gitFileAction.openFile")).toBe(true);
+    expect(actions!.children[1].matches(".gitFileAction.highlightFileHistory")).toBe(true);
   });
 
-  // TC-012: 追加ファイルにアクションアイコンが表示される
-  it("renders open-file action icon for added file (TC-012)", () => {
-    // Given: an added file (type "A")
-    const files = [makeFile({ type: "A", additions: null, deletions: null })];
+  it("renders the history icon with its title and codicon glyph (TC-032)", () => {
+    // Case: TC-032
+    // Given: a list with one M row and an allowing predicate
+    const files = [makeFile()];
 
-    // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
-    const fragment = parseHtml(html);
+    // When: the list HTML is generated
+    const fragment = parseHtml(generateGitFileListHtml(files, ALLOW));
 
-    // Then: action icon with openFile class is present
-    const actionIcon = fragment.querySelector(".gitFileAction.openFile");
-    expect(actionIcon).not.toBeNull();
+    // Then: the history icon carries the title and wraps a .codicon-history element
+    const icon = fragment.querySelector(".highlightFileHistory");
+    expect(icon).not.toBeNull();
+    expect(icon!.getAttribute("title")).toBe(HIGHLIGHT_TITLE);
+    expect(icon!.querySelector(".codicon-history")).not.toBeNull();
   });
 
-  // TC-013: リネームファイルにアクションアイコンが表示される
-  it("renders open-file action icon for renamed file (TC-013)", () => {
-    // Given: a renamed file (type "R")
-    const files = [
-      makeFile({
-        oldFilePath: "src/old.ts",
-        newFilePath: "src/new.ts",
-        type: "R",
-        additions: 0,
-        deletions: 0
-      })
-    ];
-
-    // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
-    const fragment = parseHtml(html);
-
-    // Then: action icon with openFile class is present
-    const actionIcon = fragment.querySelector(".gitFileAction.openFile");
-    expect(actionIcon).not.toBeNull();
-  });
-
-  // TC-014: 削除ファイルにはアクションアイコンが表示されない
-  it("does not render open-file action icon for deleted file (TC-014)", () => {
-    // Given: a deleted file (type "D")
+  it("renders only the history icon for a deleted row (TC-033)", () => {
+    // Case: TC-033
+    // Given: a list with one D row and an allowing predicate
     const files = [makeFile({ type: "D", additions: null, deletions: null })];
 
-    // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
-    const fragment = parseHtml(html);
+    // When: the list HTML is generated
+    const fragment = parseHtml(generateGitFileListHtml(files, ALLOW));
 
-    // Then: no action icon is present
-    const actionIcon = fragment.querySelector(".gitFileAction.openFile");
-    expect(actionIcon).toBeNull();
+    // Then: .gitFileActions exists with a single highlightFileHistory child and no openFile
+    const actions = fragment.querySelector(".gitFileActions");
+    expect(actions).not.toBeNull();
+    expect(actions!.children).toHaveLength(1);
+    expect(actions!.children[0].matches(".highlightFileHistory")).toBe(true);
+    expect(actions!.querySelector(".openFile")).toBeNull();
   });
 
-  // TC-015: アイコンに codicon-go-to-file クラスが含まれる
-  it("action icon contains codicon-go-to-file class (TC-015)", () => {
-    // Given: a modified file (type "M")
-    const files = [makeFile({ type: "M" })];
-
-    // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
-    const fragment = parseHtml(html);
-
-    // Then: icon element contains codicon-go-to-file class
-    const icon = fragment.querySelector(".codicon-go-to-file");
-    expect(icon).not.toBeNull();
-  });
-
-  // TC-016: 混在ファイルタイプでアイコン数が非削除ファイル数と一致する
-  it("renders action icons only for non-deleted files (TC-016)", () => {
-    // Given: 4 files of types A, M, D, R
-    const files: GitFileChange[] = [
-      makeFile({ newFilePath: "a.ts", type: "A", additions: null, deletions: null }),
-      makeFile({ newFilePath: "m.ts", type: "M" }),
-      makeFile({ newFilePath: "d.ts", type: "D", additions: null, deletions: null }),
+  it("renders both icons for added and renamed rows (TC-034)", () => {
+    // Case: TC-034
+    // Given: a list with an A row and an R row and an allowing predicate
+    const files = [
+      makeFile({ newFilePath: "src/a.ts", type: "A", additions: null, deletions: null }),
       makeFile({
-        oldFilePath: "old.ts",
-        newFilePath: "r.ts",
+        oldFilePath: "src/old.ts",
+        newFilePath: "src/r.ts",
         type: "R",
         additions: 0,
         deletions: 0
       })
     ];
 
-    // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
-    const fragment = parseHtml(html);
+    // When: the list HTML is generated
+    const fragment = parseHtml(generateGitFileListHtml(files, ALLOW));
 
-    // Then: exactly 3 action icons (A, M, R — not D)
-    const actionIcons = fragment.querySelectorAll(".gitFileAction.openFile");
-    expect(actionIcons).toHaveLength(3);
+    // Then: both rows have two children with the history icon second
+    for (const path of ["src/a.ts", "src/r.ts"]) {
+      const actions = actionsOf(fragment, path);
+      expect(actions, path).not.toBeNull();
+      expect(actions!.children, path).toHaveLength(2);
+      expect(actions!.children[1].matches(".highlightFileHistory"), path).toBe(true);
+    }
+  });
+
+  it("renders only openFile when the predicate denies a modified row (TC-035)", () => {
+    // Case: TC-035
+    // Given: a list with one M row and a denying predicate
+    const files = [makeFile()];
+
+    // When: the list HTML is generated
+    const fragment = parseHtml(generateGitFileListHtml(files, DENY));
+
+    // Then: openFile is present, the history icon is absent and .gitFileActions has one child
+    expect(fragment.querySelector(".openFile")).not.toBeNull();
+    expect(fragment.querySelector(".highlightFileHistory")).toBeNull();
+    expect(fragment.querySelector(".gitFileActions")!.children).toHaveLength(1);
+  });
+
+  it("omits .gitFileActions when a deleted row has no action (TC-036)", () => {
+    // Case: TC-036
+    // Given: a list with one D row and a denying predicate
+    const files = [makeFile({ type: "D", additions: null, deletions: null })];
+
+    // When: the list HTML is generated
+    const fragment = parseHtml(generateGitFileListHtml(files, DENY));
+
+    // Then: no .gitFileActions wrapper is rendered at all
+    expect(fragment.querySelector(".gitFileActions")).toBeNull();
+  });
+
+  it("renders four history icons and three openFile icons for mixed types (TC-037)", () => {
+    // Case: TC-037
+    // Given: a list with A / M / D / R rows and an allowing predicate
+    const files = makeDeepFiles();
+
+    // When: the list HTML is generated
+    const fragment = parseHtml(generateGitFileListHtml(files, ALLOW));
+
+    // Then: every row has a history icon and every non-D row has an openFile icon
+    expect(fragment.querySelectorAll(".highlightFileHistory")).toHaveLength(4);
+    expect(fragment.querySelectorAll(".openFile")).toHaveLength(3);
+    expect(fragment.querySelectorAll(".codicon-go-to-file")).toHaveLength(3);
+  });
+
+  it("calls the predicate once per list row with that row's GitFileChange (TC-038)", () => {
+    // Case: TC-038
+    // Given: three rows already in sorted order and a spying predicate
+    const files = [
+      makeFile({ oldFilePath: "src/a.ts", newFilePath: "src/a.ts" }),
+      makeFile({ oldFilePath: "src/b.ts", newFilePath: "src/b.ts" }),
+      makeFile({ oldFilePath: "src/c.ts", newFilePath: "src/c.ts" })
+    ];
+    const predicate = vi.fn(() => true);
+
+    // When: the list HTML is generated
+    generateGitFileListHtml(files, predicate);
+
+    // Then: three calls, each receiving the same GitFileChange reference as its row
+    expect(predicate).toHaveBeenCalledTimes(3);
+    for (let i = 0; i < files.length; i++) {
+      expect(predicate.mock.calls[i][0]).toBe(files[i]);
+    }
+  });
+
+  it("passes the predicate through tree recursion (TC-039)", () => {
+    // Case: TC-039
+    // Given: A / D / M / R rows under src/deep/ and a spying predicate
+    const files = makeDeepFiles();
+    const tree = generateGitFileTree(files);
+    const predicate = vi.fn(() => true);
+
+    // When: the tree HTML is generated
+    const fragment = parseHtml(generateGitFileTreeHtml(tree, files, predicate));
+
+    // Then: four history icons, three openFile icons and one predicate call per row
+    expect(fragment.querySelectorAll(".highlightFileHistory")).toHaveLength(4);
+    expect(fragment.querySelectorAll(".openFile")).toHaveLength(3);
+    expect(predicate).toHaveBeenCalledTimes(4);
+    for (let i = 0; i < files.length; i++) {
+      expect(predicate.mock.calls[i][0]).toBe(files[i]);
+    }
+  });
+
+  it("renders no history icon through tree recursion when denied (TC-040)", () => {
+    // Case: TC-040
+    // Given: the same src/deep/ rows and a denying predicate
+    const files = makeDeepFiles();
+    const tree = generateGitFileTree(files);
+
+    // When: the tree HTML is generated
+    const fragment = parseHtml(generateGitFileTreeHtml(tree, files, DENY));
+
+    // Then: no history icon, three openFile icons and three .gitFileActions wrappers (D omitted)
+    expect(fragment.querySelectorAll(".highlightFileHistory")).toHaveLength(0);
+    expect(fragment.querySelectorAll(".openFile")).toHaveLength(3);
+    expect(fragment.querySelectorAll(".gitFileActions")).toHaveLength(3);
+  });
+
+  it("renders identical .gitFileActions in list and tree views (TC-041)", () => {
+    // Case: TC-041
+    // Given: the same M and D rows for both views and an allowing predicate
+    const files = [
+      makeFile({ oldFilePath: "src/m.ts", newFilePath: "src/m.ts" }),
+      makeFile({
+        oldFilePath: "src/d.ts",
+        newFilePath: "src/d.ts",
+        type: "D",
+        additions: null,
+        deletions: null
+      })
+    ];
+
+    // When: both views are generated
+    const listFragment = parseHtml(generateGitFileListHtml(files, ALLOW));
+    const treeFragment = parseHtml(
+      generateGitFileTreeHtml(generateGitFileTree(files), files, ALLOW)
+    );
+
+    // Then: rows with the same data-newfilepath have the same .gitFileActions innerHTML
+    for (const path of ["src/m.ts", "src/d.ts"]) {
+      const listActions = actionsOf(listFragment, path);
+      const treeActions = actionsOf(treeFragment, path);
+      expect(listActions, path).not.toBeNull();
+      expect(treeActions, path).not.toBeNull();
+      expect(treeActions!.innerHTML, path).toBe(listActions!.innerHTML);
+    }
   });
 });
 

@@ -97,7 +97,7 @@
 > Status: active
 > Supersedes: S2
 > Signature: `generateGitFileListHtml(gitFiles: GitFileChange[], canHighlightFileHistory: FileHistoryActionPredicate): string` / `generateGitFileTreeHtml(folder: GitFolder, gitFiles: GitFileChange[], canHighlightFileHistory: FileHistoryActionPredicate): string`（`buildFileItemHtml()`は非exportで両関数経由）
-> Target Path: `web/fileTree.ts`（`buildFileItemHtml()`・`generateGitFileTreeHtml()`・`generateGitFileListHtml()`。Task 5完了時に行範囲へ更新）
+> Target Path: `web/fileTree.ts:44-143`
 > Test File: `tests/web/fileTree.test.ts`
 
 S2は`openFile`アイコンだけを前提にし、`D`行では`.gitFileActions`自体を描画しない契約（TC-014）だったが、対応プラン§3.5で`.gitFileAction.openFile`の直後に`.gitFileAction.highlightFileHistory`を並べ、`D`行でも判定関数が`true`なら履歴アイコンだけを描画する契約へ変わったため、S2のアクションアイコン契約を新signatureの下で再定義する。`web/fileTree.ts`は判定関数`FileHistoryActionPredicate`を行ごとに1回呼ぶだけで、uncommitted / stash / 比較表示 / typeの4条件の中身は`web/fileMenu-test.md` S6、`web/main.ts`が渡す関数の形は`web/main-test/06-file-actions-01.md` S54の責務で本表には含めない。基本fixtureは`makeFile()`（`M`、`src/file.ts`、+5 / -2）、`ALLOW = () => true`、`DENY = () => false`。

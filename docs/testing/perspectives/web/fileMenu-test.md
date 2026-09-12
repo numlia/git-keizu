@@ -165,7 +165,7 @@ S2 / S3 は 3 引数 signature と「items が `Open File` 1 件」を前提に�
 > Status: active
 > Supersedes: -
 > Signature: `canHighlightFileHistory(expandedCommit: FileMenuExpandedCommit, isStash: boolean, changeType: string | undefined): boolean` / `sendHighlightFileHistoryAction(fileRow: HTMLElement | null, expandedCommit: FileMenuExpandedCommit | null, repo: string | null, fileHistory: FileHistoryMenuContext): void`
-> Target Path: `web/fileMenu.ts`（`canHighlightFileHistory()`・`sendHighlightFileHistoryAction()`。Task 5完了時に行範囲へ更新）
+> Target Path: `web/fileMenu.ts:68-102`
 > Test File: `tests/web/fileMenu.test.ts`
 
 context menuが持つ4条件（uncommittedでない / stashでない / 比較表示でない / change typeが`A` / `M` / `D` / `R`）をexport関数`canHighlightFileHistory()`の1か所に置き、履歴アイコンのclickから呼ぶ`sendHighlightFileHistoryAction()`が`sendOpenFileAction()`と同じ4ガードのあとにその時点の入力で同じ4条件を再評価してから`onHighlightFileHistory(anchorHash, decodeURIComponent(path))`を1回呼ぶ契約の観点（対応プラン§3.4、§4 Task 2）。menu側の戻り値はS4 / S5、DOM listenerの配線は`web/main-test/06-file-actions-01.md` S54、requestの送信は`web/fileHistory-test.md`の責務で本表には含めない。基本fixtureは`{ hash: "abc", compareWithHash: null }`、`isStash: false`、type `M`で`newfilepath: "src%2Ffile.ts"`の行、`makeFileHistoryContext()`。

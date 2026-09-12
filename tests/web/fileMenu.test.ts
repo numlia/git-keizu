@@ -8,9 +8,11 @@ vi.mock("../../web/contextMenu", () => ({
 import { recordRecentAction } from "../../web/contextMenu";
 import {
   buildFileContextMenuItems,
+  canHighlightFileHistory,
   type FileHistoryMenuContext,
   type FileMenuExpandedCommit,
   resolveFileRow,
+  sendHighlightFileHistoryAction,
   sendOpenFileAction
 } from "../../web/fileMenu";
 import { vscode } from "../../web/utils";
@@ -503,5 +505,266 @@ describe("buildFileContextMenuItems Open File item under the 4-argument signatur
     // Then: no menu item exists and no recent action is recorded
     expect(items).toEqual([]);
     expect(recordRecentAction).toHaveBeenCalledTimes(0);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S6: 共有判定とアイコン起動                                          */
+/* ------------------------------------------------------------------ */
+
+const ANCHOR_HASH = "abc";
+const COMPARE_HASH = "def";
+const ENCODED_BASE_PATH = "src%2Ffile.ts";
+
+// @see docs/testing/perspectives/web/fileMenu-test.md
+describe("canHighlightFileHistory (S6)", () => {
+  it("returns true for a modified row on a normal commit (TC-033)", () => {
+    // Case: TC-033
+    // Given: a normal commit, no stash and change type M
+    // When: the shared check runs
+    const result = canHighlightFileHistory(makeExpandedCommit(ANCHOR_HASH), false, "M");
+
+    // Then: eligible
+    expect(result).toBe(true);
+  });
+
+  it("returns true for A, D and R change types (TC-034)", () => {
+    // Case: TC-034
+    // Given: the other allowed change types
+    for (const type of ["A", "D", "R"]) {
+      // When: the shared check runs
+      const result = canHighlightFileHistory(makeExpandedCommit(ANCHOR_HASH), false, type);
+
+      // Then: eligible
+      expect(result, type).toBe(true);
+    }
+  });
+
+  it("returns false for a typechange row (TC-035)", () => {
+    // Case: TC-035
+    // Given: change type T
+    // When: the shared check runs
+    const result = canHighlightFileHistory(makeExpandedCommit(ANCHOR_HASH), false, "T");
+
+    // Then: not eligible
+    expect(result).toBe(false);
+  });
+
+  it("returns false when the change type is undefined (TC-036)", () => {
+    // Case: TC-036
+    // Given: a missing data-type
+    // When: the shared check runs
+    const result = canHighlightFileHistory(makeExpandedCommit(ANCHOR_HASH), false, undefined);
+
+    // Then: not eligible
+    expect(result).toBe(false);
+  });
+
+  it("returns false for uncommitted changes (TC-037)", () => {
+    // Case: TC-037
+    // Given: the uncommitted changes hash
+    // When: the shared check runs
+    const result = canHighlightFileHistory(makeExpandedCommit("*"), false, "M");
+
+    // Then: not eligible
+    expect(result).toBe(false);
+  });
+
+  it("returns false for a stash commit (TC-038)", () => {
+    // Case: TC-038
+    // Given: isStash true
+    // When: the shared check runs
+    const result = canHighlightFileHistory(makeExpandedCommit(ANCHOR_HASH), true, "M");
+
+    // Then: not eligible
+    expect(result).toBe(false);
+  });
+
+  it("returns false in comparison mode (TC-039)", () => {
+    // Case: TC-039
+    // Given: a compare target
+    // When: the shared check runs
+    const result = canHighlightFileHistory(
+      { hash: ANCHOR_HASH, compareWithHash: COMPARE_HASH },
+      false,
+      "M"
+    );
+
+    // Then: not eligible
+    expect(result).toBe(false);
+  });
+});
+
+// @see docs/testing/perspectives/web/fileMenu-test.md
+describe("sendHighlightFileHistoryAction (S6)", () => {
+  beforeEach(() => {
+    vi.mocked(vscode.postMessage).mockClear();
+    vi.mocked(recordRecentAction).mockClear();
+  });
+
+  it("calls onHighlightFileHistory once with the anchor and decoded path (TC-040)", () => {
+    // Case: TC-040
+    // Given: the base row, commit, repo and context
+    const context = makeFileHistoryContext();
+
+    // When: the action runs
+    sendHighlightFileHistoryAction(
+      makeFileRow({ newfilepath: ENCODED_BASE_PATH }),
+      makeExpandedCommit(ANCHOR_HASH),
+      TEST_REPO,
+      context
+    );
+
+    // Then: the callback gets ("abc", "src/file.ts") once; nothing posted or recorded
+    expect(context.onHighlightFileHistory).toHaveBeenCalledTimes(1);
+    expect(context.onHighlightFileHistory).toHaveBeenCalledWith(ANCHOR_HASH, "src/file.ts");
+    expect(vscode.postMessage).toHaveBeenCalledTimes(0);
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
+  });
+
+  it("decodes spaces and Japanese characters before the callback (TC-041)", () => {
+    // Case: TC-041
+    // Given: an encoded path with a space and Japanese characters
+    const context = makeFileHistoryContext();
+    const row = makeFileRow({ newfilepath: encodeURIComponent("src/テスト ファイル.ts") });
+
+    // When: the action runs
+    sendHighlightFileHistoryAction(row, makeExpandedCommit(ANCHOR_HASH), TEST_REPO, context);
+
+    // Then: the second argument is the fully decoded string
+    expect(context.onHighlightFileHistory).toHaveBeenCalledTimes(1);
+    expect(context.onHighlightFileHistory).toHaveBeenCalledWith(
+      ANCHOR_HASH,
+      "src/テスト ファイル.ts"
+    );
+  });
+
+  it("does nothing and does not throw when the file row is null (TC-042)", () => {
+    // Case: TC-042
+    // Given: resolveFileRow() failed for a target outside .gitFile
+    const context = makeFileHistoryContext();
+    const resolved = resolveFileRow(document.createElement("span"));
+
+    // When: the action runs with the null row
+    expect(() =>
+      sendHighlightFileHistoryAction(resolved, makeExpandedCommit(ANCHOR_HASH), TEST_REPO, context)
+    ).not.toThrow();
+
+    // Then: no callback
+    expect(context.onHighlightFileHistory).toHaveBeenCalledTimes(0);
+  });
+
+  it("does nothing when expandedCommit is null (TC-043)", () => {
+    // Case: TC-043
+    // Given: no commit context
+    const context = makeFileHistoryContext();
+
+    // When: the action runs
+    sendHighlightFileHistoryAction(
+      makeFileRow({ newfilepath: ENCODED_BASE_PATH }),
+      null,
+      TEST_REPO,
+      context
+    );
+
+    // Then: no callback
+    expect(context.onHighlightFileHistory).toHaveBeenCalledTimes(0);
+  });
+
+  it("does nothing when repo is null (TC-044)", () => {
+    // Case: TC-044
+    // Given: no repo
+    const context = makeFileHistoryContext();
+
+    // When: the action runs
+    sendHighlightFileHistoryAction(
+      makeFileRow({ newfilepath: ENCODED_BASE_PATH }),
+      makeExpandedCommit(ANCHOR_HASH),
+      null,
+      context
+    );
+
+    // Then: no callback
+    expect(context.onHighlightFileHistory).toHaveBeenCalledTimes(0);
+  });
+
+  it("does nothing when data-newfilepath is missing (TC-045)", () => {
+    // Case: TC-045
+    // Given: a row without data-newfilepath
+    const context = makeFileHistoryContext();
+
+    // When: the action runs
+    sendHighlightFileHistoryAction(
+      makeFileRow({}),
+      makeExpandedCommit(ANCHOR_HASH),
+      TEST_REPO,
+      context
+    );
+
+    // Then: no callback
+    expect(context.onHighlightFileHistory).toHaveBeenCalledTimes(0);
+  });
+
+  it("does nothing on the negative side of each of the four conditions (TC-046)", () => {
+    // Case: TC-046
+    // Given: five inputs that each fail one condition at click time
+    const baseRow = () => makeFileRow({ newfilepath: ENCODED_BASE_PATH });
+    const inputs: {
+      label: string;
+      row: HTMLElement;
+      commit: FileMenuExpandedCommit;
+      isStash: boolean;
+    }[] = [
+      { label: "uncommitted", row: baseRow(), commit: makeExpandedCommit("*"), isStash: false },
+      { label: "stash", row: baseRow(), commit: makeExpandedCommit(ANCHOR_HASH), isStash: true },
+      {
+        label: "compare",
+        row: baseRow(),
+        commit: { hash: ANCHOR_HASH, compareWithHash: COMPARE_HASH },
+        isStash: false
+      },
+      {
+        label: "typechange",
+        row: makeFileRow({ newfilepath: ENCODED_BASE_PATH }, "T"),
+        commit: makeExpandedCommit(ANCHOR_HASH),
+        isStash: false
+      },
+      {
+        label: "missing type",
+        row: makeUntypedFileRow({ newfilepath: ENCODED_BASE_PATH }),
+        commit: makeExpandedCommit(ANCHOR_HASH),
+        isStash: false
+      }
+    ];
+
+    for (const input of inputs) {
+      const context = makeFileHistoryContext({ isStash: input.isStash });
+
+      // When: the action runs
+      sendHighlightFileHistoryAction(input.row, input.commit, TEST_REPO, context);
+
+      // Then: no callback for that input
+      expect(context.onHighlightFileHistory, input.label).toHaveBeenCalledTimes(0);
+    }
+  });
+
+  it("calls the callback once for A, D and R rows (TC-047)", () => {
+    // Case: TC-047
+    // Given: rows of the other allowed change types
+    for (const type of ["A", "D", "R"]) {
+      const context = makeFileHistoryContext();
+
+      // When: the action runs
+      sendHighlightFileHistoryAction(
+        makeFileRow({ newfilepath: ENCODED_BASE_PATH }, type),
+        makeExpandedCommit(ANCHOR_HASH),
+        TEST_REPO,
+        context
+      );
+
+      // Then: exactly one callback whose first argument is the anchor hash
+      expect(context.onHighlightFileHistory, type).toHaveBeenCalledTimes(1);
+      expect(vi.mocked(context.onHighlightFileHistory).mock.calls[0][0], type).toBe(ANCHOR_HASH);
+    }
   });
 });
