@@ -383,9 +383,9 @@ function getPushedSubscriptions(context: MockExtensionContext): unknown[] {
   return pushCall;
 }
 
-function invokeViewCommand(arg?: unknown): void {
+function invokeViewCommand(arg?: unknown): unknown {
   const handler = getRegisteredCommandHandler(VIEW_COMMAND);
-  handler(arg);
+  return handler(arg);
 }
 
 function invokeClearAvatarCacheCommand(): void {
@@ -843,6 +843,32 @@ describe("extension", () => {
 
         // Then: the same Error and message are propagated from the command handler
         expectThrownError(commandAction, SHOW_FAILED_MESSAGE);
+      });
+
+      it("TC-038: returns the createOrShow promise from the view command handler", async () => {
+        // Case: TC-038
+        // Given: activate registers the view command and GitKeizuView.createOrShow returns a promise
+        await activateExtension();
+        const rootUri = vscode.Uri.file(DEFAULT_REPO_PATH);
+        const expectedPromise = Promise.resolve(undefined);
+        mocks.createOrShow.mockReturnValue(expectedPromise);
+
+        // When: the view command handler is called with the Uri argument
+        const result = invokeViewCommand(rootUri);
+
+        // Then: the handler returns the same promise instance so callers can await it
+        expect(result).toBe(expectedPromise);
+      });
+
+      it("TC-039: propagates createOrShow rejections from the view command handler", async () => {
+        // Case: TC-039
+        // Given: activate registers the view command and GitKeizuView.createOrShow rejects
+        await activateExtension();
+        const rootUri = vscode.Uri.file(DEFAULT_REPO_PATH);
+        mocks.createOrShow.mockReturnValue(Promise.reject(new Error(SHOW_FAILED_MESSAGE)));
+
+        // When / Then: the rejection reaches the caller with the same message (no try/catch in activate)
+        await expect(invokeViewCommand(rootUri)).rejects.toThrow(SHOW_FAILED_MESSAGE);
       });
     });
 

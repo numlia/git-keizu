@@ -1214,18 +1214,25 @@ describe("GitKeizuView checkoutBranch response mapping", () => {
   });
 });
 
-describe("GitKeizuView createOrShow rootUri handling (S6)", () => {
+describe("GitKeizuView createOrShow registration await (S36)", () => {
   const SCM_REPO = "/scm/repo/path";
-  let mockSetLastActiveRepo: ReturnType<typeof vi.fn>;
+  const SIBLING_REPO = "/scm/sibling";
+  const REGISTER_FAILED_MESSAGE = "register failed";
+  const REPO_STATE = { columnWidths: null };
+
+  type Deferred = { promise: Promise<void>; resolve: () => void; reject: (reason: Error) => void };
+  type ViewCallback = (repos: Record<string, unknown>, numRepos: number) => void;
+
+  const createWebviewPanelMock = vi.mocked(vscode.window.createWebviewPanel);
   let mockRegisterRepoFromUri: ReturnType<typeof vi.fn>;
+  let viewCallback: ViewCallback | null;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
     GitKeizuView.currentPanel = undefined;
-
-    mockSetLastActiveRepo = vi.fn();
     mockRegisterRepoFromUri = vi.fn().mockResolvedValue(undefined);
+    viewCallback = null;
   });
 
   afterEach(() => {
@@ -1233,35 +1240,46 @@ describe("GitKeizuView createOrShow rootUri handling (S6)", () => {
     GitKeizuView.currentPanel = undefined;
   });
 
-  function createDeps(reposMap: Record<string, unknown> = { [TEST_REPO]: "Test Repo" }) {
+  function createDeferred(): Deferred {
+    let resolve!: () => void;
+    let reject!: (reason: Error) => void;
+    const promise = new Promise<void>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  function readViewState(html: string): {
+    repos: Record<string, unknown>;
+    lastActiveRepo: string | null;
+  } {
+    const match = html.match(/var viewState = (.+?);/);
+    expect(match).not.toBeNull();
+    return JSON.parse(match![1]);
+  }
+
+  function createDeps(reposMap: Record<string, unknown> = {}) {
     mocks.getRepos.mockReturnValue(reposMap);
-
-    const mockDataSource = {
-      applyStash: mocks.applyStash,
-      popStash: mocks.popStash,
-      dropStash: mocks.dropStash,
-      branchFromStash: mocks.branchFromStash,
-      pushStash: mocks.pushStash,
-      resetUncommitted: mocks.resetUncommitted,
-      cleanUntrackedFiles: mocks.cleanUntrackedFiles,
-      getCommitComparison: mocks.getCommitComparison
-    } as unknown as DataSource;
-
+    let lastActiveRepo: string | null = null;
     const mockExtensionState = {
-      getLastActiveRepo: vi.fn(() => null),
+      getLastActiveRepo: vi.fn(() => lastActiveRepo),
       isAvatarStorageAvailable: vi.fn(() => false),
       waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
-      setLastActiveRepo: mockSetLastActiveRepo
+      setLastActiveRepo: vi.fn((repo: string) => {
+        lastActiveRepo = repo;
+      })
     } as unknown as ExtensionState;
-
+    const mockDataSource = {} as unknown as DataSource;
     const mockAvatarManager = {
       registerView: vi.fn(),
       deregisterView: vi.fn()
     } as unknown as AvatarManager;
-
     const mockRepoManager = {
       getRepos: mocks.getRepos,
-      registerViewCallback: vi.fn(),
+      registerViewCallback: vi.fn((callback: ViewCallback) => {
+        viewCallback = callback;
+      }),
       deregisterViewCallback: vi.fn(),
       setRepoState: vi.fn(),
       checkReposExist: vi.fn(),
@@ -1271,118 +1289,345 @@ describe("GitKeizuView createOrShow rootUri handling (S6)", () => {
     return { mockDataSource, mockExtensionState, mockAvatarManager, mockRepoManager };
   }
 
-  it("sets lastActiveRepo from rootUri.fsPath when panel is new (TC-015)", () => {
-    // Given: No existing panel, rootUri is specified
+  function show(deps: ReturnType<typeof createDeps>, rootUri?: import("vscode").Uri) {
+    return GitKeizuView.createOrShow(
+      "/test/extension",
+      deps.mockDataSource,
+      deps.mockExtensionState,
+      deps.mockAvatarManager,
+      deps.mockRepoManager,
+      rootUri
+    );
+  }
+
+  function createRootUri(): import("vscode").Uri {
+    return { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
+  }
+
+  /** Make registerRepoFromUri return a manually resolved promise for its next call. */
+  function deferNextRegistration(): Deferred {
+    const deferred = createDeferred();
+    mockRegisterRepoFromUri.mockImplementationOnce(() => deferred.promise);
+    return deferred;
+  }
+
+  /** Simulate the registration completing: the repo set now contains the repos, then resolve. */
+  function completeRegistration(deferred: Deferred, reposMap: Record<string, unknown>): void {
+    mocks.getRepos.mockReturnValue(reposMap);
+    deferred.resolve();
+  }
+
+  function firstPanelHtml(): string {
+    return createWebviewPanelMock.mock.results[0].value.webview.html;
+  }
+
+  function capturedViewCallback(): ViewCallback {
+    expect(viewCallback).not.toBeNull();
+    return viewCallback!;
+  }
+
+  it("creates the panel only after registration completes and renders the registered repo (TC-376)", async () => {
+    // Case: TC-376
+    // Given: no panel, an empty repo set, and a registration that resolves manually
     const deps = createDeps();
-    const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
+    const registration = deferNextRegistration();
+    const rootUri = createRootUri();
 
-    // When: createOrShow is called with rootUri (first time, creates panel)
-    GitKeizuView.createOrShow(
-      "/test/extension",
-      deps.mockDataSource,
-      deps.mockExtensionState,
-      deps.mockAvatarManager,
-      deps.mockRepoManager,
-      rootUri
-    );
+    // When: createOrShow is called with the rootUri
+    const pending = show(deps, rootUri);
 
-    // Then: setLastActiveRepo is called with rootUri.fsPath
-    expect(mockSetLastActiveRepo).toHaveBeenCalledTimes(1);
-    expect(mockSetLastActiveRepo).toHaveBeenCalledWith(SCM_REPO);
+    // Then: no panel exists before the registration resolves
+    expect(createWebviewPanelMock).toHaveBeenCalledTimes(0);
+
+    // When: the registration completes with the SCM repo registered
+    completeRegistration(registration, { [SCM_REPO]: REPO_STATE });
+    await pending;
+
+    // Then: exactly one panel is created and its HTML renders the registered repo
+    expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(firstPanelHtml()).not.toBe(""));
+    const html = firstPanelHtml();
+    expect(html).not.toContain("unableToLoad");
+    expect(html).toContain('id="repoSelect"');
+    const viewState = readViewState(html);
+    expect(Object.keys(viewState.repos)).toContain(SCM_REPO);
+    expect(viewState.lastActiveRepo).toBe(SCM_REPO);
   });
 
-  it("sends ResponseSelectRepo when panel exists and repo is registered (TC-016)", () => {
-    // Given: Panel already exists, SCM_REPO is in registered repos
-    const deps = createDeps({ [TEST_REPO]: "Test Repo", [SCM_REPO]: "SCM Repo" });
-    GitKeizuView.createOrShow(
-      "/test/extension",
-      deps.mockDataSource,
-      deps.mockExtensionState,
-      deps.mockAvatarManager,
-      deps.mockRepoManager
-    );
-    vi.clearAllMocks();
+  it("registers the rootUri exactly once with the same Uri instance (TC-377)", async () => {
+    // Case: TC-377
+    // Given: no panel, an empty repo set, and a registration that resolves manually
+    const deps = createDeps();
+    const registration = deferNextRegistration();
+    const rootUri = createRootUri();
 
-    // When: createOrShow is called again with rootUri for a registered repo
-    const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
-    GitKeizuView.createOrShow(
-      "/test/extension",
-      deps.mockDataSource,
-      deps.mockExtensionState,
-      deps.mockAvatarManager,
-      deps.mockRepoManager,
-      rootUri
-    );
+    // When: createOrShow is called with the rootUri and the registration completes
+    const pending = show(deps, rootUri);
+    completeRegistration(registration, { [SCM_REPO]: REPO_STATE });
+    await pending;
 
-    // Then: ResponseSelectRepo is sent with the repo path (no registerRepoFromUri)
-    expect(mocks.postMessage).toHaveBeenCalledWith({
-      command: "selectRepo",
-      repo: SCM_REPO
-    });
-    expect(mockRegisterRepoFromUri).not.toHaveBeenCalled();
-  });
-
-  it("calls registerRepoFromUri then sends selectRepo when repo is unregistered (TC-017)", async () => {
-    // Given: Panel already exists, SCM_REPO is NOT in registered repos
-    const deps = createDeps({ [TEST_REPO]: "Test Repo" });
-    GitKeizuView.createOrShow(
-      "/test/extension",
-      deps.mockDataSource,
-      deps.mockExtensionState,
-      deps.mockAvatarManager,
-      deps.mockRepoManager
-    );
-    vi.clearAllMocks();
-
-    // When: createOrShow is called with rootUri for unregistered repo
-    const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
-    GitKeizuView.createOrShow(
-      "/test/extension",
-      deps.mockDataSource,
-      deps.mockExtensionState,
-      deps.mockAvatarManager,
-      deps.mockRepoManager,
-      rootUri
-    );
-    // Wait for async registerRepoFromUri to complete
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    // Then: registerRepoFromUri is called with rootUri
+    // Then: registerRepoFromUri receives the same Uri instance exactly once
     expect(mockRegisterRepoFromUri).toHaveBeenCalledTimes(1);
-    expect(mockRegisterRepoFromUri).toHaveBeenCalledWith(rootUri);
-    // And: ResponseSelectRepo is sent with the repo path
-    expect(mocks.postMessage).toHaveBeenCalledWith({
-      command: "selectRepo",
-      repo: SCM_REPO
-    });
+    expect(mockRegisterRepoFromUri.mock.calls[0][0]).toBe(rootUri);
   });
 
-  it("does not send selectRepo when rootUri is not specified (TC-018)", () => {
-    // Given: Panel already exists
+  it("records lastActiveRepo before registering the rootUri (TC-378)", async () => {
+    // Case: TC-378
+    // Given: no panel, an empty repo set, and a registration that resolves manually
     const deps = createDeps();
-    GitKeizuView.createOrShow(
-      "/test/extension",
-      deps.mockDataSource,
-      deps.mockExtensionState,
-      deps.mockAvatarManager,
-      deps.mockRepoManager
+    const registration = deferNextRegistration();
+    const rootUri = createRootUri();
+    const setLastActiveRepo = vi.mocked(deps.mockExtensionState.setLastActiveRepo);
+
+    // When: createOrShow is called with the rootUri and the registration completes
+    const pending = show(deps, rootUri);
+    completeRegistration(registration, { [SCM_REPO]: REPO_STATE });
+    await pending;
+
+    // Then: setLastActiveRepo is called once with the repo path, before registerRepoFromUri
+    expect(setLastActiveRepo).toHaveBeenCalledTimes(1);
+    expect(setLastActiveRepo).toHaveBeenCalledWith(SCM_REPO);
+    expect(mockRegisterRepoFromUri).toHaveBeenCalledTimes(1);
+    expect(setLastActiveRepo.mock.invocationCallOrder[0]).toBeLessThan(
+      mockRegisterRepoFromUri.mock.invocationCallOrder[0]
     );
+  });
+
+  it("creates the panel without registering or recording when rootUri is absent (TC-379)", async () => {
+    // Case: TC-379
+    // Given: no panel and no rootUri (command palette)
+    const deps = createDeps({ [TEST_REPO]: REPO_STATE });
+
+    // When: createOrShow is called without a rootUri
+    await show(deps);
+
+    // Then: nothing is registered or recorded, and one panel is created
+    expect(mockRegisterRepoFromUri).toHaveBeenCalledTimes(0);
+    expect(deps.mockExtensionState.setLastActiveRepo).toHaveBeenCalledTimes(0);
+    expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("only reveals the existing panel when rootUri is absent (TC-380)", async () => {
+    // Case: TC-380
+    // Given: an existing panel created without a rootUri
+    const deps = createDeps({ [TEST_REPO]: REPO_STATE });
+    await show(deps);
     vi.clearAllMocks();
 
-    // When: createOrShow is called without rootUri (command palette)
-    GitKeizuView.createOrShow(
-      "/test/extension",
-      deps.mockDataSource,
-      deps.mockExtensionState,
-      deps.mockAvatarManager,
-      deps.mockRepoManager
-    );
+    // When: createOrShow is called again without a rootUri
+    await show(deps);
 
-    // Then: no selectRepo message is sent
-    const selectRepoCalls = mocks.postMessage.mock.calls.filter(
-      (call: unknown[]) => (call[0] as Record<string, unknown>).command === "selectRepo"
+    // Then: the panel is revealed once and nothing else happens
+    expect(mockRegisterRepoFromUri).toHaveBeenCalledTimes(0);
+    expect(deps.mockExtensionState.setLastActiveRepo).toHaveBeenCalledTimes(0);
+    expect(mocks.reveal).toHaveBeenCalledTimes(1);
+    expect(sentMessages("selectRepo")).toHaveLength(0);
+    expect(createWebviewPanelMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("waits for registration before revealing an existing panel and selecting the repo (TC-381)", async () => {
+    // Case: TC-381
+    // Given: an existing panel and a repo set that already contains the SCM repo
+    const deps = createDeps({ [TEST_REPO]: REPO_STATE, [SCM_REPO]: REPO_STATE });
+    await show(deps);
+    vi.clearAllMocks();
+    const registration = deferNextRegistration();
+    const rootUri = createRootUri();
+    const setLastActiveRepo = vi.mocked(deps.mockExtensionState.setLastActiveRepo);
+
+    // When: createOrShow is called with the rootUri while the registration is pending
+    const pending = show(deps, rootUri);
+
+    // Then: the repo is recorded and registered even though it is already known
+    expect(setLastActiveRepo).toHaveBeenCalledTimes(1);
+    expect(setLastActiveRepo).toHaveBeenCalledWith(SCM_REPO);
+    expect(mockRegisterRepoFromUri).toHaveBeenCalledTimes(1);
+    // And: neither reveal nor selectRepo happens before the registration resolves
+    expect(mocks.reveal).toHaveBeenCalledTimes(0);
+    expect(sentMessages("selectRepo")).toHaveLength(0);
+
+    // When: the registration completes
+    completeRegistration(registration, { [TEST_REPO]: REPO_STATE, [SCM_REPO]: REPO_STATE });
+    await pending;
+
+    // Then: the panel is revealed once, the repo is selected once, and the record precedes reveal
+    expect(mocks.reveal).toHaveBeenCalledTimes(1);
+    expect(sentMessages("selectRepo")).toEqual([{ command: "selectRepo", repo: SCM_REPO }]);
+    expect(setLastActiveRepo.mock.invocationCallOrder[0]).toBeLessThan(
+      mocks.reveal.mock.invocationCallOrder[0]
     );
-    expect(selectRepoCalls).toHaveLength(0);
+  });
+
+  it("registers an unknown repo once and selects it on the existing panel (TC-382)", async () => {
+    // Case: TC-382
+    // Given: an existing panel whose repo set does not contain the SCM repo
+    const deps = createDeps({ [TEST_REPO]: REPO_STATE });
+    await show(deps);
+    vi.clearAllMocks();
+    const registration = deferNextRegistration();
+    const rootUri = createRootUri();
+
+    // When: createOrShow is called with the rootUri and the registration adds the SCM repo
+    const pending = show(deps, rootUri);
+    completeRegistration(registration, { [TEST_REPO]: REPO_STATE, [SCM_REPO]: REPO_STATE });
+    await pending;
+
+    // Then: the repo is registered exactly once (no second call from selectRepoFromUri)
+    expect(mockRegisterRepoFromUri).toHaveBeenCalledTimes(1);
+    expect(sentMessages("selectRepo")).toEqual([{ command: "selectRepo", repo: SCM_REPO }]);
+  });
+
+  it("renders the unable-to-load page when the rootUri registers nothing (TC-383)", async () => {
+    // Case: TC-383
+    // Given: no panel, an empty repo set, and a registration that leaves it empty
+    const deps = createDeps();
+    const rootUri = createRootUri();
+
+    // When: createOrShow is called with the rootUri
+    await show(deps, rootUri);
+
+    // Then: one panel is created and its HTML is the unable-to-load page
+    expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
+    await vi.waitFor(() => expect(firstPanelHtml()).not.toBe(""));
+    expect(firstPanelHtml()).toContain("unableToLoad");
+  });
+
+  it("creates one panel and reveals once when two calls complete in call order (TC-384)", async () => {
+    // Case: TC-384
+    // Given: no panel and two calls with the same rootUri, each waiting on its own registration
+    const deps = createDeps();
+    const first = deferNextRegistration();
+    const second = deferNextRegistration();
+    const rootUri = createRootUri();
+
+    // When: both calls are started and the registrations complete in call order
+    const firstPending = show(deps, rootUri);
+    const secondPending = show(deps, rootUri);
+    completeRegistration(first, { [SCM_REPO]: REPO_STATE });
+    completeRegistration(second, { [SCM_REPO]: REPO_STATE });
+    await Promise.all([firstPending, secondPending]);
+
+    // Then: both calls registered, but only one panel exists and it was revealed once
+    expect(mockRegisterRepoFromUri).toHaveBeenCalledTimes(2);
+    expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
+    expect(mocks.reveal).toHaveBeenCalledTimes(1);
+  });
+
+  it("creates one panel and reveals once when two calls complete in reverse order (TC-385)", async () => {
+    // Case: TC-385
+    // Given: no panel and two calls with the same rootUri, each waiting on its own registration
+    const deps = createDeps();
+    const first = deferNextRegistration();
+    const second = deferNextRegistration();
+    const rootUri = createRootUri();
+
+    // When: both calls are started and the registrations complete in reverse order
+    const firstPending = show(deps, rootUri);
+    const secondPending = show(deps, rootUri);
+    completeRegistration(second, { [SCM_REPO]: REPO_STATE });
+    completeRegistration(first, { [SCM_REPO]: REPO_STATE });
+    await Promise.all([firstPending, secondPending]);
+
+    // Then: both calls registered, but only one panel exists and it was revealed once
+    expect(mockRegisterRepoFromUri).toHaveBeenCalledTimes(2);
+    expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
+    expect(mocks.reveal).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects without creating a panel when registration fails (TC-386)", async () => {
+    // Case: TC-386
+    // Given: no panel and a registration that rejects
+    const deps = createDeps();
+    mockRegisterRepoFromUri.mockRejectedValue(new Error(REGISTER_FAILED_MESSAGE));
+    const rootUri = createRootUri();
+
+    // When / Then: createOrShow rejects with the registration error and no panel is created
+    await expect(show(deps, rootUri)).rejects.toThrow(REGISTER_FAILED_MESSAGE);
+    expect(createWebviewPanelMock).toHaveBeenCalledTimes(0);
+  });
+
+  it("rejects without revealing or selecting when registration fails on an existing panel (TC-387)", async () => {
+    // Case: TC-387
+    // Given: an existing panel and a registration that rejects
+    const deps = createDeps({ [TEST_REPO]: REPO_STATE, [SCM_REPO]: REPO_STATE });
+    await show(deps);
+    vi.clearAllMocks();
+    mockRegisterRepoFromUri.mockRejectedValue(new Error(REGISTER_FAILED_MESSAGE));
+    const rootUri = createRootUri();
+
+    // When / Then: createOrShow rejects with the registration error, without reveal or selectRepo
+    await expect(show(deps, rootUri)).rejects.toThrow(REGISTER_FAILED_MESSAGE);
+    expect(mocks.reveal).toHaveBeenCalledTimes(0);
+    expect(sentMessages("selectRepo")).toHaveLength(0);
+  });
+
+  it("keeps the existing repo set and records a non-repo rootUri as lastActiveRepo (TC-388)", async () => {
+    // Case: TC-388
+    // Given: no panel, one registered repo, and a rootUri whose registration adds nothing
+    const deps = createDeps({ [TEST_REPO]: REPO_STATE });
+    const rootUri = createRootUri();
+
+    // When: createOrShow is called with the non-repo rootUri
+    await show(deps, rootUri);
+
+    // Then: the graph page renders only the existing repo while lastActiveRepo keeps the rootUri path
+    await vi.waitFor(() => expect(firstPanelHtml()).not.toBe(""));
+    const html = firstPanelHtml();
+    expect(html).toContain('id="repoSelect"');
+    const viewState = readViewState(html);
+    expect(Object.keys(viewState.repos)).toEqual([TEST_REPO]);
+    expect(viewState.lastActiveRepo).toBe(SCM_REPO);
+  });
+
+  it("re-renders with the sibling repo when it registers during the first render (TC-389)", async () => {
+    // Case: TC-389
+    // Given: TC-376 conditions with the webview messages load held open
+    const loadWebviewMessagesMock = vi.mocked((await import("../../src/i18n")).loadWebviewMessages);
+    const messagesLoad = createDeferred();
+    loadWebviewMessagesMock.mockImplementationOnce(() => messagesLoad.promise.then(() => ({})));
+    const deps = createDeps();
+    const registration = deferNextRegistration();
+    const rootUri = createRootUri();
+    const pending = show(deps, rootUri);
+    completeRegistration(registration, { [SCM_REPO]: REPO_STATE });
+    await pending;
+    const twoRepos = { [SCM_REPO]: REPO_STATE, [SIBLING_REPO]: REPO_STATE };
+
+    // When: the sibling repo is reported while the first HTML is still being generated
+    mocks.getRepos.mockReturnValue(twoRepos);
+    capturedViewCallback()(twoRepos, Object.keys(twoRepos).length);
+    messagesLoad.resolve();
+
+    // Then: the HTML is generated twice, the final HTML lists both repos, and no loadRepos is sent
+    await vi.waitFor(() => expect(firstPanelHtml()).not.toBe(""));
+    expect(loadWebviewMessagesMock).toHaveBeenCalledTimes(2);
+    const viewState = readViewState(firstPanelHtml());
+    expect(Object.keys(viewState.repos).sort()).toEqual([SCM_REPO, SIBLING_REPO].sort());
+    expect(sentMessages("loadRepos")).toHaveLength(0);
+  });
+
+  it("sends loadRepos without re-rendering when the sibling registers after the render (TC-390)", async () => {
+    // Case: TC-390
+    // Given: TC-376 conditions with the first HTML already complete
+    const loadWebviewMessagesMock = vi.mocked((await import("../../src/i18n")).loadWebviewMessages);
+    const deps = createDeps();
+    const registration = deferNextRegistration();
+    const rootUri = createRootUri();
+    const pending = show(deps, rootUri);
+    completeRegistration(registration, { [SCM_REPO]: REPO_STATE });
+    await pending;
+    await vi.waitFor(() => expect(firstPanelHtml()).not.toBe(""));
+    const twoRepos = { [SCM_REPO]: REPO_STATE, [SIBLING_REPO]: REPO_STATE };
+
+    // When: the sibling repo is reported after the render
+    mocks.getRepos.mockReturnValue(twoRepos);
+    capturedViewCallback()(twoRepos, Object.keys(twoRepos).length);
+
+    // Then: one loadRepos message carries both repos and the HTML is not regenerated
+    expect(sentMessages("loadRepos")).toEqual([
+      { command: "loadRepos", repos: twoRepos, lastActiveRepo: SCM_REPO }
+    ]);
+    expect(loadWebviewMessagesMock).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -4208,114 +4453,6 @@ describe("GitKeizuView script-embedded JSON serializer (S27)", () => {
     const viewStateJson = extractViewStateJson(html);
     expect(viewStateJson).not.toContain(SCRIPT_CLOSING);
     expect(JSON.parse(viewStateJson).repos).toEqual({ [maliciousRepo]: "Repo" });
-  });
-});
-
-/* ------------------------------------------------------------------ */
-/* S23: createOrShow() reveal 前の lastActiveRepo 永続化               */
-/* ------------------------------------------------------------------ */
-
-describe("GitKeizuView createOrShow reveal persists lastActiveRepo (S23)", () => {
-  const SCM_REPO = "/scm/repo/path";
-  let mockSetLastActiveRepo: ReturnType<typeof vi.fn>;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    mocks.messageHandler.current = null;
-    GitKeizuView.currentPanel = undefined;
-    mockSetLastActiveRepo = vi.fn();
-  });
-
-  afterEach(() => {
-    GitKeizuView.currentPanel?.dispose();
-    GitKeizuView.currentPanel = undefined;
-  });
-
-  function createDeps() {
-    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo", [SCM_REPO]: "SCM Repo" });
-
-    const mockDataSource = {} as unknown as DataSource;
-    const mockExtensionState = {
-      getLastActiveRepo: vi.fn(() => null),
-      isAvatarStorageAvailable: vi.fn(() => false),
-      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
-      setLastActiveRepo: mockSetLastActiveRepo
-    } as unknown as ExtensionState;
-    const mockAvatarManager = {
-      registerView: vi.fn(),
-      deregisterView: vi.fn()
-    } as unknown as AvatarManager;
-    const mockRepoManager = {
-      getRepos: mocks.getRepos,
-      registerViewCallback: vi.fn(),
-      deregisterViewCallback: vi.fn(),
-      setRepoState: vi.fn(),
-      checkReposExist: vi.fn(),
-      registerRepoFromUri: vi.fn().mockResolvedValue(undefined)
-    } as unknown as RepoManager;
-
-    return { mockDataSource, mockExtensionState, mockAvatarManager, mockRepoManager };
-  }
-
-  function show(deps: ReturnType<typeof createDeps>, rootUri?: import("vscode").Uri) {
-    GitKeizuView.createOrShow(
-      "/test/extension",
-      deps.mockDataSource,
-      deps.mockExtensionState,
-      deps.mockAvatarManager,
-      deps.mockRepoManager,
-      rootUri
-    );
-  }
-
-  it("persists the rootUri path when revealing an existing panel (TC-086)", () => {
-    // Case: TC-086
-    // Given: an existing panel (created without rootUri)
-    const deps = createDeps();
-    show(deps);
-    vi.clearAllMocks();
-
-    // When: createOrShow is called again with a rootUri
-    const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
-    show(deps, rootUri);
-
-    // Then: setLastActiveRepo is called once with the rootUri path
-    expect(mockSetLastActiveRepo).toHaveBeenCalledTimes(1);
-    expect(mockSetLastActiveRepo).toHaveBeenCalledWith(SCM_REPO);
-  });
-
-  it("does not persist and only reveals when rootUri is undefined (TC-087)", () => {
-    // Case: TC-087
-    // Given: an existing panel
-    const deps = createDeps();
-    show(deps);
-    vi.clearAllMocks();
-
-    // When: createOrShow is called again without a rootUri
-    show(deps);
-
-    // Then: setLastActiveRepo is not called, but the panel is revealed
-    expect(mockSetLastActiveRepo).not.toHaveBeenCalled();
-    expect(mocks.reveal).toHaveBeenCalledTimes(1);
-  });
-
-  it("persists the repo before revealing the panel (TC-088)", () => {
-    // Case: TC-088
-    // Given: an existing panel
-    const deps = createDeps();
-    show(deps);
-    vi.clearAllMocks();
-
-    // When: createOrShow is called again with a rootUri
-    const rootUri = { fsPath: SCM_REPO } as unknown as import("vscode").Uri;
-    show(deps, rootUri);
-
-    // Then: setLastActiveRepo is invoked before panel.reveal
-    expect(mockSetLastActiveRepo).toHaveBeenCalledTimes(1);
-    expect(mocks.reveal).toHaveBeenCalledTimes(1);
-    expect(mockSetLastActiveRepo.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.reveal.mock.invocationCallOrder[0]
-    );
   });
 });
 

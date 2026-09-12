@@ -195,6 +195,35 @@ describe("Config fallback defaults vs package.json", () => {
       expect(actual).toBe(expected);
     });
   });
+
+  // S21: Group 6 — maxDepthOfRepoSearch default value (TC-369, TC-370)
+  describe("Group 6: maxDepthOfRepoSearch default value", () => {
+    it("TC-369: maxDepthOfRepoSearch fallback and package.json default are both 1", () => {
+      // Case: TC-369
+      // Given: mock returns fallback values (configured in beforeEach)
+
+      // When: reading maxDepthOfRepoSearch via fallback
+      const actual = getConfig().maxDepthOfRepoSearch();
+
+      // Then: both the fallback and the package.json default are the number 1
+      expect(actual).toBe(1);
+      expect(getPackageDefault("maxDepthOfRepoSearch")).toBe(1);
+    });
+
+    it("TC-370: maxDepthOfRepoSearch returns an explicit 0 setting unchanged", () => {
+      // Case: TC-370
+      // Given: the setting is explicitly 0 while other keys fall back
+      mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+        key === "maxDepthOfRepoSearch" ? 0 : defaultValue
+      );
+
+      // When: reading maxDepthOfRepoSearch
+      const actual = getConfig().maxDepthOfRepoSearch();
+
+      // Then: the explicit 0 is returned as-is
+      expect(actual).toBe(0);
+    });
+  });
 });
 
 // package.json schema validation (perspectives: docs/testing/perspectives/package.json-test.md)
