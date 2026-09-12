@@ -12,7 +12,7 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `generateGitFileListHtml(gitFiles: GG.GitFileChange[]): string`
+**シグネチャ**: `generateGitFileListHtml(gitFiles: GG.GitFileChange[], canHighlightFileHistory: FileHistoryActionPredicate): string`
 **テスト対象パス**: `web/fileTree.ts`
 
 | Case ID | Input / Precondition               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                       | Notes                |
@@ -54,7 +54,7 @@
 > Added: 2026-07-04T01:35:00Z
 > Status: active
 > Supersedes: -
-> Signature: `export function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GitFileChange[]): string`
+> Signature: `export function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GitFileChange[], canHighlightFileHistory: FileHistoryActionPredicate): string`
 > Target Path: `web/fileTree.ts:69-99`
 
 フォルダ名（`folder.name`, L72）とファイル表示名（`folder.contents[keys[i]].name`, L95）をツリー HTML へ埋め込む際に `escapeHtml` を適用する修正。`escapeHtml` の変換表: `&`→`&amp;`, `<`→`&lt;`, `>`→`&gt;`, `"`→`&quot;`, `'`→`&#x27;`, `/`→`&#x2F;`。
