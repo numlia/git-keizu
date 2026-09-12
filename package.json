@@ -367,5 +367,11 @@
   "engines": {
     "vscode": "^1.74.0"
   },
-  "packageManager": "pnpm@10.34.5"
+  "packageManager": "pnpm@10.34.5",
+  "pnpm": {
+    "overrides": {
+      "fast-uri": "^3.1.6",
+      "js-yaml": "^4.3.2"
+    }
+  }
 }
