@@ -30,7 +30,7 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `(arg?: unknown) => void`
+**シグネチャ**: `(arg?: unknown) => Promise<void>`
 **テスト対象パス**: `src/extension.ts:21-41`
 
 | Case ID | Input / Precondition                                                                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                  | Notes            |
@@ -186,3 +186,40 @@
 数値・空値境界（0 / minimum / maximum / +/-1 / empty / NULL）は、本セクションの対象が初期化順序と subscriptions 構成の契約であり仕様上意味を持たないため対象外とする（意味のある境界は「解決前」の TC-033 で充足）。
 
 **失敗系/正常系比（煙感知器）**: 正常系5件（TC-032、TC-034〜TC-037）、失敗系1件（TC-033）。比0.2 と低いためインベントリを再導出したが、本変更の失敗源（await 漏れ・登録漏れ・dispose 未伝播）はいずれも「正常契約の存在検証」で検出される退行であり、独立した失敗分岐は「解決前」（TC-033）のみである。activation 失敗系は既存 S1 の External 4件が担保していることを確認した。
+
+## S10: activate git-keizu.view コマンドの Promise 返却と reject 伝播
+
+> Origin: Feature 057 (multi-repo-single-folder-workspace) issue #49
+> Added: 2026-09-12
+> Status: active
+> Supersedes: -
+> Signature: `(arg?: unknown) => Promise<void>`（`git-keizu.view`ハンドラ）
+> Target Path: `src/extension.ts:24-44`（修正後に更新）
+> Test File: `tests/src/extension.test.ts`
+
+ハンドラは`return GitKeizuView.createOrShow(...)`とし、try/catchを追加しない。同期throwもrejectもVS Codeのコマンド実行系へそのまま伝播させる。S2 TC-010（同期throwの伝播）は`return`後も成立するため維持する。`createOrShow()`内部の登録待ちはgitGraphView ownerの責務で本表には含めない。
+
+| Case ID | Input / Precondition                                                                                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                        | Notes                    |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------ |
+| TC-038  | `createOrShow`モックが`Promise.resolve(undefined)`の特定インスタンス`expectedPromise`を返す状態で、捕捉した`handler`を`vscode.Uri.file("/repo")`で呼ぶ | Normal - Promiseの返却                                                     | `handler(...)`の戻り値が`expectedPromise`と`toBe`で同一                                                | 呼び出し側が完了を待てる |
+| TC-039  | `createOrShow`モックが`Promise.reject(new Error("show failed"))`を返す状態で`handler(vscode.Uri.file("/repo"))`を呼ぶ                                  | External - rejectの伝播                                                    | `await expect(handler(...)).rejects.toThrow("show failed")`。`activate`側で追加のtry/catchは行われない | 握りつぶさない           |
+
+### 失敗源インベントリ（include-or-justify）— Feature 057 追加分（S10）
+
+| 失敗源                                | 対応ケースまたは除外理由  |
+| ------------------------------------- | ------------------------- |
+| 戻り値の欠落（`return`を付け忘れる）  | TC-038                    |
+| rejectの握りつぶし（try/catchの追加） | TC-039                    |
+| 同期throw                             | S2 TC-010（維持）         |
+| `rootUri`解決                         | S2 TC-006〜TC-009（維持） |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(引数解決はS2の責務)
+- Exception: excluded(同期throwの伝播はS2 TC-010で担保済み)
+- External: TC-039
+- Boundary: excluded(引数解決はS2の責務)
+- Type: excluded(引数解決はS2の責務)
+- Normal: TC-038
+
+**失敗系/正常系比（煙感知器）**: 正常系1件（TC-038）、失敗系1件（TC-039）。本変更はハンドラの戻り値契約の追加のみで、失敗源は上表で網羅済みであることを確認した。

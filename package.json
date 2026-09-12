@@ -200,7 +200,7 @@
         },
         "git-keizu.maxDepthOfRepoSearch": {
           "type": "number",
-          "default": 0,
+          "default": 1,
           "description": "%config.maxDepthOfRepoSearch.description%"
         },
         "git-keizu.retainContextWhenHidden": {

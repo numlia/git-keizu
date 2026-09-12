@@ -38,6 +38,13 @@ const UNREGISTERED_REMOTE_MESSAGE = "The selected remote is not registered in th
 
 export class GitKeizuView {
   public static currentPanel: GitKeizuView | undefined;
+  // Opens are applied in invocation order: several SCM buttons can be pressed before their
+  // registration checks resolve, and the most recently pressed repository must end up selected
+  // regardless of which check finishes first.
+  private static lastOpen: Promise<void> = Promise.resolve();
+  // Bumped whenever a panel is closed so that an open still waiting on its registration or on
+  // an earlier open does not recreate a tab the user closed in the meantime.
+  private static panelCloseCount = 0;
 
   private readonly panel: vscode.WebviewPanel;
   private readonly extensionPath: string;
@@ -63,24 +70,71 @@ export class GitKeizuView {
     avatarManager: AvatarManager,
     repoManager: RepoManager,
     rootUri?: vscode.Uri
-  ) {
+  ): Promise<void> {
+    const previousOpen = GitKeizuView.lastOpen;
+    const currentOpen = GitKeizuView.open(
+      previousOpen,
+      extensionPath,
+      dataSource,
+      extensionState,
+      avatarManager,
+      repoManager,
+      rootUri
+    );
+    GitKeizuView.lastOpen = GitKeizuView.settled(previousOpen, currentOpen);
+    return currentOpen;
+  }
+
+  // The queue link must cover the predecessor as well as this open: an open that fails
+  // registration never waits for its predecessor itself, and a later open must not skip that
+  // predecessor because of it. The failure is already delivered to the caller of that open.
+  private static async settled(
+    previousOpen: Promise<void>,
+    currentOpen: Promise<void>
+  ): Promise<void> {
+    await previousOpen;
+    try {
+      await currentOpen;
+    } catch {
+      // Reported to the caller of that open.
+    }
+  }
+
+  private static async open(
+    previousOpen: Promise<void>,
+    extensionPath: string,
+    dataSource: DataSource,
+    extensionState: ExtensionState,
+    avatarManager: AvatarManager,
+    repoManager: RepoManager,
+    rootUri?: vscode.Uri
+  ): Promise<void> {
     const column = vscode.window.activeTextEditor
       ? vscode.window.activeTextEditor.viewColumn
       : undefined;
+    const panelCloseCountAtStart = GitKeizuView.panelCloseCount;
+
+    if (rootUri !== undefined) {
+      extensionState.setLastActiveRepo(getPathFromUri(rootUri));
+      // The first render reads the registered repo set, so the SCM repo must be registered
+      // before the panel exists; otherwise a workspace whose root is not a repo gets the
+      // "unable to load" page.
+      await repoManager.registerRepoFromUri(rootUri);
+      await previousOpen;
+    }
+
+    // A panel was closed while this call was waiting: drop the open rather than reopening a tab
+    // the user closed on purpose.
+    if (GitKeizuView.panelCloseCount !== panelCloseCountAtStart) {
+      return;
+    }
 
     if (GitKeizuView.currentPanel) {
-      if (rootUri !== undefined) {
-        extensionState.setLastActiveRepo(getPathFromUri(rootUri));
-      }
       GitKeizuView.currentPanel.panel.reveal(column);
       if (rootUri !== undefined) {
         GitKeizuView.currentPanel.selectRepoFromUri(rootUri, repoManager);
       }
       return;
-    }
-
-    if (rootUri !== undefined) {
-      extensionState.setLastActiveRepo(getPathFromUri(rootUri));
     }
 
     // The panel option is fixed at creation, so the same value must drive the re-show behaviour.
@@ -647,6 +701,7 @@ export class GitKeizuView {
 
   public dispose() {
     GitKeizuView.currentPanel = undefined;
+    GitKeizuView.panelCloseCount += 1;
     this.panel.dispose();
     this.avatarManager.deregisterView();
     this.repoFileWatcher.stop();

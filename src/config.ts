@@ -176,7 +176,7 @@ class Config {
   }
 
   public maxDepthOfRepoSearch() {
-    return this.workspaceConfiguration.get("maxDepthOfRepoSearch", 0);
+    return this.workspaceConfiguration.get("maxDepthOfRepoSearch", 1);
   }
 
   public retainContextWhenHidden(): boolean {
