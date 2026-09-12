@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import type { GitFileChange } from "../../src/types";
 import {
+  type FileHistoryActionPredicate,
   generateGitFileListHtml,
   generateGitFileTree,
   generateGitFileTreeHtml
@@ -28,6 +29,8 @@ function parseHtml(html: string): DocumentFragment {
   template.innerHTML = html;
   return template.content;
 }
+
+const NO_FILE_HISTORY: FileHistoryActionPredicate = () => false;
 
 /* ------------------------------------------------------------------ */
 /* S1: generateGitFileListHtml (fileTree-test.md)                     */
@@ -55,7 +58,7 @@ describe("generateGitFileListHtml", () => {
     ];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: files are sorted alphabetically
@@ -71,7 +74,7 @@ describe("generateGitFileListHtml", () => {
     const files = [makeFile({ type: "A", additions: null, deletions: null })];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: the li element has CSS class 'A'
@@ -86,7 +89,7 @@ describe("generateGitFileListHtml", () => {
     const files = [makeFile({ type: "D", additions: null, deletions: null })];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: the li element has CSS class 'D'
@@ -100,7 +103,7 @@ describe("generateGitFileListHtml", () => {
     const files = [makeFile({ type: "M", additions: 3, deletions: 1 })];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: the li element has CSS class 'M' and 'gitDiffPossible'
@@ -123,7 +126,7 @@ describe("generateGitFileListHtml", () => {
     ];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: rename badge 'R' is displayed with tooltip containing old path
@@ -139,7 +142,7 @@ describe("generateGitFileListHtml", () => {
     const files: GitFileChange[] = [];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: an empty <ul> is returned (no <li> elements, no error)
@@ -157,7 +160,7 @@ describe("generateGitFileListHtml", () => {
     ];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: every li has gitFile class + its type class
@@ -180,7 +183,7 @@ describe("generateGitFileListHtml", () => {
     ];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: data attributes are correctly set (URI-encoded)
@@ -195,7 +198,7 @@ describe("generateGitFileListHtml", () => {
     const files = [makeFile({ type: "M", additions: 10, deletions: 3 })];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: additions and deletions counters are displayed
@@ -212,7 +215,7 @@ describe("generateGitFileListHtml", () => {
     const files = [makeFile({ newFilePath: "index.ts", oldFilePath: "index.ts", type: "M" })];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: exactly 1 list item is rendered
@@ -230,7 +233,7 @@ describe("generateGitFileListHtml", () => {
     const files = [makeFile({ type: "M" })];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: action icon with openFile class is present
@@ -244,7 +247,7 @@ describe("generateGitFileListHtml", () => {
     const files = [makeFile({ type: "A", additions: null, deletions: null })];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: action icon with openFile class is present
@@ -266,7 +269,7 @@ describe("generateGitFileListHtml", () => {
     ];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: action icon with openFile class is present
@@ -280,7 +283,7 @@ describe("generateGitFileListHtml", () => {
     const files = [makeFile({ type: "D", additions: null, deletions: null })];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: no action icon is present
@@ -294,7 +297,7 @@ describe("generateGitFileListHtml", () => {
     const files = [makeFile({ type: "M" })];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: icon element contains codicon-go-to-file class
@@ -319,7 +322,7 @@ describe("generateGitFileListHtml", () => {
     ];
 
     // When: flat list HTML is generated
-    const html = generateGitFileListHtml(files);
+    const html = generateGitFileListHtml(files, NO_FILE_HISTORY);
     const fragment = parseHtml(html);
 
     // Then: exactly 3 action icons (A, M, R — not D)
@@ -349,7 +352,7 @@ describe("generateGitFileTreeHtml", () => {
     const folder = makeFolder("<script>alert(1)</script>");
 
     // When: the tree HTML is generated
-    const html = generateGitFileTreeHtml(folder, []);
+    const html = generateGitFileTreeHtml(folder, [], NO_FILE_HISTORY);
 
     // Then: the folder name is HTML-escaped and no raw <script> tag is emitted
     expect(html).toContain(
@@ -364,7 +367,7 @@ describe("generateGitFileTreeHtml", () => {
     const folder = makeFolder("a&b");
 
     // When: the tree HTML is generated
-    const html = generateGitFileTreeHtml(folder, []);
+    const html = generateGitFileTreeHtml(folder, [], NO_FILE_HISTORY);
 
     // Then: the ampersand is escaped and the raw "a&b" is not present
     expect(html).toContain('<span class="gitFolderName">a&amp;b</span>');
@@ -377,7 +380,7 @@ describe("generateGitFileTreeHtml", () => {
     const folder = makeFolder('say"hi" it\'s');
 
     // When: the tree HTML is generated
-    const html = generateGitFileTreeHtml(folder, []);
+    const html = generateGitFileTreeHtml(folder, [], NO_FILE_HISTORY);
 
     // Then: quotes are escaped and the raw quoted substrings are absent
     expect(html).toContain('<span class="gitFolderName">say&quot;hi&quot; it&#x27;s</span>');
@@ -391,7 +394,7 @@ describe("generateGitFileTreeHtml", () => {
     const folder = makeFolder("a/b");
 
     // When: the tree HTML is generated
-    const html = generateGitFileTreeHtml(folder, []);
+    const html = generateGitFileTreeHtml(folder, [], NO_FILE_HISTORY);
 
     // Then: the slash is escaped to &#x2F; and the raw "a/b" is not present
     expect(html).toContain('<span class="gitFolderName">a&#x2F;b</span>');
@@ -404,7 +407,7 @@ describe("generateGitFileTreeHtml", () => {
     const folder = makeFolder("src");
 
     // When: the tree HTML is generated
-    const html = generateGitFileTreeHtml(folder, []);
+    const html = generateGitFileTreeHtml(folder, [], NO_FILE_HISTORY);
 
     // Then: the name is rendered as-is with no HTML entities
     expect(html).toContain('<span class="gitFolderName">src</span>');
@@ -418,7 +421,7 @@ describe("generateGitFileTreeHtml", () => {
     const folder = makeFolder("");
 
     // When: the tree HTML is generated
-    const html = generateGitFileTreeHtml(folder, []);
+    const html = generateGitFileTreeHtml(folder, [], NO_FILE_HISTORY);
 
     // Then: neither the gitFolder wrapper nor the gitFolderName span is rendered
     expect(html).not.toContain('class="gitFolder"');
@@ -437,7 +440,7 @@ describe("generateGitFileTreeHtml", () => {
     ];
 
     // When: the tree HTML is generated
-    const html = generateGitFileTreeHtml(folder, gitFiles);
+    const html = generateGitFileTreeHtml(folder, gitFiles, NO_FILE_HISTORY);
 
     // Then: the display name is escaped and no raw <img tag is emitted
     expect(html).toContain("&lt;img src=x onerror=y&gt;.ts");
@@ -453,7 +456,7 @@ describe("generateGitFileTreeHtml", () => {
     const gitFiles = [makeFile({ oldFilePath: "main.ts", newFilePath: "main.ts", type: "M" })];
 
     // When: the tree HTML is generated
-    const html = generateGitFileTreeHtml(folder, gitFiles);
+    const html = generateGitFileTreeHtml(folder, gitFiles, NO_FILE_HISTORY);
 
     // Then: the basename is rendered as-is with no HTML entities
     expect(html).toContain("main.ts");
@@ -468,7 +471,7 @@ describe("generateGitFileTreeHtml", () => {
     const folder = makeFolder("parent", { child });
 
     // When: the tree HTML is generated
-    const html = generateGitFileTreeHtml(folder, []);
+    const html = generateGitFileTreeHtml(folder, [], NO_FILE_HISTORY);
 
     // Then: the recursively rendered child folder name is escaped
     expect(html).toContain('<span class="gitFolderName">&lt;b&gt;&amp;</span>');

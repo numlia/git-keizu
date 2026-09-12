@@ -41,12 +41,20 @@ export function generateGitFileTree(gitFiles: GitFileChange[]) {
   return files;
 }
 
+/** Decides per row whether the Highlight File History action is rendered. */
+export type FileHistoryActionPredicate = (gitFile: GitFileChange) => boolean;
+
 /**
  * Build the HTML for a single file item (used by both tree and list views).
  * @param gitFile - The file change data
  * @param displayName - Already-escaped display name (basename for tree view, full path for list view)
+ * @param showFileHistoryAction - Whether the Highlight File History action is rendered for this row
  */
-function buildFileItemHtml(gitFile: GitFileChange, displayName: string): string {
+function buildFileItemHtml(
+  gitFile: GitFileChange,
+  displayName: string,
+  showFileHistoryAction: boolean
+): string {
   const diffPossible = gitFile.additions !== null && gitFile.deletions !== null;
   const binaryTitle = diffPossible ? "" : BINARY_FILE_TITLE;
   const renameHtml =
@@ -57,16 +65,29 @@ function buildFileItemHtml(gitFile: GitFileChange, displayName: string): string 
     gitFile.type !== "A" && gitFile.type !== "D" && diffPossible
       ? `<span class="gitFileAddDel">(<span class="gitFileAdditions" title="${t(gitFile.additions === 1 ? "file.addition.one" : "file.addition.other", gitFile.additions ?? 0)}">+${gitFile.additions}</span>|<span class="gitFileDeletions" title="${t(gitFile.deletions === 1 ? "file.deletion.one" : "file.deletion.other", gitFile.deletions ?? 0)}">-${gitFile.deletions}</span>)</span>`
       : "";
-  const fileActionsHtml =
+  const openFileActionHtml =
     gitFile.type !== "D"
-      ? `<span class="gitFileActions"><span class="gitFileAction openFile" title="${t("context.openFile")}">${svgIcons.goToFile}</span></span>`
+      ? `<span class="gitFileAction openFile" title="${t("context.openFile")}">${svgIcons.goToFile}</span>`
       : "";
+  const fileHistoryActionHtml = showFileHistoryAction
+    ? `<span class="gitFileAction highlightFileHistory" title="${t("context.highlightFileHistory")}">${svgIcons.history}</span>`
+    : "";
+  const actionsHtml = `${openFileActionHtml}${fileHistoryActionHtml}`;
+  const fileActionsHtml =
+    actionsHtml !== "" ? `<span class="gitFileActions">${actionsHtml}</span>` : "";
   const oldPath = encodeURIComponent(gitFile.oldFilePath);
   const newPath = encodeURIComponent(gitFile.newFilePath);
   return `<li class="gitFile ${gitFile.type}${diffPossible ? " gitDiffPossible" : ""}" data-oldfilepath="${oldPath}" data-newfilepath="${newPath}" data-type="${gitFile.type}"${binaryTitle}><span class="gitFileIcon">${svgIcons.file}</span>${displayName}${renameHtml}${addDelHtml}${fileActionsHtml}</li>`;
 }
 
-export function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GitFileChange[]) {
+/**
+ * @param canHighlightFileHistory - Decides per file row whether the Highlight File History action is rendered
+ */
+export function generateGitFileTreeHtml(
+  folder: GitFolder,
+  gitFiles: GitFileChange[],
+  canHighlightFileHistory: FileHistoryActionPredicate
+): string {
   let html =
       (folder.name !== ""
         ? `<span class="gitFolder" data-folderpath="${encodeURIComponent(folder.folderPath)}"><span class="gitFolderIcon">${folder.open ? svgIcons.openFolder : svgIcons.closedFolder}</span><span class="gitFolderName">${escapeHtml(folder.name)}</span></span>`
@@ -89,20 +110,34 @@ export function generateGitFileTreeHtml(folder: GitFolder, gitFiles: GitFileChan
   for (i = 0; i < keys.length; i++) {
     if (folder.contents[keys[i]].type === "folder") {
       gitFolder = <GitFolder>folder.contents[keys[i]];
-      html += `<li${!gitFolder.open ? ' class="closed"' : ""}>${generateGitFileTreeHtml(gitFolder, gitFiles)}</li>`;
+      html += `<li${!gitFolder.open ? ' class="closed"' : ""}>${generateGitFileTreeHtml(gitFolder, gitFiles, canHighlightFileHistory)}</li>`;
     } else {
       gitFile = gitFiles[(<GitFile>folder.contents[keys[i]]).index];
-      html += buildFileItemHtml(gitFile, escapeHtml(folder.contents[keys[i]].name));
+      html += buildFileItemHtml(
+        gitFile,
+        escapeHtml(folder.contents[keys[i]].name),
+        canHighlightFileHistory(gitFile)
+      );
     }
   }
   return `${html}</ul>`;
 }
 
-export function generateGitFileListHtml(gitFiles: GitFileChange[]) {
+/**
+ * @param canHighlightFileHistory - Decides per file row whether the Highlight File History action is rendered
+ */
+export function generateGitFileListHtml(
+  gitFiles: GitFileChange[],
+  canHighlightFileHistory: FileHistoryActionPredicate
+): string {
   const sorted = [...gitFiles].sort((a, b) => a.newFilePath.localeCompare(b.newFilePath));
   let html = '<ul class="gitFolderContents">';
   for (const gitFile of sorted) {
-    html += buildFileItemHtml(gitFile, escapeHtml(gitFile.newFilePath));
+    html += buildFileItemHtml(
+      gitFile,
+      escapeHtml(gitFile.newFilePath),
+      canHighlightFileHistory(gitFile)
+    );
   }
   return `${html}</ul>`;
 }
