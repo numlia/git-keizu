@@ -20,6 +20,7 @@ import {
   canHighlightFileHistory,
   type FileHistoryMenuContext,
   resolveFileRow,
+  sendHighlightFileHistoryAction,
   sendOpenFileAction
 } from "./fileMenu";
 import {
@@ -1874,6 +1875,15 @@ class GitKeizuView {
     addListenerToClass("openFile", "click", (e) => {
       e.stopPropagation();
       sendOpenFileAction(resolveFileRow(<Element>e.target), this.expandedCommit, this.currentRepo);
+    });
+    addListenerToClass("highlightFileHistory", "click", (e) => {
+      e.stopPropagation();
+      sendHighlightFileHistoryAction(
+        resolveFileRow(<Element>e.target),
+        this.expandedCommit,
+        this.currentRepo,
+        this.buildFileHistoryMenuContext()
+      );
     });
     addListenerToClass("gitFile", "contextmenu", (e: Event) => {
       e.preventDefault();
