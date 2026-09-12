@@ -1750,6 +1750,33 @@ describe("GitKeizuView createOrShow registration await (S36)", () => {
       expect(deps.mockExtensionState.getLastActiveRepo()).toBe(SIBLING_REPO);
     });
   });
+
+  describe("GitKeizuView createOrShow queue survives a failed registration (S39)", () => {
+    it("keeps invocation order when a middle open fails registration (TC-396)", async () => {
+      // Case: TC-396
+      // Given: no panel; open A is pending, open B fails registration, open C is pending
+      const deps = createDeps();
+      const first = deferNextRegistration();
+      const second = deferNextRegistration();
+      const third = deferNextRegistration();
+      const firstPending = show(deps, createRootUri());
+      const secondPending = show(deps, createRootUri());
+      const thirdPending = show(deps, createSiblingUri());
+
+      // When: B rejects, C completes, and only then A completes
+      second.reject(new Error(REGISTER_FAILED_MESSAGE));
+      await expect(secondPending).rejects.toThrow(REGISTER_FAILED_MESSAGE);
+      completeRegistration(third, { [SIBLING_REPO]: REPO_STATE });
+      completeRegistration(first, { [SCM_REPO]: REPO_STATE, [SIBLING_REPO]: REPO_STATE });
+      await Promise.all([firstPending, thirdPending]);
+
+      // Then: A applied before C, so C (the latest open) is the one selected and recorded
+      expect(createWebviewPanelMock).toHaveBeenCalledTimes(1);
+      expect(mocks.reveal).toHaveBeenCalledTimes(1);
+      expect(sentMessages("selectRepo")).toEqual([{ command: "selectRepo", repo: SIBLING_REPO }]);
+      expect(deps.mockExtensionState.getLastActiveRepo()).toBe(SIBLING_REPO);
+    });
+  });
 });
 
 describe("GitKeizuView viewState keybindings and loadMoreCommitsAutomatically (S7)", () => {

@@ -68,8 +68,9 @@ export class GitKeizuView {
     repoManager: RepoManager,
     rootUri?: vscode.Uri
   ): Promise<void> {
+    const previousOpen = GitKeizuView.lastOpen;
     const currentOpen = GitKeizuView.open(
-      GitKeizuView.lastOpen,
+      previousOpen,
       extensionPath,
       dataSource,
       extensionState,
@@ -77,8 +78,23 @@ export class GitKeizuView {
       repoManager,
       rootUri
     );
-    GitKeizuView.lastOpen = currentOpen;
+    GitKeizuView.lastOpen = GitKeizuView.settled(previousOpen, currentOpen);
     return currentOpen;
+  }
+
+  // The queue link must cover the predecessor as well as this open: an open that fails
+  // registration never waits for its predecessor itself, and a later open must not skip that
+  // predecessor because of it. The failure is already delivered to the caller of that open.
+  private static async settled(
+    previousOpen: Promise<void>,
+    currentOpen: Promise<void>
+  ): Promise<void> {
+    await previousOpen;
+    try {
+      await currentOpen;
+    } catch {
+      // Reported to the caller of that open.
+    }
   }
 
   private static async open(
@@ -103,11 +119,7 @@ export class GitKeizuView {
       // before the panel exists; otherwise a workspace whose root is not a repo gets the
       // "unable to load" page.
       await repoManager.registerRepoFromUri(rootUri);
-      try {
-        await previousOpen;
-      } catch {
-        // The earlier open already delivered its failure to its own caller.
-      }
+      await previousOpen;
     }
 
     if (targetPanel !== undefined && GitKeizuView.currentPanel !== targetPanel) {

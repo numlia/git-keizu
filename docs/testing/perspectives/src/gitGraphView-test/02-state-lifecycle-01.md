@@ -322,3 +322,38 @@
 - Normal: TC-395
 
 **失敗系/正常系比（煙感知器）**: 正常系1件（TC-395）、失敗系1件（Boundary 1件）。比率合わせのためのケース追加は行わない。
+
+## S39: createOrShow() 登録rejectを挟んでも適用順の鎖を切らない
+
+> Origin: Feature 057 (multi-repo-single-folder-workspace) issue #49 PR #60 レビュー指摘
+> Added: 2026-09-12
+> Status: active
+> Supersedes: -
+> Signature: `public static createOrShow(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, rootUri?: vscode.Uri): Promise<void>`
+> Target Path: `src/gitGraphView.ts`（`createOrShow()`と`settled()`）
+> Test File: `tests/src/gitGraphView.test.ts`
+
+適用順の鎖（`lastOpen`）は「先行呼び出しがsettleし、かつ自呼び出しがsettleした時点」で進める。登録がrejectした呼び出しは先行の完了を自分では待たないため、その呼び出しを鎖の要素にそのまま使うと、後続がさらに前の呼び出しを追い越してしまう。S37は連続する2呼び出しの順序、本セクションは間に登録rejectを挟んだ3呼び出しの順序を固定する。定数はS36と同じ。
+
+| Case ID | Input / Precondition                                                                                                                                                                                                                                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                      | Notes               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
+| TC-396  | `currentPanel`なし、`getRepos()`が`{}`。A（`SCM_REPO`）→B（`SCM_REPO`）→C（`SIBLING_REPO`）の順に`createOrShow`を呼び、独立したdeferred d1・d2・d3を返す。d2を`Error("register failed")`でreject、d3をresolve（`{ [SIBLING_REPO] }`へ）、最後にd1をresolve（`{ [SCM_REPO], [SIBLING_REPO] }`へ） | External - 中間呼び出しの登録reject                                        | Bの`Promise`が`"register failed"`でreject。A・C完了後、`createWebviewPanel`1回、`reveal`1回、`selectRepo`メッセージが`{ command: "selectRepo", repo: SIBLING_REPO }`の1件のみ、`getLastActiveRepo()`が`SIBLING_REPO` | Cが最後に適用される |
+
+### 失敗源インベントリ（include-or-justify）— PR #60 レビュー対応分（S39）
+
+| 失敗源                                                               | 対応ケースまたは除外理由                                |
+| -------------------------------------------------------------------- | ------------------------------------------------------- |
+| rejectした呼び出しを鎖の要素にし、後続がさらに前の呼び出しを追い越す | TC-396                                                  |
+| 先行rejectが後続を止める                                             | S37 TC-393が所有                                        |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）                | 2呼び出しはS37 TC-391 / TC-392が所有。3呼び出し: TC-396 |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(`rootUri`は`Uri`型で、拒否分岐を持たない)
+- Exception: excluded(`settled()`のcatchは自呼び出しのrejectを鎖へ波及させないためのもので、Externalの TC-396 で検証する)
+- External: TC-396
+- Boundary: excluded(3呼び出しの順序はExternalのTC-396で扱う)
+- Type: excluded(型はコンパイル時に保証)
+- Normal: excluded(正常順序はS37 TC-392が所有)
+
+**失敗系/正常系比（煙感知器）**: 正常系0件、失敗系1件（External 1件）。正常系はS37が所有するため比率合わせのケース追加は行わない。
