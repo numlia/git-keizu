@@ -70,7 +70,7 @@
   "devDependencies": {
     "@types/node": "^22.20.2",
     "@types/vscode": "~1.74.0",
-    "@vitest/coverage-v8": "4.1.10",
+    "@vitest/coverage-v8": "5.0.0",
     "@vscode/codicons": "^0.0.45",
     "@vscode/vsce": "^3.9.2",
     "esbuild": "^0.28.2",
@@ -80,7 +80,7 @@
     "oxlint": "^1.82.0",
     "typescript": "^5.9.3",
     "vite": "^7.3.6",
-    "vitest": "^4.1.11"
+    "vitest": "^5.0.0"
   },
   "l10n": "./l10n",
   "contributes": {
