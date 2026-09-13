@@ -17,3 +17,10 @@ updates:
       - dependency-name: "vite"
         update-types:
           - "version-update:semver-major"
+      # Keep in step with engines.vscode so the compiler still rejects APIs
+      # missing from the minimum supported VS Code. Minor updates are ignored
+      # too: 1.74 -> 1.137 is a semver-minor bump.
+      - dependency-name: "@types/vscode"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
