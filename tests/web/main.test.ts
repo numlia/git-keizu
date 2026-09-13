@@ -4504,6 +4504,9 @@ describe("Author, details, remotes & parent navigation", () => {
 
 describe("Multi-select filter state management", () => {
   let liveVscode: typeof vscode;
+  // Mock call history is cleared before each test, so the construction-time
+  // setState calls have to be captured while beforeAll is still running.
+  let initialSavedState: Record<string, unknown> | undefined;
 
   beforeAll(async () => {
     vi.resetModules();
@@ -4519,6 +4522,11 @@ describe("Multi-select filter state management", () => {
 
     await import("../../web/main");
     loadTestCommits();
+
+    const setStateCalls = vi.mocked(liveVscode.setState).mock.calls;
+    initialSavedState = setStateCalls[setStateCalls.length - 1]?.[0] as
+      | Record<string, unknown>
+      | undefined;
   });
 
   afterEach(() => {
@@ -4534,10 +4542,8 @@ describe("Multi-select filter state management", () => {
       // Given: GitKeizuView was constructed with no prevState
       // When: saveState is called (implicit on construction)
       // Then: setState includes selectedBranches: []
-      const lastSetState = vi.mocked(liveVscode.setState).mock.calls;
-      const latestState = lastSetState[lastSetState.length - 1]?.[0] as Record<string, unknown>;
-      expect(latestState).toHaveProperty("selectedBranches");
-      expect(latestState.selectedBranches).toEqual([]);
+      expect(initialSavedState).toHaveProperty("selectedBranches");
+      expect(initialSavedState?.selectedBranches).toEqual([]);
     });
 
     it("updates selectedBranches on branch dropdown callback (TC-135)", () => {
