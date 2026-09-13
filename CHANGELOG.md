@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.1.3] - 2026-09-13
+
+This release makes Highlight File History reachable from the file row itself, so the action is visible where you are already looking instead of only inside the right-click menu.
+
+### Changed
+
+- **Highlight File History can be started from the file row**: Hovering a file in a commit's details now shows a history icon next to **Open File**, which starts Highlight File History for that file — the same action, with the same result, as the context-menu entry. The icon appears only on rows where the action can actually run: not for uncommitted changes, stash entries, or a two-commit comparison, and only for added, modified, deleted, and renamed files. A deleted file shows the history icon on its own, since **Open File** does not apply to it. Both the folder tree and the flat list show the icon, and it keeps working after switching between them. If a two-commit comparison is started while an icon is still on screen, clicking it does nothing until the file list is redrawn, rather than starting a history that the comparison does not allow. The context menu is unchanged.
+
 ## [1.1.2] - 2026-09-12
 
 This release makes Git Keizu work in a folder that is not itself a Git repository but contains several repositories side by side, such as a parent folder holding a few projects opened as one workspace.
@@ -586,7 +594,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.1.2...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.1.3...HEAD
+[1.1.3]: https://github.com/numlia/git-keizu/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/numlia/git-keizu/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/numlia/git-keizu/compare/v1.1.0...v1.1.1
 [1.1.0]: https://github.com/numlia/git-keizu/compare/v1.0.0...v1.1.0
