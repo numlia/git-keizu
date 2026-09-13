@@ -65,19 +65,40 @@ export function sendOpenFileAction(
  * File history needs a stable anchor commit: uncommitted changes, stashes and
  * comparison views have none, and typechange rows are not part of the lineage.
  */
-function canHighlightFileHistory(
-  fileRow: HTMLElement,
+export function canHighlightFileHistory(
   expandedCommit: FileMenuExpandedCommit,
-  fileHistory: FileHistoryMenuContext
+  isStash: boolean,
+  changeType: string | undefined
 ): boolean {
-  const changeType = fileRow.dataset[DATASET_TYPE_KEY];
   return (
     expandedCommit.hash !== UNCOMMITTED_CHANGES_HASH &&
-    fileHistory.isStash === false &&
+    isStash === false &&
     expandedCommit.compareWithHash === null &&
     changeType !== undefined &&
     FILE_HISTORY_MENU_CHANGE_TYPES.has(changeType)
   );
+}
+
+/**
+ * Request file history for the given file row.
+ * No-op under the same guards as `sendOpenFileAction()`, and when the shared
+ * eligibility check fails for the state at click time.
+ */
+export function sendHighlightFileHistoryAction(
+  fileRow: HTMLElement | null,
+  expandedCommit: FileMenuExpandedCommit | null,
+  repo: string | null,
+  fileHistory: FileHistoryMenuContext
+): void {
+  if (fileRow === null || expandedCommit === null || repo === null) return;
+  const encodedPath = fileRow.dataset[DATASET_NEW_FILE_PATH_KEY];
+  if (encodedPath === undefined) return;
+  if (
+    !canHighlightFileHistory(expandedCommit, fileHistory.isStash, fileRow.dataset[DATASET_TYPE_KEY])
+  ) {
+    return;
+  }
+  fileHistory.onHighlightFileHistory(expandedCommit.hash, decodeURIComponent(encodedPath));
 }
 
 /**
@@ -102,7 +123,10 @@ export function buildFileContextMenuItems(
       sendOpenFileAction(fileRow, expandedCommit, repo);
     }
   };
-  if (!canHighlightFileHistory(fileRow, expandedCommit, fileHistory)) return [openFileItem];
+  if (
+    !canHighlightFileHistory(expandedCommit, fileHistory.isStash, fileRow.dataset[DATASET_TYPE_KEY])
+  )
+    return [openFileItem];
   return [
     openFileItem,
     {

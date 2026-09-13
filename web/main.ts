@@ -17,12 +17,15 @@ import {
 } from "./fileHistory";
 import {
   buildFileContextMenuItems,
+  canHighlightFileHistory,
   type FileHistoryMenuContext,
   resolveFileRow,
+  sendHighlightFileHistoryAction,
   sendOpenFileAction
 } from "./fileMenu";
 import {
   alterGitFileTree,
+  type FileHistoryActionPredicate,
   generateGitFileListHtml,
   generateGitFileTree,
   generateGitFileTreeHtml
@@ -1830,15 +1833,22 @@ class GitKeizuView {
     });
     this.saveState();
   }
+  private buildFileHistoryActionPredicate(): FileHistoryActionPredicate {
+    const expandedCommit = this.expandedCommit;
+    if (expandedCommit === null) return () => false;
+    const isStash = this.buildFileHistoryMenuContext().isStash;
+    return (gitFile) => canHighlightFileHistory(expandedCommit, isStash, gitFile.type);
+  }
   private buildFilesSectionInnerHtml(
     fileViewType: FileViewType,
     fileChanges: GG.GitFileChange[],
     fileTree: GitFolder
   ): string {
+    const canHighlight = this.buildFileHistoryActionPredicate();
     const fileListHtml =
       fileViewType === FILE_VIEW_LIST
-        ? generateGitFileListHtml(fileChanges)
-        : generateGitFileTreeHtml(fileTree, fileChanges);
+        ? generateGitFileListHtml(fileChanges, canHighlight)
+        : generateGitFileTreeHtml(fileTree, fileChanges, canHighlight);
     const { icon, title } = getFileViewToggle(fileViewType);
     return `<span id="fileViewToggle" class="fileViewToggleBtn" title="${title}">${icon}</span>${fileListHtml}`;
   }
@@ -1865,6 +1875,15 @@ class GitKeizuView {
     addListenerToClass("openFile", "click", (e) => {
       e.stopPropagation();
       sendOpenFileAction(resolveFileRow(<Element>e.target), this.expandedCommit, this.currentRepo);
+    });
+    addListenerToClass("highlightFileHistory", "click", (e) => {
+      e.stopPropagation();
+      sendHighlightFileHistoryAction(
+        resolveFileRow(<Element>e.target),
+        this.expandedCommit,
+        this.currentRepo,
+        this.buildFileHistoryMenuContext()
+      );
     });
     addListenerToClass("gitFile", "contextmenu", (e: Event) => {
       e.preventDefault();

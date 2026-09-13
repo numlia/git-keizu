@@ -1,7 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GitCommitDetails, GitCommitNode, GitCommitStash, GitRef } from "../../src/types";
+import type {
+  GitCommitDetails,
+  GitCommitNode,
+  GitCommitStash,
+  GitFileChange,
+  GitFileChangeType,
+  GitRef
+} from "../../src/types";
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 
 /* ------------------------------------------------------------------ */
@@ -294,7 +301,12 @@ vi.mock("../../web/fileTree", () => ({
 }));
 
 import { getBranchLabels } from "../../web/branchLabels";
-import { hideContextMenu, isContextMenuActive, showContextMenu } from "../../web/contextMenu";
+import {
+  hideContextMenu,
+  isContextMenuActive,
+  recordRecentAction,
+  showContextMenu
+} from "../../web/contextMenu";
 import {
   hideDialog,
   isDialogActive,
@@ -305,7 +317,11 @@ import {
   showRefInputDialog,
   showSelectDialog
 } from "../../web/dialogs";
-import { generateGitFileListHtml, generateGitFileTreeHtml } from "../../web/fileTree";
+import {
+  type FileHistoryActionPredicate,
+  generateGitFileListHtml,
+  generateGitFileTreeHtml
+} from "../../web/fileTree";
 import { buildRefContextMenuItems, checkoutBranchAction } from "../../web/refMenu";
 import { buildStashContextMenuItems } from "../../web/stashMenu";
 import { buildUncommittedContextMenuItems } from "../../web/uncommittedMenu";
@@ -6278,6 +6294,544 @@ describe("file row context menu handler", () => {
       "Open File",
       "Highlight File History"
     ]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S54: bindFileViewListeners() 履歴アイコンの描画判定配線とクリック  */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/main-test/06-file-actions-01.md
+describe("highlightFileHistory icon wiring and click handler (S54)", () => {
+  const STASH_HASH = "eee555eee555eee5";
+  const ENCODED_BASE_PATH = "src%2Ffile.ts";
+  const DECODED_BASE_PATH = "src/file.ts";
+  const GLYPH_SELECTOR = ".highlightFileHistory .codicon-history";
+  const ICON_ACTIONS_HTML =
+    '<span class="gitFileActions"><span class="gitFileAction openFile" title="Open File">icon</span><span class="gitFileAction highlightFileHistory" title="Highlight File History"><span class="codicon codicon-history"></span></span></span>';
+  const ICON_ROW_HTML = `<table><tr class="gitFile M gitDiffPossible" data-oldfilepath="${ENCODED_BASE_PATH}" data-newfilepath="${ENCODED_BASE_PATH}" data-type="M"><td>${ICON_ACTIONS_HTML}</td></tr></table>`;
+  const ICON_LIST_HTML = `<ul class="gitFolderContents"><li class="gitFile M gitDiffPossible" data-oldfilepath="${ENCODED_BASE_PATH}" data-newfilepath="${ENCODED_BASE_PATH}" data-type="M"><span class="gitFileIcon">icon</span>${DECODED_BASE_PATH}${ICON_ACTIONS_HTML}</li></ul>`;
+  const ICON_ROW_WITHOUT_PATH_HTML = `<table><tr class="gitFile M gitDiffPossible" data-oldfilepath="${ENCODED_BASE_PATH}" data-type="M"><td>${ICON_ACTIONS_HTML}</td></tr></table>`;
+  const ICON_ROW_WITHOUT_TYPE_HTML = `<table><tr class="gitFile gitDiffPossible" data-oldfilepath="${ENCODED_BASE_PATH}" data-newfilepath="${ENCODED_BASE_PATH}"><td>${ICON_ACTIONS_HTML}</td></tr></table>`;
+  const COMMITS_WITH_UNCOMMITTED: GitCommitNode[] = [
+    {
+      hash: UNCOMMITTED_CHANGES_HASH,
+      parentHashes: [],
+      author: "*",
+      email: "",
+      date: 1700003000,
+      message: "Uncommitted Changes (3)",
+      refs: [],
+      stash: null
+    },
+    ...MOCK_COMMITS
+  ];
+  const COMMITS_WITH_STASH: GitCommitNode[] = [
+    ...MOCK_COMMITS,
+    {
+      hash: STASH_HASH,
+      parentHashes: [COMMIT_HASH_3],
+      author: "Dave",
+      email: "dave@test.com",
+      date: 1700003000,
+      message: "WIP on main",
+      refs: [],
+      stash: { selector: "stash@{0}", baseHash: COMMIT_HASH_3, untrackedFilesHash: null }
+    }
+  ];
+  const TYPECHANGE_FILE = {
+    oldFilePath: DECODED_BASE_PATH,
+    newFilePath: DECODED_BASE_PATH,
+    type: "T",
+    additions: 1,
+    deletions: 0
+  } as unknown as GitFileChange;
+  const UNTYPED_FILE = {
+    oldFilePath: DECODED_BASE_PATH,
+    newFilePath: DECODED_BASE_PATH,
+    additions: 1,
+    deletions: 0
+  } as unknown as GitFileChange;
+
+  let liveVscode: typeof vscode;
+  let liveFileTreeHtml: typeof generateGitFileTreeHtml;
+  let liveFileListHtml: typeof generateGitFileListHtml;
+  let liveRecordRecentAction: typeof recordRecentAction;
+
+  function iconRowHtml(type: string): string {
+    return `<table><tr class="gitFile ${type}" data-oldfilepath="${ENCODED_BASE_PATH}" data-newfilepath="${ENCODED_BASE_PATH}" data-type="${type}"><td>${ICON_ACTIONS_HTML}</td></tr></table>`;
+  }
+
+  function makeChange(type: GitFileChangeType): GitFileChange {
+    return {
+      oldFilePath: DECODED_BASE_PATH,
+      newFilePath: DECODED_BASE_PATH,
+      type,
+      additions: 1,
+      deletions: 0
+    };
+  }
+
+  function loadCommits(commits: GitCommitNode[]): void {
+    dispatchMessage({
+      command: "loadCommits",
+      commits,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+  }
+
+  function respondCommitDetails(hash: string): void {
+    dispatchMessage({
+      command: "commitDetails",
+      commitDetails: { ...makeCommitDetails(hash), fileChanges: [makeChange("M")] }
+    });
+  }
+
+  /** Expands `hash` with the mocked tree HTML; mock call history is kept for inspection. */
+  function expandWithTreeHtml(hash: string, treeHtml: string): void {
+    vi.mocked(liveFileTreeHtml).mockReturnValueOnce(treeHtml);
+    clickCommit(hash);
+    respondCommitDetails(hash);
+  }
+
+  function expandUncommittedWithTreeHtml(treeHtml: string): void {
+    loadCommits(COMMITS_WITH_UNCOMMITTED);
+    vi.mocked(liveFileTreeHtml).mockReturnValueOnce(treeHtml);
+    clickUnsavedChanges();
+    respondCommitDetails(UNCOMMITTED_CHANGES_HASH);
+  }
+
+  function expandStashWithTreeHtml(treeHtml: string): void {
+    loadCommits(COMMITS_WITH_STASH);
+    expandWithTreeHtml(STASH_HASH, treeHtml);
+  }
+
+  function treePredicateAt(index: number): FileHistoryActionPredicate {
+    const calls = vi.mocked(liveFileTreeHtml).mock.calls;
+    expect(calls.length).toBeGreaterThan(index);
+    return calls[index][2];
+  }
+
+  function latestTreePredicate(): FileHistoryActionPredicate {
+    return treePredicateAt(vi.mocked(liveFileTreeHtml).mock.calls.length - 1);
+  }
+
+  function glyph(): Element {
+    const elem = document.querySelector(GLYPH_SELECTOR);
+    expect(elem).not.toBeNull();
+    return elem!;
+  }
+
+  function clickGlyph(): void {
+    glyph().dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  }
+
+  function postedCommands(): string[] {
+    return vi
+      .mocked(liveVscode.postMessage)
+      .mock.calls.map((call) => (call[0] as { command: string }).command);
+  }
+
+  function clickFileViewToggle(): void {
+    const toggle = document.getElementById("fileViewToggle");
+    expect(toggle).not.toBeNull();
+    toggle!.click();
+  }
+
+  beforeAll(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+
+    const utilsMod = await import("../../web/utils");
+    liveVscode = utilsMod.vscode;
+    vi.mocked(liveVscode.getState).mockReturnValueOnce(null);
+
+    const fileTreeMod = await import("../../web/fileTree");
+    liveFileTreeHtml = fileTreeMod.generateGitFileTreeHtml;
+    liveFileListHtml = fileTreeMod.generateGitFileListHtml;
+
+    const ctxMenuMod = await import("../../web/contextMenu");
+    liveRecordRecentAction = ctxMenuMod.recordRecentAction;
+
+    await import("../../web/main");
+    loadTestCommits();
+  });
+
+  beforeEach(() => {
+    resetCommitState();
+    mockFileHistoryInstance.isActive.mockReturnValue(false);
+    mockFileHistoryInstance.isPending.mockReturnValue(false);
+  });
+
+  afterEach(() => {
+    // Restore the tree file view so a toggled list mode does not leak into later cases.
+    dispatchMessage({
+      command: "loadRepos",
+      repos: { [TEST_REPO]: { columnWidths: null } },
+      lastActiveRepo: TEST_REPO
+    });
+    vi.clearAllMocks();
+  });
+
+  it("passes a tree predicate that follows the four conditions for a normal commit (TC-372)", () => {
+    // Case: TC-372
+    // Given: a normal commit is expanded with the commitDetails response
+    expandWithTreeHtml(COMMIT_HASH_1, "<table></table>");
+
+    // When: the third argument of the tree generator call is taken
+    expect(liveFileTreeHtml).toHaveBeenCalledTimes(1);
+    const predicate = treePredicateAt(0);
+
+    // Then: it is a function that allows A / M / D / R and rejects T and a missing type
+    expect(typeof predicate).toBe("function");
+    for (const type of ["A", "M", "D", "R"] as const) {
+      expect(predicate(makeChange(type)), type).toBe(true);
+    }
+    expect(predicate(TYPECHANGE_FILE)).toBe(false);
+    expect(predicate(UNTYPED_FILE)).toBe(false);
+  });
+
+  it("passes a predicate that rejects rows of uncommitted changes (TC-373)", () => {
+    // Case: TC-373
+    // Given: the uncommitted changes row is expanded
+    expandUncommittedWithTreeHtml("<table></table>");
+
+    // When: the predicate of the latest tree generator call is evaluated for M
+    // Then: false
+    expect(latestTreePredicate()(makeChange("M"))).toBe(false);
+  });
+
+  it("passes a predicate that rejects rows of a stash commit (TC-374)", () => {
+    // Case: TC-374
+    // Given: a stash commit (stash !== null) is expanded
+    expandStashWithTreeHtml("<table></table>");
+
+    // When: the predicate of the latest tree generator call is evaluated for M
+    // Then: false
+    expect(latestTreePredicate()(makeChange("M"))).toBe(false);
+  });
+
+  it("passes a predicate that rejects rows in comparison view (TC-375)", () => {
+    // Case: TC-375
+    // Given: COMMIT_HASH_1 is expanded and compared with COMMIT_HASH_2
+    expandCommit(COMMIT_HASH_1);
+    clickCommit(COMMIT_HASH_2, { ctrlKey: true });
+    dispatchMessage({
+      command: "compareCommits",
+      fileChanges: [makeChange("M")],
+      fromHash: COMMIT_HASH_1,
+      toHash: COMMIT_HASH_2
+    });
+
+    // When: the predicate of the comparison render is evaluated for M
+    // Then: false
+    expect(liveFileTreeHtml).toHaveBeenCalledTimes(1);
+    expect(treePredicateAt(0)(makeChange("M"))).toBe(false);
+  });
+
+  it("passes the same predicate shape to the list generator after a toggle (TC-376)", () => {
+    // Case: TC-376
+    // Given: a normal commit is expanded in tree view
+    expandWithTreeHtml(COMMIT_HASH_1, "<table></table>");
+    vi.clearAllMocks();
+
+    // When: the file view toggle is clicked
+    clickFileViewToggle();
+
+    // Then: the list generator runs once with a predicate that allows M and rejects T
+    expect(liveFileListHtml).toHaveBeenCalledTimes(1);
+    const predicate = vi.mocked(liveFileListHtml).mock.calls[0][1];
+    expect(predicate(makeChange("M"))).toBe(true);
+    expect(predicate(TYPECHANGE_FILE)).toBe(false);
+  });
+
+  it("delegates a glyph click to fileHistory.request without viewDiff (TC-377)", () => {
+    // Case: TC-377
+    // Given: a normal commit is expanded with the icon row
+    expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_HTML);
+    vi.clearAllMocks();
+
+    // When: the history glyph is clicked
+    clickGlyph();
+
+    // Then: request runs once with the anchor and decoded path, and no viewDiff is posted
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(1);
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledWith(COMMIT_HASH_1, DECODED_BASE_PATH);
+    expect(postedCommands()).not.toContain("viewDiff");
+  });
+
+  it("decodes a path with a space and Japanese characters (TC-378)", () => {
+    // Case: TC-378
+    // Given: an icon row whose data-newfilepath is encoded
+    const encoded = encodeURIComponent("src/テスト ファイル.ts");
+    expandWithTreeHtml(
+      COMMIT_HASH_1,
+      `<table><tr class="gitFile M gitDiffPossible" data-oldfilepath="${encoded}" data-newfilepath="${encoded}" data-type="M"><td>${ICON_ACTIONS_HTML}</td></tr></table>`
+    );
+    vi.clearAllMocks();
+
+    // When: the history glyph is clicked
+    clickGlyph();
+
+    // Then: the second argument is the fully decoded string
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(1);
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledWith(
+      COMMIT_HASH_1,
+      "src/テスト ファイル.ts"
+    );
+  });
+
+  it("stops propagation so the gitDiffPossible row posts nothing (TC-379)", () => {
+    // Case: TC-379
+    // Given: a gitDiffPossible icon row is rendered
+    expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_HTML);
+    vi.clearAllMocks();
+
+    // When: the history glyph is clicked
+    clickGlyph();
+
+    // Then: postMessage is not called at all
+    expect(liveVscode.postMessage).toHaveBeenCalledTimes(0);
+  });
+
+  it("rebinds the click handler after switching to list view (TC-380)", () => {
+    // Case: TC-380
+    // Given: a normal commit is expanded, then toggled to the list fixture
+    expandWithTreeHtml(COMMIT_HASH_1, "<table></table>");
+    vi.mocked(liveFileListHtml).mockReturnValueOnce(ICON_LIST_HTML);
+    clickFileViewToggle();
+    vi.clearAllMocks();
+
+    // When: the history glyph of the list row is clicked
+    expect(document.querySelector("li.gitFile")).not.toBeNull();
+    clickGlyph();
+
+    // Then: request runs once
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(1);
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledWith(COMMIT_HASH_1, DECODED_BASE_PATH);
+  });
+
+  it("ignores a retained glyph after the commit was collapsed (TC-381)", () => {
+    // Case: TC-381
+    // Given: the glyph reference is kept and the same commit is clicked to collapse it
+    expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_HTML);
+    const retainedGlyph = glyph();
+    clickCommit(COMMIT_HASH_1);
+    expect(document.getElementById("commitDetails")).toBeNull();
+    vi.clearAllMocks();
+
+    // When: the retained glyph is clicked
+    retainedGlyph.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Then: no request
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(0);
+  });
+
+  it("ignores a history icon placed outside any file row (TC-382)", () => {
+    // Case: TC-382
+    // Given: a .highlightFileHistory icon in #footer is bound by the same listener pass
+    const footer = document.getElementById("footer")!;
+    footer.innerHTML =
+      '<span class="gitFileAction highlightFileHistory"><span class="codicon codicon-history"></span></span>';
+    expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_HTML);
+    vi.clearAllMocks();
+
+    // When: the footer glyph is clicked
+    footer.querySelector(GLYPH_SELECTOR)!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Then: no request
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(0);
+    footer.innerHTML = "";
+  });
+
+  it("ignores a row without data-newfilepath (TC-383)", () => {
+    // Case: TC-383
+    // Given: an icon row that lacks data-newfilepath
+    expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_WITHOUT_PATH_HTML);
+    vi.clearAllMocks();
+
+    // When: the history glyph is clicked
+    clickGlyph();
+
+    // Then: no request
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(0);
+  });
+
+  it("ignores a glyph click while uncommitted changes are expanded (TC-384)", () => {
+    // Case: TC-384
+    // Given: the uncommitted changes row is expanded with the icon fixture
+    expandUncommittedWithTreeHtml(ICON_ROW_HTML);
+    vi.clearAllMocks();
+
+    // When: the history glyph is clicked
+    clickGlyph();
+
+    // Then: no request
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(0);
+  });
+
+  it("ignores a glyph click while a stash commit is expanded (TC-385)", () => {
+    // Case: TC-385
+    // Given: a stash commit is expanded with the icon fixture
+    expandStashWithTreeHtml(ICON_ROW_HTML);
+    vi.clearAllMocks();
+
+    // When: the history glyph is clicked
+    clickGlyph();
+
+    // Then: no request
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(0);
+  });
+
+  it("ignores a glyph click on typechange and untyped rows (TC-386)", () => {
+    // Case: TC-386
+    // Given: an icon row with data-type="T" and one without data-type
+    for (const html of [iconRowHtml("T"), ICON_ROW_WITHOUT_TYPE_HTML]) {
+      resetCommitState();
+      expandWithTreeHtml(COMMIT_HASH_1, html);
+      vi.clearAllMocks();
+
+      // When: the history glyph is clicked
+      clickGlyph();
+
+      // Then: no request for that row
+      expect(mockFileHistoryInstance.request, html).toHaveBeenCalledTimes(0);
+    }
+  });
+
+  it("rejects a glyph click while a commit comparison is pending (TC-387)", () => {
+    // Case: TC-387
+    // Given: the icon row is expanded and COMMIT_HASH_2 is ctrl+clicked without a response
+    expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_HTML);
+    vi.clearAllMocks();
+    clickCommit(COMMIT_HASH_2, { ctrlKey: true });
+
+    // When: the still-rendered history glyph is clicked
+    clickGlyph();
+
+    // Then: no request, no viewDiff, and exactly one compareCommits was sent
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(0);
+    expect(postedCommands()).not.toContain("viewDiff");
+    expect(postedCommands().filter((command) => command === "compareCommits")).toHaveLength(1);
+  });
+
+  it("rejects a glyph click while an uncommitted comparison is pending (TC-388)", () => {
+    // Case: TC-388
+    // Given: a list with uncommitted changes, COMMIT_HASH_1 expanded, then meta+click on the row
+    loadCommits(COMMITS_WITH_UNCOMMITTED);
+    expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_HTML);
+    vi.clearAllMocks();
+    clickUnsavedChanges({ metaKey: true });
+
+    // When: the still-rendered history glyph is clicked
+    clickGlyph();
+
+    // Then: no request and no viewDiff
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(0);
+    expect(postedCommands()).not.toContain("viewDiff");
+  });
+
+  it("passes a rejecting predicate once the comparison response arrives (TC-389)", () => {
+    // Case: TC-389
+    // Given: the pending comparison of TC-387
+    expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_HTML);
+    clickCommit(COMMIT_HASH_2, { ctrlKey: true });
+    vi.clearAllMocks();
+
+    // When: the compareCommits response is dispatched
+    dispatchMessage({
+      command: "compareCommits",
+      fileChanges: [makeChange("M")],
+      fromHash: COMMIT_HASH_1,
+      toHash: COMMIT_HASH_2
+    });
+
+    // Then: the latest tree generator call received a predicate that rejects M
+    expect(liveFileTreeHtml).toHaveBeenCalledTimes(1);
+    expect(latestTreePredicate()(makeChange("M"))).toBe(false);
+  });
+
+  it("requests again after the comparison is cancelled (TC-390)", () => {
+    // Case: TC-390
+    // Given: the comparison of TC-389 is shown, then cancelled with the icon row re-rendered
+    expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_HTML);
+    clickCommit(COMMIT_HASH_2, { ctrlKey: true });
+    dispatchMessage({
+      command: "compareCommits",
+      fileChanges: [makeChange("M")],
+      fromHash: COMMIT_HASH_1,
+      toHash: COMMIT_HASH_2
+    });
+    vi.mocked(liveFileTreeHtml).mockReturnValueOnce(ICON_ROW_HTML);
+    clickCommit(COMMIT_HASH_2, { ctrlKey: true });
+    vi.clearAllMocks();
+
+    // When: the history glyph is clicked
+    clickGlyph();
+
+    // Then: request runs once again
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(1);
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledWith(COMMIT_HASH_1, DECODED_BASE_PATH);
+  });
+
+  it("requests for A, D and R rows (TC-391)", () => {
+    // Case: TC-391
+    // Given: icon rows of the other allowed change types
+    for (const type of ["A", "D", "R"]) {
+      resetCommitState();
+      expandWithTreeHtml(COMMIT_HASH_1, iconRowHtml(type));
+      vi.clearAllMocks();
+
+      // When: the history glyph is clicked
+      clickGlyph();
+
+      // Then: exactly one request whose first argument is the expanded commit hash
+      expect(mockFileHistoryInstance.request, type).toHaveBeenCalledTimes(1);
+      expect(mockFileHistoryInstance.request.mock.calls[0][0], type).toBe(COMMIT_HASH_1);
+    }
+  });
+
+  it("delegates while file history is active and while it is pending (TC-392)", () => {
+    // Case: TC-392
+    // Given: the icon row is expanded
+    expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_HTML);
+    vi.clearAllMocks();
+
+    // When: the glyph is clicked while the mode is active
+    mockFileHistoryInstance.isActive.mockReturnValue(true);
+    clickGlyph();
+
+    // Then: one request with the same arguments
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(1);
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledWith(COMMIT_HASH_1, DECODED_BASE_PATH);
+
+    // When: the glyph is clicked while a request is pending
+    mockFileHistoryInstance.request.mockClear();
+    mockFileHistoryInstance.isActive.mockReturnValue(false);
+    mockFileHistoryInstance.isPending.mockReturnValue(true);
+    clickGlyph();
+
+    // Then: one request with the same arguments
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(1);
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledWith(COMMIT_HASH_1, DECODED_BASE_PATH);
+  });
+
+  it("records no recent action for a glyph click (TC-393)", () => {
+    // Case: TC-393
+    // Given: the icon row is expanded
+    expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_HTML);
+    vi.clearAllMocks();
+
+    // When: the history glyph is clicked
+    clickGlyph();
+
+    // Then: the request is delegated but no recent action is recorded
+    expect(mockFileHistoryInstance.request).toHaveBeenCalledTimes(1);
+    expect(liveRecordRecentAction).toHaveBeenCalledTimes(0);
   });
 });
 

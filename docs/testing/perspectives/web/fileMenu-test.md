@@ -157,3 +157,59 @@ S2 / S3 は 3 引数 signature と「items が `Open File` 1 件」を前提に�
 - Normal: TC-028、TC-030、TC-031
 
 **失敗系/正常系比（煙感知器）**: 正常系3件、失敗系2件。S2 / S3 の契約を 4 引数 signature へ写した replacement section で、失敗源は先頭維持・payload・recent action の 3 点に限られることを上表で列挙した。比率合わせのためのケース追加・削除は行わない。
+
+## S6: canHighlightFileHistory() / sendHighlightFileHistoryAction() 共有判定とアイコン起動
+
+> Origin: Feature 055-09 (light-spec-plan)
+> Added: 2026-09-13
+> Status: active
+> Supersedes: -
+> Signature: `canHighlightFileHistory(expandedCommit: FileMenuExpandedCommit, isStash: boolean, changeType: string | undefined): boolean` / `sendHighlightFileHistoryAction(fileRow: HTMLElement | null, expandedCommit: FileMenuExpandedCommit | null, repo: string | null, fileHistory: FileHistoryMenuContext): void`
+> Target Path: `web/fileMenu.ts:68-102`
+> Test File: `tests/web/fileMenu.test.ts`
+
+context menuが持つ4条件（uncommittedでない / stashでない / 比較表示でない / change typeが`A` / `M` / `D` / `R`）をexport関数`canHighlightFileHistory()`の1か所に置き、履歴アイコンのclickから呼ぶ`sendHighlightFileHistoryAction()`が`sendOpenFileAction()`と同じ4ガードのあとにその時点の入力で同じ4条件を再評価してから`onHighlightFileHistory(anchorHash, decodeURIComponent(path))`を1回呼ぶ契約の観点（対応プラン§3.4、§4 Task 2）。menu側の戻り値はS4 / S5、DOM listenerの配線は`web/main-test/06-file-actions-01.md` S54、requestの送信は`web/fileHistory-test.md`の責務で本表には含めない。基本fixtureは`{ hash: "abc", compareWithHash: null }`、`isStash: false`、type `M`で`newfilepath: "src%2Ffile.ts"`の行、`makeFileHistoryContext()`。
+
+| Case ID | Input / Precondition                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                    | Notes                            |
+| ------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | -------------------------------- |
+| TC-033  | `canHighlightFileHistory({ hash: "abc", compareWithHash: null }, false, "M")`    | Normal - 基本                                                              | `true`                                                                                             | -                                |
+| TC-034  | changeTypeが`A` / `D` / `R`                                                      | Normal - 許容type集合                                                      | 3入力とも`true`                                                                                    | `FILE_HISTORY_MENU_CHANGE_TYPES` |
+| TC-035  | changeTypeが`T`                                                                  | Validation - 許容外type                                                    | `false`                                                                                            | typechange                       |
+| TC-036  | changeTypeが`undefined`                                                          | Boundary - dataset欠落                                                     | `false`                                                                                            | -                                |
+| TC-037  | hashが`*`                                                                        | Validation - uncommitted                                                   | `false`                                                                                            | `UNCOMMITTED_CHANGES_HASH`       |
+| TC-038  | isStashが`true`                                                                  | Validation - stash                                                         | `false`                                                                                            | -                                |
+| TC-039  | compareWithHashが`"def"`                                                         | Validation - 比較表示                                                      | `false`                                                                                            | -                                |
+| TC-040  | `sendHighlightFileHistoryAction(基本行, 基本commit, TEST_REPO, context)`         | Normal - 起動                                                              | `onHighlightFileHistory`が`("abc", "src/file.ts")`で1回、`postMessage`0回、`recordRecentAction`0回 | menu項目と同じ引数               |
+| TC-041  | `data-newfilepath`が`encodeURIComponent("src/テスト ファイル.ts")`               | Boundary - special characters                                              | 第2引数が`"src/テスト ファイル.ts"`                                                                | `decodeURIComponent`             |
+| TC-042  | fileRowが`null`（`resolveFileRow(span)`の結果）                                  | Validation - 行解決失敗                                                    | callback 0回、例外なし                                                                             | S1 TC-006と同じguard             |
+| TC-043  | expandedCommitが`null`                                                           | Validation - commit contextなし                                            | 0回                                                                                                | -                                |
+| TC-044  | repoが`null`                                                                     | Validation - repoなし                                                      | 0回                                                                                                | DOM統合では作れない経路          |
+| TC-045  | `data-newfilepath`欠落の行                                                       | Validation - dataset欠落                                                   | 0回                                                                                                | -                                |
+| TC-046  | hash `*` / isStash `true` / compareWithHash `"def"` / type `T` / type欠落の5入力 | Validation - 4条件の否定側                                                 | 各0回                                                                                              | click時の再評価                  |
+| TC-047  | type `A` / `D` / `R`の行                                                         | Normal - 4条件の許可側                                                     | 各1回、第1引数`"abc"`                                                                              | -                                |
+
+### 失敗源インベントリ（include-or-justify）— Feature 055-09 追加分（S6）
+
+| 失敗源                                                                                               | 対応ケースまたは除外理由                                                                                                          |
+| ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| 4条件の否定側（uncommitted / stash / 比較表示 / 許容外type・type欠落）で`true`を返す・callbackを呼ぶ | TC-035〜TC-039、TC-046                                                                                                            |
+| ガード後退（`fileRow` / `expandedCommit` / `repo`の`null`、`data-newfilepath`欠落でcallbackを呼ぶ）  | TC-042〜TC-045                                                                                                                    |
+| encode済みpathの素通し                                                                               | TC-041                                                                                                                            |
+| recent actionの記録（`recordRecentAction`を呼ぶ）・`postMessage`の直接送信                           | TC-040                                                                                                                            |
+| 許容typeの取りこぼし                                                                                 | TC-034、TC-047                                                                                                                    |
+| menu側の戻り値・DOM listenerの配線・requestの送信                                                    | excluded(S4 / S5、`web/main-test/06-file-actions-01.md` S54、`web/fileHistory-test.md`の責務)                                     |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）                                                | 0回: TC-042〜TC-046。`null`引数: TC-042〜TC-044。dataset欠落: TC-036、TC-045。maximum / +/-1: excluded(数値閾値が存在しない)      |
+| 外部依存×失敗モード                                                                                  | excluded(判定と起動はDOM datasetとcallbackだけで外部依存なし)                                                                     |
+| 例外・エラー経路                                                                                     | excluded(ガードは早期returnで表現しthrow経路を持たない。TC-042で例外なしを確認)                                                   |
+| 型不正・フォーマット不正                                                                             | excluded(`FileMenuExpandedCommit` / `FileHistoryMenuContext`の型はTypeScriptの型検査で担保し、`changeType`の未知値はTC-035で固定) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-035、TC-037〜TC-039、TC-042〜TC-046
+- Exception: excluded(上表のとおりthrow経路なし)
+- External: excluded(上表のとおり)
+- Boundary: TC-036、TC-041
+- Type: excluded(上表のとおり)
+- Normal: TC-033、TC-034、TC-040、TC-047
+
+**失敗系/正常系比（煙感知器）**: 正常系4件、失敗系11件。4条件の否定側を判定関数と起動helperの両方で、4ガードを起動helperで列挙し、比2.75倍がインベントリから導かれた値であることを確認した。比率合わせのためのケース追加・削除は行わない。
