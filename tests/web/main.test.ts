@@ -345,7 +345,7 @@ import {
 import { buildDetachedWorktreeContextMenuItems } from "../../web/worktreeMenu";
 
 /* ------------------------------------------------------------------ */
-/* Helpers                                                        */
+/* Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
 function makeStash(overrides: Partial<GitCommitStash> = {}): GitCommitStash {
