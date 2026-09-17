@@ -267,6 +267,7 @@
   "Are you sure you want to rebase the current branch on {0}?": "現在のブランチを {0} 上にリベースしますか?",
   "Remove Worktree": "ワークツリーを削除",
   "Are you sure you want to remove the worktree for branch {0} at {1}?": "ブランチ {0} のワークツリー {1} を削除しますか?",
+  "Are you sure you want to remove the worktree at {0}?": "ワークツリー {0} を削除しますか?",
   "Also delete branch {0} (git branch -d)": "ブランチ {0} も削除する (git branch -d)",
   "Uses safe delete — unmerged branches will not be deleted.": "安全な削除を使用します。未マージのブランチは削除されません。",
   "Remove": "削除",
