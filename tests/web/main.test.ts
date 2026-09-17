@@ -245,6 +245,15 @@ vi.mock("../../web/refMenu", () => ({
 }));
 
 /* ------------------------------------------------------------------ */
+/* Mock: worktreeMenu module                                          */
+/* ------------------------------------------------------------------ */
+
+vi.mock("../../web/worktreeMenu", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../web/worktreeMenu")>();
+  return { ...actual, buildDetachedWorktreeContextMenuItems: vi.fn(() => []) };
+});
+
+/* ------------------------------------------------------------------ */
 /* Mock: branchCleanupPanel module                                    */
 /* ------------------------------------------------------------------ */
 
@@ -333,9 +342,10 @@ import {
   sendMessage,
   vscode
 } from "../../web/utils";
+import { buildDetachedWorktreeContextMenuItems } from "../../web/worktreeMenu";
 
 /* ------------------------------------------------------------------ */
-/* Helpers                                                            */
+/* Helpers                                                        */
 /* ------------------------------------------------------------------ */
 
 function makeStash(overrides: Partial<GitCommitStash> = {}): GitCommitStash {
@@ -5738,23 +5748,41 @@ describe("worktree label rendering (S48)", () => {
     expect(label!.hasAttribute("data-name")).toBe(false);
   });
 
-  it("suppresses the branch context menu on a detached label (TC-295)", () => {
-    // Case: TC-295
-    // Given: a detached label is rendered
+  it("shows the detached worktree menu on a detached label (TC-412)", () => {
+    // Case: TC-412
+    // Given: the current repo has a recent action and a detached label is rendered
+    dispatchMessage({
+      command: "loadRepos",
+      repos: { [TEST_REPO]: { columnWidths: null, recentActions: ["ref.openTerminal"] } },
+      lastActiveRepo: TEST_REPO
+    });
     loadWithWorktrees({
       branches: {},
       detached: [detachedEntry("/tmp/wt8", COMMIT_HASH_1)]
     });
     vi.clearAllMocks();
+    const label = rowFor(COMMIT_HASH_1).querySelector(".detachedWorktree")!;
 
     // When: the detached label receives a contextmenu event
-    rowFor(COMMIT_HASH_1)
-      .querySelector(".detachedWorktree")!
-      .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    label.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
 
-    // Then: no ref menu is built and no context menu is shown
+    // Then: the detached worktree menu is built from the label path and shown with recent actions
+    expect(buildDetachedWorktreeContextMenuItems).toHaveBeenCalledTimes(1);
+    expect(buildDetachedWorktreeContextMenuItems).toHaveBeenCalledWith(TEST_REPO, "/tmp/wt8");
     expect(buildRefContextMenuItems).not.toHaveBeenCalled();
-    expect(showContextMenu).not.toHaveBeenCalled();
+    expect(showContextMenu).toHaveBeenCalledTimes(1);
+    const showContextMenuArgs = vi.mocked(showContextMenu).mock.calls[0];
+    expect(showContextMenuArgs[1]).toBe(
+      vi.mocked(buildDetachedWorktreeContextMenuItems).mock.results[0].value
+    );
+    expect(showContextMenuArgs[2]).toBe(label);
+    expect(showContextMenuArgs[3]).toEqual(["ref.openTerminal"]);
+
+    dispatchMessage({
+      command: "loadRepos",
+      repos: { [TEST_REPO]: { columnWidths: null } },
+      lastActiveRepo: TEST_REPO
+    });
   });
 
   it("suppresses checkout on a detached label double click (TC-296)", () => {
