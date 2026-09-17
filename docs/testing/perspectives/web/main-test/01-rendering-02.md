@@ -91,7 +91,7 @@ webview 内部状態と `loadCommits()` の worktree 引数を `WorktreeCollecti
 > Status: active
 > Supersedes: S48
 > Signature: `private renderTable(): void` / `loadCommits(commits, commitHead, moreAvailable, forceRender, authors?, worktrees?: GG.WorktreeCollection)` / `addListenerToClass("gitRef", "contextmenu", ...)`
-> Target Path: `web/main.ts`（detachedラベル描画、`gitRef` の contextmenu / dblclick / click handler。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:870-878`（detachedラベル描画）、`web/main.ts:1080-1136`（`gitRef` の contextmenu / dblclick / click handler）
 > Test File: `tests/web/main.test.ts`
 
 S48の描画・イベント契約を引き継ぎ、TC-295（context menu 0回）だけをworktree menu表示へ再定義する。menu項目の内容は`web/worktreeMenu-test.md` S1、Recent合成は`web/contextMenu-test.md` S4の責務。`TEST_REPO = "/test/repo"`。
@@ -158,7 +158,8 @@ S48の描画・イベント契約を引き継ぎ、TC-295（context menu 0回）
 | 外部依存の失敗                                  | excluded(描画は受領済み response だけに依存し、Git 実行の失敗は `src/dataSource-test/02-branch-worktree-03.md` S47 TC-308 / TC-309 の責務) |
 | 例外送出                                        | excluded(描画経路に throw を持たず、`data-name` の非 null assertion へ流さないことは TC-411〜TC-413 で担保する)                            |
 | 差分判定 helper 自体の誤り                      | excluded(`web/utils-test.md` S5 の責務)                                                                                                    |
-| **失敗カテゴリ網羅（diversity floor）**:        |
+
+**失敗カテゴリ網羅（diversity floor）**:
 
 - Validation: TC-403、TC-405、TC-411、TC-413、TC-418、TC-420、TC-426
 - Exception: excluded(throw 経路なし)

@@ -105,7 +105,7 @@ Remove Worktree ダイアログの「Also delete branch」チェックボック�
 > Status: active
 > Supersedes: -
 > Signature: `buildRefContextMenuItems(repo, refName, sourceElem, isRemoteCombined, gitBranchHead, remotes?, worktreeInfo?): ContextMenuElement[]`
-> Target Path: `web/refMenu.ts:308-311`（worktreeItems。実装後に更新）
+> Target Path: `web/refMenu.ts:309-312`（worktreeItems）
 > Test File: `tests/web/refMenu.test.ts`
 
 S8のTC-034 / TC-039 / TC-040は`toContain`で項目の有無を見る。本sectionは順序とterminal名の供給元を固定する。`WORKTREE_PATH = "/home/user/project-feature"`、`REPO = "/test/repo"`。

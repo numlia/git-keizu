@@ -126,7 +126,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `case "removeWorktree"`（`onDidReceiveMessage`）
-> Target Path: `src/gitGraphView.ts:584-606`（実装後に更新）
+> Target Path: `src/gitGraphView.ts:585-610`
 > Test File: `tests/src/gitGraphView.test.ts`
 
 S15 TC-051、S16 TC-053〜TC-058は維持する。`mockDataSource`は`removeWorktree`と`deleteBranch`だけを持ち、他のadapter呼び出しは`TypeError`で失敗する。応答は`mocks.postMessage.mock.calls[0][0]`を`toStrictEqual`で見る。`TEST_REPO = "/test/repo"`、`MISSING = "Branch name is required to delete the branch."`。TC-399〜TC-405は各入力が識別できる`it.each`でよい。

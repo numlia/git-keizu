@@ -456,7 +456,7 @@ branch 名をキーにする `WorktreeMap` では表現できない detached HEA
 > Status: active
 > Supersedes: -
 > Signature: `type RequestRemoveWorktree = (RequestRemoveWorktreeBase & { deleteBranch?: false; branchName?: string }) | (RequestRemoveWorktreeBase & { deleteBranch: true; branchName: string })`
-> Target Path: `src/types.ts:665-679`（実装後に更新）
+> Target Path: `src/types.ts:665-679`
 > Test File: `tests/src/types.test.ts`
 
 対応プラン§3.9のhelperで実物の`src/types.ts`を検査する。`@ts-expect-error`だけの検証は`pnpm run typecheck`の対象外で不採用。runtimeの検証は`src/gitGraphView-test/03-worktree-actions-01.md` S41の責務。

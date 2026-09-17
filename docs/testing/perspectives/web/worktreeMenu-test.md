@@ -12,7 +12,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `getWorktreeLabelName(worktreePath: string): string` / `buildWorktreeActionItems(repo: string, worktreePath: string, terminalLabel: string): ContextMenuItem[]` / `buildDetachedWorktreeContextMenuItems(repo: string, worktreePath: string): ContextMenuElement[]`
-> Target Path: `web/worktreeMenu.ts`（新規。実装後に行範囲へ更新）
+> Target Path: `web/worktreeMenu.ts:6-86`
 > Test File: `tests/web/worktreeMenu.test.ts`
 
 path起点のworktree操作（表示名helper、共通4操作builder、detached用Remove確認、detached menu配列）の契約。`REPO = "/test/repo"`。DOM属性からのpath復元は`web/main-test/01-rendering-02.md` S55、Recentセクションの合成は`web/contextMenu-test.md` S4、Gitの成否は`src/gitGraphView-test/03-worktree-actions-01.md` S41と`src/dataSource-test/02-branch-worktree-01.md` S51の責務で本表には含めない。
