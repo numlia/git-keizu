@@ -231,3 +231,34 @@ pathspec 制限（`"--", oldFilePath`）を除去し `--name-status` を追加�
 | TC-163  | oldFilePath=`"../secret.ts"`（".." セグメント含む）                                       | Validation - path traversal guard                                          | `null` が返される。cp.spawn が呼ばれない（0回）                                                                                                           | パストラバーサルガード（L575）               |
 | TC-164  | git diff が exit code 非0 で終了                                                          | Exception - git error fallback                                             | spawnGit の errorValue により `null` が返される                                                                                                           | 外部プロセス失敗時フォールバック             |
 | TC-165  | stdout=`"R100\0old.ts\0"`（new フィールド欠落の切り詰めレコード）, oldFilePath=`"old.ts"` | Boundary - truncated record missing new path                               | `fields[cursor+2]` が undefined のため `getPathFromStr("")` すなわち空文字 `""` が返される                                                                | 欠損 new フィールドの `?? ""` フォールバック |
+
+## S51: removeWorktree() の非 force・非再試行
+
+> Origin: Feature 053 (detached-worktree-menu) (light-spec-plan)
+> Added: 2026-09-13
+> Status: active
+> Supersedes: -
+> Signature: `removeWorktree(repo: string, worktreePath: string): Promise<GitCommandStatus>`
+> Target Path: `src/dataSource.ts:1202-1204`
+> Test File: `tests/src/dataSource.test.ts`
+
+S24 TC-140 / TC-141は維持する。本sectionはspawn回数を固定する。
+
+| Case ID | Input / Precondition                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                     | Notes |
+| ------- | ---------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ----- |
+| TC-369  | `removeWorktree(REPO, "/tmp/wt")`、spawnが成功       | Normal - single non-force spawn                                            | `spawn`が1回、args`toEqual(["worktree", "remove", "/tmp/wt"])`（`--force`を含まない）、戻り値`null` | -     |
+| TC-370  | spawnがexit 128、stderr `fatal: '/tmp/wt' is locked` | External - refusal without retry                                           | `spawn`が1回のまま、戻り値に`is locked`を含む                                                       | -     |
+
+### 失敗源インベントリ（include-or-justify）— Feature 053 追加分（S51）
+
+| 失敗源               | 対応ケースまたは除外理由 |
+| -------------------- | ------------------------ |
+| `--force`付与        | TC-369                   |
+| 再試行・追加コマンド | TC-370                   |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(引数はhandler側で検証済み。本メソッドに分岐なし)
+- External: TC-370
+- Boundary: excluded(同上)
+- Type: excluded(同上)

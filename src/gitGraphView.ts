@@ -31,6 +31,7 @@ const CONFIG_SECTION = "git-keizu";
 const CSS_COLOR_VAR_PREFIX = "--git-keizu-color";
 const DEFAULT_PUSH_REMOTE = "origin";
 const INVALID_REF_NAME_MESSAGE = "Invalid ref name.";
+const MISSING_BRANCH_NAME_MESSAGE = "Branch name is required to delete the branch.";
 const BRANCH_ALREADY_EXISTS_MESSAGE = "A branch with this name already exists.";
 const INVALID_REMOTE_NAME_MESSAGE = "Invalid remote name.";
 const REMOTE_LOOKUP_FAILED_MESSAGE = "Unable to read the remotes of this repository.";
@@ -582,6 +583,16 @@ export class GitKeizuView {
               break;
             }
             case "removeWorktree": {
+              if (
+                msg.deleteBranch === true &&
+                (typeof msg.branchName !== "string" || msg.branchName.length === 0)
+              ) {
+                this.sendMessage({
+                  command: "removeWorktree",
+                  status: MISSING_BRANCH_NAME_MESSAGE
+                });
+                break;
+              }
               const wtStatus = await this.dataSource.removeWorktree(msg.repo, msg.worktreePath);
               if (wtStatus !== null) {
                 this.sendMessage({ command: "removeWorktree", status: wtStatus });

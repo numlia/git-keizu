@@ -97,3 +97,36 @@ Remove Worktree ダイアログの「Also delete branch」チェックボック�
 数値・空値境界（0 / minimum / maximum / +/-1 / empty / NULL）は、本セクションの対象がエスケープ回数の契約であり仕様上意味を持たないため対象外とする（意味のある境界は `&` / `/` を含む refName の TC-079/TC-080 で充足）。
 
 **失敗系/正常系比（煙感知器）**: 正常系1件（TC-079）、失敗系1件（TC-080）。件数が同数のためインベントリを再導出したが、本変更の失敗源は二重エスケープのみで、他の失敗源は上表の除外理由（owner 分離）により充足されていることを確認した。
+
+## S22: 共通 builder 抽出後のブランチ付き worktree menu 契約の維持
+
+> Origin: Feature 053 (detached-worktree-menu) (light-spec-plan)
+> Added: 2026-09-13
+> Status: active
+> Supersedes: -
+> Signature: `buildRefContextMenuItems(repo, refName, sourceElem, isRemoteCombined, gitBranchHead, remotes?, worktreeInfo?): ContextMenuElement[]`
+> Target Path: `web/refMenu.ts:309-312`（worktreeItems）
+> Test File: `tests/web/refMenu.test.ts`
+
+S8のTC-034 / TC-039 / TC-040は`toContain`で項目の有無を見る。本sectionは順序とterminal名の供給元を固定する。`WORKTREE_PATH = "/home/user/project-feature"`、`REPO = "/test/repo"`。
+
+| Case ID | Input / Precondition                                                                                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                                                                                                                                                         | Notes |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| TC-106  | `createMockElement(["head"])`、`refName = "feature/x"`、`gitBranchHead = "feature/x"`、`worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false }` | Normal - HEAD branch menu order                                            | `title`／`null`の並びが`Pull`、`Push`、`null`、`Open in New Window`、`Reveal in File Manager`、`Open Terminal Here`、`Copy Worktree Path`、`null`、`More...`、`null`、`Copy Branch Name to Clipboard`。index 3〜5の`recentActionId`が`ref.openWorktreeInNewWindow` / `ref.revealWorktreeInOS` / `ref.openTerminal`。index 5の`onClick()`で`sendMessage`が1回`{ command: "openTerminal", repo: REPO, path: WORKTREE_PATH, name: "Worktree: feature/x" }` | -     |
+| TC-107  | 同条件で`gitBranchHead = "main"`                                                                                                                       | Normal - non-HEAD local branch menu order                                  | 並びが`Checkout Branch`、`Merge into current branch&#8230;`、`Rebase current branch on Branch&#8230;`、`null`、共通4項目、`null`、`More...`、`null`、`Copy Branch Name to Clipboard`。`More...`の`submenu`の`title`が`Rename Branch&#8230;`、`Delete Branch&#8230;`、`Remove Worktree&#8230;`の順。`Remove Worktree&#8230;`の`onClick()`で`showFormDialog`が1回、第2引数の入力配列の長さが1で`type: "checkbox"`                                         | -     |
+
+### 失敗源インベントリ（include-or-justify）— Feature 053 追加分（S22）
+
+| 失敗源                         | 対応ケースまたは除外理由 |
+| ------------------------------ | ------------------------ |
+| 共通化による順序変化           | TC-106、TC-107           |
+| terminal名の末尾名化           | TC-106                   |
+| detached用Removeへの置き換わり | TC-107                   |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(本sectionは既存契約の固定で、分岐を追加しない)
+- Exception: excluded(同上)
+- External: excluded(同上)
+- Boundary: excluded(同上)
+- Type: excluded(同上)

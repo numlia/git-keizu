@@ -44,7 +44,6 @@ import {
   buildCommitRowAttributes,
   buildStashSelectorDisplay,
   escapeHtml,
-  getRepoName,
   getVSCodeStyle,
   insertAfter,
   sendMessage,
@@ -53,6 +52,7 @@ import {
   vscode,
   worktreeCollectionsEqual
 } from "./utils";
+import { buildDetachedWorktreeContextMenuItems, getWorktreeLabelName } from "./worktreeMenu";
 
 const FLASH_ANIMATION_DURATION_MS = 850;
 export const MIN_COMMIT_LOAD_COUNT = 1;
@@ -99,13 +99,7 @@ function getFileViewToggle(mode: FileViewType): { icon: string; title: string } 
 }
 
 const EMPTY_WORKTREE_COLLECTION: GG.WorktreeCollection = { branches: {}, detached: [] };
-const WORKTREE_PATH_TRAILING_SEPARATORS = /[/\\]+$/;
 const DETACHED_WORKTREE_CLASS = "detachedWorktree";
-
-function getWorktreeLabelName(worktreePath: string): string {
-  const finalComponent = getRepoName(worktreePath.replace(WORKTREE_PATH_TRAILING_SEPARATORS, ""));
-  return finalComponent === "" ? worktreePath : finalComponent;
-}
 
 type PendingCommitLoad = {
   forceRender: boolean;
@@ -1087,7 +1081,17 @@ class GitKeizuView {
       e.stopPropagation();
       let target = <HTMLElement>e.target;
       let sourceElem = <HTMLElement>target.closest(".gitRef")!;
-      if (sourceElem.classList.contains(DETACHED_WORKTREE_CLASS)) return;
+      if (sourceElem.classList.contains(DETACHED_WORKTREE_CLASS)) {
+        const worktreePath = sourceElem.dataset.worktreePath;
+        if (worktreePath === undefined) return;
+        showContextMenu(
+          <MouseEvent>e,
+          buildDetachedWorktreeContextMenuItems(this.currentRepo, worktreePath),
+          sourceElem,
+          this.getCurrentRepoRecentActions()
+        );
+        return;
+      }
       let isRemoteCombined = target.classList.contains("gitRefHeadRemote");
       let refName = isRemoteCombined ? target.dataset.name! : sourceElem.dataset.name!;
       const remotes = sourceElem.dataset.remotes

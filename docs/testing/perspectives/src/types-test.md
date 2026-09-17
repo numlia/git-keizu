@@ -448,3 +448,41 @@ branch 名をキーにする `WorktreeMap` では表現できない detached HEA
 - Type: TC-112〜TC-121
 
 **失敗系/正常系比（煙感知器）**: 正常系0件、失敗系10件（TC-112〜TC-121）。S2〜S8 と同じく本セクションの対象は型契約のみで正常実行経路を持たないため、正常系0件はインベントリ欠落ではないことを確認した。
+
+## S10: RequestRemoveWorktree のブランチ削除要求 union（Compiler API 意味診断）
+
+> Origin: Feature 053 (detached-worktree-menu) (light-spec-plan)
+> Added: 2026-09-13
+> Status: active
+> Supersedes: -
+> Signature: `type RequestRemoveWorktree = (RequestRemoveWorktreeBase & { deleteBranch?: false; branchName?: string }) | (RequestRemoveWorktreeBase & { deleteBranch: true; branchName: string })`
+> Target Path: `src/types.ts:665-679`
+> Test File: `tests/src/types.test.ts`
+
+対応プラン§3.9のhelperで実物の`src/types.ts`を検査する。`@ts-expect-error`だけの検証は`pnpm run typecheck`の対象外で不採用。runtimeの検証は`src/gitGraphView-test/03-worktree-actions-01.md` S41の責務。
+
+| Case ID | Input / Precondition                                                                                                                                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                             | Notes |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ----- |
+| TC-122  | literal `{ command: "removeWorktree", repo: "/r", worktreePath: "/tmp/wt8", deleteBranch: false }`                                                                                | Normal - detached payload accepted                                         | Error診断が0件（全ファイル）。`program.getSourceFile(TYPES_PATH)`が定義済み | -     |
+| TC-123  | `{ command: "removeWorktree", repo: "/r", worktreePath: "/tmp/wt8" }`                                                                                                             | Boundary - deleteBranch and branchName omitted                             | Error診断が0件                                                              | -     |
+| TC-124  | preamble `const flag: boolean = Math.random() > 0.5;`、literal `{ command: "removeWorktree", repo: "/r", worktreePath: "/tmp/wt8", branchName: "feature/x", deleteBranch: flag }` | Normal - legacy sender with boolean variable                               | Error診断が0件                                                              | -     |
+| TC-125  | `{ command: "removeWorktree", repo: "/r", worktreePath: "/tmp/wt8", deleteBranch: true }`                                                                                         | Validation - branchName required when deleting                             | Error診断が1件、`code`が`2322`、`file.fileName`が`VIRTUAL_PATH`             | -     |
+| TC-126  | `{ command: "removeWorktree", repo: "/r", worktreePath: "/tmp/wt8", deleteBranch: true, branchName: "feature/x" }`                                                                | Normal - explicit delete accepted                                          | Error診断が0件                                                              | -     |
+
+### 失敗源インベントリ（include-or-justify）— Feature 053 追加分（S10）
+
+| 失敗源                         | 対応ケースまたは除外理由                       |
+| ------------------------------ | ---------------------------------------------- |
+| detached形の拒否               | TC-122                                         |
+| 省略形の拒否                   | TC-123                                         |
+| 既存senderの拒否               | TC-124                                         |
+| `true`＋欠落の受理             | TC-125                                         |
+| 明示形の拒否                   | TC-126                                         |
+| モジュール解決エラーの成功扱い | TC-122の`getSourceFile`確認と全ファイル0件判定 |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-125
+- Exception: excluded(コンパイラ実行のみ)
+- External: excluded(コンパイラ実行のみ)
+- Boundary: TC-123

@@ -4685,6 +4685,54 @@ describe("removeWorktree", () => {
   });
 });
 
+// S51: removeWorktree() の非 force・非再試行
+// @see docs/testing/perspectives/src/dataSource-test/02-branch-worktree-01.md
+describe("removeWorktree non-force single spawn (S51)", () => {
+  let ds: DataSource;
+  const spawnMock = vi.mocked(cp.spawn);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    ds = new DataSource();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("spawns git once without --force and returns null on success (TC-369)", async () => {
+    // Case: TC-369
+    // Given: git worktree remove succeeds
+    spawnMock.mockImplementation(() => createCommandMockProcess());
+
+    // When: removeWorktree is called
+    const result = await ds.removeWorktree(REPO, "/tmp/wt");
+
+    // Then: exactly one non-force command runs
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    expect(spawnMock.mock.calls[0][1]).toEqual(["worktree", "remove", "/tmp/wt"]);
+    expect(result).toBeNull();
+  });
+
+  it("returns the Git refusal without retrying or running another command (TC-370)", async () => {
+    // Case: TC-370
+    // Given: git refuses to remove a locked worktree
+    spawnMock.mockImplementation(() =>
+      createCommandMockProcess({
+        stderr: "fatal: '/tmp/wt' is locked\n",
+        exitCode: 128
+      })
+    );
+
+    // When: removeWorktree is called
+    const result = await ds.removeWorktree(REPO, "/tmp/wt");
+
+    // Then: the refusal is returned after a single attempt
+    expect(spawnMock).toHaveBeenCalledTimes(1);
+    expect(result).toContain("is locked");
+  });
+});
+
 // S27: getNewPathOfRenamedFile() リネーム追跡（pathspec 除去 + name-status カーソルパース）
 describe("getNewPathOfRenamedFile (S27)", () => {
   let ds: DataSource;

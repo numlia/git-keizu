@@ -2297,3 +2297,114 @@ describe("showDeleteBranchDialog exported contract (S21)", () => {
     expect(menuCall[2]).toEqual(directCall[2]);
   });
 });
+
+// S22: 共通 builder 抽出後のブランチ付き worktree menu 契約の維持
+// @see docs/testing/perspectives/web/refMenu-test/02-worktree-actions-01.md
+describe("buildRefContextMenuItems worktree menu order after builder extraction (S22)", () => {
+  const WORKTREE_PATH = "/home/user/project-feature";
+  const REF_NAME = "feature/x";
+  const WORKTREE_ACTION_TITLES = [
+    "Open in New Window",
+    "Reveal in File Manager",
+    "Open Terminal Here",
+    "Copy Worktree Path"
+  ];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
+  });
+
+  function buildWorktreeBranchMenu(gitBranchHead: string): ContextMenuElement[] {
+    return buildRefContextMenuItems(
+      REPO,
+      REF_NAME,
+      createMockElement(["head"]),
+      false,
+      gitBranchHead,
+      undefined,
+      { path: WORKTREE_PATH, isMainWorktree: false }
+    );
+  }
+
+  it("keeps the HEAD branch menu order and names the terminal after the branch (TC-106)", () => {
+    // Case: TC-106
+    // When: The menu is built for the checked-out branch that has a linked worktree
+    const menu = buildWorktreeBranchMenu(REF_NAME);
+
+    // Then: The four worktree actions sit between Pull / Push and More...
+    expect(menu.map((item) => (item === null ? null : item.title))).toEqual([
+      "Pull",
+      "Push",
+      null,
+      ...WORKTREE_ACTION_TITLES,
+      null,
+      "More...",
+      null,
+      "Copy Branch Name to Clipboard"
+    ]);
+    expect(
+      menu.slice(3, 6).map((item) => (isContextMenuItem(item) ? item.recentActionId : undefined))
+    ).toEqual(["ref.openWorktreeInNewWindow", "ref.revealWorktreeInOS", "ref.openTerminal"]);
+
+    // When: Open Terminal Here is clicked
+    const terminalItem = menu[5];
+    expect(isContextMenuItem(terminalItem)).toBe(true);
+    (terminalItem as ContextMenuItem).onClick();
+
+    // Then: The terminal is named after the branch, not the final path component
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(sendMessage).toHaveBeenCalledWith({
+      command: "openTerminal",
+      repo: REPO,
+      path: WORKTREE_PATH,
+      name: "Worktree: feature/x"
+    });
+  });
+
+  it("keeps the non-HEAD branch menu order and the checkbox Remove Worktree dialog (TC-107)", () => {
+    // Case: TC-107
+    // When: The menu is built for a branch other than the checked-out one
+    const menu = buildWorktreeBranchMenu("main");
+
+    // Then: The four worktree actions sit between the branch actions and More...
+    expect(menu.map((item) => (item === null ? null : item.title))).toEqual([
+      "Checkout Branch",
+      "Merge into current branch&#8230;",
+      "Rebase current branch on Branch&#8230;",
+      null,
+      ...WORKTREE_ACTION_TITLES,
+      null,
+      "More...",
+      null,
+      "Copy Branch Name to Clipboard"
+    ]);
+    const moreSubmenu = getTopLevelSubmenu(menu);
+    expect(moreSubmenu).toBeDefined();
+    expect(moreSubmenu!.submenu.map((item) => (item === null ? null : item.title))).toEqual([
+      "Rename Branch&#8230;",
+      "Delete Branch&#8230;",
+      "Remove Worktree&#8230;"
+    ]);
+
+    // When: Remove Worktree is clicked
+    const removeItem = moreSubmenu!.submenu[2];
+    expect(isContextMenuItem(removeItem)).toBe(true);
+    (removeItem as ContextMenuItem).onClick();
+
+    // Then: The branch-deletion checkbox dialog is used, not the plain confirmation
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0].type).toBe("checkbox");
+    expect(showConfirmationDialog).toHaveBeenCalledTimes(0);
+  });
+});

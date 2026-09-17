@@ -911,3 +911,43 @@ describe("file history l10n keys (Feature 055-07)", () => {
     }
   });
 });
+
+// @see docs/testing/perspectives/l10n/web/web.l10n.en.json-test.md
+// @see docs/testing/perspectives/l10n/web/web.l10n.ja.json-test.md
+describe("detached worktree removal confirmation l10n key (Feature 053)", () => {
+  const REMOVE_DETACHED_WORKTREE_KEY = "Are you sure you want to remove the worktree at {0}?";
+  const PATH_PLACEHOLDER = "{0}";
+
+  function loadBundle(fileName: string): Record<string, string> {
+    const jsonPath = resolve(process.cwd(), `l10n/web/${fileName}`);
+    return JSON.parse(readFileSync(jsonPath, "utf-8"));
+  }
+
+  it("English l10n JSON contains the confirmation key with the path placeholder (en l10n TC-025)", () => {
+    // Case: TC-025 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const messages = loadBundle("web.l10n.en.json");
+
+    // When: looking up the detached worktree removal confirmation key
+    const value = messages[REMOVE_DETACHED_WORKTREE_KEY];
+
+    // Then: the key exists with a non-empty string that keeps the path placeholder
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+    expect(value).toContain(PATH_PLACEHOLDER);
+  });
+
+  it("Japanese l10n JSON contains the confirmation key with the path placeholder (ja l10n TC-027)", () => {
+    // Case: TC-027 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const messages = loadBundle("web.l10n.ja.json");
+
+    // When: looking up the detached worktree removal confirmation key
+    const value = messages[REMOVE_DETACHED_WORKTREE_KEY];
+
+    // Then: the key exists with a non-empty string that keeps the path placeholder
+    expect(typeof value).toBe("string");
+    expect(value.length).toBeGreaterThan(0);
+    expect(value).toContain(PATH_PLACEHOLDER);
+  });
+});

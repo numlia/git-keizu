@@ -126,3 +126,34 @@
 - Type: excluded(応答型は TypeScript コンパイル時に保証される)
 
 **失敗系/正常系比（煙感知器）**: 正常系2件（TC-032、TC-034）、失敗系2件（TC-033、TC-035）。件数が同数のためインベントリを再導出したが、本変更（2 command × 成功/失敗の4分岐）の失敗源は上表のとおりすべて対応ケースまたは除外理由で充足されており、追加すべき失敗系ケースはないことを確認した。
+
+## S19: removeWorktree 応答の成功／失敗の呼び出し回数
+
+> Origin: Feature 053 (detached-worktree-menu) (light-spec-plan)
+> Added: 2026-09-13
+> Status: active
+> Supersedes: -
+> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void`（`case "removeWorktree"`）
+> Target Path: `web/messageHandler.ts:218-227`
+> Test File: `tests/web/messageHandler.test.ts`
+
+S6 TC-017 / TC-018、S7 TC-020〜TC-023は維持する。本sectionは回数を固定する。
+
+| Case ID | Input / Precondition                                                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                | Notes |
+| ------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----- |
+| TC-085  | `{ command: "removeWorktree", status: null }`                                                     | Normal - soft refresh once                                                 | `gitKeizu.refresh`が1回`("soft")`、`showErrorDialog`が0回                                      | -     |
+| TC-086  | `{ command: "removeWorktree", status: "fatal: '/tmp/wt8' contains modified or untracked files" }` | External - Git reason shown once                                           | `showErrorDialog`が1回`("Unable to Remove Worktree", <status>, null)`、`gitKeizu.refresh`が0回 | -     |
+
+### 失敗源インベントリ（include-or-justify）— Feature 053 追加分（S19）
+
+| 失敗源           | 対応ケースまたは除外理由 |
+| ---------------- | ------------------------ |
+| 失敗時refresh    | TC-086                   |
+| 成功時ダイアログ | TC-085                   |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(S7が`branchStatus`の組合せを担う)
+- External: TC-086
+- Boundary: excluded(同上)
+- Type: excluded(同上)

@@ -15,6 +15,7 @@ import {
   sendMessage,
   svgIcons
 } from "./utils";
+import { buildWorktreeActionItems } from "./worktreeMenu";
 
 export interface ParsedRemoteRef {
   remoteName: string;
@@ -308,55 +309,7 @@ export function buildRefContextMenuItems(
     const worktreeItems: ContextMenuItem[] =
       worktreeInfo === null || worktreeInfo === undefined
         ? []
-        : [
-            {
-              title: t("Open in New Window"),
-              recentActionId: "ref.openWorktreeInNewWindow",
-              onClick: () => {
-                recordRecentAction(repo, "ref.openWorktreeInNewWindow");
-                sendMessage({
-                  command: "openWorktreeInNewWindow",
-                  repo: repo,
-                  path: worktreeInfo.path
-                });
-              }
-            },
-            {
-              title: t("Reveal in File Manager"),
-              recentActionId: "ref.revealWorktreeInOS",
-              onClick: () => {
-                recordRecentAction(repo, "ref.revealWorktreeInOS");
-                sendMessage({
-                  command: "revealWorktreeInOS",
-                  repo: repo,
-                  path: worktreeInfo.path
-                });
-              }
-            },
-            {
-              title: t("Open Terminal Here"),
-              recentActionId: "ref.openTerminal",
-              onClick: () => {
-                recordRecentAction(repo, "ref.openTerminal");
-                sendMessage({
-                  command: "openTerminal",
-                  repo: repo,
-                  path: worktreeInfo.path,
-                  name: `Worktree: ${refName}`
-                });
-              }
-            },
-            {
-              title: t("Copy Worktree Path"),
-              onClick: () => {
-                sendMessage({
-                  command: "copyToClipboard",
-                  type: "worktreePath",
-                  data: worktreeInfo.path
-                });
-              }
-            }
-          ];
+        : buildWorktreeActionItems(repo, worktreeInfo.path, refName);
 
     const createWorktreeItem: ContextMenuItem | null =
       worktreeInfo === null || worktreeInfo === undefined

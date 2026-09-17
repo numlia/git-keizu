@@ -237,6 +237,7 @@
   "Are you sure you want to rebase the current branch on {0}?": "Are you sure you want to rebase the current branch on {0}?",
   "Remove Worktree": "Remove Worktree",
   "Are you sure you want to remove the worktree for branch {0} at {1}?": "Are you sure you want to remove the worktree for branch {0} at {1}?",
+  "Are you sure you want to remove the worktree at {0}?": "Are you sure you want to remove the worktree at {0}?",
   "Also delete branch {0} (git branch -d)": "Also delete branch {0} (git branch -d)",
   "Uses safe delete — unmerged branches will not be deleted.": "Uses safe delete — unmerged branches will not be deleted.",
   "Remove": "Remove",
