@@ -1,3 +1,6 @@
+import { resolve } from "node:path";
+
+import * as ts from "typescript";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -1504,5 +1507,98 @@ describe("file history message and entry contract (S9)", () => {
     expect(label("M")).toBe("modified");
     expect(label("D")).toBe("deleted");
     expect(label("R")).toBe("renamed");
+  });
+});
+
+// S10: RequestRemoveWorktree のブランチ削除要求 union（Compiler API 意味診断）
+// @see docs/testing/perspectives/src/types-test.md
+describe("RequestRemoveWorktree branch-deletion union (S10)", () => {
+  const TYPES_PATH = resolve(process.cwd(), "src/types.ts");
+  const VIRTUAL_PATH = resolve(process.cwd(), "tests/src/removeWorktreeContract.virtual.ts");
+  const COMPILER_OPTIONS: ts.CompilerOptions = {
+    strict: true,
+    noEmit: true,
+    target: ts.ScriptTarget.ES2020,
+    module: ts.ModuleKind.CommonJS,
+    moduleResolution: ts.ModuleResolutionKind.Node10,
+    types: []
+  };
+  const NOT_ASSIGNABLE_ERROR_CODE = 2322;
+
+  function diagnoseRemoveWorktreeRequest(preamble: string, literal: string): ts.Diagnostic[] {
+    const source = [
+      'import type { RequestMessage, RequestRemoveWorktree } from "../../src/types";',
+      preamble,
+      `export const request: RequestRemoveWorktree = ${literal};`,
+      "export const message: RequestMessage = request;",
+      ""
+    ].join("\n");
+    const host = ts.createCompilerHost(COMPILER_OPTIONS);
+    const fileExists = host.fileExists;
+    const readFile = host.readFile;
+    const getSourceFile = host.getSourceFile;
+    host.fileExists = (fileName) => fileName === VIRTUAL_PATH || fileExists(fileName);
+    host.readFile = (fileName) => (fileName === VIRTUAL_PATH ? source : readFile(fileName));
+    host.getSourceFile = (fileName, languageVersion, onError, shouldCreateNewSourceFile) =>
+      fileName === VIRTUAL_PATH
+        ? ts.createSourceFile(fileName, source, languageVersion)
+        : getSourceFile(fileName, languageVersion, onError, shouldCreateNewSourceFile);
+    const program = ts.createProgram([VIRTUAL_PATH], COMPILER_OPTIONS, host);
+    expect(program.getSourceFile(TYPES_PATH)).toBeDefined();
+    return ts
+      .getPreEmitDiagnostics(program)
+      .filter((diagnostic) => diagnostic.category === ts.DiagnosticCategory.Error);
+  }
+
+  it("accepts the detached payload without a branch name (TC-122)", () => {
+    // Case: TC-122
+    const diagnostics = diagnoseRemoveWorktreeRequest(
+      "",
+      '{ command: "removeWorktree", repo: "/r", worktreePath: "/tmp/wt8", deleteBranch: false }'
+    );
+
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("accepts a payload that omits both deleteBranch and branchName (TC-123)", () => {
+    // Case: TC-123
+    const diagnostics = diagnoseRemoveWorktreeRequest(
+      "",
+      '{ command: "removeWorktree", repo: "/r", worktreePath: "/tmp/wt8" }'
+    );
+
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("accepts the existing sender that passes a boolean variable with a branch name (TC-124)", () => {
+    // Case: TC-124
+    const diagnostics = diagnoseRemoveWorktreeRequest(
+      "const flag: boolean = Math.random() > 0.5;",
+      '{ command: "removeWorktree", repo: "/r", worktreePath: "/tmp/wt8", branchName: "feature/x", deleteBranch: flag }'
+    );
+
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("rejects deleteBranch: true without a branch name (TC-125)", () => {
+    // Case: TC-125
+    const diagnostics = diagnoseRemoveWorktreeRequest(
+      "",
+      '{ command: "removeWorktree", repo: "/r", worktreePath: "/tmp/wt8", deleteBranch: true }'
+    );
+
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0].code).toBe(NOT_ASSIGNABLE_ERROR_CODE);
+    expect(diagnostics[0].file?.fileName).toBe(VIRTUAL_PATH);
+  });
+
+  it("accepts deleteBranch: true with a branch name (TC-126)", () => {
+    // Case: TC-126
+    const diagnostics = diagnoseRemoveWorktreeRequest(
+      "",
+      '{ command: "removeWorktree", repo: "/r", worktreePath: "/tmp/wt8", deleteBranch: true, branchName: "feature/x" }'
+    );
+
+    expect(diagnostics).toHaveLength(0);
   });
 });

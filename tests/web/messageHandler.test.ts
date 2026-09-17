@@ -1266,3 +1266,43 @@ describe("handleMessage fileHistory delegation (S18)", () => {
     expect(vi.mocked(gitKeizu.loadFileHistory).mock.calls[0][0]).toBe(msg);
   });
 });
+
+// S19: removeWorktree 応答の成功／失敗の呼び出し回数
+// @see docs/testing/perspectives/web/messageHandler-test/02-worktree-and-details-01.md
+describe("handleMessage removeWorktree call counts (S19)", () => {
+  let gitKeizu: GitKeizuViewAPI;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    gitKeizu = createMockGitKeizuView();
+  });
+
+  it("soft-refreshes once without a dialog on removal success (TC-085)", () => {
+    // Case: TC-085
+    // Given: a removeWorktree success response without branchStatus (detached removal)
+    const msg: ResponseMessage = { command: "removeWorktree", status: null };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: one soft refresh runs and no error dialog is shown
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.refresh).toHaveBeenCalledWith("soft");
+    expect(showErrorDialog).toHaveBeenCalledTimes(0);
+  });
+
+  it("shows the Git reason once without refreshing on removal failure (TC-086)", () => {
+    // Case: TC-086
+    // Given: a removeWorktree response carrying Git's refusal
+    const status = "fatal: '/tmp/wt8' contains modified or untracked files";
+    const msg: ResponseMessage = { command: "removeWorktree", status };
+
+    // When: handleMessage is called
+    handleMessage(msg, gitKeizu);
+
+    // Then: the reason is shown once and the graph is not refreshed
+    expect(showErrorDialog).toHaveBeenCalledTimes(1);
+    expect(showErrorDialog).toHaveBeenCalledWith("Unable to Remove Worktree", status, null);
+    expect(gitKeizu.refresh).toHaveBeenCalledTimes(0);
+  });
+});

@@ -5385,3 +5385,185 @@ describe("GitKeizuView retainContextWhenHidden (S35)", () => {
     expect(mocks.postMessage).not.toHaveBeenCalled();
   });
 });
+
+// S41: removeWorktree ハンドラの detached 削除と削除前入力検証
+// @see docs/testing/perspectives/src/gitGraphView-test/03-worktree-actions-01.md
+describe("GitKeizuView removeWorktree detached removal and input validation (S41)", () => {
+  const DETACHED_WORKTREE_PATH = "/tmp/wt8";
+  const MISSING_BRANCH_NAME_MESSAGE = "Branch name is required to delete the branch.";
+  const LOCKED_WORKTREE_MESSAGE = "fatal: '/tmp/wt8' is locked";
+  const DETACHED_REMOVE_REQUEST = {
+    command: "removeWorktree",
+    repo: TEST_REPO,
+    worktreePath: DETACHED_WORKTREE_PATH,
+    deleteBranch: false
+  };
+
+  let mockDataSource: DataSource;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.messageHandler.current = null;
+    GitKeizuView.currentPanel = undefined;
+
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    mocks.removeWorktree.mockResolvedValue(null);
+    mocks.deleteBranch.mockResolvedValue(null);
+
+    mockDataSource = {
+      removeWorktree: mocks.removeWorktree,
+      deleteBranch: mocks.deleteBranch
+    } as unknown as DataSource;
+
+    const mockExtensionState = {
+      getLastActiveRepo: vi.fn(() => null),
+      isAvatarStorageAvailable: vi.fn(() => false),
+      waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
+      setLastActiveRepo: vi.fn()
+    } as unknown as ExtensionState;
+
+    const mockAvatarManager = {
+      registerView: vi.fn(),
+      deregisterView: vi.fn()
+    } as unknown as AvatarManager;
+
+    const mockRepoManager = {
+      getRepos: mocks.getRepos,
+      registerViewCallback: vi.fn(),
+      deregisterViewCallback: vi.fn(),
+      setRepoState: vi.fn(),
+      checkReposExist: vi.fn()
+    } as unknown as RepoManager;
+
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      mockDataSource,
+      mockExtensionState,
+      mockAvatarManager,
+      mockRepoManager
+    );
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  it("removes a detached worktree from a request without a branch name (TC-398)", async () => {
+    // Case: TC-398
+    // Given: removeWorktree succeeds
+    mocks.removeWorktree.mockResolvedValue(null);
+
+    // When: the detached removal request (no branchName key) is received
+    await mocks.messageHandler.current!(DETACHED_REMOVE_REQUEST);
+
+    // Then: only the worktree is removed and the success response has no branchStatus
+    expect(mocks.removeWorktree).toHaveBeenCalledTimes(1);
+    expect(mocks.removeWorktree).toHaveBeenCalledWith(TEST_REPO, DETACHED_WORKTREE_PATH);
+    expect(mocks.deleteBranch).toHaveBeenCalledTimes(0);
+    expect(mocks.postMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.postMessage.mock.calls[0][0]).toStrictEqual({
+      command: "removeWorktree",
+      status: null
+    });
+  });
+
+  it.each([
+    { caseId: "TC-399", label: "a missing branchName key", branchNameFields: {} },
+    {
+      caseId: "TC-400",
+      label: "an undefined branchName",
+      branchNameFields: { branchName: undefined }
+    },
+    { caseId: "TC-401", label: "a null branchName", branchNameFields: { branchName: null } },
+    { caseId: "TC-402", label: "an empty branchName", branchNameFields: { branchName: "" } },
+    { caseId: "TC-403", label: "a numeric branchName", branchNameFields: { branchName: 42 } },
+    { caseId: "TC-404", label: "an array branchName", branchNameFields: { branchName: [] } },
+    { caseId: "TC-405", label: "an object branchName", branchNameFields: { branchName: {} } }
+  ])(
+    "rejects deleteBranch: true with $label before removing anything ($caseId)",
+    async ({ branchNameFields }) => {
+      // Case: TC-399, TC-400, TC-401, TC-402, TC-403, TC-404, TC-405
+      // When: a branch deletion is requested without a usable branch name
+      await mocks.messageHandler.current!({
+        command: "removeWorktree",
+        repo: TEST_REPO,
+        worktreePath: DETACHED_WORKTREE_PATH,
+        deleteBranch: true,
+        ...branchNameFields
+      });
+
+      // Then: nothing is removed and the fixed rejection message is returned without branchStatus
+      expect(mocks.removeWorktree).toHaveBeenCalledTimes(0);
+      expect(mocks.deleteBranch).toHaveBeenCalledTimes(0);
+      expect(mocks.postMessage).toHaveBeenCalledTimes(1);
+      expect(mocks.postMessage.mock.calls[0][0]).toStrictEqual({
+        command: "removeWorktree",
+        status: MISSING_BRANCH_NAME_MESSAGE
+      });
+    }
+  );
+
+  it.each([
+    { caseId: "TC-406", label: 'the string "true"', deleteBranch: "true" },
+    { caseId: "TC-407", label: "the number 1", deleteBranch: 1 }
+  ])("does not treat $label as a branch deletion request ($caseId)", async ({ deleteBranch }) => {
+    // Case: TC-406, TC-407
+    // Given: removeWorktree succeeds
+    mocks.removeWorktree.mockResolvedValue(null);
+
+    // When: deleteBranch arrives as a truthy value other than true
+    await mocks.messageHandler.current!({
+      command: "removeWorktree",
+      repo: TEST_REPO,
+      worktreePath: DETACHED_WORKTREE_PATH,
+      branchName: "feature/x",
+      deleteBranch
+    });
+
+    // Then: only the worktree is removed
+    expect(mocks.removeWorktree).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteBranch).toHaveBeenCalledTimes(0);
+    expect(mocks.postMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.postMessage.mock.calls[0][0]).toStrictEqual({
+      command: "removeWorktree",
+      status: null
+    });
+  });
+
+  it("passes a Git success through without any pre-check call (TC-408)", async () => {
+    // Case: TC-408
+    // Given: Git removes the worktree successfully (ignored-only, hidden untracked or missing path)
+    mocks.removeWorktree.mockResolvedValue(null);
+
+    // When: the detached removal request is received
+    await mocks.messageHandler.current!(DETACHED_REMOVE_REQUEST);
+
+    // Then: one removal call produces the success response, and no other adapter method exists
+    expect(mocks.removeWorktree).toHaveBeenCalledTimes(1);
+    expect(mocks.postMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.postMessage.mock.calls[0][0]).toStrictEqual({
+      command: "removeWorktree",
+      status: null
+    });
+    expect(Object.keys(mockDataSource).sort()).toEqual(["deleteBranch", "removeWorktree"]);
+  });
+
+  it("passes a Git refusal through without retrying or deleting a branch (TC-409)", async () => {
+    // Case: TC-409
+    // Given: Git refuses to remove the locked worktree
+    mocks.removeWorktree.mockResolvedValue(LOCKED_WORKTREE_MESSAGE);
+
+    // When: the detached removal request is received
+    await mocks.messageHandler.current!(DETACHED_REMOVE_REQUEST);
+
+    // Then: the refusal is returned as-is after a single attempt
+    expect(mocks.removeWorktree).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteBranch).toHaveBeenCalledTimes(0);
+    expect(mocks.postMessage).toHaveBeenCalledTimes(1);
+    expect(mocks.postMessage.mock.calls[0][0]).toStrictEqual({
+      command: "removeWorktree",
+      status: LOCKED_WORKTREE_MESSAGE
+    });
+  });
+});

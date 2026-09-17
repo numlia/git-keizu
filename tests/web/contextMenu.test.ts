@@ -724,3 +724,149 @@ describe("showContextMenu recent actions (S3)", () => {
     });
   });
 });
+
+// S4: detached worktree menu 形の項目に対する Recent 合成
+// @see docs/testing/perspectives/web/contextMenu-test.md
+describe("showContextMenu detached worktree menu recent actions (S4)", () => {
+  const ITEM_CLASS = "contextMenuItem";
+  const DIVIDER_CLASS = "contextMenuDivider";
+  const LABEL_CLASS = "contextMenuLabel";
+  const MENU_CLASSES = [ITEM_CLASS, DIVIDER_CLASS, LABEL_CLASS];
+  const DETACHED_MENU_CLASS_ORDER = [
+    ITEM_CLASS,
+    ITEM_CLASS,
+    ITEM_CLASS,
+    ITEM_CLASS,
+    DIVIDER_CLASS,
+    ITEM_CLASS
+  ];
+
+  function createDetachedWorktreeMenuItems(): ContextMenuElement[] {
+    return [
+      {
+        title: "Open in New Window",
+        recentActionId: "ref.openWorktreeInNewWindow",
+        onClick: vi.fn()
+      },
+      {
+        title: "Reveal in File Manager",
+        recentActionId: "ref.revealWorktreeInOS",
+        onClick: vi.fn()
+      },
+      { title: "Open Terminal Here", recentActionId: "ref.openTerminal", onClick: vi.fn() },
+      { title: "Copy Worktree Path", onClick: vi.fn() },
+      null,
+      { title: "Remove Worktree&#8230;", onClick: vi.fn() }
+    ];
+  }
+
+  function setShowRecentActions(showRecentActions: boolean): void {
+    (globalThis as Record<string, unknown>).viewState = {
+      repos: { "/test/repo": { columnWidths: null } },
+      showRecentActions
+    };
+  }
+
+  function getRenderedItems(): HTMLLIElement[] {
+    return Array.from(contextMenuEl.querySelectorAll("li"));
+  }
+
+  function getClassOrder(elems: HTMLLIElement[]): string[][] {
+    return elems.map((el) => MENU_CLASSES.filter((className) => el.classList.contains(className)));
+  }
+
+  function countLabels(elems: HTMLLIElement[]): number {
+    return elems.filter((el) => el.classList.contains(LABEL_CLASS)).length;
+  }
+
+  it("renders only the six menu elements when showRecentActions is disabled (TC-023)", () => {
+    // Case: TC-023
+    // Given: a matching recent action exists but the setting is disabled
+    setShowRecentActions(false);
+
+    // When: the detached worktree menu is shown with recent actions
+    showContextMenu(
+      createMouseEvent(100, 100),
+      createDetachedWorktreeMenuItems(),
+      createSourceElem(),
+      ["ref.openTerminal"]
+    );
+
+    // Then: four items, a divider and one item are rendered without a Recent label
+    const rendered = getRenderedItems();
+    expect(rendered).toHaveLength(6);
+    expect(countLabels(rendered)).toBe(0);
+    expect(getClassOrder(rendered)).toEqual(DETACHED_MENU_CLASS_ORDER.map((name) => [name]));
+  });
+
+  it("renders no Recent block when the history is empty (TC-024)", () => {
+    // Case: TC-024
+    // Given: Recent display is enabled and the history is empty
+    setShowRecentActions(true);
+
+    // When: the detached worktree menu is shown with an empty history
+    showContextMenu(
+      createMouseEvent(100, 100),
+      createDetachedWorktreeMenuItems(),
+      createSourceElem(),
+      []
+    );
+
+    // Then: only the six menu elements are rendered
+    const rendered = getRenderedItems();
+    expect(rendered).toHaveLength(6);
+    expect(countLabels(rendered)).toBe(0);
+  });
+
+  it("prepends the matching recent action above the unchanged menu (TC-025)", () => {
+    // Case: TC-025
+    // Given: Recent display is enabled and one history entry matches a menu item
+    setShowRecentActions(true);
+
+    // When: the detached worktree menu is shown with that history
+    showContextMenu(
+      createMouseEvent(100, 100),
+      createDetachedWorktreeMenuItems(),
+      createSourceElem(),
+      ["ref.openTerminal"]
+    );
+
+    // Then: a Recent label, the matching item and a divider precede the original six elements
+    const rendered = getRenderedItems();
+    expect(rendered).toHaveLength(9);
+    expect(rendered[0].classList.contains(LABEL_CLASS)).toBe(true);
+    expect(rendered[0].textContent).toContain("Recent");
+    expect(rendered[1].textContent).toBe("Open Terminal Here");
+    expect(rendered[2].classList.contains(DIVIDER_CLASS)).toBe(true);
+    expect(getClassOrder(rendered.slice(3))).toEqual(
+      DETACHED_MENU_CLASS_ORDER.map((name) => [name])
+    );
+    expect(rendered.slice(3).map((el) => el.textContent)).toEqual([
+      "Open in New Window",
+      "Reveal in File Manager",
+      "Open Terminal Here",
+      "Copy Worktree Path",
+      "",
+      "Remove Worktree…"
+    ]);
+  });
+
+  it("renders no Recent block when no history entry matches a menu item (TC-026)", () => {
+    // Case: TC-026
+    // Given: Recent display is enabled and the only history entry belongs to another menu
+    setShowRecentActions(true);
+
+    // When: the detached worktree menu is shown with that history
+    showContextMenu(
+      createMouseEvent(100, 100),
+      createDetachedWorktreeMenuItems(),
+      createSourceElem(),
+      ["commit.merge"]
+    );
+
+    // Then: only the six menu elements are rendered
+    const rendered = getRenderedItems();
+    expect(rendered).toHaveLength(6);
+    expect(countLabels(rendered)).toBe(0);
+  });
+});
