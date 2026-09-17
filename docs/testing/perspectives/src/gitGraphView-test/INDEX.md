@@ -2,12 +2,12 @@
 
 > Source: `src/gitGraphView.ts`
 > Storage Mode: sharded
-> Generated: 2026-09-12T00:00:00Z
+> Generated: 2026-09-13T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 10
-> Total Sections: 35
-> Total Cases: 168
+> Total Sections: 36
+> Total Cases: 180
 
 ## Shards
 
@@ -18,7 +18,7 @@
 | 01-message-routing-03.md             | message-routing             | 3        | 26    | 2026-08-06   |
 | 02-state-lifecycle-01.md             | state-lifecycle             | 12       | 47    | 2026-09-12   |
 | 02-state-lifecycle-02.md             | state-lifecycle             | 1        | 1     | 2026-09-12   |
-| 03-worktree-actions-01.md            | worktree-actions            | 4        | 22    | 2026-07-19   |
+| 03-worktree-actions-01.md            | worktree-actions            | 5        | 34    | 2026-09-13   |
 | 04-context-menu-recent-actions-01.md | context-menu-recent-actions | 2        | 3     | 2026-05-10   |
 | 05-branch-cleanup-01.md              | branch-cleanup              | 1        | 15    | 2026-08-25   |
 | 06-file-history-01.md                | file-history                | 1        | 12    | 2026-09-08   |
@@ -46,6 +46,7 @@
 | Feature 045 (defensive-fixes) (light-spec-plan)                        | 02-state-lifecycle-01.md, 03-worktree-actions-01.md |
 | Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan) | 01-message-routing-03.md                            |
 | Feature 051 (remote-checkout-pull) (light-spec-plan)                   | 01-message-routing-03.md                            |
+| Feature 053 (detached-worktree-menu) (light-spec-plan)                 | 03-worktree-actions-01.md                           |
 | Feature 055-03 (light-spec-plan)                                       | 05-branch-cleanup-01.md                             |
 | Feature 055-07 (light-spec-plan)                                       | 06-file-history-01.md                               |
 | Feature 056 (retain-context-when-hidden) issue #48                     | 07-retain-context-01.md                             |

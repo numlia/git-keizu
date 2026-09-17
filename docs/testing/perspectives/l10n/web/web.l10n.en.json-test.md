@@ -325,3 +325,25 @@ branch cleanup panel の表示に使う英語キー集合（title、comparison�
 - Normal: TC-021、TC-022
 
 **失敗系/正常系比（煙感知器）**: 正常系2件（TC-021、TC-022）、失敗系2件（TC-023、TC-024）。件数が同数のため再導出したが、静的 JSON データの失敗源は drift・placeholder・parity・誤削除に限られ、上表のとおりすべて充足されていることを確認した。
+
+## S9: detached worktree 削除確認の英語キー
+
+> Origin: Feature 053 (detached-worktree-menu) (light-spec-plan)
+> Added: 2026-09-13
+> Status: active
+> Supersedes: -
+> Signature: 追加キー `Are you sure you want to remove the worktree at {0}?`
+> Target Path: `l10n/web/web.l10n.en.json:240`
+> Test File: `tests/web/i18n.test.ts`
+
+| Case ID | Input / Precondition                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                      | Notes                                       |
+| ------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------- |
+| TC-025  | `l10n/web/web.l10n.en.json`を読み、キー`Are you sure you want to remove the worktree at {0}?` | Normal - key present                                                       | 値が`string`で長さ1以上、`{0}`を含む | ja側は`web.l10n.ja.json-test.md` S10 TC-027 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 053 追加分（S9）
+
+| 失敗源                                                            | 対応ケースまたは除外理由     |
+| ----------------------------------------------------------------- | ---------------------------- |
+| キー欠落／空文字                                                  | TC-025                       |
+| placeholder欠落                                                   | TC-025                       |
+| 他category（Validation / Exception / External / Boundary / Type） | excluded(静的JSONの存在検証) |

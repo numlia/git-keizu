@@ -7,14 +7,14 @@
 > Test Framework: Vitest
 > Total Shards: 13
 > Total Sections: 50
-> Total Cases: 343
+> Total Cases: 348
 
 ## Shards
 
 | Shard File                  | Responsibility     | Sections | Cases | Last Updated |
 | --------------------------- | ------------------ | -------- | ----- | ------------ |
 | 01-rendering-01.md          | rendering          | 7        | 35    | 2026-03-05   |
-| 01-rendering-02.md          | rendering          | 1        | 28    | 2026-08-08   |
+| 01-rendering-02.md          | rendering          | 1        | 33    | 2026-09-13   |
 | 02-context-menu-01.md       | context-menu       | 6        | 49    | 2026-07-04   |
 | 03-compare-find-01.md       | compare-find       | 3        | 25    | 2026-03-01   |
 | 04-keyboard-selection-01.md | keyboard-selection | 9        | 52    | 2026-07-19   |
@@ -50,7 +50,7 @@
 | Feature 040 (settings-and-copy-polish) (light-spec-plan)             | 07-load-count-01.md                                                         |
 | Feature 041 (refresh-contention-and-dialog-escape) (light-spec-plan) | 08-request-queue-01.md                                                      |
 | Feature 045 (defensive-fixes) (light-spec-plan)                      | 04-keyboard-selection-01.md                                                 |
-| Feature 052 (detached-worktree-display) (light-spec-plan)            | 01-rendering-02.md                                                          |
+| Feature 053 (detached-worktree-menu) (light-spec-plan)               | 01-rendering-02.md                                                          |
 | Feature 055-03 (light-spec-plan)                                     | 09-branch-cleanup-01.md                                                     |
 | Feature 055-07 (light-spec-plan)                                     | 10-file-history-01.md                                                       |
 | Feature 055-07 (light-spec-plan) Task 8                              | 06-file-actions-01.md                                                       |

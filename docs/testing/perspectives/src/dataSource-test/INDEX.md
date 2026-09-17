@@ -2,19 +2,19 @@
 
 > Source: `src/dataSource.ts`
 > Storage Mode: sharded
-> Generated: 2026-09-12T00:00:00Z
+> Generated: 2026-09-13T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 9
-> Total Sections: 43
-> Total Cases: 313
+> Total Sections: 44
+> Total Cases: 315
 
 ## Shards
 
 | Shard File                  | Responsibility     | Sections | Cases | Last Updated |
 | --------------------------- | ------------------ | -------- | ----- | ------------ |
 | 01-history-diff-01.md       | history-diff       | 9        | 61    | 2026-07-04   |
-| 02-branch-worktree-01.md    | branch-worktree    | 8        | 45    | 2026-07-04   |
+| 02-branch-worktree-01.md    | branch-worktree    | 9        | 47    | 2026-09-13   |
 | 02-branch-worktree-02.md    | branch-worktree    | 5        | 49    | 2026-08-06   |
 | 02-branch-worktree-03.md    | branch-worktree    | 1        | 26    | 2026-09-12   |
 | 03-author-watch-paths-01.md | author-watch-paths | 8        | 38    | 2026-07-04   |
@@ -42,6 +42,7 @@
 | Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan) | 02-branch-worktree-02.md                              |
 | Feature 051 (remote-checkout-pull) (light-spec-plan)                   | 02-branch-worktree-02.md                              |
 | Feature 052 (detached-worktree-display) (light-spec-plan)              | 02-branch-worktree-03.md                              |
+| Feature 053 (detached-worktree-menu) (light-spec-plan)                 | 02-branch-worktree-01.md                              |
 | Feature 055-03 (light-spec-plan)                                       | 06-branch-cleanup-01.md                               |
 | Feature 055-07 (light-spec-plan)                                       | 07-file-history-01.md                                 |
 | test-plan (既存テスト)                                                 | 01-history-diff-01.md                                 |

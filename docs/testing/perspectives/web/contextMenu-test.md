@@ -64,3 +64,39 @@
 | TC-020  | `showRecentActions = true`、menu 内の recent 対象 item が 1 件のみ                    | Boundary - insufficient eligible items                                     | Recent block を生成せず、通常メニューのみ描画する                                                                                                          | fileMenu 想定条件              |
 | TC-021  | `showRecentActions = true`、一致履歴が submenu child + top-level item を指す          | Normal - submenu coexistence                                               | 時計 icon 付き `Recent` 見出し配下に submenu child がフラット item として持ち上がりつつ、元の submenu DOM も従来どおり生成される                           | More... 構造維持               |
 | TC-022  | `recordRecentAction("/test/repo", "commit.createBranch")`、既存 recentActions あり    | Normal - local state + persistence                                         | `viewState.repos[repo].recentActions` が先頭追加 + dedupe された配列へ更新され、`saveRepoState` payload と `vscode.setState().gitRepos[repo]` も同値になる | local state 先更新 + host 保存 |
+
+## S4: detached worktree menu 形の項目に対する Recent 合成
+
+> Origin: Feature 053 (detached-worktree-menu) (light-spec-plan)
+> Added: 2026-09-13
+> Status: active
+> Supersedes: -
+> Signature: `showContextMenu(e: MouseEvent, items: ContextMenuElement[], sourceElem: HTMLElement, recentActions?: RecentActionId[]): void`
+> Target Path: `web/contextMenu.ts:176-208, 256-261`
+> Test File: `tests/web/contextMenu.test.ts`
+
+itemsはFeature 053確定仕様§7.2の6要素（`recentActionId`付き3件、無し1件、`null`、無し1件）を`onClick: vi.fn()`で作った固定fixture。S3のTC-018〜TC-022は維持する。
+
+| Case ID | Input / Precondition                                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                             | Notes |
+| ------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| TC-023  | `viewState.showRecentActions = false`、`recentActions = ["ref.openTerminal"]`  | Validation - setting off                                                   | `#contextMenu li`が6件。`.contextMenuLabel`が0件。class順が`contextMenuItem`×4、`contextMenuDivider`、`contextMenuItem`                                                                     | -     |
+| TC-024  | `showRecentActions = true`、`recentActions = []`                               | Boundary - empty history                                                   | `#contextMenu li`が6件、`.contextMenuLabel`が0件                                                                                                                                            | -     |
+| TC-025  | `showRecentActions = true`、`recentActions = ["ref.openTerminal"]`             | Normal - one matching entry prepended                                      | `#contextMenu li`が9件。li[0]が`.contextMenuLabel`で`textContent`に`Recent`を含む、li[1]の`textContent`が`Open Terminal Here`、li[2]が`.contextMenuDivider`、li[3]〜li[8]がTC-023と同じ順序 | -     |
+| TC-026  | `showRecentActions = true`、`recentActions = ["commit.merge"]`（非空・非一致） | Boundary - no matching entry                                               | `#contextMenu li`が6件、`.contextMenuLabel`が0件                                                                                                                                            | -     |
+
+### 失敗源インベントリ（include-or-justify）— Feature 053 追加分（S4）
+
+| 失敗源              | 対応ケースまたは除外理由 |
+| ------------------- | ------------------------ |
+| 設定OFFでの表示     | TC-023                   |
+| 履歴空での表示      | TC-024                   |
+| 一致1件の順序の誤り | TC-025                   |
+| 非一致での表示      | TC-026                   |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-023
+- Exception: excluded(合成は純粋な配列操作で外部依存・throw・型分岐を持たない)
+- External: excluded(同上)
+- Boundary: TC-024、TC-026
+- Type: excluded(同上)

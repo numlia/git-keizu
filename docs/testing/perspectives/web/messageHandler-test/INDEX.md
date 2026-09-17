@@ -2,19 +2,19 @@
 
 > Source: `web/messageHandler.ts`
 > Storage Mode: sharded
-> Generated: 2026-09-08T00:00:00Z
+> Generated: 2026-09-13T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 5
-> Total Sections: 14
-> Total Cases: 62
+> Total Sections: 15
+> Total Cases: 64
 
 ## Shards
 
 | Shard File                       | Responsibility          | Sections | Cases | Last Updated |
 | -------------------------------- | ----------------------- | -------- | ----- | ------------ |
 | 01-basic-responses-01.md         | basic-responses         | 4        | 23    | 2026-08-23   |
-| 02-worktree-and-details-01.md    | worktree-and-details    | 6        | 21    | 2026-07-19   |
+| 02-worktree-and-details-01.md    | worktree-and-details    | 7        | 23    | 2026-09-13   |
 | 03-git-operation-responses-01.md | git-operation-responses | 2        | 12    | 2026-08-06   |
 | 04-branch-cleanup-01.md          | branch-cleanup          | 1        | 3     | 2026-08-25   |
 | 05-file-history-01.md            | file-history            | 1        | 3     | 2026-09-08   |
@@ -33,6 +33,7 @@
 | Feature 045 (defensive-fixes) (light-spec-plan)                        | 02-worktree-and-details-01.md    |
 | Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan) | 03-git-operation-responses-01.md |
 | Feature 051 (remote-checkout-pull) (light-spec-plan)                   | 03-git-operation-responses-01.md |
+| Feature 053 (detached-worktree-menu) (light-spec-plan)                 | 02-worktree-and-details-01.md    |
 | Feature 055-01 (light-spec-plan)                                       | 01-basic-responses-01.md         |
 | Feature 055-03 (light-spec-plan)                                       | 04-branch-cleanup-01.md          |
 | Feature 055-07 (light-spec-plan)                                       | 05-file-history-01.md            |

@@ -118,3 +118,48 @@
 - Type: TC-102、TC-105
 
 **失敗系/正常系比（煙感知器）**: 正常系2件（TC-100、TC-103）、失敗系4件（TC-101、TC-102、TC-104、TC-105）、比2.0。
+
+## S41: removeWorktree ハンドラの detached 削除と削除前入力検証
+
+> Origin: Feature 053 (detached-worktree-menu) (light-spec-plan)
+> Added: 2026-09-13
+> Status: active
+> Supersedes: -
+> Signature: `case "removeWorktree"`（`onDidReceiveMessage`）
+> Target Path: `src/gitGraphView.ts:584-606`（実装後に更新）
+> Test File: `tests/src/gitGraphView.test.ts`
+
+S15 TC-051、S16 TC-053〜TC-058は維持する。`mockDataSource`は`removeWorktree`と`deleteBranch`だけを持ち、他のadapter呼び出しは`TypeError`で失敗する。応答は`mocks.postMessage.mock.calls[0][0]`を`toStrictEqual`で見る。`TEST_REPO = "/test/repo"`、`MISSING = "Branch name is required to delete the branch."`。TC-399〜TC-405は各入力が識別できる`it.each`でよい。
+
+| Case ID | Input / Precondition                                                                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                              | Notes |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| TC-398  | `{ command: "removeWorktree", repo: TEST_REPO, worktreePath: "/tmp/wt8", deleteBranch: false }`（`branchName`なし）、`removeWorktree`が`null`を返す | Normal - detached removal                                                  | `removeWorktree`が1回`(TEST_REPO, "/tmp/wt8")`、`deleteBranch`が0回、`postMessage`が1回`{ command: "removeWorktree", status: null }`                                         | -     |
+| TC-399  | `deleteBranch: true`、`branchName`キーなし                                                                                                          | Validation - missing branch name                                           | `removeWorktree`0回、`deleteBranch`0回、`postMessage`1回`{ command: "removeWorktree", status: MISSING }`（`branchStatus`キーなし）                                           | -     |
+| TC-400  | `deleteBranch: true, branchName: undefined`                                                                                                         | Validation - undefined branch name                                         | TC-399と同じ                                                                                                                                                                 | -     |
+| TC-401  | `deleteBranch: true, branchName: null`                                                                                                              | Type - null branch name                                                    | TC-399と同じ                                                                                                                                                                 | -     |
+| TC-402  | `deleteBranch: true, branchName: ""`                                                                                                                | Boundary - empty branch name                                               | TC-399と同じ                                                                                                                                                                 | -     |
+| TC-403  | `deleteBranch: true, branchName: 42`                                                                                                                | Type - numeric branch name                                                 | TC-399と同じ                                                                                                                                                                 | -     |
+| TC-404  | `deleteBranch: true, branchName: []`                                                                                                                | Type - array branch name                                                   | TC-399と同じ                                                                                                                                                                 | -     |
+| TC-405  | `deleteBranch: true, branchName: {}`                                                                                                                | Type - object branch name                                                  | TC-399と同じ                                                                                                                                                                 | -     |
+| TC-406  | `deleteBranch: "true", branchName: "feature/x"`、`removeWorktree`が`null`                                                                           | Type - string "true" is not true                                           | `removeWorktree`1回、`deleteBranch`0回、`postMessage`1回`{ command: "removeWorktree", status: null }`                                                                        | -     |
+| TC-407  | `deleteBranch: 1, branchName: "feature/x"`                                                                                                          | Type - numeric 1 is not true                                               | TC-406と同じ                                                                                                                                                                 | -     |
+| TC-408  | TC-398のrequestで、`removeWorktree`が`null`（ignoredファイルのみ／隠れた未追跡ファイル／欠落pathでGitが成功した場合のモデル）                       | Normal - Git success passed through                                        | `removeWorktree`が1回、`postMessage`が1回`{ command: "removeWorktree", status: null }`。`mockDataSource`の他メソッドは存在せず呼ばれない（事前検査なし）                     | -     |
+| TC-409  | TC-398のrequestで、`removeWorktree`が`"fatal: '/tmp/wt8' is locked"`を返す                                                                          | External - Git refusal passed through                                      | `removeWorktree`が1回（再試行なし）、`deleteBranch`が0回、`postMessage`が1回`{ command: "removeWorktree", status: "fatal: '/tmp/wt8' is locked" }`（`branchStatus`キーなし） | -     |
+
+### 失敗源インベントリ（include-or-justify）— Feature 053 追加分（S41）
+
+| 失敗源                       | 対応ケースまたは除外理由 |
+| ---------------------------- | ------------------------ |
+| 削除前拒否の欠落             | TC-399〜TC-405           |
+| truthy変換                   | TC-406、TC-407           |
+| 成功の失敗化・事前検査       | TC-408                   |
+| 失敗時の再試行・ブランチ削除 | TC-409                   |
+| detached形の互換             | TC-398                   |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-399、TC-400
+- Exception: excluded(handlerはthrowしない。DataSourceの失敗は戻り値で表す)
+- External: TC-409
+- Boundary: TC-402
+- Type: TC-401、TC-403〜TC-407
