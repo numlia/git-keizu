@@ -662,13 +662,21 @@ export interface ResponseCreateWorktree {
   status: GitCommandStatus;
 }
 
-export interface RequestRemoveWorktree {
+interface RequestRemoveWorktreeBase {
   command: "removeWorktree";
   repo: string;
   worktreePath: string;
-  branchName: string;
-  deleteBranch: boolean;
 }
+
+export type RequestRemoveWorktree =
+  | (RequestRemoveWorktreeBase & {
+      deleteBranch?: false;
+      branchName?: string;
+    })
+  | (RequestRemoveWorktreeBase & {
+      deleteBranch: true;
+      branchName: string;
+    });
 export interface ResponseRemoveWorktree {
   command: "removeWorktree";
   status: GitCommandStatus;
