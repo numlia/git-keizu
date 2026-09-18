@@ -74,8 +74,9 @@ Create and manage Git worktrees without leaving the graph.
 ![Create worktree from a commit](./resources/screenshots/worktree-create.png)
 
 - Create a worktree from a branch or any commit, with a suggested path derived from the branch name.
-- Open a worktree in VS Code or a terminal, reveal it in the file manager, copy its path, or remove it.
+- Open a worktree in VS Code or a terminal, reveal it in the file manager, copy its path, or remove it — from the label of a branch-based or a detached-HEAD worktree alike.
 - Linked and detached-HEAD worktrees remain visible in the graph, including detached commits outside the loaded history.
+- Removal never forces: a worktree with modified or untracked files is left in place and Git's reason is shown.
 
 ### Designed for everyday use
 

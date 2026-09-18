@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.2.0] - 2026-09-18
+
+This release makes detached HEAD worktrees actionable: the worktree labels introduced in 0.9.0 now open a context menu, so a throwaway worktree can be opened, revealed, or removed from the graph instead of from a terminal.
+
+### Added
+
+- **Context menu on detached worktree labels**: Right-clicking the label of a detached-HEAD worktree now shows **Open in New Window**, **Reveal in File Manager**, **Open Terminal Here**, **Copy Worktree Path**, and **Remove Worktree...** — the same path-based actions available on branch-based worktrees. Recent actions are recorded and offered at the top of the menu in the same way as for other labels. **Remove Worktree...** asks for confirmation and then runs `git worktree remove` once, without `--force`: a worktree that still contains modified or untracked files, or is locked, is left in place and Git's reason is shown in the existing **Unable to Remove Worktree** dialog. Because a detached worktree has no branch, the menu never offers to delete one. The label itself is unchanged — double-click still performs no checkout.
+
 ## [1.1.3] - 2026-09-13
 
 This release makes Highlight File History reachable from the file row itself, so the action is visible where you are already looking instead of only inside the right-click menu.
@@ -594,7 +602,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.1.3...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.2.0...HEAD
+[1.2.0]: https://github.com/numlia/git-keizu/compare/v1.1.3...v1.2.0
 [1.1.3]: https://github.com/numlia/git-keizu/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/numlia/git-keizu/compare/v1.1.1...v1.1.2
 [1.1.1]: https://github.com/numlia/git-keizu/compare/v1.1.0...v1.1.1
