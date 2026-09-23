@@ -165,106 +165,70 @@ export class AvatarManager {
   }
 
   private fetchFromGithub(avatarRequest: AvatarRequestItem, owner: string, repo: string) {
-    let t = new Date().getTime();
-    if (t < this.githubTimeout) {
-      // Defer request until after timeout
-      this.queue.addItem(avatarRequest, this.githubTimeout, false);
-      this.fetchAvatarsInterval();
-      return;
-    }
     let commitIndex =
       avatarRequest.commits.length < 5
         ? avatarRequest.commits.length - 1 - avatarRequest.attempts
         : Math.round((4 - avatarRequest.attempts) * 0.25 * (avatarRequest.commits.length - 1));
-    const req = https
-      .get(
-        {
-          hostname: "api.github.com",
-          path: `/repos/${owner}/${repo}/commits/${avatarRequest.commits[commitIndex]}`,
-          headers: { "User-Agent": "git-keizu" },
-          agent: false,
-          timeout: 15000
-        },
-        (res: http.IncomingMessage) => {
-          let respBody = "";
-          res.on("data", (chunk: Buffer) => {
-            respBody += chunk;
-          });
-          res.on("end", async () => {
-            if (this.disposed) return;
-            if (res.headers["x-ratelimit-remaining"] === "0") {
-              // If the GitHub Api rate limit was reached, store the github timeout to prevent subsequent requests
-              const resetTime = parseInt(<string>res.headers["x-ratelimit-reset"], 10);
-              this.githubTimeout = Number.isFinite(resetTime) ? resetTime * 1000 : 0;
-            }
-
-            if (res.statusCode === 200) {
-              // Sucess
-              let commit: { author?: { avatar_url?: string } };
-              try {
-                commit = JSON.parse(respBody) as { author?: { avatar_url?: string } };
-              } catch {
-                this.fetchFromGravatar(avatarRequest);
-                return;
-              }
-              if (commit.author && commit.author.avatar_url) {
-                // Avatar url found
-                let img = await this.downloadAvatarImage(
-                  avatarRequest.email,
-                  `${commit.author.avatar_url}&size=54`
-                );
-                if (img !== null) this.saveAvatar(avatarRequest.email, img, false);
-                return;
-              }
-            } else if (res.statusCode === 403) {
-              // Rate limit reached, try again after timeout
-              if (this.githubTimeout === 0) {
-                // Rate limit reset time unavailable, retry after a default interval and count the attempt
-                this.queue.addItem(avatarRequest, t + RATE_LIMIT_RETRY_INTERVAL_MS, true);
-              } else {
-                this.queue.addItem(avatarRequest, this.githubTimeout, false);
-              }
-              return;
-            } else if (
-              res.statusCode === 422 &&
-              avatarRequest.commits.length > avatarRequest.attempts + 1 &&
-              avatarRequest.attempts < 4
-            ) {
-              // Commit not found on remote, try again with the next commit if less than 5 attempts have been made
-              this.queue.addItem(avatarRequest, 0, true);
-              return;
-            } else if (res.statusCode! >= 500) {
-              // If server error, try again after 10 minutes
-              this.githubTimeout = t + 600000;
-              this.queue.addItem(avatarRequest, this.githubTimeout, false);
-              return;
-            }
-            this.fetchFromGravatar(avatarRequest); // Fallback to Gravatar
-          });
+    this.fetchFromAvatarApi(avatarRequest, {
+      hostname: "api.github.com",
+      path: `/repos/${owner}/${repo}/commits/${avatarRequest.commits[commitIndex]}`,
+      rateLimitHeaderPrefix: "x-ratelimit",
+      rateLimitStatusCode: 403,
+      getTimeout: () => this.githubTimeout,
+      storeTimeout: (timeout) => {
+        this.githubTimeout = timeout;
+      },
+      getAvatarUrl: (respBody) => {
+        const commit = respBody as { author?: { avatar_url?: string } };
+        return commit.author && commit.author.avatar_url
+          ? `${commit.author.avatar_url}&size=54`
+          : null;
+      },
+      handleStatus: (statusCode) => {
+        if (
+          statusCode === 422 &&
+          avatarRequest.commits.length > avatarRequest.attempts + 1 &&
+          avatarRequest.attempts < 4
+        ) {
+          // Commit not found on remote, try again with the next commit if less than 5 attempts have been made
+          this.queue.addItem(avatarRequest, 0, true);
+          return true;
         }
-      )
-      .on("error", () => {
-        if (this.disposed) return;
-        // If connection error, try again after 5 minutes
-        this.githubTimeout = t + 300000;
-        this.queue.addItem(avatarRequest, this.githubTimeout, false);
-      });
-    req.on("timeout", () => req.destroy(new Error("timeout")));
+        return false;
+      }
+    });
   }
 
   private fetchFromGitLab(avatarRequest: AvatarRequestItem) {
+    this.fetchFromAvatarApi(avatarRequest, {
+      hostname: "gitlab.com",
+      path: `/api/v4/users?search=${encodeURIComponent(avatarRequest.email)}`,
+      rateLimitHeaderPrefix: "ratelimit",
+      rateLimitStatusCode: 429,
+      getTimeout: () => this.gitLabTimeout,
+      storeTimeout: (timeout) => {
+        this.gitLabTimeout = timeout;
+      },
+      getAvatarUrl: (respBody) => {
+        const users = respBody as { avatar_url?: string }[];
+        return users.length > 0 && users[0].avatar_url ? users[0].avatar_url : null;
+      }
+    });
+  }
+
+  private fetchFromAvatarApi(avatarRequest: AvatarRequestItem, api: AvatarApiRequest) {
     let t = new Date().getTime();
-    if (t < this.gitLabTimeout) {
+    if (t < api.getTimeout()) {
       // Defer request until after timeout
-      this.queue.addItem(avatarRequest, this.gitLabTimeout, false);
+      this.queue.addItem(avatarRequest, api.getTimeout(), false);
       this.fetchAvatarsInterval();
       return;
     }
     const req = https
       .get(
         {
-          hostname: "gitlab.com",
-          path: `/api/v4/users?search=${encodeURIComponent(avatarRequest.email)}`,
+          hostname: api.hostname,
+          path: api.path,
           headers: { "User-Agent": "git-keizu" },
           agent: false,
           timeout: 15000
@@ -276,40 +240,46 @@ export class AvatarManager {
           });
           res.on("end", async () => {
             if (this.disposed) return;
-            if (res.headers["ratelimit-remaining"] === "0") {
-              // If the GitLab Api rate limit was reached, store the github timeout to prevent subsequent requests
-              const resetTime = parseInt(<string>res.headers["ratelimit-reset"], 10);
-              this.gitLabTimeout = Number.isFinite(resetTime) ? resetTime * 1000 : 0;
+            if (res.headers[`${api.rateLimitHeaderPrefix}-remaining`] === "0") {
+              // If the API rate limit was reached, store the timeout to prevent subsequent requests
+              const resetTime = parseInt(
+                <string>res.headers[`${api.rateLimitHeaderPrefix}-reset`],
+                10
+              );
+              api.storeTimeout(Number.isFinite(resetTime) ? resetTime * 1000 : 0);
             }
 
             if (res.statusCode === 200) {
               // Sucess
-              let users: { avatar_url?: string }[];
+              let parsedBody: unknown;
               try {
-                users = JSON.parse(respBody) as { avatar_url?: string }[];
+                parsedBody = JSON.parse(respBody);
               } catch {
                 this.fetchFromGravatar(avatarRequest);
                 return;
               }
-              if (users.length > 0 && users[0].avatar_url) {
+              const avatarUrl = api.getAvatarUrl(parsedBody);
+              if (avatarUrl !== null) {
                 // Avatar url found
-                let img = await this.downloadAvatarImage(avatarRequest.email, users[0].avatar_url);
+                let img = await this.downloadAvatarImage(avatarRequest.email, avatarUrl);
                 if (img !== null) this.saveAvatar(avatarRequest.email, img, false);
                 return;
               }
-            } else if (res.statusCode === 429) {
+            } else if (res.statusCode === api.rateLimitStatusCode) {
               // Rate limit reached, try again after timeout
-              if (this.gitLabTimeout === 0) {
+              if (api.getTimeout() === 0) {
                 // Rate limit reset time unavailable, retry after a default interval and count the attempt
                 this.queue.addItem(avatarRequest, t + RATE_LIMIT_RETRY_INTERVAL_MS, true);
               } else {
-                this.queue.addItem(avatarRequest, this.gitLabTimeout, false);
+                this.queue.addItem(avatarRequest, api.getTimeout(), false);
               }
+              return;
+            } else if (api.handleStatus?.(res.statusCode) === true) {
               return;
             } else if (res.statusCode! >= 500) {
               // If server error, try again after 10 minutes
-              this.gitLabTimeout = t + 600000;
-              this.queue.addItem(avatarRequest, this.gitLabTimeout, false);
+              api.storeTimeout(t + 600000);
+              this.queue.addItem(avatarRequest, api.getTimeout(), false);
               return;
             }
             this.fetchFromGravatar(avatarRequest); // Fallback to Gravatar
@@ -319,8 +289,8 @@ export class AvatarManager {
       .on("error", () => {
         if (this.disposed) return;
         // If connection error, try again after 5 minutes
-        this.gitLabTimeout = t + 300000;
-        this.queue.addItem(avatarRequest, this.gitLabTimeout, false);
+        api.storeTimeout(t + 300000);
+        this.queue.addItem(avatarRequest, api.getTimeout(), false);
       });
     req.on("timeout", () => req.destroy(new Error("timeout")));
   }
@@ -527,3 +497,17 @@ interface GravatarRemoteSource {
   type: "gravatar";
 }
 type RemoteSource = GitHubRemoteSource | GitLabRemoteSource | GravatarRemoteSource;
+
+// Provider-specific parts of an avatar lookup against the GitHub or GitLab API
+interface AvatarApiRequest {
+  hostname: string;
+  path: string;
+  rateLimitHeaderPrefix: string;
+  rateLimitStatusCode: number;
+  getTimeout: () => number;
+  storeTimeout: (timeout: number) => void;
+  // Returns the avatar image URL from the parsed response body, or null when it has none
+  getAvatarUrl: (respBody: unknown) => string | null;
+  // Returns true when the status was handled and the Gravatar fallback must be skipped
+  handleStatus?: (statusCode: number | undefined) => boolean;
+}
