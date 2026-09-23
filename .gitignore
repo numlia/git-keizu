@@ -18,3 +18,4 @@ notes/*
 .claude/
 .mcp.json
 .tmp/
+.agents/
