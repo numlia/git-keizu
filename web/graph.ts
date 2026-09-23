@@ -22,7 +22,6 @@ type VertexOrNull = Vertex | null;
 class Branch {
   private lines: Line[] = [];
   private colour: number;
-  private end: number = 0;
   private numUncommitted: number = 0;
 
   constructor(colour: number) {
@@ -39,12 +38,6 @@ class Branch {
   }
   public getColour() {
     return this.colour;
-  }
-  public getEnd() {
-    return this.end;
-  }
-  public setEnd(end: number) {
-    this.end = end;
   }
   public draw(svg: SVGElement, config: Config, expandAt: number) {
     let colour = config.graphColours[this.colour % config.graphColours.length],
@@ -222,16 +215,9 @@ export class Vertex {
   public addParent(vertex: Vertex) {
     this.parents.push(vertex);
   }
-  public hasParents() {
-    return this.parents.length > 0;
-  }
   public getNextParent(): Vertex | null {
     if (this.nextParent < this.parents.length) return this.parents[this.nextParent];
     return null;
-  }
-  public getLastParent(): Vertex | null {
-    if (this.nextParent < 1) return null;
-    return this.parents[this.nextParent - 1];
   }
   public registerParentProcessed() {
     this.nextParent++;
@@ -694,7 +680,6 @@ export class Graph {
           }
         }
       }
-      branch.setEnd(i);
       this.branches.push(branch);
       this.availableColours[branch.getColour()] = i;
     }
