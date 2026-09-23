@@ -68,7 +68,7 @@
     "test:ci": "vitest run"
   },
   "devDependencies": {
-    "@types/node": "^22.20.2",
+    "@types/node": "^22.20.3",
     "@types/vscode": "~1.74.0",
     "@vitest/coverage-v8": "5.0.0",
     "@vscode/codicons": "^0.0.45",
