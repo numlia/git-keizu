@@ -99,6 +99,34 @@ function escapeRegExp(str: string): string {
   return str.replace(REGEX_META_CHARS, "\\$&");
 }
 
+function splitNullSeparatedFields(stdout: string): string[] {
+  return stdout.split(NULL_BYTE_SEPARATOR);
+}
+
+function appendAuthorArgs(args: string[], authors: string[]) {
+  for (const author of authors) {
+    args.push(`--author=${escapeRegExp(author)}`);
+  }
+}
+
+function buildMergeArgs(
+  ref: string,
+  createNewCommit: boolean,
+  squash: boolean,
+  noCommit: boolean
+): string[] {
+  const args = ["merge", ref];
+  if (squash) {
+    args.push("--squash");
+  } else if (createNewCommit) {
+    args.push("--no-ff");
+  }
+  if (noCommit) {
+    args.push("--no-commit");
+  }
+  return args;
+}
+
 const VALID_GIT_REFS = new Set([
   "HEAD",
   "MERGE_HEAD",
@@ -111,6 +139,7 @@ function isValidGitRef(ref: string): boolean {
 }
 
 const INVALID_COMMIT_HASH_MESSAGE = "Invalid commit hash.";
+const INVALID_PARENT_INDEX_MESSAGE = "Invalid parent index.";
 const INVALID_REF_NAME_MESSAGE = "Invalid ref name.";
 const INVALID_REMOTE_NAME_MESSAGE = "Invalid remote name.";
 const GIT_QUERY_FAILED_MESSAGE = "Git command failed.";
@@ -384,7 +413,7 @@ export class DataSource {
       const numStatArgs = this.buildDiffArgs(isStash, hasParents, NUMSTAT_OPTION, commitHash);
       const isRootCommit = !hasParents && !isStash;
       const splitDiffOutput = (stdout: string): string[] => {
-        const fields = stdout.split(NULL_BYTE_SEPARATOR);
+        const fields = splitNullSeparatedFields(stdout);
         if (isRootCommit) fields.shift();
         return fields;
       };
@@ -417,38 +446,7 @@ export class DataSource {
 
       if (details === null) return null;
 
-      const fileLookup: { [file: string]: number } = {};
-
-      let ns = 0;
-      while (ns < nameStatusFields.length && nameStatusFields[ns] !== "") {
-        const statusChar = (nameStatusFields[ns] ?? "")[0] ?? "";
-        if (!VALID_FILE_CHANGE_TYPES.has(statusChar)) break;
-        if (statusChar === "R") {
-          const oldPath = getPathFromStr(nameStatusFields[ns + 1] ?? "");
-          const newPath = getPathFromStr(nameStatusFields[ns + 2] ?? "");
-          fileLookup[newPath] = details.fileChanges.length;
-          details.fileChanges.push({
-            oldFilePath: oldPath,
-            newFilePath: newPath,
-            type: statusChar as GitFileChangeType,
-            additions: null,
-            deletions: null
-          });
-          ns += 3;
-        } else {
-          const filePath = getPathFromStr(nameStatusFields[ns + 1] ?? "");
-          fileLookup[filePath] = details.fileChanges.length;
-          details.fileChanges.push({
-            oldFilePath: filePath,
-            newFilePath: filePath,
-            type: statusChar as GitFileChangeType,
-            additions: null,
-            deletions: null
-          });
-          ns += 2;
-        }
-      }
-
+      const fileLookup = this.parseNameStatusRecords(nameStatusFields, details.fileChanges);
       this.applyNumStatRecords(numStatFields, fileLookup, details.fileChanges);
       return details;
     } catch {
@@ -460,39 +458,18 @@ export class DataSource {
     try {
       const [nameStatus, numStat, untrackedFiles] = await Promise.all([
         this.spawnGit<string[]>(
-          [
-            ...NO_QUOTE_PATH_CONFIG,
-            "diff",
-            "HEAD",
-            "--name-status",
-            "--find-renames",
-            "--diff-filter=AMDR",
-            NULL_BYTE_OPTION
-          ],
+          this.buildDiffStatArgs(NAME_STATUS_OPTION, "HEAD"),
           repo,
-          (stdout) => stdout.split(NULL_BYTE_SEPARATOR),
+          splitNullSeparatedFields,
           []
         ),
         this.spawnGit<string[]>(
-          [
-            ...NO_QUOTE_PATH_CONFIG,
-            "diff",
-            "HEAD",
-            "--numstat",
-            "--find-renames",
-            "--diff-filter=AMDR",
-            NULL_BYTE_OPTION
-          ],
+          this.buildDiffStatArgs(NUMSTAT_OPTION, "HEAD"),
           repo,
-          (stdout) => stdout.split(NULL_BYTE_SEPARATOR),
+          splitNullSeparatedFields,
           []
         ),
-        this.spawnGit<string[]>(
-          [...NO_QUOTE_PATH_CONFIG, "ls-files", "--others", "--exclude-standard", NULL_BYTE_OPTION],
-          repo,
-          (stdout) => stdout.split(NULL_BYTE_SEPARATOR),
-          []
-        )
+        this.listUntrackedFiles(repo)
       ]);
 
       const details: GitCommitDetails = {
@@ -507,50 +484,9 @@ export class DataSource {
         fileChanges: []
       };
 
-      const fileLookup: { [file: string]: number } = {};
-      let ns = 0;
-      while (ns < nameStatus.length && nameStatus[ns] !== "") {
-        const statusChar = (nameStatus[ns] ?? "")[0] ?? "";
-        if (!VALID_FILE_CHANGE_TYPES.has(statusChar)) break;
-        if (statusChar === "R") {
-          const oldFilePath = getPathFromStr(nameStatus[ns + 1] ?? "");
-          const newFilePath = getPathFromStr(nameStatus[ns + 2] ?? "");
-          fileLookup[newFilePath] = details.fileChanges.length;
-          details.fileChanges.push({
-            oldFilePath,
-            newFilePath,
-            type: statusChar as GitFileChangeType,
-            additions: null,
-            deletions: null
-          });
-          ns += 3;
-        } else {
-          const filePath = getPathFromStr(nameStatus[ns + 1] ?? "");
-          fileLookup[filePath] = details.fileChanges.length;
-          details.fileChanges.push({
-            oldFilePath: filePath,
-            newFilePath: filePath,
-            type: statusChar as GitFileChangeType,
-            additions: null,
-            deletions: null
-          });
-          ns += 2;
-        }
-      }
-
+      const fileLookup = this.parseNameStatusRecords(nameStatus, details.fileChanges);
       this.applyNumStatRecords(numStat, fileLookup, details.fileChanges);
-
-      for (let i = 0; i < untrackedFiles.length; i++) {
-        const filePath = untrackedFiles[i];
-        if (filePath === "" || typeof fileLookup[filePath] === "number") continue;
-        details.fileChanges.push({
-          oldFilePath: filePath,
-          newFilePath: filePath,
-          type: "A",
-          additions: null,
-          deletions: null
-        });
-      }
+      this.appendUntrackedFileChanges(untrackedFiles, fileLookup, details.fileChanges);
 
       return details;
     } catch {
@@ -576,112 +512,31 @@ export class DataSource {
     }
 
     try {
-      const nameStatusArgs = [
-        ...NO_QUOTE_PATH_CONFIG,
-        "diff",
-        "--name-status",
-        "--find-renames",
-        "--diff-filter=AMDR",
-        NULL_BYTE_OPTION,
-        diffBaseHash
-      ];
-      const numStatArgs = [
-        ...NO_QUOTE_PATH_CONFIG,
-        "diff",
-        "--numstat",
-        "--find-renames",
-        "--diff-filter=AMDR",
-        NULL_BYTE_OPTION,
-        diffBaseHash
-      ];
-
-      if (!isToWorkingTree) {
-        nameStatusArgs.push(toHash);
-        numStatArgs.push(toHash);
-      }
-
+      const diffRefs = isToWorkingTree ? [diffBaseHash] : [diffBaseHash, toHash];
       const gitCommands: Promise<string[]>[] = [
         this.spawnGit<string[]>(
-          nameStatusArgs,
+          this.buildDiffStatArgs(NAME_STATUS_OPTION, ...diffRefs),
           repo,
-          (stdout) => stdout.split(NULL_BYTE_SEPARATOR),
+          splitNullSeparatedFields,
           []
         ),
         this.spawnGit<string[]>(
-          numStatArgs,
+          this.buildDiffStatArgs(NUMSTAT_OPTION, ...diffRefs),
           repo,
-          (stdout) => stdout.split(NULL_BYTE_SEPARATOR),
+          splitNullSeparatedFields,
           []
         )
       ];
       if (isToWorkingTree) {
-        gitCommands.push(
-          this.spawnGit<string[]>(
-            [
-              ...NO_QUOTE_PATH_CONFIG,
-              "ls-files",
-              "--others",
-              "--exclude-standard",
-              NULL_BYTE_OPTION
-            ],
-            repo,
-            (stdout) => stdout.split(NULL_BYTE_SEPARATOR),
-            []
-          )
-        );
+        gitCommands.push(this.listUntrackedFiles(repo));
       }
 
-      const results = await Promise.all(gitCommands);
-      const nameStatus = results[0];
-      const numStat = results[1];
-      const untrackedFiles = results[2] ?? [];
+      const [nameStatus, numStat, untrackedFiles = []] = await Promise.all(gitCommands);
 
       const fileChanges: GitFileChange[] = [];
-      const fileLookup: { [file: string]: number } = {};
-
-      let ns = 0;
-      while (ns < nameStatus.length && nameStatus[ns] !== "") {
-        const statusChar = (nameStatus[ns] ?? "")[0] ?? "";
-        if (!VALID_FILE_CHANGE_TYPES.has(statusChar)) break;
-        if (statusChar === "R") {
-          const oldFilePath = getPathFromStr(nameStatus[ns + 1] ?? "");
-          const newFilePath = getPathFromStr(nameStatus[ns + 2] ?? "");
-          fileLookup[newFilePath] = fileChanges.length;
-          fileChanges.push({
-            oldFilePath,
-            newFilePath,
-            type: statusChar as GitFileChangeType,
-            additions: null,
-            deletions: null
-          });
-          ns += 3;
-        } else {
-          const filePath = getPathFromStr(nameStatus[ns + 1] ?? "");
-          fileLookup[filePath] = fileChanges.length;
-          fileChanges.push({
-            oldFilePath: filePath,
-            newFilePath: filePath,
-            type: statusChar as GitFileChangeType,
-            additions: null,
-            deletions: null
-          });
-          ns += 2;
-        }
-      }
-
+      const fileLookup = this.parseNameStatusRecords(nameStatus, fileChanges);
       this.applyNumStatRecords(numStat, fileLookup, fileChanges);
-
-      for (let i = 0; i < untrackedFiles.length; i++) {
-        const filePath = untrackedFiles[i];
-        if (filePath === "" || typeof fileLookup[filePath] === "number") continue;
-        fileChanges.push({
-          oldFilePath: filePath,
-          newFilePath: filePath,
-          type: "A",
-          additions: null,
-          deletions: null
-        });
-      }
+      this.appendUntrackedFileChanges(untrackedFiles, fileLookup, fileChanges);
 
       return fileChanges;
     } catch {
@@ -957,16 +812,10 @@ export class DataSource {
     squash: boolean,
     noCommit: boolean
   ) {
-    const args = ["merge", branchName];
-    if (squash) {
-      args.push("--squash");
-    } else if (createNewCommit) {
-      args.push("--no-ff");
-    }
-    if (noCommit) {
-      args.push("--no-commit");
-    }
-    return this.runGitCommandSpawn(args, repo);
+    return this.runGitCommandSpawn(
+      buildMergeArgs(branchName, createNewCommit, squash, noCommit),
+      repo
+    );
   }
 
   public deleteRemoteBranch(repo: string, remoteName: string, branchName: string) {
@@ -987,16 +836,10 @@ export class DataSource {
     if (!isValidCommitHash(commitHash)) {
       return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
     }
-    const args = ["merge", commitHash];
-    if (squash) {
-      args.push("--squash");
-    } else if (createNewCommit) {
-      args.push("--no-ff");
-    }
-    if (noCommit) {
-      args.push("--no-commit");
-    }
-    return this.runGitCommandSpawn(args, repo);
+    return this.runGitCommandSpawn(
+      buildMergeArgs(commitHash, createNewCommit, squash, noCommit),
+      repo
+    );
   }
 
   public cherrypickCommit(
@@ -1010,7 +853,7 @@ export class DataSource {
       return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
     }
     if (!Number.isInteger(parentIndex) || parentIndex < 0) {
-      return Promise.resolve("Invalid parent index.");
+      return Promise.resolve(INVALID_PARENT_INDEX_MESSAGE);
     }
     const args = ["cherry-pick", commitHash];
     if (parentIndex > 0) {
@@ -1030,7 +873,7 @@ export class DataSource {
       return Promise.resolve(INVALID_COMMIT_HASH_MESSAGE);
     }
     if (!Number.isInteger(parentIndex) || parentIndex < 0) {
-      return Promise.resolve("Invalid parent index.");
+      return Promise.resolve(INVALID_PARENT_INDEX_MESSAGE);
     }
     return this.runGitCommandSpawn(
       ["revert", "--no-edit", commitHash, ...(parentIndex > 0 ? ["-m", String(parentIndex)] : [])],
@@ -1405,9 +1248,7 @@ export class DataSource {
       `--format=${this.gitLogFormat}`,
       COMMIT_ORDER_FLAGS[commitOrdering]
     ];
-    for (const author of authors) {
-      args.push(`--author=${escapeRegExp(author)}`);
-    }
+    appendAuthorArgs(args, authors);
     if (branches.length > 0) {
       args.push(...branches);
     } else {
@@ -1427,9 +1268,7 @@ export class DataSource {
     if (heads.length === 0) return Promise.resolve<GitCommit[]>([]);
 
     const args = ["log", NO_WALK_SORTED_OPTION, `--format=${this.gitLogFormat}`];
-    for (const author of authors) {
-      args.push(`--author=${escapeRegExp(author)}`);
-    }
+    appendAuthorArgs(args, authors);
     args.push(...heads);
 
     return this.spawnGit<GitCommit[]>(args, repo, parseGitLogCommits, []);
@@ -1496,6 +1335,86 @@ export class DataSource {
       },
       []
     );
+  }
+
+  private buildDiffStatArgs(statOption: string, ...refs: string[]): string[] {
+    return [
+      ...NO_QUOTE_PATH_CONFIG,
+      "diff",
+      statOption,
+      DIFF_FIND_RENAMES_OPTION,
+      DIFF_FILTER_AMDR_OPTION,
+      NULL_BYTE_OPTION,
+      ...refs
+    ];
+  }
+
+  private listUntrackedFiles(repo: string) {
+    return this.spawnGit<string[]>(
+      [...NO_QUOTE_PATH_CONFIG, "ls-files", "--others", "--exclude-standard", NULL_BYTE_OPTION],
+      repo,
+      splitNullSeparatedFields,
+      []
+    );
+  }
+
+  /**
+   * Parses NUL-separated name-status fields ("status\0path" pairs, or
+   * "R\0old\0new" triples) into fileChanges, returning a new-path lookup used
+   * to attach numstat counts and to skip untracked files already in the diff.
+   */
+  private parseNameStatusRecords(
+    nameStatusFields: string[],
+    fileChanges: GitFileChange[]
+  ): { [file: string]: number } {
+    const fileLookup: { [file: string]: number } = {};
+    let ns = 0;
+    while (ns < nameStatusFields.length && nameStatusFields[ns] !== "") {
+      const statusChar = (nameStatusFields[ns] ?? "")[0] ?? "";
+      if (!VALID_FILE_CHANGE_TYPES.has(statusChar)) break;
+      if (statusChar === "R") {
+        const oldFilePath = getPathFromStr(nameStatusFields[ns + 1] ?? "");
+        const newFilePath = getPathFromStr(nameStatusFields[ns + 2] ?? "");
+        fileLookup[newFilePath] = fileChanges.length;
+        fileChanges.push({
+          oldFilePath,
+          newFilePath,
+          type: statusChar as GitFileChangeType,
+          additions: null,
+          deletions: null
+        });
+        ns += 3;
+      } else {
+        const filePath = getPathFromStr(nameStatusFields[ns + 1] ?? "");
+        fileLookup[filePath] = fileChanges.length;
+        fileChanges.push({
+          oldFilePath: filePath,
+          newFilePath: filePath,
+          type: statusChar as GitFileChangeType,
+          additions: null,
+          deletions: null
+        });
+        ns += 2;
+      }
+    }
+    return fileLookup;
+  }
+
+  private appendUntrackedFileChanges(
+    untrackedFiles: string[],
+    fileLookup: { [file: string]: number },
+    fileChanges: GitFileChange[]
+  ) {
+    for (const filePath of untrackedFiles) {
+      if (filePath === "" || typeof fileLookup[filePath] === "number") continue;
+      fileChanges.push({
+        oldFilePath: filePath,
+        newFilePath: filePath,
+        type: "A",
+        additions: null,
+        deletions: null
+      });
+    }
   }
 
   private buildDiffArgs(
@@ -1579,84 +1498,54 @@ export class DataSource {
     }
   }
 
-  private runGitCommandSpawn(args: string[], repo: string) {
-    return new Promise<GitCommandStatus>((resolve) => {
-      const stdoutChunks: Buffer[] = [];
-      const stderrChunks: Buffer[] = [];
-      let err = false;
-      const cmd = cp.spawn(this.gitPath, args, {
-        cwd: repo,
-        env: { ...process.env, LC_ALL: "C" }
-      });
-      cmd.stdout.on("data", (d: string | Buffer) => {
-        stdoutChunks.push(Buffer.from(d));
-      });
-      cmd.stderr.on("data", (d: string | Buffer) => {
-        stderrChunks.push(Buffer.from(d));
-      });
-      cmd.on("error", (e: Error) => {
-        resolve(e.message.split(eolRegex).join("\n"));
-        err = true;
-      });
-      cmd.on("close", (code: number | null) => {
-        if (err) return;
-        if (code === 0) {
-          resolve(null);
-        } else {
-          const stdout = Buffer.concat(stdoutChunks).toString();
-          const stderr = Buffer.concat(stderrChunks).toString();
-          const raw = stdout !== "" ? stdout : stderr !== "" ? stderr : "";
-          const lines = raw.split(eolRegex);
-          if (lines[lines.length - 1] === "") lines.pop();
-          resolve(lines.join("\n"));
-        }
-      });
-    });
+  private async runGitCommandSpawn(args: string[], repo: string): Promise<GitCommandStatus> {
+    const result = await this.spawnGitProcess(args, repo);
+    if (result.kind === "error") {
+      return result.error.message.split(eolRegex).join("\n");
+    }
+    if (result.code === 0) {
+      return null;
+    }
+    const raw = result.stdout !== "" ? result.stdout : result.stderr !== "" ? result.stderr : "";
+    const lines = raw.split(eolRegex);
+    if (lines[lines.length - 1] === "") lines.pop();
+    return lines.join("\n");
   }
 
-  private runGitQuery(args: string[], repo: string) {
-    return new Promise<GitQueryResult>((resolve) => {
-      const stdoutChunks: Buffer[] = [];
-      const stderrChunks: Buffer[] = [];
-      let err = false;
-      const cmd = cp.spawn(this.gitPath, args, {
-        cwd: repo,
-        env: { ...process.env, LC_ALL: "C" }
-      });
-      cmd.stdout.on("data", (d: string | Buffer) => {
-        stdoutChunks.push(Buffer.from(d));
-      });
-      cmd.stderr.on("data", (d: string | Buffer) => {
-        stderrChunks.push(Buffer.from(d));
-      });
-      cmd.on("error", (e: Error) => {
-        resolve({ kind: "error", status: e.message.split(eolRegex).join("\n") });
-        err = true;
-      });
-      cmd.on("close", (code: number | null) => {
-        if (err) return;
-        const stdout = Buffer.concat(stdoutChunks).toString();
-        if (code === 0) {
-          resolve({ kind: "ok", stdout });
-          return;
-        }
-        const stderr = Buffer.concat(stderrChunks).toString();
-        const lines = (stderr !== "" ? stderr : stdout).split(eolRegex);
-        if (lines[lines.length - 1] === "") lines.pop();
-        const message = lines.join("\n");
-        resolve({ kind: "error", status: message !== "" ? message : GIT_QUERY_FAILED_MESSAGE });
-      });
-    });
+  private async runGitQuery(args: string[], repo: string): Promise<GitQueryResult> {
+    const result = await this.spawnGitProcess(args, repo);
+    if (result.kind === "error") {
+      return { kind: "error", status: result.error.message.split(eolRegex).join("\n") };
+    }
+    if (result.code === 0) {
+      return { kind: "ok", stdout: result.stdout };
+    }
+    const lines = (result.stderr !== "" ? result.stderr : result.stdout).split(eolRegex);
+    if (lines[lines.length - 1] === "") lines.pop();
+    const message = lines.join("\n");
+    return { kind: "error", status: message !== "" ? message : GIT_QUERY_FAILED_MESSAGE };
   }
 
-  private spawnGit<T>(
+  private async spawnGit<T>(
     args: string[],
     repo: string,
     successValue: { (stdout: string): T },
     errorValue: T
-  ) {
-    return new Promise<T>((resolve) => {
+  ): Promise<T> {
+    const result = await this.spawnGitProcess(args, repo);
+    return result.kind === "exit" && result.code === 0 ? successValue(result.stdout) : errorValue;
+  }
+
+  private spawnGitProcess(
+    args: string[],
+    repo: string
+  ): Promise<
+    | { kind: "error"; error: Error }
+    | { kind: "exit"; code: number | null; stdout: string; stderr: string }
+  > {
+    return new Promise((resolve) => {
       const stdoutChunks: Buffer[] = [];
+      const stderrChunks: Buffer[] = [];
       let err = false;
       const cmd = cp.spawn(this.gitPath, args, {
         cwd: repo,
@@ -1665,14 +1554,21 @@ export class DataSource {
       cmd.stdout.on("data", (d: string | Buffer) => {
         stdoutChunks.push(Buffer.from(d));
       });
-      cmd.stderr.on("data", () => {});
-      cmd.on("error", () => {
-        resolve(errorValue);
+      cmd.stderr.on("data", (d: string | Buffer) => {
+        stderrChunks.push(Buffer.from(d));
+      });
+      cmd.on("error", (e: Error) => {
+        resolve({ kind: "error", error: e });
         err = true;
       });
       cmd.on("close", (code: number | null) => {
         if (err) return;
-        resolve(code === 0 ? successValue(Buffer.concat(stdoutChunks).toString()) : errorValue);
+        resolve({
+          kind: "exit",
+          code,
+          stdout: Buffer.concat(stdoutChunks).toString(),
+          stderr: Buffer.concat(stderrChunks).toString()
+        });
       });
     });
   }
