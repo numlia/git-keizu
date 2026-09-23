@@ -2,6 +2,7 @@ import type { GitCommitNode, GitResetMode } from "../src/types";
 import { recordRecentAction } from "./contextMenu";
 import { showConfirmationDialog, showFormDialog, showSelectDialog } from "./dialogs";
 import { t } from "./i18n";
+import { buildMergeMenuItem } from "./mergeDialog";
 import {
   abbrevCommit,
   ELLIPSIS,
@@ -280,72 +281,16 @@ export function buildCommitContextMenuItems(
       }
     }
   };
-  const mergeItem: ContextMenuItem = {
-    title: `${t("Merge into current branch")}${ELLIPSIS}`,
-    recentActionId: "commit.merge",
-    onClick: () => {
-      const noFfDefault = viewState.dialogDefaults.merge.noFastForward;
-      showFormDialog(
-        t(
-          "Are you sure you want to merge commit {0} into the current branch?",
-          `<b><i>${abbrevCommit(hash)}</i></b>`
-        ),
-        [
-          {
-            type: "checkbox",
-            name: t("Create a new commit even if fast-forward is possible"),
-            value: noFfDefault
-          },
-          {
-            type: "checkbox",
-            name: t("Squash Commits"),
-            value: viewState.dialogDefaults.merge.squashCommits,
-            info: t(
-              "Create a single commit on the current branch whose effect is the same as merging this branch. Squash does not create a commit automatically, so the No Commit option has no additional effect when Squash is enabled."
-            )
-          },
-          {
-            type: "checkbox",
-            name: t("No Commit"),
-            value: viewState.dialogDefaults.merge.noCommit,
-            info: t(
-              "The changes of the merge will be staged but not committed, so that you can review and/or modify the merge result before committing."
-            )
-          }
-        ],
-        t("Yes, merge"),
-        (values) => {
-          recordRecentAction(repo, "commit.merge");
-          sendMessage({
-            command: "mergeCommit",
-            repo: repo,
-            commitHash: hash,
-            createNewCommit: values[0] === "checked",
-            squash: values[1] === "checked",
-            noCommit: values[2] === "checked"
-          });
-        },
-        null,
-        (dialogEl) => {
-          const squashInput = dialogEl.querySelector("#dialogInput1") as HTMLInputElement;
-          const noFfInput = dialogEl.querySelector("#dialogInput0") as HTMLInputElement;
-          if (squashInput.checked) {
-            noFfInput.checked = false;
-            noFfInput.disabled = true;
-          }
-          squashInput.addEventListener("change", () => {
-            if (squashInput.checked) {
-              noFfInput.checked = false;
-              noFfInput.disabled = true;
-            } else {
-              noFfInput.disabled = false;
-              noFfInput.checked = noFfDefault;
-            }
-          });
-        }
-      );
-    }
-  };
+  const mergeItem = buildMergeMenuItem(
+    repo,
+    "commit.merge",
+    () =>
+      t(
+        "Are you sure you want to merge commit {0} into the current branch?",
+        `<b><i>${abbrevCommit(hash)}</i></b>`
+      ),
+    (options) => ({ command: "mergeCommit", repo: repo, commitHash: hash, ...options })
+  );
   const resetItem: ContextMenuItem = {
     title: `${t("Reset current branch to this Commit")}${ELLIPSIS}`,
     recentActionId: "commit.resetToCommit",
