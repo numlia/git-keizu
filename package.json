@@ -72,7 +72,7 @@
     "@types/vscode": "~1.74.0",
     "@vitest/coverage-v8": "5.0.0",
     "@vscode/codicons": "^0.0.45",
-    "@vscode/vsce": "^3.9.2",
+    "@vscode/vsce": "^4.0.0",
     "esbuild": "^0.28.2",
     "eslint-plugin-simple-import-sort": "^14.0.0",
     "jsdom": "^30.0.1",
