@@ -30,7 +30,6 @@ const ABBREV_LENGTH = 8;
 function createMockCallbacks(): FindWidgetCallbacks {
   return {
     getCommits: vi.fn(() => []),
-    getColumnVisibility: vi.fn(() => ({ author: true, date: true, commit: true })),
     scrollToCommit: vi.fn(),
     saveState: vi.fn(),
     loadCommitDetails: vi.fn(),
