@@ -29,7 +29,7 @@ git-keizu/
 ├── web/                  # Webview frontend (Browser)
 ├── .oxfmtrc.jsonc        # oxfmt formatting config
 ├── .oxlintrc.json        # oxlint linting config
-├── CLAUDE.md             # Claude Code guide
+├── AGENTS.md             # Claude Code guide
 ├── package.json          # Dependencies, scripts, VS Code contributes
 ├── tsconfig.json         # (none: managed separately in src/ and web/)
 └── vitest.config.ts      # Test config
@@ -162,5 +162,5 @@ The `out/` directory is removed by `pnpm run clean`.
 
 ## Related Documents
 
-- [`CLAUDE.md`](../../CLAUDE.md): Claude Code guide (commands, architecture, coding conventions)
+- [`AGENTS.md`](../../AGENTS.md): Claude Code guide (commands, architecture, coding conventions)
 - [`notes/modernization-plan.md`](../../notes/modernization-plan.md): Modernization plan details
