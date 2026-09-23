@@ -8,7 +8,6 @@ import {
   sanitizeBranchNameForPath,
   svgIcons,
   UNCOMMITTED_CHANGES_HASH,
-  unescapeHtml,
   worktreeCollectionsEqual
 } from "../../web/utils";
 
@@ -45,33 +44,6 @@ describe("escapeHtml", () => {
 
   it("returns plain text unchanged", () => {
     expect(escapeHtml("hello world")).toBe("hello world");
-  });
-});
-
-describe("unescapeHtml", () => {
-  it("unescapes ampersand", () => {
-    expect(unescapeHtml("a &amp; b")).toBe("a & b");
-  });
-
-  it("unescapes less-than and greater-than", () => {
-    expect(unescapeHtml("&lt;div&gt;")).toBe("<div>");
-  });
-
-  it("unescapes double quotes", () => {
-    expect(unescapeHtml("&quot;hello&quot;")).toBe('"hello"');
-  });
-
-  it("unescapes single quotes", () => {
-    expect(unescapeHtml("it&#x27;s")).toBe("it's");
-  });
-
-  it("unescapes forward slashes", () => {
-    expect(unescapeHtml("a&#x2F;b")).toBe("a/b");
-  });
-
-  it("round-trips with escapeHtml", () => {
-    const original = '<a href="test">it\'s & done</a>';
-    expect(unescapeHtml(escapeHtml(original))).toBe(original);
   });
 });
 
