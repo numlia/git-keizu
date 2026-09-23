@@ -596,9 +596,7 @@ export class Graph {
 
   private getSameBranchChild(i: number, children: Vertex[]): Vertex | undefined {
     const branch = this.vertices[i].getBranch();
-    return branch === null
-      ? undefined
-      : children.find((child) => child.isOnThisBranch(branch));
+    return branch === null ? undefined : children.find((child) => child.isOnThisBranch(branch));
   }
 
   public limitMaxWidth(maxWidth: number) {
