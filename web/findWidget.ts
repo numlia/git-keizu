@@ -68,12 +68,11 @@ function abbrevCommit(commitHash: string): string {
 
 export interface FindWidgetCallbacks {
   getCommits(): GG.GitCommitNode[];
-  getColumnVisibility(): { author: boolean; date: boolean; commit: boolean };
   scrollToCommit(hash: string, alwaysCenterCommit: boolean): void;
   saveState(): void;
   loadCommitDetails(elem: HTMLElement): void;
   getCommitId(hash: string): number | null;
-  isCdvOpen(hash: string, compareWithHash: string | null): boolean;
+  isCdvOpen(hash: string): boolean;
 }
 
 /* === FindWidget === */
@@ -268,7 +267,6 @@ export class FindWidget {
     this.position = -1;
 
     if (this.text !== "") {
-      const colVisibility = this.callbacks.getColumnVisibility();
       const regexText = this.regex ? this.text : this.text.replace(REGEX_META_CHARS, "\\$&");
       const flags = `u${this.caseSensitive ? "" : "i"}`;
 
@@ -297,10 +295,9 @@ export class FindWidget {
           if (
             commit.hash !== UNCOMMITTED_CHANGES_HASH &&
             (findPattern.test(commit.message) ||
-              (colVisibility.author && findPattern.test(commit.author)) ||
-              (colVisibility.commit &&
-                (commit.hash.search(findPattern) === 0 ||
-                  findPattern.test(abbrevCommit(commit.hash)))) ||
+              findPattern.test(commit.author) ||
+              commit.hash.search(findPattern) === 0 ||
+              findPattern.test(abbrevCommit(commit.hash)) ||
               branchLabels.heads.some(
                 (head) =>
                   findPattern!.test(head.name) ||
@@ -308,7 +305,7 @@ export class FindWidget {
               ) ||
               branchLabels.remotes.some((remote) => findPattern!.test(remote.name)) ||
               branchLabels.tags.some((tag) => findPattern!.test(tag.name)) ||
-              (colVisibility.date && findPattern.test(getCommitDate(commit.date).value)) ||
+              findPattern.test(getCommitDate(commit.date).value) ||
               (commit.stash !== null &&
                 findPattern.test(buildStashSelectorDisplay(commit.stash.selector))))
           ) {
@@ -363,7 +360,6 @@ export class FindWidget {
             }
 
             if (
-              colVisibility.commit &&
               commit.hash.search(findPattern) === 0 &&
               !findPattern.test(abbrevCommit(commit.hash)) &&
               textElems.length > 0
@@ -467,7 +463,7 @@ export class FindWidget {
   private openCommitDetailsViewForCurrentMatchIfEnabled() {
     if (!this.openCdvEnabled) return;
     const commitHash = this.getCurrentHash();
-    if (commitHash === null || this.callbacks.isCdvOpen(commitHash, null)) return;
+    if (commitHash === null || this.callbacks.isCdvOpen(commitHash)) return;
     const commitElem = findCommitElemWithId(
       getCommitElems(),
       this.callbacks.getCommitId(commitHash)

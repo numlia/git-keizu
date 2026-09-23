@@ -264,20 +264,15 @@ class GitKeizuView {
     });
     this.findWidget = new FindWidget({
       getCommits: () => this.commits,
-      getColumnVisibility: () => ({
-        author: true,
-        date: true,
-        commit: true
-      }),
       scrollToCommit: (hash, alwaysCenterCommit) => this.scrollToCommit(hash, alwaysCenterCommit),
       saveState: () => this.saveState(),
       loadCommitDetails: (elem) => this.loadCommitDetails(elem),
       getCommitId: (hash) =>
         typeof this.commitLookup[hash] === "number" ? this.commitLookup[hash] : null,
-      isCdvOpen: (hash, compareWithHash) =>
+      isCdvOpen: (hash) =>
         this.expandedCommit !== null &&
         this.expandedCommit.hash === hash &&
-        this.expandedCommit.compareWithHash === compareWithHash
+        this.expandedCommit.compareWithHash === null
     });
     this.fileHistory = new FileHistoryController({
       getCommits: () => this.commits,
