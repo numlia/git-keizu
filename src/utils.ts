@@ -68,6 +68,36 @@ export async function doesFileExist(filePath: string): Promise<boolean> {
 
 const PATH_TRAVERSAL_ERROR = "The file path is invalid.";
 
+/**
+ * Open relPath (relative to repo) if it stays inside the repository and exists.
+ * Returns null when opened, an error message on failure, or undefined when the file does not exist.
+ * filePath is the originally requested path, used in the error message.
+ */
+async function openFileIfExists(
+  repo: string,
+  relPath: string,
+  filePath: string,
+  viewColumn: vscode.ViewColumn
+): Promise<string | null | undefined> {
+  const resolvedPath = path.resolve(repo, relPath);
+  const relativePath = path.relative(repo, resolvedPath);
+  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+    return PATH_TRAVERSAL_ERROR;
+  }
+  if (!(await doesFileExist(resolvedPath))) {
+    return undefined;
+  }
+  try {
+    await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(resolvedPath), {
+      preview: true,
+      viewColumn
+    });
+    return null;
+  } catch {
+    return `Visual Studio Code was unable to open ${filePath}.`;
+  }
+}
+
 export async function openFile(
   repo: string,
   filePath: string,
@@ -75,42 +105,17 @@ export async function openFile(
   dataSource: DataSource,
   viewColumn: vscode.ViewColumn
 ): Promise<string | null> {
-  const resolvedPath = path.resolve(repo, filePath);
-  const relativePath = path.relative(repo, resolvedPath);
-  if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
-    return PATH_TRAVERSAL_ERROR;
-  }
-
-  if (await doesFileExist(resolvedPath)) {
-    try {
-      await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(resolvedPath), {
-        preview: true,
-        viewColumn
-      });
-      return null;
-    } catch {
-      return `Visual Studio Code was unable to open ${filePath}.`;
-    }
+  const result = await openFileIfExists(repo, filePath, filePath, viewColumn);
+  if (result !== undefined) {
+    return result;
   }
 
   if (commitHash !== UNCOMMITTED_CHANGES_HASH) {
     const newPath = await dataSource.getNewPathOfRenamedFile(repo, commitHash, filePath);
     if (newPath !== null) {
-      const resolvedNewPath = path.resolve(repo, newPath);
-      const relativeNewPath = path.relative(repo, resolvedNewPath);
-      if (relativeNewPath.startsWith("..") || path.isAbsolute(relativeNewPath)) {
-        return PATH_TRAVERSAL_ERROR;
-      }
-      if (await doesFileExist(resolvedNewPath)) {
-        try {
-          await vscode.commands.executeCommand("vscode.open", vscode.Uri.file(resolvedNewPath), {
-            preview: true,
-            viewColumn
-          });
-          return null;
-        } catch {
-          return `Visual Studio Code was unable to open ${filePath}.`;
-        }
+      const renamedResult = await openFileIfExists(repo, newPath, filePath, viewColumn);
+      if (renamedResult !== undefined) {
+        return renamedResult;
       }
     }
   }
