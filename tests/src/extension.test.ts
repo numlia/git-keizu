@@ -452,11 +452,11 @@ function resetMockState(): void {
     return mocks.extensionStateInstance;
   });
   mocks.DataSourceMock.mockReset();
-  mocks.DataSourceMock.mockImplementation(
-    function (this: unknown): typeof mocks.dataSourceInstance {
-      return mocks.dataSourceInstance;
-    }
-  );
+  mocks.DataSourceMock.mockImplementation(function (
+    this: unknown
+  ): typeof mocks.dataSourceInstance {
+    return mocks.dataSourceInstance;
+  });
   mocks.AvatarManagerMock.mockReset();
   mocks.AvatarManagerMock.mockImplementation(function (
     this: unknown,
