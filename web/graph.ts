@@ -559,16 +559,10 @@ export class Graph {
   public getFirstChildIndex(i: number): number {
     const children = this.vertices[i].getChildren();
     if (children.length > 1) {
-      const branch = this.vertices[i].getBranch();
-      let childOnSameBranch: Vertex | undefined;
-      if (
-        branch !== null &&
-        (childOnSameBranch = children.find((child) => child.isOnThisBranch(branch)))
-      ) {
-        return childOnSameBranch.getId();
-      } else {
-        return Math.max(...children.map((child) => child.getId()));
-      }
+      const childOnSameBranch = this.getSameBranchChild(i, children);
+      return childOnSameBranch !== undefined
+        ? childOnSameBranch.getId()
+        : Math.max(...children.map((child) => child.getId()));
     } else if (children.length === 1) {
       return children[0].getId();
     } else {
@@ -584,12 +578,8 @@ export class Graph {
   public getAlternativeChildIndex(i: number): number {
     const children = this.vertices[i].getChildren();
     if (children.length > 1) {
-      const branch = this.vertices[i].getBranch();
-      let childOnSameBranch: Vertex | undefined;
-      if (
-        branch !== null &&
-        (childOnSameBranch = children.find((child) => child.isOnThisBranch(branch)))
-      ) {
+      const childOnSameBranch = this.getSameBranchChild(i, children);
+      if (childOnSameBranch !== undefined) {
         return Math.max(
           ...children.filter((child) => child !== childOnSameBranch).map((child) => child.getId())
         );
@@ -602,6 +592,11 @@ export class Graph {
     } else {
       return -1;
     }
+  }
+
+  private getSameBranchChild(i: number, children: Vertex[]): Vertex | undefined {
+    const branch = this.vertices[i].getBranch();
+    return branch === null ? undefined : children.find((child) => child.isOnThisBranch(branch));
   }
 
   public limitMaxWidth(maxWidth: number) {

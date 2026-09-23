@@ -204,11 +204,7 @@ class GitKeizuView {
       t("toolbar.branches"),
       (values: string[]) => {
         this.selectedBranches = values;
-        this.maxCommits = this.config.initialLoadCommits;
-        this.expandedCommit = null;
-        this.saveState();
-        this.renderShowLoading();
-        this.requestLoadCommits(true, () => {});
+        this.resetFilterAndReload();
       },
       true
     );
@@ -218,11 +214,7 @@ class GitKeizuView {
       t("toolbar.authors"),
       (values: string[]) => {
         this.selectedAuthors = values;
-        this.maxCommits = this.config.initialLoadCommits;
-        this.expandedCommit = null;
-        this.saveState();
-        this.renderShowLoading();
-        this.requestLoadCommits(true, () => {});
+        this.resetFilterAndReload();
       },
       true
     );
@@ -666,6 +658,14 @@ class GitKeizuView {
       hard: forceRender
     });
   }
+  private resetFilterAndReload() {
+    this.maxCommits = this.config.initialLoadCommits;
+    this.expandedCommit = null;
+    this.saveState();
+    this.renderShowLoading();
+    this.requestLoadCommits(true, () => {});
+  }
+
   private requestLoadCommits(forceRender: boolean, loadedCallback: (changes: boolean) => void) {
     if (this.loadCommitsCallback !== null) {
       this.queueLoadCommits(forceRender, loadedCallback);
@@ -998,74 +998,20 @@ class GitKeizuView {
       let sourceElem = <HTMLElement>(<Element>e.target).closest(".commit")!;
       const clickedHash = sourceElem.dataset.hash!;
       this.fileHistory.handleCommitRowClick(clickedHash);
-      const isModifierClick = mouseEvent.ctrlKey || mouseEvent.metaKey;
-
-      if (isModifierClick && this.expandedCommit !== null) {
-        // Compare mode: Ctrl/Cmd+click while a commit is expanded
-        if (this.expandedCommit.compareWithHash === clickedHash) {
-          // Same compare target clicked again → cancel comparison
-          this.clearCompareTarget();
-          this.expandedCommit.compareWithHash = null;
-          this.expandedCommit.compareWithSrcElem = null;
-          this.saveState();
-          if (this.expandedCommit.commitDetails !== null && this.expandedCommit.fileTree !== null) {
-            this.showCommitDetails(this.expandedCommit.commitDetails, this.expandedCommit.fileTree);
-          }
-        } else if (clickedHash !== this.expandedCommit.hash) {
-          // Different commit → enter/change compare target
-          this.clearCompareTarget();
-          this.expandedCommit.compareWithHash = clickedHash;
-          this.expandedCommit.compareWithSrcElem = sourceElem;
-          sourceElem.classList.add("compareTarget");
-          this.saveState();
-          const order = this.getCommitOrder(this.expandedCommit.hash, clickedHash);
-          sendMessage({
-            command: "compareCommits",
-            repo: this.currentRepo,
-            fromHash: order.from,
-            toHash: order.to
-          });
-        }
-      } else if (this.expandedCommit !== null && this.expandedCommit.hash === clickedHash) {
-        this.hideCommitDetails();
-      } else {
-        this.loadCommitDetails(sourceElem);
-      }
+      this.handleCommitRowActivation(
+        clickedHash,
+        sourceElem,
+        mouseEvent.ctrlKey || mouseEvent.metaKey
+      );
     });
     addListenerToClass("unsavedChanges", "click", (e: Event) => {
       const mouseEvent = <MouseEvent>e;
       let sourceElem = <HTMLElement>(<Element>e.target).closest(".unsavedChanges")!;
-      const clickedHash = sourceElem.dataset.hash!;
-      const isModifierClick = mouseEvent.ctrlKey || mouseEvent.metaKey;
-
-      if (isModifierClick && this.expandedCommit !== null) {
-        if (this.expandedCommit.compareWithHash === clickedHash) {
-          this.clearCompareTarget();
-          this.expandedCommit.compareWithHash = null;
-          this.expandedCommit.compareWithSrcElem = null;
-          this.saveState();
-          if (this.expandedCommit.commitDetails !== null && this.expandedCommit.fileTree !== null) {
-            this.showCommitDetails(this.expandedCommit.commitDetails, this.expandedCommit.fileTree);
-          }
-        } else if (clickedHash !== this.expandedCommit.hash) {
-          this.clearCompareTarget();
-          this.expandedCommit.compareWithHash = clickedHash;
-          this.expandedCommit.compareWithSrcElem = sourceElem;
-          sourceElem.classList.add("compareTarget");
-          this.saveState();
-          const order = this.getCommitOrder(this.expandedCommit.hash, clickedHash);
-          sendMessage({
-            command: "compareCommits",
-            repo: this.currentRepo,
-            fromHash: order.from,
-            toHash: order.to
-          });
-        }
-      } else if (this.expandedCommit !== null && this.expandedCommit.hash === clickedHash) {
-        this.hideCommitDetails();
-      } else {
-        this.loadCommitDetails(sourceElem);
-      }
+      this.handleCommitRowActivation(
+        sourceElem.dataset.hash!,
+        sourceElem,
+        mouseEvent.ctrlKey || mouseEvent.metaKey
+      );
     });
     addListenerToClass("unsavedChanges", "contextmenu", (e: Event) => {
       e.stopPropagation();
@@ -1518,6 +1464,44 @@ class GitKeizuView {
   }
 
   /* Commit Details */
+  private handleCommitRowActivation(
+    clickedHash: string,
+    sourceElem: HTMLElement,
+    isModifierClick: boolean
+  ) {
+    if (isModifierClick && this.expandedCommit !== null) {
+      // Compare mode: Ctrl/Cmd+click while a commit is expanded
+      if (this.expandedCommit.compareWithHash === clickedHash) {
+        // Same compare target clicked again → cancel comparison
+        this.clearCompareTarget();
+        this.expandedCommit.compareWithHash = null;
+        this.expandedCommit.compareWithSrcElem = null;
+        this.saveState();
+        if (this.expandedCommit.commitDetails !== null && this.expandedCommit.fileTree !== null) {
+          this.showCommitDetails(this.expandedCommit.commitDetails, this.expandedCommit.fileTree);
+        }
+      } else if (clickedHash !== this.expandedCommit.hash) {
+        // Different commit → enter/change compare target
+        this.clearCompareTarget();
+        this.expandedCommit.compareWithHash = clickedHash;
+        this.expandedCommit.compareWithSrcElem = sourceElem;
+        sourceElem.classList.add("compareTarget");
+        this.saveState();
+        const order = this.getCommitOrder(this.expandedCommit.hash, clickedHash);
+        sendMessage({
+          command: "compareCommits",
+          repo: this.currentRepo,
+          fromHash: order.from,
+          toHash: order.to
+        });
+      }
+    } else if (this.expandedCommit !== null && this.expandedCommit.hash === clickedHash) {
+      this.hideCommitDetails();
+    } else {
+      this.loadCommitDetails(sourceElem);
+    }
+  }
+
   private loadCommitDetails(sourceElem: HTMLElement) {
     this.hideCommitDetails();
     const hash = sourceElem.dataset.hash!;
