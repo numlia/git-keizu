@@ -3,6 +3,8 @@ import { t } from "./i18n";
 
 export const REF_BADGE_WIDTH_RATIO = 0.6;
 export const DESCRIPTION_MIN_WIDTH = 64;
+// Marks the counter, the list and the measuring area so text search skips their duplicated text.
+export const REF_OVERFLOW_IGNORE_ATTRIBUTE = "data-ref-overflow-ignore";
 
 const DESCRIPTION_WIDTH_RATIO = 1 - REF_BADGE_WIDTH_RATIO;
 
@@ -91,11 +93,13 @@ const CLASS_HEAD_DOT = "commitHeadDot";
 const CLASS_MESSAGE = "commitMessage";
 const CLASS_POPUP = "refOverflowPopup";
 const CLASS_CONTEXT_MENU_ACTIVE = "contextMenuActive";
+const CLASS_SEARCH_MATCH = "refOverflowMatch";
+// FindWidget's inline mark class; not imported because findWidget already depends on this module.
+const CLASS_FIND_MATCH = "findMatch";
 // Transient state classes do not describe the badge itself, so clones drop them.
 const CLONE_EXCLUDED_CLASSES = [CLASS_HIDDEN, CLASS_CONTEXT_MENU_ACTIVE, "dialogActive"];
 // Clicks inside these stay "inside": menus opened from the list must not dismiss it.
 const POPUP_INSIDE_SELECTOR = `.${CLASS_COUNTER}, #contextMenu, ul.contextMenuSubmenu`;
-const ATTR_IGNORE = "data-ref-overflow-ignore";
 const ATTR_COLOR = "data-color";
 const DESCRIPTION_COLUMN_INDEX = 1;
 const TABLE_CELL_TAG = "TD";
@@ -158,7 +162,7 @@ function createCounterElement(hiddenCount: number): HTMLButtonElement {
   const counter = document.createElement("button");
   counter.type = "button";
   counter.className = CLASS_COUNTER;
-  counter.setAttribute(ATTR_IGNORE, "");
+  counter.setAttribute(REF_OVERFLOW_IGNORE_ATTRIBUTE, "");
   updateCounterElement(counter, hiddenCount);
   return counter;
 }
@@ -246,7 +250,7 @@ function measureRows(rows: readonly RefOverflowRow[]): RefOverflowMeasurement[] 
   const measureElem = document.createElement("div");
   measureElem.className = CLASS_MEASURE;
   measureElem.setAttribute("aria-hidden", "true");
-  measureElem.setAttribute(ATTR_IGNORE, "");
+  measureElem.setAttribute(REF_OVERFLOW_IGNORE_ATTRIBUTE, "");
   const probes = rows.map((row) => {
     const measureRow = createMeasureRow(row);
     measureElem.appendChild(measureRow.elem);
@@ -285,6 +289,17 @@ function getHiddenRefs(cell: HTMLElement): HTMLElement[] {
     }
   }
   return refs;
+}
+
+// The counter keeps showing every hidden ref; the highlight only says one of them matched.
+function syncCounterHighlight(counter: Element): void {
+  const cell = counter.parentElement;
+  const matched =
+    cell !== null &&
+    getHiddenRefs(cell).some((ref) => ref.querySelector(`.${CLASS_FIND_MATCH}`) !== null);
+  if (counter.classList.contains(CLASS_SEARCH_MATCH) !== matched) {
+    counter.classList.toggle(CLASS_SEARCH_MATCH, matched);
+  }
 }
 
 function clamp(value: number, max: number): number {
@@ -381,6 +396,15 @@ export class RefOverflowController {
     return true;
   }
 
+  // Reads only the current marks and never schedules a layout, so a search refresh keeps the list.
+  public syncSearchHighlights(): void {
+    if (this.table !== null) {
+      const counters = this.table.querySelectorAll(`button.${CLASS_COUNTER}`);
+      for (let i = 0; i < counters.length; i++) syncCounterHighlight(counters[i]);
+    }
+    if (this.popup !== null && !this.renderPopupItems()) this.closePopup();
+  }
+
   public dispose(): void {
     this.detachTable();
     this.disposed = true;
@@ -447,11 +471,16 @@ export class RefOverflowController {
     if (this.isPopupStale(rows, visibleCounts)) this.closePopup();
     this.recordHeaderWidth();
 
+    let foldingChanged = false;
     rows.forEach((row, index) => {
       const visibleCount = visibleCounts[index];
       // null means the row could not be measured; keep whatever it currently shows.
-      if (visibleCount !== null) this.applyVisibleCount(row, visibleCount);
+      if (visibleCount !== null && this.applyVisibleCount(row, visibleCount)) {
+        foldingChanged = true;
+      }
     });
+    // Refs moving in or out of the hidden set change which matches the counters stand for.
+    if (foldingChanged) this.syncSearchHighlights();
   }
 
   // The list mirrors one row's hidden refs, so it closes once the column is really re-laid out or
@@ -474,22 +503,31 @@ export class RefOverflowController {
     this.lastHeaderWidth = this.header === null ? null : this.header.getBoundingClientRect().width;
   }
 
-  private applyVisibleCount(row: RefOverflowRow, visibleCount: number): void {
+  // Returns whether the row's folding (hidden refs or counter placement) was rewritten.
+  private applyVisibleCount(row: RefOverflowRow, visibleCount: number): boolean {
+    let changed = false;
     row.refs.forEach((ref, index) => {
       const hidden = index >= visibleCount;
-      if (ref.classList.contains(CLASS_HIDDEN) !== hidden)
+      if (ref.classList.contains(CLASS_HIDDEN) !== hidden) {
         ref.classList.toggle(CLASS_HIDDEN, hidden);
+        changed = true;
+      }
     });
 
     const hiddenCount = row.refs.length - visibleCount;
     if (hiddenCount === 0) {
-      row.counter?.remove();
-      return;
+      if (row.counter === null) return changed;
+      row.counter.remove();
+      return true;
     }
     const counter = row.counter ?? this.createCounter(hiddenCount);
     updateCounterElement(counter, hiddenCount);
     const firstHiddenRef = row.refs[visibleCount];
-    if (counter.nextSibling !== firstHiddenRef) row.cell.insertBefore(counter, firstHiddenRef);
+    if (counter.nextSibling !== firstHiddenRef) {
+      row.cell.insertBefore(counter, firstHiddenRef);
+      changed = true;
+    }
+    return changed;
   }
 
   private createCounter(hiddenCount: number): HTMLButtonElement {
@@ -514,17 +552,15 @@ export class RefOverflowController {
     if (!this.table.contains(cell)) return;
     const popup = document.createElement("div");
     popup.className = CLASS_POPUP;
-    popup.setAttribute(ATTR_IGNORE, "");
+    popup.setAttribute(REF_OVERFLOW_IGNORE_ATTRIBUTE, "");
     copyRowAppearance(popup, cell);
     popup.addEventListener("click", this.stopPropagation);
     popup.addEventListener("dblclick", this.stopPropagation);
     this.popup = popup;
     this.popupCounter = counter;
-    if (!this.renderPopupItems()) {
-      this.popup = null;
-      this.popupCounter = null;
-      return;
-    }
+    // The same sync as a search refresh fills the list, so it opens with the current marks.
+    this.syncSearchHighlights();
+    if (this.popup !== popup) return;
     document.body.appendChild(popup);
     positionPopup(popup, counter);
     document.addEventListener("click", this.handleDocumentClick, true);

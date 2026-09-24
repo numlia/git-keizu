@@ -298,7 +298,8 @@ class GitKeizuView {
       isCdvOpen: (hash) =>
         this.expandedCommit !== null &&
         this.expandedCommit.hash === hash &&
-        this.expandedCommit.compareWithHash === null
+        this.expandedCommit.compareWithHash === null,
+      onHighlightsChanged: () => this.refOverflow.syncSearchHighlights()
     });
     this.fileHistory = new FileHistoryController({
       getCommits: () => this.commits,

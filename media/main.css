@@ -530,6 +530,11 @@ body.unableToLoad p {
   white-space: nowrap;
   cursor: pointer;
 }
+/* A hidden ref matches the search: same orange as the find match row highlight */
+.refOverflowCounter.refOverflowMatch {
+  background-color: rgba(234, 92, 0, 0.35);
+  border-color: rgba(234, 92, 0, 0.9);
+}
 .refOverflowMeasure {
   position: fixed;
   left: 0;

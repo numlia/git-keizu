@@ -2,6 +2,7 @@ import * as GG from "../src/types";
 import { getBranchLabels } from "./branchLabels";
 import { getCommitDate } from "./dates";
 import { t } from "./i18n";
+import { REF_OVERFLOW_IGNORE_ATTRIBUTE } from "./refOverflow";
 import { buildStashSelectorDisplay, svgIcons, UNCOMMITTED_CHANGES_HASH } from "./utils";
 
 /* === Constants === */
@@ -24,9 +25,16 @@ export function getCommitElems(): HTMLCollectionOf<HTMLElement> {
   return document.getElementsByClassName("commit") as HTMLCollectionOf<HTMLElement>;
 }
 
+// The ref overflow counter, list and measuring clones repeat or summarise row text, so their
+// subtrees are neither marked nor unmarked; the hidden original refs are still searched.
+function isSearchIgnored(node: Node): boolean {
+  return node instanceof Element && node.hasAttribute(REF_OVERFLOW_IGNORE_ATTRIBUTE);
+}
+
 function getChildNodesWithTextContent(elem: Node): Node[] {
   const textChildren: Node[] = [];
   for (let i = 0; i < elem.childNodes.length; i++) {
+    if (isSearchIgnored(elem.childNodes[i])) continue;
     if (elem.childNodes[i].childNodes.length > 0) {
       textChildren.push(...getChildNodesWithTextContent(elem.childNodes[i]));
     } else if (elem.childNodes[i].textContent !== null && elem.childNodes[i].textContent !== "") {
@@ -39,6 +47,7 @@ function getChildNodesWithTextContent(elem: Node): Node[] {
 function getChildrenWithClassName(elem: Element, className: string): Element[] {
   const children: Element[] = [];
   for (let i = 0; i < elem.children.length; i++) {
+    if (isSearchIgnored(elem.children[i])) continue;
     if (elem.children[i].children.length > 0) {
       children.push(...getChildrenWithClassName(elem.children[i], className));
     } else if (elem.children[i].className === className) {
@@ -73,6 +82,7 @@ export interface FindWidgetCallbacks {
   loadCommitDetails(elem: HTMLElement): void;
   getCommitId(hash: string): number | null;
   isCdvOpen(hash: string): boolean;
+  onHighlightsChanged?(): void;
 }
 
 /* === FindWidget === */
@@ -204,6 +214,7 @@ export class FindWidget {
     this.widgetElem.classList.add(CLASS_TRANSITION);
     this.widgetElem.classList.remove(CLASS_ACTIVE);
     this.clearMatches();
+    this.callbacks.onHighlightsChanged?.();
     this.text = "";
     this.matches = [];
     this.position = -1;
@@ -397,6 +408,9 @@ export class FindWidget {
       }
     }
     this.updatePosition(newPos, scrollToCommit);
+    // Every search, including empty, invalid and zero-length patterns, ends here after its marks
+    // are cleared or inserted, so one notification per search covers all of them.
+    this.callbacks.onHighlightsChanged?.();
   }
 
   private clearMatches() {
