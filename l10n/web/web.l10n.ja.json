@@ -38,6 +38,7 @@
   "table.author": "作者",
   "table.commit": "コミット",
   "table.loadMoreCommits": "さらにコミットを読み込む",
+  "refs.showHidden": "非表示のバッジ {0} 件を表示",
   "loading.label": "読み込み中 ...",
   "loading.commitDetails": "{0}を読み込み中 ...",
   "commitDetails.label": "コミット詳細",

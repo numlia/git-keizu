@@ -951,3 +951,131 @@ describe("detached worktree removal confirmation l10n key (Feature 053)", () => 
     expect(value).toContain(PATH_PLACEHOLDER);
   });
 });
+
+// @see docs/testing/perspectives/web/i18n-test.md
+// @see docs/testing/perspectives/l10n/web/web.l10n.en.json-test.md
+// @see docs/testing/perspectives/l10n/web/web.l10n.ja.json-test.md
+describe("hidden ref badge counter label (Feature 059-02)", () => {
+  const SHOW_HIDDEN_KEY = "refs.showHidden";
+  const EXISTING_KEYS = ["table.description", "table.loadMoreCommits", "find.placeholder"];
+
+  function loadBundle(fileName: string): Record<string, string> {
+    const jsonPath = resolve(process.cwd(), "l10n/web", fileName);
+    return JSON.parse(readFileSync(jsonPath, "utf-8")) as Record<string, string>;
+  }
+
+  function placeholderSet(value: string): string[] {
+    return [...value.matchAll(/\{\d+\}/g)].map((match) => match[0]).sort();
+  }
+
+  it("inserts the count into the English label (i18n TC-006)", () => {
+    // Case: TC-006 (web/i18n-test.md)
+    // Given: the real English bundle
+    globalThis.webviewMessages = loadBundle("web.l10n.en.json");
+
+    // When/Then: the number is inserted by the existing t
+    expect(t(SHOW_HIDDEN_KEY, 4)).toBe("Show 4 hidden badges");
+  });
+
+  it("inserts the count into the Japanese label (i18n TC-007)", () => {
+    // Case: TC-007 (web/i18n-test.md)
+    // Given: the real Japanese bundle
+    globalThis.webviewMessages = loadBundle("web.l10n.ja.json");
+
+    // When/Then: the number is inserted by the existing t
+    expect(t(SHOW_HIDDEN_KEY, 4)).toBe("非表示のバッジ 4 件を表示");
+  });
+
+  it.each([
+    { count: 9, expected: "Show 9 hidden badges" },
+    { count: 10, expected: "Show 10 hidden badges" },
+    { count: 99, expected: "Show 99 hidden badges" },
+    { count: 100, expected: "Show 100 hidden badges" }
+  ])("keeps the label intact for $count hidden badges (i18n TC-008)", (entry) => {
+    // Case: TC-008 (web/i18n-test.md)
+    // Given: the real English bundle
+    globalThis.webviewMessages = loadBundle("web.l10n.en.json");
+
+    // When/Then: every digit count is inserted as-is
+    expect(t(SHOW_HIDDEN_KEY, entry.count)).toBe(entry.expected);
+  });
+
+  it("does not add a thousands separator (i18n TC-009)", () => {
+    // Case: TC-009 (web/i18n-test.md)
+    // Given: the real English bundle
+    globalThis.webviewMessages = loadBundle("web.l10n.en.json");
+
+    // When/Then: 1000 stays 1000
+    expect(t(SHOW_HIDDEN_KEY, 1000)).toBe("Show 1000 hidden badges");
+  });
+
+  it("English bundle holds the fixed counter label with only {0} (en l10n TC-026)", () => {
+    // Case: TC-026 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const english = loadBundle("web.l10n.en.json");
+
+    // When/Then: the value is exactly the plan wording with one placeholder
+    expect(english[SHOW_HIDDEN_KEY]).toBe("Show {0} hidden badges");
+    expect(placeholderSet(english[SHOW_HIDDEN_KEY])).toEqual(["{0}"]);
+  });
+
+  it("Japanese bundle has the key with the same placeholders (en l10n TC-027)", () => {
+    // Case: TC-027 (l10n/web/web.l10n.en.json-test.md)
+    // Given: both bundles on disk
+    const english = loadBundle("web.l10n.en.json");
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When/Then: the Japanese key exists and both placeholder sets are {0}
+    expect(japanese[SHOW_HIDDEN_KEY]).toBeDefined();
+    expect(placeholderSet(japanese[SHOW_HIDDEN_KEY])).toEqual(["{0}"]);
+    expect(placeholderSet(english[SHOW_HIDDEN_KEY])).toEqual(["{0}"]);
+  });
+
+  it("English bundle keeps its existing keys and has no empty value (en l10n TC-028)", () => {
+    // Case: TC-028 (l10n/web/web.l10n.en.json-test.md)
+    // Given: the English l10n bundle on disk
+    const english = loadBundle("web.l10n.en.json");
+
+    // When: existing keys and all values are inspected
+    const emptyKeys = Object.keys(english).filter((key) => english[key] === "");
+
+    // Then: the existing keys remain and no value is empty
+    for (const key of EXISTING_KEYS) {
+      expect(english[key], key).toBeDefined();
+    }
+    expect(Object.keys(english).filter((key) => key.startsWith("find.")).length).toBeGreaterThan(0);
+    expect(emptyKeys).toEqual([]);
+  });
+
+  it("Japanese bundle holds the fixed counter label with only {0} (ja l10n TC-028)", () => {
+    // Case: TC-028 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When/Then: the value is exactly the plan wording with one placeholder
+    expect(japanese[SHOW_HIDDEN_KEY]).toBe("非表示のバッジ {0} 件を表示");
+    expect(placeholderSet(japanese[SHOW_HIDDEN_KEY])).toEqual(["{0}"]);
+  });
+
+  it("Japanese value is not the raw key (ja l10n TC-029)", () => {
+    // Case: TC-029 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: the Japanese l10n bundle on disk
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When/Then: no raw key fallback
+    expect(japanese[SHOW_HIDDEN_KEY]).not.toBe(SHOW_HIDDEN_KEY);
+  });
+
+  it("English bundle has the key with the same placeholders (ja l10n TC-030)", () => {
+    // Case: TC-030 (l10n/web/web.l10n.ja.json-test.md)
+    // Given: both bundles on disk
+    const english = loadBundle("web.l10n.en.json");
+    const japanese = loadBundle("web.l10n.ja.json");
+
+    // When/Then: the English key exists and both placeholder sets match
+    expect(english[SHOW_HIDDEN_KEY]).toBeDefined();
+    expect(placeholderSet(english[SHOW_HIDDEN_KEY])).toEqual(
+      placeholderSet(japanese[SHOW_HIDDEN_KEY])
+    );
+  });
+});

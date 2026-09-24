@@ -10,7 +10,8 @@
 
 > Origin: Feature 055-02 (light-spec-plan)
 > Added: 2026-08-24
-> Status: active
+> Status: superseded
+> Superseded By: S4
 > Supersedes: -
 > Signature: `media/main.css :root` の `--git-keizu-z-index-*` 9変数＋`--git-keizu-local-z-index-dropdown-menu` の10定義と、main 内8セレクタの `z-index: var(...)` 宣言
 > Target Path: `media/main.css`（`:root`、`#commitGraph`、`.tableColHeader`、`#controls`、`#contextMenu`、`ul.contextMenuSubmenu`、`#scrollShadow.active`、`#dialogBacking.active`、`#dialog.active`。行番号は Task 2 実装後に確定）
@@ -184,3 +185,163 @@ Additional failure sources: competing mute opacity on dim cells or message child
 - Normal: TC-028〜TC-038, TC-041, TC-042
 
 **失敗系/正常系比（煙感知器）**: 正常系13件、失敗系2件。静的 CSS 契約は宣言の存在検証が正常系として並ぶ構造で、失敗源は欠落・drift・既存契約の破壊に限られることをインベントリで確認した。比率合わせのためのケース追加・削除は行わない。
+
+## S4: z-index 名前付き層の定義と参照・グローバル順序（ref一覧層13の追加）
+
+> Origin: Feature 059-02 (light-spec-plan)
+> Added: 2026-09-24
+> Status: active
+> Supersedes: S1
+> Signature: `media/main.css :root` の `--git-keizu-z-index-*` 10変数（新規 `--git-keizu-z-index-ref-overflow: 13` を含む）＋`--git-keizu-local-z-index-dropdown-menu` の11定義と、main 内9セレクタ（新規 `.refOverflowPopup` を含む）の `z-index: var(...)` 宣言
+> Target Path: `media/main.css`（`:root`、`#commitGraph`、`.tableColHeader`、`#controls`、`#contextMenu`、`ul.contextMenuSubmenu`、`#scrollShadow.active`、`#dialogBacking.active`、`#dialog.active`、`.refOverflowPopup`。実装後に行範囲へ更新）
+> Test File: `tests/web/overlayLayers.test.ts`
+
+S1は層数を10定義に固定していたため、ref一覧層の追加で期待結果が変わる。S1の表は改変せず、既存10値の維持と新規13の順序を本節へ引き継ぐ（対応プラン §3.5・Task 1 実装内容4）。既存層の値は変えない。findwidget / dropdown 各ファイル内の参照は `media/findwidget-test.md` / `media/dropdown-test.md` の責務。
+
+| Case ID | Input / Precondition                                                                                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                   | Notes                                                                                          |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| TC-043  | `media/main.css` を文字列として読み込み、`:root` 内の変数定義を抽出する                                                                 | Normal - 変数定義の完全一致                                                | 11変数がすべて定義され、値が commit-graph=-1、table-header=11、controls=12、ref-overflow=13、context-menu=15、context-submenu=16、find-widget=100、scroll-shadow=200、dialog-backing=210、dialog=211、local dropdown=100 と `toBe` で完全一致する | S1/TC-001 の引き継ぎ（ref-overflow=13を追加し既存10値は不変）                                  |
+| TC-044  | `media/main.css` 全体で各変数名の定義（`--名前:` 形式）出現回数を数える                                                                 | Validation - 重複定義の排除                                                | 11変数それぞれの定義出現回数がちょうど1回である                                                                                                                                                                                                   | S1/TC-002 の引き継ぎ                                                                           |
+| TC-045  | `#commitGraph` ルールの z-index 宣言を抽出する                                                                                          | Normal - 参照 commit graph                                                 | 宣言値が `var(--git-keizu-z-index-commit-graph)` と完全一致する                                                                                                                                                                                   | S1/TC-003 の引き継ぎ                                                                           |
+| TC-046  | `.tableColHeader` ルールの z-index 宣言を抽出する                                                                                       | Normal - 参照 table header                                                 | 宣言値が `var(--git-keizu-z-index-table-header)` と完全一致する                                                                                                                                                                                   | S1/TC-004 の引き継ぎ                                                                           |
+| TC-047  | `#controls` ルールの z-index 宣言を抽出する                                                                                             | Normal - 参照 controls                                                     | 宣言値が `var(--git-keizu-z-index-controls)` と完全一致する                                                                                                                                                                                       | S1/TC-005 の引き継ぎ                                                                           |
+| TC-048  | `#contextMenu` ルールの z-index 宣言を抽出する                                                                                          | Normal - 参照 context menu                                                 | 宣言値が `var(--git-keizu-z-index-context-menu)` と完全一致する                                                                                                                                                                                   | S1/TC-006 の引き継ぎ                                                                           |
+| TC-049  | `ul.contextMenuSubmenu` ルールの z-index 宣言を抽出する                                                                                 | Normal - 参照 context submenu                                              | 宣言値が `var(--git-keizu-z-index-context-submenu)` と完全一致する                                                                                                                                                                                | S1/TC-007 の引き継ぎ                                                                           |
+| TC-050  | `#scrollShadow.active` ルールの z-index 宣言を抽出する                                                                                  | Normal - 参照 scroll shadow                                                | 宣言値が `var(--git-keizu-z-index-scroll-shadow)` と完全一致する                                                                                                                                                                                  | S1/TC-008 の引き継ぎ                                                                           |
+| TC-051  | `#dialogBacking.active` ルールの z-index 宣言を抽出する                                                                                 | Normal - 参照 dialog backing                                               | 宣言値が `var(--git-keizu-z-index-dialog-backing)` と完全一致する                                                                                                                                                                                 | S1/TC-009 の引き継ぎ                                                                           |
+| TC-052  | `#dialog.active` ルールの z-index 宣言を抽出する                                                                                        | Normal - 参照 dialog                                                       | 宣言値が `var(--git-keizu-z-index-dialog)` と完全一致する                                                                                                                                                                                         | S1/TC-010 の引き継ぎ                                                                           |
+| TC-053  | `.refOverflowPopup` ルールの z-index 宣言を抽出する                                                                                     | Normal - 参照 ref一覧                                                      | 宣言値が `var(--git-keizu-z-index-ref-overflow)` と完全一致する                                                                                                                                                                                   | 新規                                                                                           |
+| TC-054  | TC-043で抽出した10のグローバル変数値を commit graph → dialog の順で数値比較する                                                         | Boundary - グローバル10層の厳密昇順                                        | -1 < 11 < 12 < 13 < 15 < 16 < 100 < 200 < 210 < 211 の全9隣接比較が真（strict less-than）である                                                                                                                                                   | S1/TC-011 の引き継ぎ（13を追加）。ローカル dropdown 変数は比較列に含めない                     |
+| TC-055  | TC-043で抽出した controls / ref-overflow / context-menu の3値を比較する                                                                 | Boundary - ref一覧層の位置                                                 | ref-overflow が controls より大きく、context-menu より小さい（12 < 13 < 15）                                                                                                                                                                      | 一覧はcontrolsより上、一覧起点メニューより下。AC-03                                            |
+| TC-056  | TC-043で抽出した scroll-shadow / dialog-backing / dialog の3値を比較する                                                                | Boundary - dialog 境界の逆転検出                                           | dialog-backing が scroll-shadow より大きく、dialog が dialog-backing より大きい（210 > 200 かつ 211 > 210）                                                                                                                                       | S1/TC-012 の引き継ぎ                                                                           |
+| TC-057  | `media/main.css` 全体の z-index 宣言をすべて抽出する                                                                                    | Validation - 数値直書きの再混入                                            | `z-index:` 宣言の値のうち `var(` で始まらないものが0件である                                                                                                                                                                                      | S1/TC-013 の引き継ぎ                                                                           |
+| TC-058  | 実際の VS Code Webview（通常高さ）で検索ウィジェットを開いたままエラーダイアログを表示し、ウィジェットと重なる座標を調べる              | Normal - 手動: 重なり領域のヒットテスト                                    | `document.elementFromPoint()` が `#dialog` またはその子孫を返す                                                                                                                                                                                   | S1/TC-014 の引き継ぎ。手動確認（理由・手順・証跡はS1/TC-014と同じ）                            |
+| TC-059  | 同上の状態で、ダイアログと重ならない検索ウィジェット領域の座標を調べ、検索UIをクリックする                                              | Normal - 手動: 非重複領域の backing ヒットと操作遮断                       | `document.elementFromPoint()` が `#dialogBacking` を返し、ダイアログ表示中は検索ウィジェットの入力・ボタンを操作できない                                                                                                                          | S1/TC-015 の引き継ぎ。手動確認                                                                 |
+| TC-060  | 実際の VS Code Webview の幅を320px以下にして TC-058 / TC-059 と同じ操作を行う                                                           | Boundary - 手動: 320px以下の最小幅                                         | 重なり座標は `#dialog` または子孫、非重複検索領域は `#dialogBacking` がヒットする                                                                                                                                                                 | S1/TC-016 の引き継ぎ。手動確認                                                                 |
+| TC-061  | 検索ウィジェットを開いたまま `showFormDialog` または `showCheckboxDialog` 系のダイアログを表示する                                      | Normal - 手動: ダイアログ種別の共通適用                                    | ダイアログ本体と backing が検索ウィジェットより前面に表示・ヒットする                                                                                                                                                                             | S1/TC-017 の引き継ぎ。手動確認                                                                 |
+| TC-062  | context menu または dropdown メニューを開いた状態でダイアログを表示する                                                                 | Normal - 手動: 既存メニュー層との共存                                      | ダイアログ本体と backing が context menu（15/16）・dropdown（controls 内ローカル100）より前面に表示される                                                                                                                                         | S1/TC-018 の引き継ぎ。手動確認                                                                 |
+| TC-063  | スクロールして `#scrollShadow.active`（200）が表示された状態でダイアログを表示する                                                      | Boundary - 手動: scroll shadow 直上の隣接境界                              | ダイアログ本体と backing（210/211）が scroll shadow（200）より前面に表示される                                                                                                                                                                    | S1/TC-019 の引き継ぎ。手動確認                                                                 |
+| TC-064  | 実際の VS Code Webview で表ヘッダーと `#controls` に重なる位置にref一覧を開き、一覧の複製から右クリックメニューとMoreサブメニューを開く | Normal - 手動: ref一覧と既存層の重なり                                     | 一覧が表ヘッダー・`#controls` より前面に表示され、メニューとサブメニューが一覧より前面に表示される                                                                                                                                                | 手動確認。理由: stacking contextの実描画はjsdomで解決できない。証跡: スクリーンショット。AC-03 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 059-02 追加分（S4）
+
+| 失敗源                                                  | 対応ケースまたは除外理由                                                           |
+| ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| 既存10値の変更・新規13の誤値                            | TC-043                                                                             |
+| 変数の重複定義                                          | TC-044                                                                             |
+| セレクタの誤参照・参照の欠落                            | TC-045〜TC-053                                                                     |
+| 順序境界（グローバル昇順・ref一覧層の位置・dialog境界） | TC-054〜TC-056                                                                     |
+| 数値直書きの再混入                                      | TC-057                                                                             |
+| 実描画での重なり・ヒットテストの不成立                  | TC-058〜TC-064（手動確認）                                                         |
+| 入力検証・外部依存・例外・型                            | excluded(S1 と同じく静的 CSS 契約で入力・外部依存・throw 経路・型分岐が存在しない) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-044、TC-057
+- Exception: excluded(throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: TC-054〜TC-056、TC-060、TC-063
+- Type: excluded(型分岐なし)
+
+**失敗系/正常系比（煙感知器）**: 正常系15件、失敗系7件。S1と同じく静的 CSS 契約は定義・参照の存在検証が正常系として並ぶ構造であり、比率合わせのためのケース追加・削除は行わない。
+
+## S5: ref折り畳みのcounter・一覧・計測領域・横スクロールの表示契約
+
+> Origin: Feature 059-02 (light-spec-plan)
+> Added: 2026-09-24
+> Status: active
+> Supersedes: -
+> Signature: `.refOverflowHidden` / `.refOverflowCounter` / `.refOverflowCounter.refOverflowMatch` / `.refOverflowPopup` と一覧内 `.gitRef` / `.refOverflowMeasure` / `#scrollContainer` の宣言
+> Target Path: `media/main.css`（Ref Labels 付近と `#scrollContainer`。実装後に行範囲へ更新）
+> Test File: `tests/web/overlayLayers.test.ts`
+
+`readFileSync` で文字列として読み宣言テキストを照合する。jsdomは宣言の実効性（寸法・scroll・重なり）を解決しないため、実表示は手動ケースで確認し、CSS文字列の確認を実表示確認と呼ばない。JSの位置判定は `web/refOverflow-test.md` S4 の責務。
+
+| Case ID | Input / Precondition                                                                                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                              | Notes                                                                                                         |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
+| TC-065  | `.refOverflowHidden` ルールを抽出する                                                                                                                | Normal - 隠れた元refの非表示                                               | `display: none` の宣言が存在する                                                                                                                                                                                                                             | 元refはDOMに残し幅を占めない                                                                                  |
+| TC-066  | `.refOverflowCounter` と `.gitRef` のルールを抽出して比較する                                                                                        | Normal - counterの寸法をrefと揃える                                        | `.refOverflowCounter` が `.gitRef` と同じ値の `height` / `line-height` / `font-size` / `margin-top` / `margin-right` / `border` / `border-radius` / `vertical-align` を宣言し、button既定値のリセットとして `font-family: inherit` と明示の `padding` を持つ | 行高を変えない。AC-16                                                                                         |
+| TC-067  | `.refOverflowCounter.refOverflowMatch` ルールを抽出する                                                                                              | Normal - 隠れた一致の強調                                                  | ルールが存在し、既存Find match宣言と同じ `rgba(234, 92, 0` 系の色値を背景色または枠色に用いる                                                                                                                                                                | AC-08                                                                                                         |
+| TC-068  | `.refOverflowPopup` ルールを抽出する                                                                                                                 | Normal - 一覧の配置とscroll                                                | `position: fixed`、`overflow: auto`（または `overflow-x` / `overflow-y` とも `auto`）、viewport以内の `max-width` と `max-height`（`100vw` / `100vh` 以下）の宣言が存在する                                                                                  | AC-15                                                                                                         |
+| TC-069  | 一覧内 `.gitRef` のルールを抽出する                                                                                                                  | Normal - 1バッジ1行と長い名前                                              | `white-space: nowrap` と `width: max-content` があり、各refが縦に1個ずつ並ぶ配置（一覧の `display: flex` と `flex-direction: column`、または ref の `display: block`）を宣言する                                                                             | AC-15                                                                                                         |
+| TC-070  | `.refOverflowMeasure` ルールを抽出する                                                                                                               | Normal - 不可視・非対話の計測領域                                          | `visibility: hidden`、`pointer-events: none`、`position: absolute` または `fixed`、`width: max-content`、`white-space: nowrap` の宣言が存在する                                                                                                              | §3.5                                                                                                          |
+| TC-071  | `#scrollContainer` ルールを抽出する                                                                                                                  | Normal - 表全体の横スクロール                                              | 横方向の `overflow-x: auto`（または `overflow: auto`）があり、既存の縦 `overflow-y: auto` と `min-height: 0` が維持される                                                                                                                                    | AC-12                                                                                                         |
+| TC-072  | `#commitTable td` と `.gitRef` のルールを抽出する                                                                                                    | Validation - 行高・バッジ高の維持                                          | `#commitTable td` の `line-height: 24px` と `.gitRef` の `height: 18px` が変更されていない                                                                                                                                                                   | §3.1                                                                                                          |
+| TC-073  | 実ブラウザでAC-01の行（mainと結合remote、長い名前のworktree5個）を変更前後に表示                                                                     | Normal - 手動: 折り畳みの実表示                                            | counter `+4` の全文が見え（`scrollWidth <= clientWidth`）、バッジとcounterが重ならず、説明文の幅がW（説明セル内幅−padding−HEAD）の40%以上。行高とグラフ頂点のy座標が変更前と一致する                                                                         | 手動確認。証跡: 行高・頂点座標・説明列内幅・バッジ外幅・フォント/ズーム条件とスクリーンショット。AC-01、AC-16 |
+| TC-074  | 実ブラウザでviewportを表の必要幅より狭くする                                                                                                         | Boundary - 手動: 横スクロール                                              | 横scrollで全列へ到達でき、表とグラフの相対位置・行高・グラフの縦位置が変わらない                                                                                                                                                                             | 手動確認。AC-12                                                                                               |
+| TC-075  | 実ブラウザで隠れたrefが大量かつ長い名前を含む行の一覧を、viewportの上下左右の端で開く                                                                | Boundary - 手動: 一覧の縦横scroll                                          | 一覧がviewport内に収まり、縦横scrollで全refと名前の末尾へ到達できる                                                                                                                                                                                          | 手動確認。AC-15                                                                                               |
+| TC-076  | 実ブラウザで列ドラッグ、狭い保存幅からの再表示、ウィンドウ縮小、ズーム、フォント/テーマ切替、非表示→再表示、更新・追加読み込み・リポジトリ切替を行う | Normal - 手動: 再計測後の表示                                              | 各操作後にcounterと説明文が表示され、説明セル内幅が適用された最小幅以上で、隠れた一致がある行のcounter強調が視認できる                                                                                                                                       | 手動確認。AC-05、AC-08、AC-11、AC-17                                                                          |
+
+### 失敗源インベントリ（include-or-justify）— Feature 059-02 追加分（S5）
+
+| 失敗源                                          | 対応ケースまたは除外理由                                                |
+| ----------------------------------------------- | ----------------------------------------------------------------------- |
+| 隠れた元refが幅を占める                         | TC-065                                                                  |
+| counterの寸法差による行高変化・重なり・全文欠け | TC-066、TC-073                                                          |
+| 隠れた一致の強調が見えない                      | TC-067、TC-076                                                          |
+| 一覧がviewport外・scroll不能・複数行へ折返し    | TC-068、TC-069、TC-075                                                  |
+| 計測領域が見える・操作できる                    | TC-070                                                                  |
+| 横scrollできない・表とグラフの位置ずれ          | TC-071、TC-074                                                          |
+| 既存の行高・バッジ高の変更                      | TC-072                                                                  |
+| 再計測後の表示崩れ                              | TC-076                                                                  |
+| 入力検証・外部依存・例外・型                    | excluded(静的 CSS 契約で入力・外部依存・throw 経路・型分岐が存在しない) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-072
+- Exception: excluded(throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: TC-074、TC-075
+- Type: excluded(型分岐なし)
+
+**失敗系/正常系比（煙感知器）**: 正常系9件、失敗系3件。静的 CSS 契約は宣言の存在検証が正常系として並ぶ構造で、実効性は手動ケースで確認する。
+
+### Feature 059-02 テスト対応と実行証跡（S4・S5）
+
+**テスト対応**（`tests/web/overlayLayers.test.ts`）:
+
+- S4 TC-043〜TC-057: describe `media/main.css overlay layers (S4)`。S1 の TC-001〜TC-013 を検証していた既存テストを S4 の Case ID へ付け替え、層定数表へ `--git-keizu-z-index-ref-overflow: 13` を追加（既存10値は不変のまま完全一致で比較）。TC-053（`.refOverflowPopup` の参照）と TC-055（12 < 13 < 15）を追加し、TC-054 は13を含む10層の厳密昇順。S2 TC-025・S3 TC-039 の「既存z-index契約の不変」も同じ定数表で13を含めて比較する
+- S5 TC-065〜TC-072: describe `media/main.css ref overflow declarations (S5)`。宣言文字列の照合であり、実表示の確認ではない
+
+**手動確認（実ブラウザ）**: Chromium 1194 headless、viewport 1000×500（手順・環境は `web/refOverflow-test.md` の実行証跡と同じ）。VS Code 実 webview では未検証（理由: 本環境に VS Code 実行環境がない）。スクリーンショットはリポジトリ外（作業セッションの scratchpad `t6/shots/`）に保存。
+
+- TC-058〜TC-060・TC-062・TC-063（S1 からの引き継ぎ）: 高さ120pxのviewportで検索ウィジェットと重なるエラーダイアログの座標は `#dialog`、重ならない検索領域は `#dialogBacking` がヒットし、クリックしても検索入力へフォーカスしない。幅320pxでも同じ。context menu 表示中・scroll shadow（active）表示中のダイアログでも `#dialogBacking` が前面。TC-061（form / checkbox 系ダイアログ）は同じ `showDialog` 経路のため再実施していない
+- TC-064: 一覧を表ヘッダー・`#controls` と重なる位置へ移すと両座標とも一覧がヒット（z-index 13）。一覧の複製から開いた `#contextMenu` とMoreサブメニューは一覧の上でヒットし、一覧は開いたまま（`step5-list-menu-layers.png`）
+- TC-073: 変更前後で行高 `[24.5, 24, 24, …]`、行top、グラフ頂点 cx/cy、グラフと表の top が一致（viewport 1000・600、devicePixelRatio 2、CSS zoom 1.25 で前後比較）。変更後は AC-01 と同形の行で `main | origin` 可視・`+5`（W=584.688、フォント DejaVu Sans 13px、ズーム1）、counter 29.7×20・scrollWidth 28 = clientWidth 28 で全文表示、可視refとの重なりなし、説明文の可視幅 439.8px（Wの75%）、変更前のバッジ外幅は main 110.156・worktree 各343.188（`step1-*.png`）
+- TC-074: viewport 400px で表 scrollWidth 458 > clientWidth 385、横ホイールで scrollLeft 73（最大）まで到達し最終列が表示、グラフと表の left 差 8・top 一致・行高不変（`step2-hscroll.png`）
+- TC-075: 隠れ58件と300文字名を含む一覧が viewport 1000×500 に収まり（scrollHeight 1282 > clientHeight 483、scrollWidth 2173 > clientWidth 983）、縦横ホイールで最終行と長い名前の末尾へ到達し一覧は維持（`step2-big-list-scrolled.png`）
+- TC-076: 列ドラッグ（実マウス）、狭い保存幅の再表示（幅700、内幅81 = M）、ウィンドウ縮小（1000→700→520→400、内幅は常に81以上、400で横スクロール）、devicePixelRatio 2、CSS zoom 1.25（再計測1回、行高30）、フォント切替（`--vscode-font-family` を DejaVu Serif 15px へ）、テーマ切替（body class `vscode-dark`→`vscode-light`、再計測1回）、非表示→再表示（`html` を `display: none` にしている間は counter 2個・隠れref 63個を維持、rAF追加0回、再表示後に同じ折り畳みへ復帰）、無変更更新・追加読み込み・リポジトリ切替の各後に counter と説明文（W の40%以上）が表示され、各操作後の0.8〜2秒間に rAF・ResizeObserver の追加呼出し0回。隠れた一致の counter は背景 rgba(234, 92, 0, 0.35)・枠 rgba(234, 92, 0, 0.9) で表示（`step3-hidden-only.png`）
+
+## S6: 一覧内の検索一致マークの表示契約
+
+> Origin: Feature 059-02 (PR #82 実機確認)
+> Added: 2026-09-24
+> Status: active
+> Supersedes: -
+> Signature: `.refOverflowPopup .findMatch` の宣言と、一覧外の `.findMatch` / `span.findMatch` ルールの不在
+> Target Path: `media/main.css:572-575`
+> Test File: `tests/web/overlayLayers.test.ts`
+
+検索の強調は表の行背景（`#commitTable tr.commit.findMatch td`）だけで、一致文字列を囲む `span.findMatch` には見た目の指定がない。一覧は表の外にあるため行背景が届かず、複製した一致マークが見えなかった（VS Code 実機で確認）。一覧内の一致文字列だけに背景色を付け、表の見た目は変えない。
+
+| Case ID | Input / Precondition                                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                            | Notes                          |
+| ------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| TC-077  | `.refOverflowPopup .findMatch` ルールを抽出する                          | Normal - 一覧内の一致マークの着色                                          | `background-color` が既存Find match宣言と同じ `rgba(234, 92, 0` 系の色値である                             | AC-08                          |
+| TC-078  | 一覧の範囲指定を持たない `.findMatch` / `span.findMatch` のルールを探す  | Validation - 表の検索表示を変えない                                        | どちらのルールも存在しない                                                                                 | 表は行背景の強調だけを維持する |
+| TC-079  | VS Code 実機で隠れたバッジの名前を検索し、「+N」をクリックして一覧を開く | Normal - 手動: 一覧内の一致マークの実表示                                  | 一覧の中で一致した文字列だけにオレンジ系の背景が付き、一致しないバッジと表の行内バッジの見た目は変わらない | 手動確認。AC-08                |
+
+### 失敗源インベントリ（include-or-justify）— PR #82 実機確認分（S6）
+
+| 失敗源                                   | 対応ケースまたは除外理由                                                |
+| ---------------------------------------- | ----------------------------------------------------------------------- |
+| 一覧内の一致マークが見えない             | TC-077、TC-079                                                          |
+| 着色が一覧の外へ広がり表の見た目が変わる | TC-078、TC-079                                                          |
+| 入力検証・外部依存・例外・型             | excluded(静的 CSS 契約で入力・外部依存・throw 経路・型分岐が存在しない) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-078
+- Exception: excluded(throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: excluded(色の宣言に境界値がない)
+- Type: excluded(型分岐なし)

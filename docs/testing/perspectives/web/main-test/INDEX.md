@@ -2,12 +2,12 @@
 
 > Source: `web/main.ts`
 > Storage Mode: sharded
-> Generated: 2026-09-13T00:00:00Z
+> Generated: 2026-09-24T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 13
-> Total Sections: 50
-> Total Cases: 348
+> Total Shards: 14
+> Total Sections: 54
+> Total Cases: 397
 
 ## Shards
 
@@ -15,11 +15,12 @@
 | --------------------------- | ------------------ | -------- | ----- | ------------ |
 | 01-rendering-01.md          | rendering          | 7        | 35    | 2026-03-05   |
 | 01-rendering-02.md          | rendering          | 1        | 33    | 2026-09-13   |
-| 02-context-menu-01.md       | context-menu       | 6        | 49    | 2026-07-04   |
+| 01-rendering-03.md          | rendering          | 1        | 19    | 2026-09-24   |
+| 02-context-menu-01.md       | context-menu       | 7        | 61    | 2026-09-24   |
 | 03-compare-find-01.md       | compare-find       | 3        | 25    | 2026-03-01   |
-| 04-keyboard-selection-01.md | keyboard-selection | 9        | 52    | 2026-07-19   |
+| 04-keyboard-selection-01.md | keyboard-selection | 10       | 59    | 2026-09-24   |
 | 05-state-response-01.md     | state-response     | 10       | 38    | 2026-05-10   |
-| 05-state-response-02.md     | state-response     | 4        | 22    | 2026-07-04   |
+| 05-state-response-02.md     | state-response     | 5        | 33    | 2026-09-24   |
 | 06-file-actions-01.md       | file-actions       | 3        | 34    | 2026-09-13   |
 | 07-load-count-01.md         | load-count         | 1        | 5     | 2026-05-17   |
 | 08-request-queue-01.md      | request-queue      | 2        | 14    | 2026-08-04   |
@@ -29,37 +30,38 @@
 
 ## Origin Coverage
 
-| Origin                                                               | Shard Files                                                                 |
-| -------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Feature 001 (menu-bar-enhancement) Task 3.4                          | 01-rendering-01.md                                                          |
-| Feature 001 (menu-bar-enhancement) Task 4.4                          | 02-context-menu-01.md                                                       |
-| Feature 001 (menu-bar-enhancement) Task 5.4                          | 02-context-menu-01.md                                                       |
-| Feature 001 (menu-bar-enhancement) Task 6.2                          | 05-state-response-01.md                                                     |
-| Feature 002 (menubar-search-diff) Task 4.3                           | 03-compare-find-01.md                                                       |
-| Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)               | 01-rendering-01.md                                                          |
-| Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)         | 02-context-menu-01.md, 04-keyboard-selection-01.md, 05-state-response-01.md |
-| Feature 006 (git-graph-parity) (aidd-spec-tasks-test)                | 01-rendering-01.md, 02-context-menu-01.md, 03-compare-find-01.md            |
-| Feature 010 (mute-branch-label-fix) (aidd-spec-tasks-test)           | 01-rendering-01.md                                                          |
-| Feature 012 (ui-enhancements) (aidd-spec-tasks-test)                 | 05-state-response-01.md                                                     |
-| Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)            | 04-keyboard-selection-01.md                                                 |
-| Feature 013 (scroll-position-restore) (aidd-spec-tasks-test)         | 05-state-response-01.md                                                     |
-| Feature 015 (commit-sort-order) (aidd-spec-tasks-test)               | 02-context-menu-01.md                                                       |
-| Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)         | 06-file-actions-01.md                                                       |
-| Feature 027 (commit-file-context-menu) (aidd-spec-tasks-test)        | 06-file-actions-01.md                                                       |
-| Feature 039 (show-recent-actions-runtime-sync) (light-spec-plan)     | 05-state-response-01.md                                                     |
-| Feature 040 (settings-and-copy-polish) (light-spec-plan)             | 07-load-count-01.md                                                         |
-| Feature 041 (refresh-contention-and-dialog-escape) (light-spec-plan) | 08-request-queue-01.md                                                      |
-| Feature 045 (defensive-fixes) (light-spec-plan)                      | 04-keyboard-selection-01.md                                                 |
-| Feature 053 (detached-worktree-menu) (light-spec-plan)               | 01-rendering-02.md                                                          |
-| Feature 055-03 (light-spec-plan)                                     | 09-branch-cleanup-01.md                                                     |
-| Feature 055-07 (light-spec-plan)                                     | 10-file-history-01.md                                                       |
-| Feature 055-07 (light-spec-plan) Task 8                              | 06-file-actions-01.md                                                       |
-| Feature 055-09 (light-spec-plan)                                     | 06-file-actions-01.md                                                       |
-| Feature 056 (retain-context-when-hidden) issue #48                   | 11-state-persistence-01.md                                                  |
-| test-plan (既存コード網羅)                                           | 04-keyboard-selection-01.md                                                 |
-| フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                                     |
-| フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                                     |
-| フェーズ3 修正 L15 (avatar-raw-email-compare)                        | 05-state-response-02.md                                                     |
-| フェーズ3 修正 L16 (ref-dataset-raw-read)                            | 02-context-menu-01.md                                                       |
-| フェーズ3 修正 L17 (restore-loading-resend-commit-details)           | 05-state-response-02.md                                                     |
-| 回帰修正 (checkout-active-branch-force-render)                       | 08-request-queue-01.md                                                      |
+| Origin                                                               | Shard Files                                                                                     |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Feature 001 (menu-bar-enhancement) Task 3.4                          | 01-rendering-01.md                                                                              |
+| Feature 001 (menu-bar-enhancement) Task 4.4                          | 02-context-menu-01.md                                                                           |
+| Feature 001 (menu-bar-enhancement) Task 5.4                          | 02-context-menu-01.md                                                                           |
+| Feature 001 (menu-bar-enhancement) Task 6.2                          | 05-state-response-01.md                                                                         |
+| Feature 002 (menubar-search-diff) Task 4.3                           | 03-compare-find-01.md                                                                           |
+| Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)               | 01-rendering-01.md                                                                              |
+| Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)         | 02-context-menu-01.md, 04-keyboard-selection-01.md, 05-state-response-01.md                     |
+| Feature 006 (git-graph-parity) (aidd-spec-tasks-test)                | 01-rendering-01.md, 02-context-menu-01.md, 03-compare-find-01.md                                |
+| Feature 010 (mute-branch-label-fix) (aidd-spec-tasks-test)           | 01-rendering-01.md                                                                              |
+| Feature 012 (ui-enhancements) (aidd-spec-tasks-test)                 | 05-state-response-01.md                                                                         |
+| Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)            | 04-keyboard-selection-01.md                                                                     |
+| Feature 013 (scroll-position-restore) (aidd-spec-tasks-test)         | 05-state-response-01.md                                                                         |
+| Feature 015 (commit-sort-order) (aidd-spec-tasks-test)               | 02-context-menu-01.md                                                                           |
+| Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)         | 06-file-actions-01.md                                                                           |
+| Feature 027 (commit-file-context-menu) (aidd-spec-tasks-test)        | 06-file-actions-01.md                                                                           |
+| Feature 039 (show-recent-actions-runtime-sync) (light-spec-plan)     | 05-state-response-01.md                                                                         |
+| Feature 040 (settings-and-copy-polish) (light-spec-plan)             | 07-load-count-01.md                                                                             |
+| Feature 041 (refresh-contention-and-dialog-escape) (light-spec-plan) | 08-request-queue-01.md                                                                          |
+| Feature 045 (defensive-fixes) (light-spec-plan)                      | 04-keyboard-selection-01.md                                                                     |
+| Feature 053 (detached-worktree-menu) (light-spec-plan)               | 01-rendering-02.md                                                                              |
+| Feature 055-03 (light-spec-plan)                                     | 09-branch-cleanup-01.md                                                                         |
+| Feature 055-07 (light-spec-plan)                                     | 10-file-history-01.md                                                                           |
+| Feature 055-07 (light-spec-plan) Task 8                              | 06-file-actions-01.md                                                                           |
+| Feature 055-09 (light-spec-plan)                                     | 06-file-actions-01.md                                                                           |
+| Feature 056 (retain-context-when-hidden) issue #48                   | 11-state-persistence-01.md                                                                      |
+| Feature 059-02 (light-spec-plan)                                     | 01-rendering-03.md, 02-context-menu-01.md, 04-keyboard-selection-01.md, 05-state-response-02.md |
+| test-plan (既存コード網羅)                                           | 04-keyboard-selection-01.md                                                                     |
+| フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                                                         |
+| フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                                                         |
+| フェーズ3 修正 L15 (avatar-raw-email-compare)                        | 05-state-response-02.md                                                                         |
+| フェーズ3 修正 L16 (ref-dataset-raw-read)                            | 02-context-menu-01.md                                                                           |
+| フェーズ3 修正 L17 (restore-loading-resend-commit-details)           | 05-state-response-02.md                                                                         |
+| 回帰修正 (checkout-active-branch-force-render)                       | 08-request-queue-01.md                                                                          |

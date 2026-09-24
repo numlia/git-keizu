@@ -179,3 +179,59 @@ stash の照合値を完全な `commit.stash.selector`（例 `stash@{0}`）か�
 数値境界（0 / minimum / maximum / +/-1）は本変更の対象（文字列照合と boolean 状態）に仕様上存在しないため対象外とし、意味のある境界は欠落値（TC-039）と非表示復元（TC-037）で充足する。
 
 **失敗系/正常系比（煙感知器）**: 正常系3件（TC-034、TC-036、TC-038）、失敗系4件（TC-033、TC-035、TC-037、TC-039）、比1.3。
+
+## S10: ref折り畳み要素の走査除外と強調更新通知
+
+> Origin: Feature 059-02 (light-spec-plan)
+> Added: 2026-09-24
+> Status: active
+> Supersedes: -
+> Signature: `FindWidgetCallbacks.onHighlightsChanged?(): void`、`findMatches()` / `clearMatches()` のテキスト走査と強調解除（`data-ref-overflow-ignore` を持つ要素のsubtreeを除外）
+> Target Path: `web/findWidget.ts`（`getChildNodesWithTextContent` / `getChildrenWithClassName`、`findMatches`、`clearMatches`、`close`。実装後に行範囲へ更新）
+> Test File: `tests/web/findWidget.test.ts`
+
+検索対象の判定（コミットの元データ）、正規表現・大小文字の設定、コミット単位の件数、結果移動、詳細を開くオプションを変えずに、counterと複製（`data-ref-overflow-ignore`）をテキスト走査と強調解除から除外し、強調の付与・解除の完了後に通知する。counterの強調と一覧の同期は `web/refOverflow-test.md` S5 の責務。一覧の座標は扱わない。
+
+| Case ID | Input / Precondition                                                                                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                | Notes                     |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| TC-040  | branch `feature/hidden-only` を持つコミット行で、そのrefが `.refOverflowHidden` を持つ（非表示）。検索語 `hidden-only`                                 | Normal - 隠れた元refの走査                                                 | カウンターが `1 of 1`（1コミット）で、隠れたref内に `span.findMatch` が挿入される                                                                              | AC-08                     |
+| TC-041  | 行内に `data-ref-overflow-ignore` を持つ `button.refOverflowCounter`（文字列 `+4`）があり、他の検索対象フィールドに `4` を含まないコミット。検索語 `4` | Validation - counter文字列を検索対象にしない                               | カウンターが `No Results`、counterの子孫に `.findMatch` が0個で、counterは `BUTTON` 要素のまま                                                                 | AC-10                     |
+| TC-042  | 行内に `data-ref-overflow-ignore` を持つcounterと複製があり、コミットメッセージが検索語に一致                                                          | Normal - 除外subtreeの外だけを強調                                         | 一致件数が1コミットのまま、`span.findMatch` がメッセージ側だけにあり、`data-ref-overflow-ignore` のsubtree内の `.findMatch` が0個                              | AC-10                     |
+| TC-043  | TC-040の検索後に検索語を空にする                                                                                                                       | Normal - 強調解除と除外subtreeの保持                                       | 隠れたref内の `span.findMatch` が0個になり元の文字列へ戻る。`data-ref-overflow-ignore` のsubtreeの `innerHTML` が検索前と一致し、counterは `BUTTON` 要素のまま | -                         |
+| TC-044  | `onHighlightsChanged` をspyにして一致する語で検索                                                                                                      | Normal - 強調付与後の通知                                                  | 検索1回につき通知が1回で、通知時点で `span.findMatch` がDOMに存在する                                                                                          | AC-08                     |
+| TC-045  | 一致後に、検索語を空にする / `close()` / regex ONで `[invalid` / regex ONで `(?:)` のいずれかを行う                                                    | Boundary - 解除経路の通知                                                  | 各操作で通知が1回以上あり、最後の通知時点で表の `span.findMatch` が0個                                                                                         | AC-09                     |
+| TC-046  | `onHighlightsChanged` を持たないcallbacksで検索と解除を行う                                                                                            | Boundary - 通知は任意                                                      | 例外なく検索と解除が完了し、既存どおりカウンターが更新される                                                                                                   | optional callback         |
+| TC-047  | `onHighlightsChanged` をspyにして1回の入力で検索                                                                                                       | Validation - 通知から再検索しない                                          | `getCommits` の呼出しが1回、通知が1回で、通知をきっかけにした再検索が起きない                                                                                  | 検索→同期→検索の循環なし  |
+| TC-048  | ブランチなしworktree（path `/tmp/wt8`）のラベルを持つ行で、他の検索対象フィールドに `wt8` を含まない。検索語 `wt8`                                     | Validation - worktree名/pathを検索対象に追加しない                         | カウンターが `No Results`                                                                                                                                      | §3.6 検索範囲の限界を受容 |
+| TC-049  | 隠れたref `Feature/Hidden` の行で、caseSensitive ONの検索語 `feature/hidden` と、regex ONの検索語 `Feature/Hid.*`                                      | Normal - 既存の検索条件の維持                                              | caseSensitive ONでは `No Results`、regex ONでは `1 of 1`                                                                                                       | 元データ基準の判定。AC-10 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 059-02 追加分（S10）
+
+| 失敗源                                              | 対応ケースまたは除外理由                                                   |
+| --------------------------------------------------- | -------------------------------------------------------------------------- |
+| 隠れた元refを走査しない                             | TC-040                                                                     |
+| counter文字列・複製を件数や置換へ混入させる         | TC-041、TC-042                                                             |
+| 強調解除でcounterをテキストへ置換する               | TC-041、TC-043                                                             |
+| 付与・解除後の通知漏れ                              | TC-044、TC-045                                                             |
+| optional callbackの欠落で例外                       | TC-046                                                                     |
+| 通知による再検索ループ                              | TC-047                                                                     |
+| 検索範囲の変更（worktree名/pathの追加、条件の変化） | TC-048、TC-049                                                             |
+| 一覧の座標                                          | excluded(`web/refOverflow-test.md` S4 の責務)                              |
+| 外部依存の失敗                                      | excluded(callbacksはテスト側のspyで、検索は受領済みのコミットだけを使う)   |
+| 例外送出                                            | excluded(無効regexは既存S4 TC-020の例外処理のまま。通知経路はTC-045で確認) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-041、TC-047、TC-048
+- Exception: excluded(上表のとおり)
+- External: excluded(上表のとおり)
+- Boundary: TC-045、TC-046
+- Type: excluded(callbackの型はTypeScriptで保証される)
+
+**失敗系/正常系比（煙感知器）**: 正常系5件（TC-040、TC-042〜TC-044、TC-049）、失敗系5件。件数が同数のため再導出したが、走査除外と通知の失敗源は上表で充足した。
+
+### Feature 059-02 テスト対応と実行証跡（S10）
+
+- テストファイル: `tests/web/findWidget.test.ts` の describe `FindWidget ref overflow exclusion and highlight notification (S10)`。TC-040〜TC-049 を各 `it` で検証（TC-045 は4つの解除経路、TC-049 は2つの検索条件を `it.each`）。TC-043 は、行内の除外subtreeに既に複製された `span.findMatch` を置き、検索と解除の後も除外subtreeの `innerHTML` が検索前と一致することで、強調解除の走査除外も確認する
+- 変異確認: テキスト走査の除外を外すと TC-042/TC-043、強調解除の走査除外を外すと TC-043、`close()` 後の通知を外すと TC-045 が失敗することを確認した（変異は確認後に戻した）
+- 実FindWidgetとmainの配線は `web/main-test/01-rendering-03.md` TC-492 で確認。実ブラウザ（Chromium headless）では、隠れたref名だけの一致で `1 of 1`・counter強調（背景 rgba(234, 92, 0, 0.35)）・一覧は閉じたまま、説明文だけの一致で counter 強調なし、`+4` の検索で No Results かつ counter は BUTTON のまま、クリアと不正regex（`[inv`）で表のマーク0件

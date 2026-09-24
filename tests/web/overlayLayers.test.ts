@@ -10,12 +10,14 @@ const mainCss = readFileSync(join(MEDIA_DIR, "main.css"), "utf8");
 const findWidgetCss = readFileSync(join(MEDIA_DIR, "findwidget.css"), "utf8");
 const dropdownCss = readFileSync(join(MEDIA_DIR, "dropdown.css"), "utf8");
 
-// Canonical layer values fixed by the plan (§3.2). Tests compare values extracted from the
-// CSS files against this table, never test constants against each other.
+// Canonical layer values fixed by the plans (055-02 §3.2, plus the ref list layer 13 of 059-02
+// §3.5). Tests compare values extracted from the CSS files against this table, never test
+// constants against each other.
 const Z_INDEX_VARIABLES: ReadonlyArray<{ readonly name: string; readonly value: string }> = [
   { name: "--git-keizu-z-index-commit-graph", value: "-1" },
   { name: "--git-keizu-z-index-table-header", value: "11" },
   { name: "--git-keizu-z-index-controls", value: "12" },
+  { name: "--git-keizu-z-index-ref-overflow", value: "13" },
   { name: "--git-keizu-z-index-context-menu", value: "15" },
   { name: "--git-keizu-z-index-context-submenu", value: "16" },
   { name: "--git-keizu-z-index-find-widget", value: "100" },
@@ -25,12 +27,13 @@ const Z_INDEX_VARIABLES: ReadonlyArray<{ readonly name: string; readonly value: 
   { name: "--git-keizu-local-z-index-dropdown-menu", value: "100" }
 ];
 
-// The 9 global layers in their required ascending order; the local dropdown variable is
+// The 10 global layers in their required ascending order; the local dropdown variable is
 // deliberately excluded from this comparison chain (§3.2).
 const GLOBAL_LAYER_ASCENDING_ORDER: readonly string[] = [
   "--git-keizu-z-index-commit-graph",
   "--git-keizu-z-index-table-header",
   "--git-keizu-z-index-controls",
+  "--git-keizu-z-index-ref-overflow",
   "--git-keizu-z-index-context-menu",
   "--git-keizu-z-index-context-submenu",
   "--git-keizu-z-index-find-widget",
@@ -77,27 +80,29 @@ const zIndexDeclarationValues = (cssText: string): string[] =>
 const numericZIndexDeclarations = (cssText: string): string[] =>
   zIndexDeclarationValues(cssText).filter((value) => !value.startsWith("var("));
 
-describe("media/main.css overlay layers", () => {
-  // TC-014 to TC-019 are manual-only webview verifications (elementFromPoint hit testing,
-  // pointer blocking, width <= 320px, dialog kinds, menu and scroll shadow coexistence);
-  // see the Notes column in docs/testing/perspectives/media/main-test.md.
+// S4 supersedes S1 (ref list layer 13 added); the S1 cases TC-001 to TC-013 continue as
+// TC-043 to TC-057 below.
+describe("media/main.css overlay layers (S4)", () => {
+  // TC-058 to TC-064 are manual-only webview verifications (elementFromPoint hit testing,
+  // pointer blocking, width <= 320px, dialog kinds, menu and scroll shadow coexistence, the
+  // ref list over the header and controls); see docs/testing/perspectives/media/main-test.md.
 
-  it("defines the 10 named z-index layers with the canonical values (TC-001)", () => {
+  it("defines the 11 named z-index layers with the canonical values (TC-043)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-001
+    // Case: TC-043
     // Given: media/main.css loaded as text
     // When: each :root custom property definition is extracted by name
     for (const { name, value } of Z_INDEX_VARIABLES) {
       const definition = variableDefinition(mainCss, name);
-      // Then: the definition exists and exactly matches the canonical value from §3.2
+      // Then: the definition exists and exactly matches the canonical value (13 added, others kept)
       expect(definition, `definition of ${name}`).not.toBeNull();
       expect(definition, `value of ${name}`).toBe(value);
     }
   });
 
-  it("defines each z-index variable exactly once (TC-002)", () => {
+  it("defines each z-index variable exactly once (TC-044)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-002
+    // Case: TC-044
     // Given: the full text of media/main.css
     // When: definition occurrences (`--name:`) are counted per variable
     for (const { name } of Z_INDEX_VARIABLES) {
@@ -106,9 +111,9 @@ describe("media/main.css overlay layers", () => {
     }
   });
 
-  it("references the commit graph layer variable from #commitGraph (TC-003)", () => {
+  it("references the commit graph layer variable from #commitGraph (TC-045)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-003
+    // Case: TC-045
     // Given: the #commitGraph rule block in media/main.css
     const block = ruleBlock(mainCss, "#commitGraph");
     // When: its z-index declarations are extracted
@@ -117,9 +122,9 @@ describe("media/main.css overlay layers", () => {
     expect(declarations).toEqual(["var(--git-keizu-z-index-commit-graph)"]);
   });
 
-  it("references the table header layer variable from .tableColHeader (TC-004)", () => {
+  it("references the table header layer variable from .tableColHeader (TC-046)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-004
+    // Case: TC-046
     // Given: the .tableColHeader rule block in media/main.css
     const block = ruleBlock(mainCss, ".tableColHeader");
     // When: its z-index declarations are extracted
@@ -128,9 +133,9 @@ describe("media/main.css overlay layers", () => {
     expect(declarations).toEqual(["var(--git-keizu-z-index-table-header)"]);
   });
 
-  it("references the controls layer variable from #controls (TC-005)", () => {
+  it("references the controls layer variable from #controls (TC-047)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-005
+    // Case: TC-047
     // Given: the #controls rule block in media/main.css (stacking context for the dropdown)
     const block = ruleBlock(mainCss, "#controls");
     // When: its z-index declarations are extracted
@@ -139,9 +144,9 @@ describe("media/main.css overlay layers", () => {
     expect(declarations).toEqual(["var(--git-keizu-z-index-controls)"]);
   });
 
-  it("references the context menu layer variable from #contextMenu (TC-006)", () => {
+  it("references the context menu layer variable from #contextMenu (TC-048)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-006
+    // Case: TC-048
     // Given: the #contextMenu rule block in media/main.css
     const block = ruleBlock(mainCss, "#contextMenu");
     // When: its z-index declarations are extracted
@@ -150,9 +155,9 @@ describe("media/main.css overlay layers", () => {
     expect(declarations).toEqual(["var(--git-keizu-z-index-context-menu)"]);
   });
 
-  it("references the context submenu layer variable from ul.contextMenuSubmenu (TC-007)", () => {
+  it("references the context submenu layer variable from ul.contextMenuSubmenu (TC-049)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-007
+    // Case: TC-049
     // Given: the ul.contextMenuSubmenu rule block in media/main.css
     const block = ruleBlock(mainCss, "ul.contextMenuSubmenu");
     // When: its z-index declarations are extracted
@@ -161,9 +166,9 @@ describe("media/main.css overlay layers", () => {
     expect(declarations).toEqual(["var(--git-keizu-z-index-context-submenu)"]);
   });
 
-  it("references the scroll shadow layer variable from #scrollShadow.active (TC-008)", () => {
+  it("references the scroll shadow layer variable from #scrollShadow.active (TC-050)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-008
+    // Case: TC-050
     // Given: the #scrollShadow.active rule block in media/main.css
     const block = ruleBlock(mainCss, "#scrollShadow.active");
     // When: its z-index declarations are extracted
@@ -172,9 +177,9 @@ describe("media/main.css overlay layers", () => {
     expect(declarations).toEqual(["var(--git-keizu-z-index-scroll-shadow)"]);
   });
 
-  it("references the dialog backing layer variable from #dialogBacking.active (TC-009)", () => {
+  it("references the dialog backing layer variable from #dialogBacking.active (TC-051)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-009
+    // Case: TC-051
     // Given: the #dialogBacking.active rule block in media/main.css
     const block = ruleBlock(mainCss, "#dialogBacking.active");
     // When: its z-index declarations are extracted
@@ -183,9 +188,9 @@ describe("media/main.css overlay layers", () => {
     expect(declarations).toEqual(["var(--git-keizu-z-index-dialog-backing)"]);
   });
 
-  it("references the dialog layer variable from #dialog.active (TC-010)", () => {
+  it("references the dialog layer variable from #dialog.active (TC-052)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-010
+    // Case: TC-052
     // Given: the #dialog.active rule block in media/main.css
     const block = ruleBlock(mainCss, "#dialog.active");
     // When: its z-index declarations are extracted
@@ -194,10 +199,21 @@ describe("media/main.css overlay layers", () => {
     expect(declarations).toEqual(["var(--git-keizu-z-index-dialog)"]);
   });
 
-  it("keeps the 9 global layers in strictly ascending order (TC-011)", () => {
+  it("references the ref list layer variable from .refOverflowPopup (TC-053)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-011
-    // Given: the 9 global layer values extracted from media/main.css (local dropdown excluded)
+    // Case: TC-053
+    // Given: the .refOverflowPopup rule block in media/main.css
+    const block = ruleBlock(mainCss, ".refOverflowPopup");
+    // When: its z-index declarations are extracted
+    const declarations = zIndexDeclarationValues(block);
+    // Then: the single declaration exactly matches the ref list layer reference
+    expect(declarations).toEqual(["var(--git-keizu-z-index-ref-overflow)"]);
+  });
+
+  it("keeps the 10 global layers in strictly ascending order (TC-054)", () => {
+    // @see docs/testing/perspectives/media/main-test.md
+    // Case: TC-054
+    // Given: the 10 global layer values extracted from media/main.css (local dropdown excluded)
     const values = GLOBAL_LAYER_ASCENDING_ORDER.map((name) =>
       numericVariableDefinition(mainCss, name)
     );
@@ -210,9 +226,21 @@ describe("media/main.css overlay layers", () => {
     }
   });
 
-  it("keeps the dialog boundary above the scroll shadow (TC-012)", () => {
+  it("places the ref list above the controls and below the context menu (TC-055)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-012
+    // Case: TC-055
+    // Given: the controls, ref list and context menu values extracted from media/main.css
+    const controls = numericVariableDefinition(mainCss, "--git-keizu-z-index-controls");
+    const refOverflow = numericVariableDefinition(mainCss, "--git-keizu-z-index-ref-overflow");
+    const contextMenu = numericVariableDefinition(mainCss, "--git-keizu-z-index-context-menu");
+    // When/Then: 12 < 13 < 15
+    expect(refOverflow, "ref list above controls").toBeGreaterThan(controls);
+    expect(refOverflow, "ref list below context menu").toBeLessThan(contextMenu);
+  });
+
+  it("keeps the dialog boundary above the scroll shadow (TC-056)", () => {
+    // @see docs/testing/perspectives/media/main-test.md
+    // Case: TC-056
     // Given: the scroll shadow, dialog backing, and dialog values extracted from media/main.css
     const scrollShadow = numericVariableDefinition(mainCss, "--git-keizu-z-index-scroll-shadow");
     const dialogBacking = numericVariableDefinition(mainCss, "--git-keizu-z-index-dialog-backing");
@@ -223,9 +251,9 @@ describe("media/main.css overlay layers", () => {
     expect(dialog, "dialog above dialog backing").toBeGreaterThan(dialogBacking);
   });
 
-  it("contains no hard-coded numeric z-index declarations (TC-013)", () => {
+  it("contains no hard-coded numeric z-index declarations (TC-057)", () => {
     // @see docs/testing/perspectives/media/main-test.md
-    // Case: TC-013
+    // Case: TC-057
     // Given: every z-index declaration in media/main.css
     // When: declarations whose value does not start with "var(" are collected
     const numericDeclarations = numericZIndexDeclarations(mainCss);
@@ -358,7 +386,7 @@ describe("media/main.css branch cleanup panel layout (S2)", () => {
   it("keeps the 055-02 z-index layer contract untouched (TC-025)", () => {
     // Case: TC-025
     // Given: every z-index declaration and layer variable in media/main.css
-    // When: numeric literals and the 10 canonical definitions are checked again
+    // When: numeric literals and the canonical layer definitions are checked again
     const numericDeclarations = numericZIndexDeclarations(mainCss);
 
     // Then: no numeric z-index literal was introduced and every layer value is unchanged
@@ -655,5 +683,151 @@ describe("media/main.css mute and file history applicability (S3)", () => {
         expect(opacityDeclarations(cells[1]), row.className).toEqual([]);
       }
     }
+  });
+});
+
+/** Declarations of one rule block as property → value (comments removed). */
+const declarationsOf = (block: string): Map<string, string> =>
+  new Map(
+    block
+      .replace(/\/\*[\s\S]*?\*\//g, "")
+      .split(";")
+      .map((declaration) => declaration.trim())
+      .filter((declaration) => declaration.includes(":"))
+      .map((declaration) => {
+        const colon = declaration.indexOf(":");
+        return [declaration.slice(0, colon).trim(), declaration.slice(colon + 1).trim()];
+      })
+  );
+
+// S5: ref折り畳みのcounter・一覧・計測領域・横スクロールの表示契約
+// @see docs/testing/perspectives/media/main-test.md
+describe("media/main.css ref overflow declarations (S5)", () => {
+  // TC-073 to TC-076 are manual real-browser verifications (folding, horizontal scroll, list
+  // scrolling at the viewport edges, re-measurement after resize / zoom / font / theme / reload);
+  // the text checks below are not a substitute. See docs/testing/perspectives/media/main-test.md.
+
+  it("removes hidden original refs from the layout (TC-065)", () => {
+    // Case: TC-065
+    // Given/When: the .refOverflowHidden rule
+    const declarations = declarationsOf(ruleBlock(mainCss, ".refOverflowHidden"));
+
+    // Then: display none
+    expect(declarations.get("display")).toBe("none");
+  });
+
+  it("mirrors the .gitRef box metrics on the counter (TC-066)", () => {
+    // Case: TC-066 (AC-16)
+    // Given: the .refOverflowCounter and .gitRef rules
+    const counter = declarationsOf(ruleBlock(mainCss, ".refOverflowCounter"));
+    const gitRef = declarationsOf(ruleBlock(mainCss, ".gitRef"));
+    const mirrored = [
+      "height",
+      "line-height",
+      "font-size",
+      "margin-top",
+      "margin-right",
+      "border",
+      "border-radius",
+      "vertical-align"
+    ];
+
+    // When/Then: each mirrored property has the same value, and the button defaults are reset
+    for (const property of mirrored) {
+      expect(gitRef.get(property), `.gitRef ${property}`).toBeDefined();
+      expect(counter.get(property), `.refOverflowCounter ${property}`).toBe(gitRef.get(property));
+    }
+    expect(counter.get("font-family")).toBe("inherit");
+    expect(counter.get("padding")).toBe("0 5px");
+  });
+
+  it("highlights a hidden match with the find match orange (TC-067)", () => {
+    // Case: TC-067 (AC-08)
+    // Given/When: the .refOverflowCounter.refOverflowMatch rule
+    const declarations = declarationsOf(ruleBlock(mainCss, ".refOverflowCounter.refOverflowMatch"));
+
+    // Then: background and border use the existing rgba(234, 92, 0, …) family
+    expect(declarations.get("background-color")).toMatch(/^rgba\(234, 92, 0, /);
+    expect(declarations.get("border-color")).toMatch(/^rgba\(234, 92, 0, /);
+  });
+
+  it("keeps the list fixed inside the viewport and scrollable (TC-068)", () => {
+    // Case: TC-068 (AC-15)
+    // Given/When: the .refOverflowPopup rule
+    const declarations = declarationsOf(ruleBlock(mainCss, ".refOverflowPopup"));
+
+    // Then: fixed, scrollable on both axes and capped by the viewport
+    expect(declarations.get("position")).toBe("fixed");
+    expect(declarations.get("overflow")).toBe("auto");
+    expect(declarations.get("max-width")).toBe("100vw");
+    expect(declarations.get("max-height")).toBe("100vh");
+  });
+
+  it("lays out one full-width badge per line in the list (TC-069)", () => {
+    // Case: TC-069 (AC-15)
+    // Given: the list rule and the rule for refs inside it
+    const list = declarationsOf(ruleBlock(mainCss, ".refOverflowPopup"));
+    const item = declarationsOf(ruleBodiesFor(".refOverflowPopup .gitRef").join(";"));
+
+    // When/Then: a vertical flex column of unwrapped, max-content badges
+    expect(list.get("display")).toBe("flex");
+    expect(list.get("flex-direction")).toBe("column");
+    expect(item.get("white-space")).toBe("nowrap");
+    expect(item.get("width")).toBe("max-content");
+  });
+
+  it("keeps the measuring area invisible and inert (TC-070)", () => {
+    // Case: TC-070
+    // Given/When: the .refOverflowMeasure rule
+    const declarations = declarationsOf(ruleBlock(mainCss, ".refOverflowMeasure"));
+
+    // Then: hidden, not interactive, out of flow and at its natural width
+    expect(declarations.get("visibility")).toBe("hidden");
+    expect(declarations.get("pointer-events")).toBe("none");
+    expect(["absolute", "fixed"]).toContain(declarations.get("position"));
+    expect(declarations.get("width")).toBe("max-content");
+    expect(declarations.get("white-space")).toBe("nowrap");
+  });
+
+  it("scrolls the table area horizontally while keeping the vertical contract (TC-071)", () => {
+    // Case: TC-071 (AC-12)
+    // Given/When: the #scrollContainer rule
+    const declarations = declarationsOf(ruleBlock(mainCss, "#scrollContainer"));
+
+    // Then: horizontal auto scroll plus the existing vertical scroll and min-height
+    expect(declarations.get("overflow-x")).toBe("auto");
+    expect(declarations.get("overflow-y")).toBe("auto");
+    expect(declarations.get("min-height")).toBe("0");
+  });
+
+  it("keeps the 24px row line height and the 18px badge height (TC-072)", () => {
+    // Case: TC-072
+    // Given/When: the table cell and .gitRef rules
+    // Then: both heights are unchanged
+    expect(hasDeclarationFor("#commitTable td", "line-height: 24px")).toBe(true);
+    expect(declarationsOf(ruleBlock(mainCss, ".gitRef")).get("height")).toBe("18px");
+  });
+});
+
+// S6: 一覧内の検索一致マークの表示契約
+// @see docs/testing/perspectives/media/main-test.md
+describe("media/main.css search marks in the ref list (S6)", () => {
+  // TC-079 is a manual real-webview verification of the visible mark; see the perspectives file.
+
+  it("paints matched text in the list with the find match orange (TC-077)", () => {
+    // Case: TC-077 (AC-08)
+    // Given/When: the .refOverflowPopup .findMatch rule
+    const declarations = declarationsOf(ruleBlock(mainCss, ".refOverflowPopup .findMatch"));
+
+    // Then: the background uses the existing rgba(234, 92, 0, …) family
+    expect(declarations.get("background-color")).toMatch(/^rgba\(234, 92, 0, /);
+  });
+
+  it("does not style search marks outside the list (TC-078)", () => {
+    // Case: TC-078
+    // Given/When: rules selecting the inline mark without the list scope
+    // Then: none exist, so the table keeps its row-level match highlight only
+    expect(ruleBodiesFor(".findMatch")).toEqual([]);
+    expect(ruleBodiesFor("span.findMatch")).toEqual([]);
   });
 });
