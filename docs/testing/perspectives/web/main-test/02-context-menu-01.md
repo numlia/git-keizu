@@ -129,3 +129,53 @@
 | TC-249  | remote-combined（`gitRefHeadRemote`）ラベルをダブルクリックで checkout                     | Normal - checkout remote raw name                                          | `checkoutBranchAction` が `target.dataset.name` の生値と `true` で呼ばれる          | remote-combined 分岐 |
 | TC-250  | 非 remote-combined の gitRef をダブルクリックで checkout                                   | Normal - checkout local raw name                                           | `checkoutBranchAction` が `sourceElem.dataset.name` の生値で呼ばれる                | local 分岐           |
 | TC-251  | `head` かつ `worktrees` に該当キーが存在しない ref を右クリック                            | Boundary - worktree lookup miss                                            | `worktrees[生ref名]` が undefined で `worktreeInfo` が `null` のまま（例外なし）    | 非ヒット境界         |
+
+## S57: refバッジ右クリックの共通化と一覧からの受渡し
+
+> Origin: Feature 059-02 (light-spec-plan)
+> Added: 2026-09-24
+> Status: active
+> Supersedes: -
+> Signature: `showRefBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void`（行内 `.gitRef` のcontextmenuと `RefOverflowOptions.onRefContextMenu` の共通処理）
+> Target Path: `web/main.ts`（`addListenerToClass("gitRef", "contextmenu", ...)` から切り出す共通処理とcontroller生成時の接続。実装後に行範囲へ更新）
+> Test File: `tests/web/main.test.ts`
+
+行内refと一覧の複製の右クリックが同じ共通処理を通り、既存menu builderへ同じ値を渡すことを検証する。builder内の項目分岐は `web/refMenu-test/`・`web/worktreeMenu-test.md` の責務。TC-445〜TC-454は既存menuモックで引数の同値を確認し、TC-455は別describeで実contextMenuを使う。`TEST_REPO = "/test/repo"`。
+
+| Case ID | Input / Precondition                                                                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                         | Notes                                                                  |
+| ------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| TC-445  | worktree付きlocal branch `feature/x`（remotes `["origin"]`）の行内バッジ本体でcontextmenu                      | Normal - 行内refの既存引数                                                 | `buildRefContextMenuItems` が1回 `(TEST_REPO, "feature/x", バッジ, false, gitBranchHead, ["origin"], { path, isMainWorktree })` で呼ばれ、`showContextMenu` の第2引数がbuilderの戻り値、第3引数がバッジ | 共通化前と同じ引数                                                     |
+| TC-446  | 結合バッジの `.gitRefHeadRemote`（`data-name="origin/main"`）でcontextmenu                                     | Normal - 結合remoteの選択                                                  | builderの第2引数が `origin/main`、第4引数が `true`、第7引数が `null`                                                                                                                                    | -                                                                      |
+| TC-447  | 検索で `.gitRefHeadRemote` 内の文字列が `span.findMatch` に囲まれ、その `span.findMatch` をtargetにcontextmenu | Boundary - 検索マーク内のremote                                            | TC-446と同じ引数でbuilderが呼ばれる（local名 `main` にならない）                                                                                                                                        | 最寄りの `.gitRefHeadRemote` がバッジ内にある場合だけremote扱い。AC-09 |
+| TC-448  | 結合バッジのアイコン要素、または `.gitRefName` をtargetにcontextmenu                                           | Boundary - remote以外の子要素                                              | builderの第2引数がlocal名 `main`、第4引数が `false`                                                                                                                                                     | -                                                                      |
+| TC-449  | TC-445と同じrefを折り畳み、一覧の複製でcontextmenu                                                             | Normal - 一覧から同じbuilder引数                                           | 第3引数（複製要素）以外の引数がTC-445と `toEqual` で一致し、`showContextMenu` の第3引数が複製要素                                                                                                       | AC-03                                                                  |
+| TC-450  | 一覧の結合バッジ複製の `.gitRefHeadRemote` でcontextmenu                                                       | Normal - 一覧の結合remote                                                  | builderの第2引数が `origin/main`、第4引数が `true`                                                                                                                                                      | AC-03                                                                  |
+| TC-451  | 一覧のブランチなしworktree複製（`data-worktree-path="/tmp/wt8"`）でcontextmenu                                 | Normal - 一覧のdetached worktree                                           | `buildDetachedWorktreeContextMenuItems` が1回 `(TEST_REPO, "/tmp/wt8")`、`buildRefContextMenuItems` が0回                                                                                               | AC-03                                                                  |
+| TC-452  | 一覧のtag複製 `v1.0` とremote複製 `origin/dev` でそれぞれcontextmenu                                           | Normal - 一覧のtag・remote                                                 | builderの第2引数がそれぞれ `v1.0` / `origin/dev` で、行内から同じrefを右クリックした場合と引数が一致する                                                                                                | AC-03                                                                  |
+| TC-453  | stashバッジを行内と一覧の複製の両方でcontextmenu                                                               | Normal - スタッシュは既存処理のまま                                        | 行内と一覧で呼ばれるmenu builderと引数（第3引数を除く）が一致し、stash専用の分岐・builderが追加されていない                                                                                             | 059-01の修正は含めない。AC-14                                          |
+| TC-454  | 一覧の複製 `data-name="feat&x"` でcontextmenu                                                                  | Boundary - 特殊文字の生値                                                  | builderの第2引数が `feat&x` と `toBe` で一致                                                                                                                                                            | S44 TC-247 と同じ生値契約                                              |
+| TC-455  | 実contextMenuで、一覧のworktree付きbranch複製を右クリックし、Moreサブメニュー内の項目を実行                    | Normal - 実メニュー経由の操作                                              | 行内の同じrefから同じ項目を実行した場合と同一の `postMessage` payload（または同一の確認ダイアログ）になり、メニューとサブメニューの操作中に一覧が開いたまま                                             | AC-03                                                                  |
+| TC-456  | `recentActions = ["ref.openTerminal"]` のリポジトリで一覧の複製を右クリック                                    | Normal - recent actionsの受渡し                                            | `showContextMenu` の第4引数が `["ref.openTerminal"]` と `toEqual` で一致                                                                                                                                | -                                                                      |
+
+### 失敗源インベントリ（include-or-justify）— Feature 059-02 追加分（S57）
+
+| 失敗源                                         | 対応ケースまたは除外理由                                                       |
+| ---------------------------------------------- | ------------------------------------------------------------------------------ |
+| 共通化による行内引数の変化                     | TC-445、TC-446                                                                 |
+| 検索マーク・子要素targetでのremote/local取違え | TC-447、TC-448、TC-450                                                         |
+| 一覧から渡す値の不一致                         | TC-449、TC-451、TC-452、TC-456                                                 |
+| スタッシュ専用分岐の混入                       | TC-453                                                                         |
+| 特殊文字の二重復号                             | TC-454                                                                         |
+| 実メニュー操作で一覧が閉じる・payloadが変わる  | TC-455                                                                         |
+| builder内の業務分岐                            | excluded(`web/refMenu-test/`・`web/worktreeMenu-test.md` の責務)               |
+| 外部依存・例外                                 | excluded(builderはモックまたは既存実装を使い、共通処理にthrow経路を追加しない) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(入力を拒否する分岐を追加しない。target判定の境界はBoundaryで扱う)
+- Exception: excluded(throw経路なし)
+- External: excluded(上表のとおり)
+- Boundary: TC-447、TC-448、TC-454
+- Type: excluded(event targetのElement判定はTC-447・TC-448の境界で扱う)
+
+**失敗系/正常系比（煙感知器）**: 正常系9件、失敗系3件。共通化は既存引数の同値性の確認が主で、失敗源は上表で充足した。

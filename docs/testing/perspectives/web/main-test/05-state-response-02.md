@@ -83,3 +83,51 @@
 | TC-254  | `expandedCommit.loading===true`、該当コミットが stash（`stash !== null`）                                         | Boundary - stash commit                                                    | 送信 payload が `isStash:true` になる                                                                                                                                 | stash 判定                                                                                                                                                                                                                                                                                                                                                                                                               |
 | TC-255  | `expandedCommit.commitDetails` と `fileTree` が取得済み                                                           | Normal - cached details path                                               | `showCommitDetails()` が呼ばれ、`commitDetails` 再送は行われない                                                                                                      | 先行分岐（再送しない）                                                                                                                                                                                                                                                                                                                                                                                                   |
 | TC-256  | `expandedCommit.loading===false` かつ details/fileTree 未取得                                                     | Boundary - not loading path                                                | `loadCommitDetails(elem)` が呼ばれ、`commitDetails` 再送は行われない                                                                                                  | else 分岐。未カバー: `expandedCommit` が `loading===false` かつ詳細未取得となる状態は state 復元（`vscode.getState()`）で永続化された expandedCommit を構築時に読み込む経路でのみ発生し、公開メッセージ/DOM 操作では到達不能。加えて else 分岐の `loadCommitDetails` も `commitDetails` を送信するため、loading 分岐の再送との観測差分が乏しい。実装済み TC-252/254（loading 再送）と TC-255（cached）で近傍分岐を担保。 |
+
+## S59: ref一覧とcontrollerの破棄・保持（表置換・リポジトリ切替・無変更更新・scroll）
+
+> Origin: Feature 059-02 (light-spec-plan)
+> Added: 2026-09-24
+> Status: active
+> Supersedes: -
+> Signature: `public loadCommits(commits, commitHead, moreAvailable, forceRender, authors?, worktrees?)` / `public loadRepos(repos, lastActiveRepo): boolean` / `public selectRepo(repo: string)` / repoDropdownの変更callback / `private renderShowLoading()` / `#scrollContainer` のscroll処理
+> Target Path: `web/main.ts`（上記各経路でのdetach / closePopup の呼出し。実装後に行範囲へ更新）
+> Test File: `tests/web/main.test.ts`
+
+表置換・loading表示・リポジトリ切替の開始では一覧と一覧起点メニューを閉じてcontrollerをdetachし、無変更更新・一覧内scrollでは一覧を保持する。一覧は実controllerでcounterをclickして開き、一覧起点メニューは複製の右クリックで開く。ホスト側の取得処理は対象外。
+
+| Case ID | Input / Precondition                                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                 | Notes                                 |
+| ------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| TC-464  | 一覧と一覧起点メニューを開いた状態で、refの変わったcommitsを `loadCommits`              | Normal - 表置換で閉鎖                                                      | `hideContextMenu` が呼ばれ、旧一覧と旧複製が `isConnected === false`。新しい表の行に `.refOverflowCounter` が描画され直している | AC-06                                 |
+| TC-465  | 一覧を開いた状態で、同じcommits・head・worktreesを `forceRender=false` で `loadCommits` | Boundary - 無変更更新で保持                                                | `.refOverflowPopup` が1個のまま、一覧起点メニューへの `hideContextMenu` 0回、`onMinimumWidth` による `min-width` 解除なし       | 無変更returnに閉鎖を追加しない。AC-07 |
+| TC-466  | 一覧を開いた状態で、追加読み込み後の増えたcommitsを `loadCommits`                       | Normal - 追加読み込みで閉鎖                                                | 一覧が0個になり、旧複製が `isConnected === false`                                                                               | AC-06                                 |
+| TC-467  | 一覧を開いた状態で、repoDropdownで別リポジトリを選択                                    | Normal - ドロップダウン切替の開始で閉鎖                                    | 次の `loadCommits` 要求を送る前に一覧が0個になり、`#content` と表の `min-width` が解除される                                    | AC-06                                 |
+| TC-468  | 一覧を開いた状態で `selectRepo(存在するrepo)`                                           | Normal - selectRepo経路で閉鎖                                              | 一覧が0個になり、controllerがdetachされる                                                                                       | AC-06                                 |
+| TC-469  | 一覧を開いた状態で `selectRepo(未登録repo)`                                             | Boundary - 切替が起きない呼出し                                            | 既存の早期returnで一覧が1個のまま                                                                                               | -                                     |
+| TC-470  | 一覧を開いた状態で、現在のrepoを含まない `loadRepos`                                    | Normal - loadRepos経路で閉鎖                                               | 一覧が0個になり、controllerがdetachされる                                                                                       | AC-06                                 |
+| TC-471  | 一覧を開いた状態で、現在のrepoを含む `loadRepos`                                        | Boundary - 切替なしのloadRepos                                             | 一覧が1個のまま                                                                                                                 | -                                     |
+| TC-472  | 一覧を開いた状態でhard refreshによりloading表示へ切り替わる                             | Normal - loading表示で閉鎖                                                 | `#loadingHeader` の表示時点で一覧が0個、controllerがdetachされている                                                            | -                                     |
+| TC-473  | 一覧と一覧起点メニューを開いた状態で `#scrollContainer` のscrollを発火                  | Normal - 表scrollで閉鎖                                                    | 一覧が0個になり `hideContextMenu` が1回呼ばれる                                                                                 | AC-06                                 |
+| TC-474  | 一覧を開いた状態で `.refOverflowPopup` 自身のscrollを発火                               | Validation - 一覧内scrollで閉じない                                        | 一覧が1個のまま                                                                                                                 | AC-07                                 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 059-02 追加分（S59）
+
+| 失敗源                             | 対応ケースまたは除外理由                      |
+| ---------------------------------- | --------------------------------------------- |
+| 表置換後に古い一覧・メニューが残る | TC-464、TC-466、TC-472                        |
+| 無変更更新で一覧が閉じる           | TC-465                                        |
+| 切替経路の一部で破棄漏れ           | TC-467、TC-468、TC-470                        |
+| 切替が起きない呼出しで閉じる       | TC-469、TC-471                                |
+| scroll判定の誤り                   | TC-473、TC-474                                |
+| ホストの取得処理の失敗             | excluded(本節はwebview内の表示状態だけを扱う) |
+| 例外送出                           | excluded(破棄処理にthrow経路を追加しない)     |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-474
+- Exception: excluded(throw経路なし)
+- External: excluded(上表のとおり)
+- Boundary: TC-465、TC-469、TC-471
+- Type: excluded(メッセージ型は既存の責務)
+
+**失敗系/正常系比（煙感知器）**: 正常系7件、失敗系4件。

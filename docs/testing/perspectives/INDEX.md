@@ -1,21 +1,21 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-09-18T07:33:06+09:00
-> Total sources: 51
-> Total physical files: 90
-> Total sections: 552
-> Total cases: 3146
+> Auto-generated: 2026-09-24T02:21:34+00:00
+> Total sources: 52
+> Total physical files: 91
+> Total sections: 566
+> Total cases: 3326
 
 ## Source File -> Perspectives (Forward Lookup)
 
 | Source File | Storage Mode | Perspectives Entry | Shards | Sections | Cases | Last Updated |
 |-------------|--------------|--------------------|--------|----------|-------|--------------|
 | `Dependency automation operational contract` | single-file | `dependency-automation-test.md` | 1 | 1 | 25 | 2026-08-04 |
-| `l10n/web/web.l10n.en.json` | single-file | `l10n/web/web.l10n.en.json-test.md` | 1 | 8 | 23 | 2026-09-13 |
-| `l10n/web/web.l10n.ja.json` | single-file | `l10n/web/web.l10n.ja.json-test.md` | 1 | 9 | 25 | 2026-09-13 |
+| `l10n/web/web.l10n.en.json` | single-file | `l10n/web/web.l10n.en.json-test.md` | 1 | 9 | 26 | 2026-09-24 |
+| `l10n/web/web.l10n.ja.json` | single-file | `l10n/web/web.l10n.ja.json-test.md` | 1 | 10 | 28 | 2026-09-24 |
 | `media/dropdown.css` | single-file | `media/dropdown-test.md` | 1 | 1 | 3 | 2026-08-24 |
 | `media/findwidget.css` | single-file | `media/findwidget-test.md` | 1 | 1 | 3 | 2026-08-24 |
-| `media/main.css` | single-file | `media/main-test.md` | 1 | 3 | 42 | 2026-09-08 |
+| `media/main.css` | single-file | `media/main-test.md` | 1 | 4 | 57 | 2026-09-24 |
 | `package.json` | single-file | `package.json-test.md` | 1 | 3 | 43 | 2026-08-04 |
 | `src/avatarManager.ts` | single-file | `src/avatarManager-test.md` | 1 | 25 | 101 | 2026-07-19 |
 | `src/branchCleanup.ts` | single-file | `src/branchCleanup-test.md` | 1 | 5 | 43 | 2026-08-25 |
@@ -48,15 +48,16 @@
 | `web/fileHistory.ts` | single-file | `web/fileHistory-test.md` | 1 | 9 | 57 | 2026-09-08 |
 | `web/fileMenu.ts` | single-file | `web/fileMenu-test.md` | 1 | 4 | 39 | 2026-09-13 |
 | `web/fileTree.ts` | single-file | `web/fileTree-test.md` | 1 | 4 | 35 | 2026-09-13 |
-| `web/findWidget.ts` | single-file | `web/findWidget-test.md` | 1 | 9 | 39 | 2026-07-19 |
+| `web/findWidget.ts` | single-file | `web/findWidget-test.md` | 1 | 10 | 49 | 2026-09-24 |
 | `web/graph.ts` | single-file | `web/graph-test.md` | 1 | 20 | 77 | 2026-09-12 |
-| `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 1 | 5 | 2026-05-03 |
+| `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 2 | 9 | 2026-09-24 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 13 | 50 | 348 | 2026-09-13 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 13 | 54 | 396 | 2026-09-24 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
 | `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 15 | 64 | 2026-09-13 |
 | `web/refMenu.ts` | single-file | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md` | 1 | 14 | 74 | 2026-07-19 |
 | `web/refMenu.ts` | sharded | `web/refMenu-test/INDEX.md` | 3 | 18 | 94 | 2026-09-13 |
+| `web/refOverflow.ts` | single-file | `web/refOverflow-test.md` | 1 | 5 | 97 | 2026-09-24 |
 | `web/stashMenu.ts` | single-file | `web/stashMenu-test.md` | 1 | 8 | 30 | 2026-04-30 |
 | `web/uncommittedMenu.ts` | single-file | `web/uncommittedMenu-test.md` | 1 | 1 | 3 | 2026-03-09 |
 | `web/utils.ts` | single-file | `web/utils-test.md` | 1 | 5 | 31 | 2026-08-08 |
@@ -124,7 +125,7 @@
 | Feature 052 (detached-worktree-display) (light-spec-plan) | `src/dataSource-test/INDEX.md`, `src/repoFileWatcher-test.md`, `src/types-test.md`, `src/utils-test.md`, `src/worktree-test.md`, `web/utils-test.md` |
 | Feature 053 (detached-worktree-menu) (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/contextMenu-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md`, `web/worktreeMenu-test.md` |
 | Feature 055-01 (light-spec-plan) | `web/dialogs-test.md`, `web/messageHandler-test/INDEX.md` |
-| Feature 055-02 (light-spec-plan) | `media/dropdown-test.md`, `media/findwidget-test.md`, `media/main-test.md` |
+| Feature 055-02 (light-spec-plan) | `media/dropdown-test.md`, `media/findwidget-test.md` |
 | Feature 055-03 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `src/branchCleanup-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/i18n-test.md`, `src/types-test.md`, `web/branchCleanupPanel-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | Feature 055-03 follow-up | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `web/branchCleanupPanel-test.md` |
 | Feature 055-07 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `src/dataSource-test/INDEX.md`, `src/fileHistory-test.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/fileHistory-test.md`, `web/fileMenu-test.md`, `web/graph-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
@@ -133,6 +134,7 @@
 | Feature 056 (retain-context-when-hidden) issue #48 | `src/config-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `web/main-test/INDEX.md` |
 | Feature 057 (multi-repo-single-folder-workspace) issue #49 | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/gitGraphView-test/INDEX.md` |
 | Feature 057 (multi-repo-single-folder-workspace) issue #49 PR #60 レビュー指摘 | `src/gitGraphView-test/INDEX.md` |
+| Feature 059-02 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `web/findWidget-test.md`, `web/i18n-test.md`, `web/main-test/INDEX.md`, `web/refOverflow-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
 | test-plan | `web/stashMenu-test.md` |

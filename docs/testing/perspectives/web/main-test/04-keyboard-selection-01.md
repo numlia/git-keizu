@@ -194,3 +194,46 @@ ArrowUp/ArrowDown のコミット移動分岐に、event target が入力可能�
 - Type: excluded(event target は DOM 型で、実行時の型分岐は要素種別判定として Validation 4件に含まれる)
 
 **失敗系/正常系比（煙感知器）**: 正常系2件（TC-261、TC-262）、失敗系4件（TC-257〜TC-260）、比2.0。
+
+## S58: handleEscape() ref一覧の段階的閉鎖
+
+> Origin: Feature 059-02 (light-spec-plan)
+> Added: 2026-09-24
+> Status: active
+> Supersedes: -
+> Signature: `handleEscape(): void`（`RefOverflowController.closePopup(): boolean` の呼出しを既存ドロップダウンの後、findWidgetの前へ追加）
+> Target Path: `web/main.ts`（`handleEscape()`。実装後に行範囲へ更新）
+> Test File: `tests/web/main.test.ts`
+
+Escの順序を `contextMenu → dialog → repoDropdown → branchDropdown → authorDropdown → ref一覧 → findWidget → expandedCommit` とし、`closePopup()` が `true` ならそのEscを終える。既存S40の順序は一覧が閉じている場合にそのまま成り立つため、本節はadditive。一覧は実controllerでcounterをclickして開く。
+
+| Case ID | Input / Precondition                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                              | Notes                                        |
+| ------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| TC-457  | 一覧を開き、その複製からcontextメニューを開いた状態で1回目のEsc                               | Normal - メニューを先に閉じる                                              | `hideContextMenu()` だけが呼ばれ、`.refOverflowPopup` が1個のまま                            | AC-04                                        |
+| TC-458  | TC-457の後、findWidget表示中・コミット詳細展開中のまま2回目のEsc                              | Normal - 次のEscで一覧だけ閉じる                                           | `.refOverflowPopup` が0個になり、`findWidget.close()` と `hideCommitDetails()` の呼出しが0回 | AC-04                                        |
+| TC-459  | ダイアログ表示中かつ一覧表示中にEsc                                                           | Validation - ダイアログ優先                                                | `hideDialog()` だけが呼ばれ、一覧は1個のまま                                                 | -                                            |
+| TC-460  | repo / branch / author の各ドロップダウンを1つずつ開き、一覧も表示した状態でEsc               | Validation - 既存ドロップダウン優先                                        | 開いたドロップダウンの `close()` だけが呼ばれ、一覧は1個のまま                               | 既存ドロップダウン同士の順序はS40のまま      |
+| TC-461  | 一覧表示中、findWidget表示中、コミット詳細展開中にEsc                                         | Normal - 検索・詳細より先に一覧                                            | 一覧が0個になり、`findWidget.close()` と `hideCommitDetails()` の呼出しが0回                 | 一覧を閉じた同じEscで他のUIを閉じない。AC-04 |
+| TC-462  | 一覧を開いていない（`closePopup()` が `false`）状態でfindWidget表示中にEsc                    | Boundary - 一覧なしで既存順へ進む                                          | `findWidget.close()` が1回呼ばれる                                                           | S40 TC-224の維持                             |
+| TC-463  | メニュー・ダイアログ・ドロップダウン・一覧・findWidget・コミット詳細がすべて非アクティブでEsc | Boundary - 何も開いていない                                                | hide / close系の呼出しが0回で、`.refOverflowPopup` も生成されない                            | S40 TC-226の維持                             |
+
+### 失敗源インベントリ（include-or-justify）— Feature 059-02 追加分（S58）
+
+| 失敗源                                         | 対応ケースまたは除外理由                                   |
+| ---------------------------------------------- | ---------------------------------------------------------- |
+| メニューと一覧を同じEscで閉じる                | TC-457、TC-458                                             |
+| 一覧を閉じたEscで検索・詳細も閉じる            | TC-458、TC-461                                             |
+| 既存のダイアログ・ドロップダウン優先順位の破壊 | TC-459、TC-460                                             |
+| 一覧がないときに後段へ進まない                 | TC-462、TC-463                                             |
+| 検索パターン解析                               | excluded(`web/findWidget-test.md` の責務)                  |
+| 外部依存・例外                                 | excluded(DOM状態の判定だけで外部依存とthrow経路を持たない) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-459、TC-460
+- Exception: excluded(throw経路なし)
+- External: excluded(外部依存なし)
+- Boundary: TC-462、TC-463
+- Type: excluded(キー判定は既存S10の責務)
+
+**失敗系/正常系比（煙感知器）**: 正常系3件（TC-457、TC-458、TC-461）、失敗系4件。

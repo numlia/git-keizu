@@ -347,3 +347,32 @@ branch cleanup panel の表示に使う英語キー集合（title、comparison�
 | キー欠落／空文字                                                  | TC-025                       |
 | placeholder欠落                                                   | TC-025                       |
 | 他category（Validation / Exception / External / Boundary / Type） | excluded(静的JSONの存在検証) |
+
+## S10: 隠れたバッジcounterの英語キー
+
+> Origin: Feature 059-02 (light-spec-plan)
+> Added: 2026-09-24
+> Status: active
+> Supersedes: -
+> Signature: 追加キー `refs.showHidden`（値 `Show {0} hidden badges`、placeholder 集合 `{0}`）
+> Target Path: `l10n/web/web.l10n.en.json`
+> Test File: `tests/web/i18n.test.ts`
+
+counterのtitle/aria-labelに使う新キーが en bundle に追加され、値が対応プラン §3.5 の固定値と完全一致することを検証する additive section。件数の差込みは `web/i18n-test.md` S2、counterへの設定は `web/refOverflow-test.md` S3 の責務。
+
+| Case ID | Input / Precondition                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                      | Notes                                             |
+| ------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
+| TC-026  | en bundle から `refs.showHidden` を読み込む                                         | Normal - 新キーの固定値                                                    | キーが存在し、値が `Show {0} hidden badges` と `toBe` で完全一致し、値から抽出した `{数字}` 形式 placeholder 集合が `{0}` のみである | AC-18                                             |
+| TC-027  | en / ja 両 bundle を読み込み、`refs.showHidden` の存在と placeholder 集合を比較する | Validation - locale parity                                                 | ja bundle に `refs.showHidden` が存在し、placeholder 集合が両 locale とも `{0}` で一致する                                           | ja側は `web.l10n.ja.json-test.md` S11 TC-030 と対 |
+| TC-028  | en bundle の全 key 集合を読み込む                                                   | Validation - 既存 key の維持                                               | 追加後も既存 key（`table.description`、`find.*` など）が欠落せず、bundle 全体で値が空文字列の key が 0 件である                      | 追加による誤削除を防ぐ                            |
+
+### 失敗源インベントリ（include-or-justify）— Feature 059-02 追加分（S10）
+
+| 失敗源                                    | 対応ケースまたは除外理由                                                 |
+| ----------------------------------------- | ------------------------------------------------------------------------ |
+| en 側のキー欠落・固定値からの drift       | TC-026                                                                   |
+| placeholder の欠落・過剰                  | TC-026                                                                   |
+| 片 locale だけの追加 / placeholder 不一致 | TC-027                                                                   |
+| 追加時の既存 key 誤削除・空値             | TC-028                                                                   |
+| 日本語値                                  | excluded(`web.l10n.ja.json-test.md` S11 の責務)                          |
+| 境界値・外部依存・例外・型                | excluded(静的 JSON に数値境界・外部依存・throw 経路・型分岐が存在しない) |
