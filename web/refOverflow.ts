@@ -1,3 +1,4 @@
+import { hideContextMenu } from "./contextMenu";
 import { t } from "./i18n";
 
 export const REF_BADGE_WIDTH_RATIO = 0.6;
@@ -88,8 +89,12 @@ const CLASS_COUNTER = "refOverflowCounter";
 const CLASS_MEASURE = "refOverflowMeasure";
 const CLASS_HEAD_DOT = "commitHeadDot";
 const CLASS_MESSAGE = "commitMessage";
-// Transient state classes do not describe the badge itself, so clones for measurement drop them.
-const CLONE_EXCLUDED_CLASSES = [CLASS_HIDDEN, "contextMenuActive", "dialogActive"];
+const CLASS_POPUP = "refOverflowPopup";
+const CLASS_CONTEXT_MENU_ACTIVE = "contextMenuActive";
+// Transient state classes do not describe the badge itself, so clones drop them.
+const CLONE_EXCLUDED_CLASSES = [CLASS_HIDDEN, CLASS_CONTEXT_MENU_ACTIVE, "dialogActive"];
+// Clicks inside these stay "inside": menus opened from the list must not dismiss it.
+const POPUP_INSIDE_SELECTOR = `.${CLASS_COUNTER}, #contextMenu, ul.contextMenuSubmenu`;
 const ATTR_IGNORE = "data-ref-overflow-ignore";
 const ATTR_COLOR = "data-color";
 const DESCRIPTION_COLUMN_INDEX = 1;
@@ -190,7 +195,7 @@ function collectRows(table: HTMLTableElement): RefOverflowRow[] {
   return rows;
 }
 
-function cloneForMeasurement(ref: HTMLElement): HTMLElement {
+function cloneRef(ref: HTMLElement): HTMLElement {
   const clone = <HTMLElement>ref.cloneNode(true);
   clone.classList.remove(...CLONE_EXCLUDED_CLASSES);
   clone.removeAttribute("id");
@@ -201,16 +206,20 @@ function cloneForMeasurement(ref: HTMLElement): HTMLElement {
   return clone;
 }
 
-function createMeasureRow(row: RefOverflowRow): { elem: HTMLElement; probe: RefOverflowProbe } {
-  const elem = document.createElement("div");
-  const color = row.cell.parentElement?.getAttribute(ATTR_COLOR) ?? null;
+// Clones live outside the row, so its colour variable and inherited font are copied explicitly.
+function copyRowAppearance(elem: HTMLElement, cell: HTMLTableCellElement): void {
+  const color = cell.parentElement?.getAttribute(ATTR_COLOR) ?? null;
   if (color !== null) elem.setAttribute(ATTR_COLOR, color);
-  // The measurement area lives outside the row, so the row's inherited font is copied explicitly.
-  const cellStyle = getComputedStyle(row.cell);
+  const cellStyle = getComputedStyle(cell);
   for (const property of MEASURE_FONT_PROPERTIES) {
     elem.style.setProperty(property, cellStyle.getPropertyValue(property));
   }
-  const badges = row.refs.map(cloneForMeasurement);
+}
+
+function createMeasureRow(row: RefOverflowRow): { elem: HTMLElement; probe: RefOverflowProbe } {
+  const elem = document.createElement("div");
+  copyRowAppearance(elem, row.cell);
+  const badges = row.refs.map(cloneRef);
   const counters = row.refs.map((_ref, index) => createCounterElement(index + 1));
   elem.append(...badges, ...counters);
   return { elem, probe: { badges, counters } };
@@ -263,6 +272,38 @@ function getDescriptionHeader(table: HTMLTableElement): HTMLTableCellElement | n
   return header !== undefined && header.tagName === HEADER_CELL_TAG ? header : null;
 }
 
+function getHiddenRefs(cell: HTMLElement): HTMLElement[] {
+  const refs: HTMLElement[] = [];
+  for (let i = 0; i < cell.children.length; i++) {
+    const child = cell.children[i];
+    if (
+      child instanceof HTMLElement &&
+      child.classList.contains(CLASS_GIT_REF) &&
+      child.classList.contains(CLASS_HIDDEN)
+    ) {
+      refs.push(child);
+    }
+  }
+  return refs;
+}
+
+function clamp(value: number, max: number): number {
+  return Math.max(0, Math.min(value, max));
+}
+
+// Below the counter and left-aligned by default; flipped upward when the bottom would overflow,
+// then clamped so every edge stays inside the viewport.
+function positionPopup(popup: HTMLElement, counter: HTMLElement): void {
+  const counterRect = counter.getBoundingClientRect();
+  const popupRect = popup.getBoundingClientRect();
+  const top =
+    counterRect.bottom + popupRect.height > window.innerHeight
+      ? counterRect.top - popupRect.height
+      : counterRect.bottom;
+  popup.style.left = `${clamp(counterRect.left, window.innerWidth - popupRect.width)}px`;
+  popup.style.top = `${clamp(top, window.innerHeight - popupRect.height)}px`;
+}
+
 export class RefOverflowController {
   private readonly options: RefOverflowOptions;
   private table: HTMLTableElement | null = null;
@@ -272,10 +313,16 @@ export class RefOverflowController {
   private generation = 0;
   private frameId: number | null = null;
   private disposed = false;
+  private popup: HTMLElement | null = null;
+  private popupCounter: HTMLButtonElement | null = null;
   private readonly styleObserver: MutationObserver;
   private readonly fonts: FontFaceSet | undefined;
   private readonly handleLayoutTrigger = () => this.scheduleLayout();
-  private readonly handleCounterEvent = (event: Event) => event.stopPropagation();
+  // Row selection, details and checkout listen for bubbling clicks; the counter and list stop them.
+  private readonly stopPropagation = (event: Event) => event.stopPropagation();
+  private readonly handleCounterClick = (event: MouseEvent) => this.toggleCounterPopup(event);
+  private readonly handleDocumentClick = (event: MouseEvent) =>
+    this.closePopupOnOutsideClick(event);
 
   constructor(options: RefOverflowOptions) {
     this.options = options;
@@ -323,6 +370,17 @@ export class RefOverflowController {
     });
   }
 
+  public closePopup(): boolean {
+    const popup = this.popup;
+    if (popup === null) return false;
+    this.hidePopupContextMenu();
+    popup.remove();
+    this.popup = null;
+    this.popupCounter = null;
+    document.removeEventListener("click", this.handleDocumentClick, true);
+    return true;
+  }
+
   public dispose(): void {
     this.detachTable();
     this.disposed = true;
@@ -332,6 +390,7 @@ export class RefOverflowController {
   }
 
   private releaseTable(): void {
+    this.closePopup();
     this.generation++;
     if (this.frameId !== null) {
       window.cancelAnimationFrame(this.frameId);
@@ -353,6 +412,7 @@ export class RefOverflowController {
     if (this.header === null) return;
     // Our own writes keep the column width unchanged; only a real size change needs another pass.
     if (this.header.getBoundingClientRect().width === this.lastHeaderWidth) return;
+    this.closePopup();
     this.scheduleLayout();
   }
 
@@ -384,6 +444,7 @@ export class RefOverflowController {
       const budget = getAvailableWidth(row, measurement) * REF_BADGE_WIDTH_RATIO;
       return selectVisibleRefCount(measurement.badgeWidths, budget, measurement.counterWidths);
     });
+    if (this.isPopupStale(rows, visibleCounts)) this.closePopup();
     this.recordHeaderWidth();
 
     rows.forEach((row, index) => {
@@ -391,6 +452,22 @@ export class RefOverflowController {
       // null means the row could not be measured; keep whatever it currently shows.
       if (visibleCount !== null) this.applyVisibleCount(row, visibleCount);
     });
+  }
+
+  // The list mirrors one row's hidden refs, so it closes once the column is really re-laid out or
+  // that row's folding changes; a pass that reproduces the same widths and counts keeps it open.
+  private isPopupStale(
+    rows: readonly RefOverflowRow[],
+    visibleCounts: readonly (number | null)[]
+  ): boolean {
+    if (this.popup === null) return false;
+    const headerWidth = this.header === null ? null : this.header.getBoundingClientRect().width;
+    if (headerWidth !== this.lastHeaderWidth) return true;
+    const index = rows.findIndex((row) => row.counter === this.popupCounter);
+    if (index < 0) return true;
+    const visibleCount = visibleCounts[index];
+    const shownCount = rows[index].refs.filter((ref) => !ref.classList.contains(CLASS_HIDDEN));
+    return visibleCount !== null && visibleCount !== shownCount.length;
   }
 
   private recordHeaderWidth(): void {
@@ -417,8 +494,72 @@ export class RefOverflowController {
 
   private createCounter(hiddenCount: number): HTMLButtonElement {
     const counter = createCounterElement(hiddenCount);
-    counter.addEventListener("click", this.handleCounterEvent);
-    counter.addEventListener("dblclick", this.handleCounterEvent);
+    counter.addEventListener("click", this.handleCounterClick);
+    counter.addEventListener("dblclick", this.stopPropagation);
     return counter;
+  }
+
+  private toggleCounterPopup(event: MouseEvent): void {
+    event.stopPropagation();
+    const counter = event.currentTarget;
+    if (!(counter instanceof HTMLButtonElement)) return;
+    const isSameCounter = counter === this.popupCounter;
+    this.closePopup();
+    if (!isSameCounter) this.openPopup(counter);
+  }
+
+  private openPopup(counter: HTMLButtonElement): void {
+    const cell = counter.parentElement;
+    if (!(cell instanceof HTMLTableCellElement) || this.table === null) return;
+    if (!this.table.contains(cell)) return;
+    const popup = document.createElement("div");
+    popup.className = CLASS_POPUP;
+    popup.setAttribute(ATTR_IGNORE, "");
+    copyRowAppearance(popup, cell);
+    popup.addEventListener("click", this.stopPropagation);
+    popup.addEventListener("dblclick", this.stopPropagation);
+    this.popup = popup;
+    this.popupCounter = counter;
+    if (!this.renderPopupItems()) {
+      this.popup = null;
+      this.popupCounter = null;
+      return;
+    }
+    document.body.appendChild(popup);
+    positionPopup(popup, counter);
+    document.addEventListener("click", this.handleDocumentClick, true);
+  }
+
+  // Rebuilt from the row's current hidden refs, so names and search marks always match it.
+  private renderPopupItems(): boolean {
+    const popup = this.popup;
+    const cell = this.popupCounter?.parentElement ?? null;
+    if (popup === null || cell === null) return false;
+    const clones = getHiddenRefs(cell).map(cloneRef);
+    if (clones.length === 0) return false;
+    this.hidePopupContextMenu();
+    for (const clone of clones) {
+      clone.addEventListener("contextmenu", (event) => this.options.onRefContextMenu(event, clone));
+    }
+    popup.replaceChildren(...clones);
+    return true;
+  }
+
+  // Only a menu opened from the list belongs to it; menus opened elsewhere are left alone.
+  private hidePopupContextMenu(): void {
+    const popup = this.popup;
+    if (popup !== null && popup.querySelector(`.${CLASS_CONTEXT_MENU_ACTIVE}`) !== null) {
+      hideContextMenu();
+    }
+  }
+
+  // Capture phase sees the original target even if a menu item's own handler later removes it.
+  private closePopupOnOutsideClick(event: MouseEvent): void {
+    const target = event.target;
+    if (!(target instanceof Node) || this.popup === null) return;
+    if (this.popup.contains(target)) return;
+    const elem = target instanceof Element ? target : target.parentElement;
+    if (elem !== null && elem.closest(POPUP_INSIDE_SELECTOR) !== null) return;
+    this.closePopup();
   }
 }

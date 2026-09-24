@@ -4,6 +4,7 @@
   --git-keizu-z-index-commit-graph: -1;
   --git-keizu-z-index-table-header: 11;
   --git-keizu-z-index-controls: 12;
+  --git-keizu-z-index-ref-overflow: 13;
   --git-keizu-z-index-context-menu: 15;
   --git-keizu-z-index-context-submenu: 16;
   --git-keizu-z-index-find-widget: 100;
@@ -537,6 +538,31 @@ body.unableToLoad p {
   white-space: nowrap;
   visibility: hidden;
   pointer-events: none;
+}
+/* Hidden-ref list: one badge per line, scrollable in both directions inside the viewport */
+.refOverflowPopup {
+  position: fixed;
+  left: 0;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  box-sizing: border-box;
+  max-width: 100vw;
+  max-height: 100vh;
+  overflow: auto;
+  padding: 2px 6px 4px;
+  /* Same backdrop as the table so badge colours and icon cut-outs look identical */
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.5));
+  box-shadow: 0 1px 4px 1px var(--vscode-widget-shadow);
+  z-index: var(--git-keizu-z-index-ref-overflow);
+}
+.refOverflowPopup .gitRef {
+  flex: none;
+  width: max-content;
+  white-space: nowrap;
+  margin-right: 0;
 }
 
 /* -- Controls (top toolbar) ------------------------------------------------ */

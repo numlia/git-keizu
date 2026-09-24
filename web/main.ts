@@ -210,6 +210,7 @@ class GitKeizuView {
     this.footerElem = document.getElementById("footer")!;
     this.scrollContainerElem = document.getElementById("scrollContainer")!;
     this.repoDropdown = new Dropdown("repoSelect", true, t("toolbar.repos"), (value) => {
+      this.refOverflow.detachTable();
       this.fileHistory.onRepositoryChanged();
       this.currentRepo = value;
       this.branchCleanupPanel.selectRepository(value);
@@ -386,6 +387,7 @@ class GitKeizuView {
     let repoPaths = Object.keys(repos),
       changedRepo = false;
     if (repos[this.currentRepo] === undefined) {
+      this.refOverflow.detachTable();
       this.fileHistory.onRepositoryChanged();
       this.currentRepo =
         lastActiveRepo !== null && repos[lastActiveRepo] !== undefined
@@ -418,6 +420,7 @@ class GitKeizuView {
       return;
     }
 
+    this.refOverflow.detachTable();
     this.fileHistory.onRepositoryChanged();
     this.currentRepo = repo;
     this.branchCleanupPanel.selectRepository(repo);
@@ -842,6 +845,8 @@ class GitKeizuView {
     this.graph.render(this.expandedCommit);
   }
   private renderTable() {
+    // Close first: the ref listeners below are bound by class name across the whole document.
+    this.refOverflow.closePopup();
     const savedScrollTop = this.scrollContainerElem.scrollTop;
     let html = `<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader">${t("table.graph")}</th><th class="tableColHeader">${t("table.description")}</th><th class="tableColHeader">${t("table.date")}</th><th class="tableColHeader">${t("table.author")}</th><th class="tableColHeader">${t("table.commit")}</th></tr>`,
       i,
@@ -1116,6 +1121,7 @@ class GitKeizuView {
       `<td></td><td><b>${escapeHtml(this.commits[0].message)}</b></td><td title="${date.title}">${date.value}</td><td title="* <>">*</td><td title="*">*</td>`;
   }
   private renderShowLoading() {
+    this.refOverflow.detachTable();
     if (isDialogActive()) hideDialog();
     if (isContextMenuActive()) hideContextMenu();
     this.graph.clear();
@@ -1356,6 +1362,7 @@ class GitKeizuView {
     let active = this.scrollContainerElem.scrollTop > 0;
     this.scrollShadowElem.className = active ? "active" : "";
     this.scrollContainerElem.addEventListener("scroll", () => {
+      this.refOverflow.closePopup();
       if (active !== this.scrollContainerElem.scrollTop > 0) {
         active = this.scrollContainerElem.scrollTop > 0;
         this.scrollShadowElem.className = active ? "active" : "";
@@ -1548,6 +1555,7 @@ class GitKeizuView {
       this.authorDropdown.close();
       return;
     }
+    if (this.refOverflow.closePopup()) return;
     if (this.findWidget.isVisible()) {
       this.findWidget.close();
       return;
