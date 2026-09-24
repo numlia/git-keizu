@@ -104,6 +104,9 @@ function getFileViewToggle(mode: FileViewType): { icon: string; title: string } 
 
 const EMPTY_WORKTREE_COLLECTION: GG.WorktreeCollection = { branches: {}, detached: [] };
 const DETACHED_WORKTREE_CLASS = "detachedWorktree";
+const STASH_HASH_ATTRIBUTE = "data-stash-hash";
+const STASH_BADGE_CLASS = "stash";
+const COMMIT_ROW_SELECTOR = ".commit";
 
 type PendingCommitLoad = {
   forceRender: boolean;
@@ -906,7 +909,7 @@ class GitKeizuView {
         let selectorDisplay = escapeHtml(
           buildStashSelectorDisplay(this.commits[i].stash!.selector)
         );
-        refs = `<span class="gitRef stash">${svgIcons.stash}${selectorDisplay}</span>${refs}`;
+        refs = `<span class="gitRef stash" ${STASH_HASH_ATTRIBUTE}="${escapeHtml(commitHash)}">${svgIcons.stash}${selectorDisplay}</span>${refs}`;
       }
       let rowClass = buildCommitRowAttributes(
         this.commits[i].hash,
@@ -1075,6 +1078,10 @@ class GitKeizuView {
   }
   private showRefBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void {
     event.stopPropagation();
+    if (badge.classList.contains(STASH_BADGE_CLASS)) {
+      this.showStashBadgeContextMenu(event, badge);
+      return;
+    }
     if (badge.classList.contains(DETACHED_WORKTREE_CLASS)) {
       const worktreePath = badge.dataset.worktreePath;
       if (worktreePath === undefined) return;
@@ -1112,6 +1119,26 @@ class GitKeizuView {
         remotes,
         worktreeInfo
       ),
+      badge,
+      this.getCurrentRepoRecentActions()
+    );
+  }
+  // A listed clone lives outside its row, so the stash is resolved from the badge's hash attribute.
+  private showStashBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void {
+    const hash = badge.getAttribute(STASH_HASH_ATTRIBUTE);
+    if (hash === null || hash === "") return;
+    const index = this.commitLookup[hash];
+    if (typeof index !== "number") return;
+    const commit = this.commits[index];
+    if (commit === undefined || commit.hash !== hash) return;
+    if (commit.stash === null || commit.stash === undefined) return;
+    const originalRow = Array.from(
+      this.tableElem.querySelectorAll<HTMLElement>(COMMIT_ROW_SELECTOR)
+    ).find((row) => row.dataset.hash === hash);
+    if (originalRow === undefined) return;
+    showContextMenu(
+      event,
+      buildStashContextMenuItems(this.currentRepo, hash, commit.stash.selector, originalRow),
       badge,
       this.getCurrentRepoRecentActions()
     );

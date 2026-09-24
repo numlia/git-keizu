@@ -1202,18 +1202,52 @@ describe("ref badge right-click from the row and the list (S57)", () => {
     expect(withoutSource(result.list)).toEqual(withoutSource(result.row));
   });
 
-  it("uses the existing ref handling for a stash badge in the row and the list (TC-453)", () => {
+  it("opens the stash menu from the stash badge in the row and in the list (TC-453)", () => {
     // Case: TC-453 (AC-14)
-    // When: the stash badge is right-clicked in the row and then in its list
-    const result = rightClickInRowAndInList(
-      () => descriptionCell(1).querySelector(":scope > .gitRef.stash")!,
-      (list) => list.querySelector(".gitRef.stash")!,
-      1
-    );
+    // Given: the stash row (hashOf(2), stash@{0}) and its in-row stash badge
+    const row = commitRow(1);
+    const rowBadge = descriptionCell(1).querySelector<HTMLElement>(":scope > .gitRef.stash")!;
+    expect(rowBadge.getAttribute("data-stash-hash")).toBe(hashOf(2));
+    expect(inRow("stash-side", 1).getAttribute("data-stash-hash")).toBeNull();
 
-    // Then: the same builder and arguments; no stash-specific builder was involved
-    expect(withoutSource(result.list)).toEqual(withoutSource(result.row));
-    expect(stashMenu.buildStashContextMenuItems).not.toHaveBeenCalled();
+    // When: the in-row badge is right-clicked
+    fire(rowBadge, "contextmenu");
+
+    // Then: the stash builder gets the original row and the badge is the menu source
+    expect(stashMenu.buildStashContextMenuItems).toHaveBeenCalledTimes(1);
+    const rowBuilderArgs = vi.mocked(stashMenu.buildStashContextMenuItems).mock.calls[0];
+    expect(rowBuilderArgs[0]).toBe(TEST_REPO);
+    expect(rowBuilderArgs[1]).toBe(hashOf(2));
+    expect(rowBuilderArgs[2]).toBe("stash@{0}");
+    expect(rowBuilderArgs[3]).toBe(row);
+    expect(contextMenu.showContextMenu).toHaveBeenCalledTimes(1);
+    const rowShowArgs = vi.mocked(contextMenu.showContextMenu).mock.calls[0];
+    expect(rowShowArgs[2]).toBe(rowBadge);
+    expect(rowShowArgs[3]).toEqual(RECENT_ACTIONS);
+    expect(refMenu.buildRefContextMenuItems).not.toHaveBeenCalled();
+    expect(worktreeMenu.buildDetachedWorktreeContextMenuItems).not.toHaveBeenCalled();
+
+    // When: the listed clone of the same badge is right-clicked
+    vi.mocked(stashMenu.buildStashContextMenuItems).mockClear();
+    vi.mocked(contextMenu.showContextMenu).mockClear();
+    const list = openList(1);
+    const clone = list.querySelector<HTMLElement>(".gitRef.stash")!;
+    expect(clone).not.toBe(rowBadge);
+    expect(clone.getAttribute("data-stash-hash")).toBe(hashOf(2));
+    fire(clone, "contextmenu");
+
+    // Then: the builder still gets the original row while the clone is the menu source
+    expect(stashMenu.buildStashContextMenuItems).toHaveBeenCalledTimes(1);
+    const listBuilderArgs = vi.mocked(stashMenu.buildStashContextMenuItems).mock.calls[0];
+    expect(listBuilderArgs[0]).toBe(TEST_REPO);
+    expect(listBuilderArgs[1]).toBe(hashOf(2));
+    expect(listBuilderArgs[2]).toBe("stash@{0}");
+    expect(listBuilderArgs[3]).toBe(row);
+    expect(contextMenu.showContextMenu).toHaveBeenCalledTimes(1);
+    const listShowArgs = vi.mocked(contextMenu.showContextMenu).mock.calls[0];
+    expect(listShowArgs[2]).toBe(clone);
+    expect(listShowArgs[3]).toEqual(RECENT_ACTIONS);
+    expect(refMenu.buildRefContextMenuItems).not.toHaveBeenCalled();
     expect(worktreeMenu.buildDetachedWorktreeContextMenuItems).not.toHaveBeenCalled();
   });
 
