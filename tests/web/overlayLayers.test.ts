@@ -808,3 +808,26 @@ describe("media/main.css ref overflow declarations (S5)", () => {
     expect(declarationsOf(ruleBlock(mainCss, ".gitRef")).get("height")).toBe("18px");
   });
 });
+
+// S6: 一覧内の検索一致マークの表示契約
+// @see docs/testing/perspectives/media/main-test.md
+describe("media/main.css search marks in the ref list (S6)", () => {
+  // TC-079 is a manual real-webview verification of the visible mark; see the perspectives file.
+
+  it("paints matched text in the list with the find match orange (TC-077)", () => {
+    // Case: TC-077 (AC-08)
+    // Given/When: the .refOverflowPopup .findMatch rule
+    const declarations = declarationsOf(ruleBlock(mainCss, ".refOverflowPopup .findMatch"));
+
+    // Then: the background uses the existing rgba(234, 92, 0, …) family
+    expect(declarations.get("background-color")).toMatch(/^rgba\(234, 92, 0, /);
+  });
+
+  it("does not style search marks outside the list (TC-078)", () => {
+    // Case: TC-078
+    // Given/When: rules selecting the inline mark without the list scope
+    // Then: none exist, so the table keeps its row-level match highlight only
+    expect(ruleBodiesFor(".findMatch")).toEqual([]);
+    expect(ruleBodiesFor("span.findMatch")).toEqual([]);
+  });
+});

@@ -569,6 +569,10 @@ body.unableToLoad p {
   white-space: nowrap;
   margin-right: 0;
 }
+/* The list is outside the table, so the row match background cannot reach it; paint the text */
+.refOverflowPopup .findMatch {
+  background-color: rgba(234, 92, 0, 0.35);
+}
 
 /* -- Controls (top toolbar) ------------------------------------------------ */
 

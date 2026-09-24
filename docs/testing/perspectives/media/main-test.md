@@ -311,3 +311,37 @@ S1は層数を10定義に固定していたため、ref一覧層の追加で期�
 - TC-074: viewport 400px で表 scrollWidth 458 > clientWidth 385、横ホイールで scrollLeft 73（最大）まで到達し最終列が表示、グラフと表の left 差 8・top 一致・行高不変（`step2-hscroll.png`）
 - TC-075: 隠れ58件と300文字名を含む一覧が viewport 1000×500 に収まり（scrollHeight 1282 > clientHeight 483、scrollWidth 2173 > clientWidth 983）、縦横ホイールで最終行と長い名前の末尾へ到達し一覧は維持（`step2-big-list-scrolled.png`）
 - TC-076: 列ドラッグ（実マウス）、狭い保存幅の再表示（幅700、内幅81 = M）、ウィンドウ縮小（1000→700→520→400、内幅は常に81以上、400で横スクロール）、devicePixelRatio 2、CSS zoom 1.25（再計測1回、行高30）、フォント切替（`--vscode-font-family` を DejaVu Serif 15px へ）、テーマ切替（body class `vscode-dark`→`vscode-light`、再計測1回）、非表示→再表示（`html` を `display: none` にしている間は counter 2個・隠れref 63個を維持、rAF追加0回、再表示後に同じ折り畳みへ復帰）、無変更更新・追加読み込み・リポジトリ切替の各後に counter と説明文（W の40%以上）が表示され、各操作後の0.8〜2秒間に rAF・ResizeObserver の追加呼出し0回。隠れた一致の counter は背景 rgba(234, 92, 0, 0.35)・枠 rgba(234, 92, 0, 0.9) で表示（`step3-hidden-only.png`）
+
+## S6: 一覧内の検索一致マークの表示契約
+
+> Origin: Feature 059-02 (PR #82 実機確認)
+> Added: 2026-09-24
+> Status: active
+> Supersedes: -
+> Signature: `.refOverflowPopup .findMatch` の宣言と、一覧外の `.findMatch` / `span.findMatch` ルールの不在
+> Target Path: `media/main.css:572-575`
+> Test File: `tests/web/overlayLayers.test.ts`
+
+検索の強調は表の行背景（`#commitTable tr.commit.findMatch td`）だけで、一致文字列を囲む `span.findMatch` には見た目の指定がない。一覧は表の外にあるため行背景が届かず、複製した一致マークが見えなかった（VS Code 実機で確認）。一覧内の一致文字列だけに背景色を付け、表の見た目は変えない。
+
+| Case ID | Input / Precondition                                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                            | Notes                          |
+| ------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------ |
+| TC-077  | `.refOverflowPopup .findMatch` ルールを抽出する                          | Normal - 一覧内の一致マークの着色                                          | `background-color` が既存Find match宣言と同じ `rgba(234, 92, 0` 系の色値である                             | AC-08                          |
+| TC-078  | 一覧の範囲指定を持たない `.findMatch` / `span.findMatch` のルールを探す  | Validation - 表の検索表示を変えない                                        | どちらのルールも存在しない                                                                                 | 表は行背景の強調だけを維持する |
+| TC-079  | VS Code 実機で隠れたバッジの名前を検索し、「+N」をクリックして一覧を開く | Normal - 手動: 一覧内の一致マークの実表示                                  | 一覧の中で一致した文字列だけにオレンジ系の背景が付き、一致しないバッジと表の行内バッジの見た目は変わらない | 手動確認。AC-08                |
+
+### 失敗源インベントリ（include-or-justify）— PR #82 実機確認分（S6）
+
+| 失敗源                                   | 対応ケースまたは除外理由                                                |
+| ---------------------------------------- | ----------------------------------------------------------------------- |
+| 一覧内の一致マークが見えない             | TC-077、TC-079                                                          |
+| 着色が一覧の外へ広がり表の見た目が変わる | TC-078、TC-079                                                          |
+| 入力検証・外部依存・例外・型             | excluded(静的 CSS 契約で入力・外部依存・throw 経路・型分岐が存在しない) |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-078
+- Exception: excluded(throw 経路なし)
+- External: excluded(外部依存なし)
+- Boundary: excluded(色の宣言に境界値がない)
+- Type: excluded(型分岐なし)
