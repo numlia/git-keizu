@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-09-24T14:36:22+09:00
+> Auto-generated: 2026-09-25T06:56:46+09:00
 > Total sources: 52
-> Total physical files: 92
-> Total sections: 567
-> Total cases: 3331
+> Total physical files: 93
+> Total sections: 568
+> Total cases: 3383
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -52,7 +52,7 @@
 | `web/graph.ts` | single-file | `web/graph-test.md` | 1 | 20 | 77 | 2026-09-12 |
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 2 | 9 | 2026-09-24 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 14 | 54 | 397 | 2026-09-24 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 15 | 55 | 449 | 2026-09-25 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
 | `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 15 | 64 | 2026-09-13 |
 | `web/refMenu.ts` | single-file | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md` | 1 | 14 | 74 | 2026-07-19 |
@@ -134,6 +134,7 @@
 | Feature 056 (retain-context-when-hidden) issue #48 | `src/config-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `web/main-test/INDEX.md` |
 | Feature 057 (multi-repo-single-folder-workspace) issue #49 | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/gitGraphView-test/INDEX.md` |
 | Feature 057 (multi-repo-single-folder-workspace) issue #49 PR #60 レビュー指摘 | `src/gitGraphView-test/INDEX.md` |
+| Feature 059-01 (stash-label-context-menu) | `web/main-test/INDEX.md` |
 | Feature 059-02 (PR #82 実機確認) | `media/main-test.md` |
 | Feature 059-02 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `web/findWidget-test.md`, `web/i18n-test.md`, `web/main-test/INDEX.md`, `web/refOverflow-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
