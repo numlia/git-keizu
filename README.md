@@ -43,6 +43,7 @@ See branches, commits, tags, stash entries, and uncommitted changes together in 
 - Filter the graph by branch or author, and search commit messages with regex and case-sensitive modes.
 - Choose date, topological, or author-date ordering. Merge commits and non-ancestor commits can be visually muted.
 - Combined local and remote labels, automatic commit loading, and restored scroll position keep long histories manageable.
+- When a commit carries more branch, worktree, tag, or stash labels than fit in its row, the rest fold into a **+N** badge that opens them in a list with the same right-click actions, and Find highlights **+N** when a hidden label matches.
 
 ### Inspect changes and compare commits
 

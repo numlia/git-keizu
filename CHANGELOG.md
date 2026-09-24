@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.0] - 2026-09-24
+
+This release keeps every label on a busy commit reachable: when a commit carries more branches, worktrees, remotes, tags, or stash labels than fit in its row, the ones that do not fit are folded into a **+N** badge that opens the rest in a list, so several worktrees on the same commit no longer disappear off the end of the row.
+
+### Added
+
+- **Labels that do not fit are folded into a +N badge**: Labels on a commit row now take at most 60% of the space available in the Description column, leaving at least 40% for the commit message. When they need more, the labels are kept in their usual order from the start, the ones at the end that do not fit are hidden, and a **+N** badge showing how many are hidden is placed after the last visible label; the badge itself is never cut off. A combined local and remote label such as `main | origin` counts as one label, and a long label is never shortened or skipped over — if even the first label does not fit, all labels are folded into **+N**. Rows whose labels already fit look exactly as before, and the row height and the graph are unchanged. The fold is recalculated when the column or window is resized, the zoom or font changes, and when the graph is refreshed or more commits are loaded, so widening the column shows more labels and removes **+N** once everything fits.
+- **Hidden labels open in a list with the same right-click actions**: Clicking **+N** opens a list below it with the hidden labels, one per line, in their original order and with their usual look. Right-clicking a label in the list shows the same context menu as the same label in the row, including the remote part of a combined label, and the list stays open while the menu is in use. Clicking **+N** does not select the commit or open its details, and clicking or double-clicking a label in the list does not check anything out. The list closes when you click outside it, click the same **+N** again, press Esc (after any open menu or dialog, one at a time), scroll the graph, or when the graph is redrawn; a background refresh that changes nothing leaves it open. Long names and long lists scroll inside the list, which is kept within the window.
+- **Find highlights matches in hidden labels**: When a search term matches a label that is folded away, the row's **+N** badge is highlighted, and the matching text is marked when you open the list. The number on the badge still counts all hidden labels, the list is not opened automatically, and search results, their count, and navigation are unchanged. Changing or clearing the search updates the badge and an open list immediately.
+
+### Changed
+
+- **The Description column keeps a minimum width**: So that **+N** and part of the commit message always stay visible, the Description column can no longer be dragged, restored from a saved layout, or squeezed by a narrow window below the width those need. When the window is too narrow for all columns at that width, the graph and table scroll horizontally together instead of cutting the column off. Saved column widths are not overwritten by this adjustment.
+
 ## [1.2.0] - 2026-09-18
 
 This release makes detached HEAD worktrees actionable: the worktree labels introduced in 0.9.0 now open a context menu, so a throwaway worktree can be opened, revealed, or removed from the graph instead of from a terminal.
@@ -602,7 +616,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.2.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.3.0...HEAD
+[1.3.0]: https://github.com/numlia/git-keizu/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/numlia/git-keizu/compare/v1.1.3...v1.2.0
 [1.1.3]: https://github.com/numlia/git-keizu/compare/v1.1.2...v1.1.3
 [1.1.2]: https://github.com/numlia/git-keizu/compare/v1.1.1...v1.1.2
