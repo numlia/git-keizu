@@ -1,5 +1,7 @@
 # AGENTS.md
 
+output-language: en
+
 ## Architecture
 
 `src/` runs in the Node.js extension host and `web/` in the browser webview. They communicate via the typed `RequestMessage` / `ResponseMessage` protocol in `src/types.ts`: `web/utils.ts` posts requests, `src/gitGraphView.ts` routes them to `DataSource`, and responses return to the webview. See [`docs/development/directory-structure.md`](docs/development/directory-structure.md) for file-level details.
