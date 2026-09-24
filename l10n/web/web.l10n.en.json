@@ -38,6 +38,7 @@
   "table.author": "Author",
   "table.commit": "Commit",
   "table.loadMoreCommits": "Load More Commits",
+  "refs.showHidden": "Show {0} hidden badges",
   "loading.label": "Loading ...",
   "loading.commitDetails": "Loading {0} ...",
   "commitDetails.label": "Commit Details",

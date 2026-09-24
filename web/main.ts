@@ -35,6 +35,7 @@ import { Graph } from "./graph";
 import { t } from "./i18n";
 import { handleMessage, type RefreshMode } from "./messageHandler";
 import { buildRefContextMenuItems, checkoutBranchAction, showDeleteBranchDialog } from "./refMenu";
+import { DESCRIPTION_MIN_WIDTH, RefOverflowController } from "./refOverflow";
 import { buildStashContextMenuItems } from "./stashMenu";
 import { buildUncommittedContextMenuItems } from "./uncommittedMenu";
 import {
@@ -81,6 +82,9 @@ const ALL_BRANCHES_VALUE = "";
 const REMOTE_BRANCH_PREFIX = "remotes/";
 const GRAPH_AUTO_LAYOUT_MAX_RATIO = 0.4;
 const GRAPH_COL_MIN_WIDTH = 64;
+const DESCRIPTION_COLUMN_INDEX = 1;
+const TABLE_COLUMN_COUNT = 5;
+const COMBINED_REMOTE_SELECTOR = ".gitRefHeadRemote";
 const COMMIT_ORDERING_MENU_ITEMS: { label: string; value: GG.RepoCommitOrdering }[] = [
   { label: t("commitOrdering.default"), value: "default" },
   { label: t("commitOrdering.date"), value: "date" },
@@ -115,6 +119,20 @@ function isEditableEventTarget(target: EventTarget | null): boolean {
   return target.isContentEditable || (contentEditable !== null && contentEditable !== "false");
 }
 
+function getHorizontalSum(style: CSSStyleDeclaration, left: string, right: string): number {
+  return parseFloat(style.getPropertyValue(left)) + parseFloat(style.getPropertyValue(right));
+}
+
+function getHorizontalBorderWidth(elem: HTMLElement): number {
+  return getHorizontalSum(getComputedStyle(elem), "border-left-width", "border-right-width");
+}
+
+function setMinWidth(elems: (HTMLElement | null)[], value: string) {
+  for (const elem of elems) {
+    if (elem !== null && elem.style.minWidth !== value) elem.style.minWidth = value;
+  }
+}
+
 function buildAuthorOptions(
   authors: string[],
   selectedAuthors: string[]
@@ -142,6 +160,9 @@ class GitKeizuView {
   private currentRepo!: string;
 
   private graph: Graph;
+  private refOverflow: RefOverflowController;
+  private descriptionMinimumWidth: number | null = null;
+  private displayFixedColumns: HTMLElement[] = [];
   private findWidget: FindWidget;
   private fileHistory: FileHistoryController;
   private config: Config;
@@ -261,6 +282,10 @@ class GitKeizuView {
     searchBtnElem.innerHTML = svgIcons.search;
     searchBtnElem.addEventListener("click", () => {
       this.openFindWidget();
+    });
+    this.refOverflow = new RefOverflowController({
+      onMinimumWidth: (minimum) => this.applyDescriptionMinimumWidth(minimum),
+      onRefContextMenu: (event, badge) => this.showRefBadgeContextMenu(event, badge)
     });
     this.findWidget = new FindWidget({
       getCommits: () => this.commits,
@@ -1019,46 +1044,7 @@ class GitKeizuView {
       );
     });
     addListenerToClass("gitRef", "contextmenu", (e: Event) => {
-      e.stopPropagation();
-      let target = <HTMLElement>e.target;
-      let sourceElem = <HTMLElement>target.closest(".gitRef")!;
-      if (sourceElem.classList.contains(DETACHED_WORKTREE_CLASS)) {
-        const worktreePath = sourceElem.dataset.worktreePath;
-        if (worktreePath === undefined) return;
-        showContextMenu(
-          <MouseEvent>e,
-          buildDetachedWorktreeContextMenuItems(this.currentRepo, worktreePath),
-          sourceElem,
-          this.getCurrentRepoRecentActions()
-        );
-        return;
-      }
-      let isRemoteCombined = target.classList.contains("gitRefHeadRemote");
-      let refName = isRemoteCombined ? target.dataset.name! : sourceElem.dataset.name!;
-      const remotes = sourceElem.dataset.remotes
-        ? sourceElem.dataset.remotes.split(",")
-        : undefined;
-      let worktreeInfo: { path: string; isMainWorktree: boolean } | null = null;
-      if (sourceElem.classList.contains("head") && !isRemoteCombined) {
-        const wtEntry = this.worktrees.branches[sourceElem.dataset.name!];
-        if (wtEntry) {
-          worktreeInfo = { path: wtEntry.path, isMainWorktree: wtEntry.isMain };
-        }
-      }
-      showContextMenu(
-        <MouseEvent>e,
-        buildRefContextMenuItems(
-          this.currentRepo,
-          refName,
-          sourceElem,
-          isRemoteCombined,
-          this.gitBranchHead,
-          remotes,
-          worktreeInfo
-        ),
-        sourceElem,
-        this.getCurrentRepoRecentActions()
-      );
+      this.showRefBadgeContextMenu(<MouseEvent>e, <HTMLElement>e.currentTarget);
     });
     addListenerToClass("gitRef", "click", (e: Event) => e.stopPropagation());
     addListenerToClass("gitRef", "dblclick", (e: Event) => {
@@ -1075,8 +1061,54 @@ class GitKeizuView {
         checkoutBranchAction(this.currentRepo, sourceElem, sourceElem.dataset.name!);
       }
     });
+    // Attach after the listeners above so measurement clones never receive them.
+    const tableElem = this.tableElem.querySelector("table");
+    if (tableElem !== null) this.refOverflow.attachTable(tableElem);
 
     this.scrollContainerElem.scrollTop = savedScrollTop;
+  }
+  private showRefBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void {
+    event.stopPropagation();
+    if (badge.classList.contains(DETACHED_WORKTREE_CLASS)) {
+      const worktreePath = badge.dataset.worktreePath;
+      if (worktreePath === undefined) return;
+      showContextMenu(
+        event,
+        buildDetachedWorktreeContextMenuItems(this.currentRepo, worktreePath),
+        badge,
+        this.getCurrentRepoRecentActions()
+      );
+      return;
+    }
+    // A search highlight can wrap the remote label, so the remote is resolved from the nearest ancestor.
+    const remoteElem =
+      event.target instanceof Element
+        ? event.target.closest<HTMLElement>(COMBINED_REMOTE_SELECTOR)
+        : null;
+    const isRemoteCombined = remoteElem !== null && badge.contains(remoteElem);
+    const refName = isRemoteCombined ? remoteElem.dataset.name! : badge.dataset.name!;
+    const remotes = badge.dataset.remotes ? badge.dataset.remotes.split(",") : undefined;
+    let worktreeInfo: { path: string; isMainWorktree: boolean } | null = null;
+    if (badge.classList.contains("head") && !isRemoteCombined) {
+      const wtEntry = this.worktrees.branches[badge.dataset.name!];
+      if (wtEntry) {
+        worktreeInfo = { path: wtEntry.path, isMainWorktree: wtEntry.isMain };
+      }
+    }
+    showContextMenu(
+      event,
+      buildRefContextMenuItems(
+        this.currentRepo,
+        refName,
+        badge,
+        isRemoteCombined,
+        this.gitBranchHead,
+        remotes,
+        worktreeInfo
+      ),
+      badge,
+      this.getCurrentRepoRecentActions()
+    );
   }
   private renderUncommitedChanges() {
     let date = getCommitDate(this.commits[0].date);
@@ -1098,9 +1130,12 @@ class GitKeizuView {
     let columnWidths = this.gitRepos[this.currentRepo].columnWidths,
       mouseX = -1,
       col = -1;
+    this.displayFixedColumns = [];
 
     const makeTableFixedLayout = () => {
       if (columnWidths !== null) {
+        // Fixed layout owns the header widths from here on, so they are no longer display-only.
+        this.displayFixedColumns = [];
         cols[0].style.width = `${columnWidths[0]}px`;
         cols[0].style.padding = "";
         cols[2].style.width = `${columnWidths[1]}px`;
@@ -1115,6 +1150,7 @@ class GitKeizuView {
         col = -1;
         mouseX = -1;
         colHeadersElem.classList.remove("resizing");
+        this.refOverflow.scheduleLayout();
         this.gitRepos[this.currentRepo].columnWidths = columnWidths;
         sendMessage({
           command: "saveRepoState",
@@ -1167,13 +1203,13 @@ class GitKeizuView {
         switch (col) {
           case 0:
             if (columnWidths[0] + mouseDeltaX < 40) mouseDeltaX = -columnWidths[0] + 40;
-            if (cols[1].clientWidth - mouseDeltaX < 64) mouseDeltaX = cols[1].clientWidth - 64;
+            mouseDeltaX = Math.min(mouseDeltaX, this.getDescriptionShrinkLimit(cols[1]));
             columnWidths[0] += mouseDeltaX;
             cols[0].style.width = `${columnWidths[0]}px`;
             this.graph.limitMaxWidth(columnWidths[0] + 16);
             break;
           case 1:
-            if (cols[1].clientWidth + mouseDeltaX < 64) mouseDeltaX = -cols[1].clientWidth + 64;
+            mouseDeltaX = Math.max(mouseDeltaX, -this.getDescriptionShrinkLimit(cols[1]));
             if (columnWidths[1] - mouseDeltaX < 40) mouseDeltaX = columnWidths[1] - 40;
             columnWidths[1] -= mouseDeltaX;
             cols[2].style.width = `${columnWidths[1]}px`;
@@ -1187,6 +1223,7 @@ class GitKeizuView {
             cols[col + 1].style.width = `${columnWidths[col]}px`;
         }
         mouseX = mouseEvent.clientX;
+        this.refOverflow.scheduleLayout();
       }
     });
     colHeadersElem.addEventListener("mouseup", stopResizing);
@@ -1220,11 +1257,74 @@ class GitKeizuView {
     });
   }
 
+  /* Description Column Minimum Width */
+  private getDescriptionShrinkLimit(descriptionHeader: HTMLElement): number {
+    const headerLimit = descriptionHeader.clientWidth - DESCRIPTION_MIN_WIDTH;
+    const cell = this.tableElem.querySelector<HTMLElement>("td:nth-child(2)");
+    if (this.descriptionMinimumWidth === null || cell === null) return headerLimit;
+    // Compare the data cell's inner width (border-box minus borders) with M, never the padded header.
+    const innerWidth = cell.getBoundingClientRect().width - getHorizontalBorderWidth(cell);
+    const limit = innerWidth - this.descriptionMinimumWidth;
+    return Number.isFinite(limit) ? limit : headerLimit;
+  }
+  private applyDescriptionMinimumWidth(minimum: number | null) {
+    this.descriptionMinimumWidth = minimum;
+    const table = this.tableElem.querySelector<HTMLElement>("table");
+    const contentElem = document.getElementById("content");
+    this.releaseDisplayColumnWidths();
+    const headers = table?.querySelectorAll<HTMLElement>("#tableColHeaders > th") ?? [];
+    if (minimum === null || table === null || headers.length !== TABLE_COLUMN_COUNT) {
+      setMinWidth([table, contentElem], "");
+      return;
+    }
+    const otherHeaders = Array.from(headers).filter(
+      (_header, index) => index !== DESCRIPTION_COLUMN_INDEX
+    );
+    const otherWidths = otherHeaders.map((header) => header.getBoundingClientRect().width);
+    if (this.tableElem.classList.contains("autoLayout")) {
+      this.fixDisplayColumnWidths(otherHeaders, otherWidths);
+    }
+    const cell = table.querySelector<HTMLElement>("td:nth-child(2)");
+    const minWidth =
+      otherWidths.reduce((sum, width) => sum + width, 0) +
+      minimum +
+      (cell === null ? 0 : getHorizontalBorderWidth(cell)) +
+      getHorizontalBorderWidth(table);
+    if (!Number.isFinite(minWidth)) return;
+    setMinWidth([table, contentElem], `${minWidth}px`);
+  }
+  // Auto layout pins the other columns at their natural widths so folding cannot shift them.
+  // These widths are display-only and never reach columnWidths or saveRepoState.
+  private fixDisplayColumnWidths(headers: HTMLElement[], outerWidths: number[]) {
+    const contentWidths = headers.map((header, index) => {
+      const style = getComputedStyle(header);
+      return (
+        outerWidths[index] -
+        getHorizontalSum(style, "padding-left", "padding-right") -
+        getHorizontalSum(style, "border-left-width", "border-right-width")
+      );
+    });
+    headers.forEach((header, index) => {
+      if (Number.isFinite(contentWidths[index])) {
+        header.style.width = `${contentWidths[index]}px`;
+      }
+    });
+    this.displayFixedColumns = headers;
+  }
+  private releaseDisplayColumnWidths() {
+    for (const header of this.displayFixedColumns) {
+      header.style.width = "";
+    }
+    this.displayFixedColumns = [];
+  }
+
   /* Observers */
   private observeWindowSizeChanges() {
     let windowWidth = window.outerWidth,
       windowHeight = window.outerHeight;
     window.addEventListener("resize", () => {
+      this.releaseDisplayColumnWidths();
+      this.refOverflow.scheduleLayout();
       if (windowWidth === window.outerWidth && windowHeight === window.outerHeight) {
         if (this.expandedCommit !== null) {
           this.updateCommitDetailsHeight();

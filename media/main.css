@@ -37,6 +37,7 @@ body.unableToLoad p {
 }
 #scrollContainer {
   flex: 1;
+  overflow-x: auto;
   overflow-y: auto;
   min-height: 0;
 }
@@ -498,6 +499,44 @@ body.unableToLoad p {
 }
 .gitRefHeadRemote:hover {
   background-color: rgba(128, 128, 128, 0.1);
+}
+/* Ref overflow: folded badges stay in the DOM but take no space */
+.refOverflowHidden {
+  display: none;
+}
+/* Box metrics mirror .gitRef so the counter never changes the 24px row height */
+.refOverflowCounter {
+  display: inline-block;
+  box-sizing: content-box;
+  appearance: none;
+  height: 18px;
+  line-height: 18px;
+  margin-top: 2px;
+  margin-right: 5px;
+  margin-bottom: 0;
+  margin-left: 0;
+  padding: 0 5px;
+  background-color: rgba(128, 128, 128, 0.15);
+  color: inherit;
+  border-radius: 5px;
+  border: 1px solid rgba(128, 128, 128, 0.75);
+  vertical-align: top;
+  font-family: inherit;
+  font-size: 12px;
+  font-style: inherit;
+  font-weight: inherit;
+  letter-spacing: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.refOverflowMeasure {
+  position: fixed;
+  left: 0;
+  top: 0;
+  width: max-content;
+  white-space: nowrap;
+  visibility: hidden;
+  pointer-events: none;
 }
 
 /* -- Controls (top toolbar) ------------------------------------------------ */
