@@ -15,11 +15,11 @@
 
 Git Keizu is an actively maintained fork of [Git Graph](https://github.com/mhutchie/vscode-git-graph), intentionally focused on the core graph experience.
 
-> **Japanese UI supported / 日本語UI対応**
+> **English & Japanese UI / 英語・日本語UI対応**
 >
-> Set VS Code's display language to Japanese and the entire Git Keizu interface — commands, settings, menus, dialogs, error messages, and dates — switches to Japanese automatically. No extra configuration required.
+> Git Keizu follows VS Code's display language. The interface is in English by default and switches to Japanese automatically when the display language is Japanese — commands, settings, menus, dialogs, error messages, and dates. Other display languages fall back to English.
 >
-> VS Codeの表示言語を日本語に設定するだけで、コマンド、設定項目、メニュー、ダイアログ、エラーメッセージ、日付表示まで含めて、Git Keizuのインターフェース全体が自動的に日本語へ切り替わります。追加の設定は不要です。
+> Git Keizuの表示はVS Codeの表示言語に従います。通常は英語で表示され、表示言語を日本語にすると、コマンド、設定項目、メニュー、ダイアログ、エラーメッセージ、日付表示まで自動的に日本語へ切り替わります。追加の設定は不要です。
 
 ## Getting Started
 

@@ -2,7 +2,7 @@
   "name": "git-keizu",
   "displayName": "Git Keizu",
   "version": "1.3.0",
-  "description": "Git history graph / 日本語UI対応 — checkout, merge, rebase, cherry-pick, stash & worktree. Successor to Git Graph. Requires Git 2.32+.",
+  "description": "Git history graph (English / 日本語 UI) — checkout, merge, rebase, cherry-pick, stash & worktree. Successor to Git Graph. Requires Git 2.32+.",
   "categories": [
     "SCM Providers",
     "Visualization"
