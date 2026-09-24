@@ -306,3 +306,29 @@ jsdomはレイアウトしないため、`getBoundingClientRect`・`getComputedS
 - Type: excluded(DOM型はTypeScriptで保証される)
 
 **失敗系/正常系比（煙感知器）**: 正常系5件、失敗系6件。
+
+### Feature 059-02 テスト対応と実行証跡（S1〜S5）
+
+**テスト対応**（`tests/web/refOverflow.test.ts`。各 `it` 名の末尾と `// Case:` にCase IDを記載し、`@see` は本ファイル）:
+
+- S1 TC-001〜TC-020: describe `selectVisibleRefCount`。TC-001〜TC-004・TC-005/TC-006・TC-011〜TC-013・TC-014・TC-017・TC-018/TC-019 は `it.each` で入力ごとに識別。期待値は対応プラン §3.6 の固定値と §3.4 の式からの手計算で、production関数から計算していない。0 は `toBe(0)`、null は `toBeNull()` で直接比較
+- S2 TC-021〜TC-029: describe `calculateMinimumDescriptionWidth`（TC-022 は両順、TC-027 は7項目を `it.each`）
+- S3 TC-030〜TC-059: describe `RefOverflowController measuring and folding`。寸法は `<style>` fixture（td padding 4/4、ref・counter・HEADの右margin 5、`.commitMessage` 13px）と `Element.prototype.getBoundingClientRect` のspyで与え、`requestAnimationFrame` はキュー、`ResizeObserver` は通知を手動発火する代替、`document.fonts` は `ready` を制御できる `EventTarget` で差し替える（afterEachで復元）。controllerと幅判定はモックしない。元ref（計測領域外）は幅9999を返し、判定に使われないことを同時に検証
+- S4 TC-061〜TC-086: describe `RefOverflowController hidden-badge list`（TC-078〜TC-082 は `it.each` でviewportとrectを指定）
+- S5 TC-087〜TC-097: describe `RefOverflowController.syncSearchHighlights`
+- 変異確認（一時的に `web/refOverflow.ts` を改変し、確認後に戻した）: 右margin除外→TC-031・TC-032・TC-037・TC-038・TC-044〜TC-046、border未減算→TC-032、上方反転なし→TC-079・TC-082、折り畳み後の同期なし→TC-097、counter文字列の常時書換えとcounter位置の常時挿入→TC-044、幅変化時の一覧未閉鎖→TC-084 がそれぞれ失敗することを確認した
+
+**TC-060 手動確認（実ブラウザ性能記録）**: Chromium 1194 headless（`--headless=new --disable-gpu`）、4 vCPU Intel Xeon 2.10GHz、viewport 1000×500、DejaVu Sans 13px。変更前（`b11c2ed` の `web/` を esbuild でバンドル）と変更後を同一HTML・同一データで比較。5行ごとに AC-01 と同形の ref 7個（バッジ6個）を持つコミットを置き、表を `loadCommits`（hard）で再描画して、描画開始から2フレーム後に強制レイアウトが終わるまでをms計測した。合格閾値は設けない。
+
+| 行数 / ref総数（バッジ数） | CPU                  | 変更前 試行値（ms）                | 変更後 試行値（ms）               |
+| -------------------------- | -------------------- | ---------------------------------- | --------------------------------- |
+| 300 / 420（360）           | 1x                   | 49.2, 47.1, 56.3, 53.2, 60.4       | 70.5, 73.5, 66.3, 72.0, 77.4      |
+| 1,000 / 1,400（1,200）     | 1x                   | 189.6, 181.6, 177.4, 215.6, 197.2  | 230.1, 257.4, 242.3, 244.0, 244.6 |
+| 3,000 / 4,200（3,600）     | 1x                   | 444.8, 657.6, 636.4, 962.9, 1278.0 | 768.9, 691.8, 825.8, 657.6, 763.9 |
+| 300 / 420（360）           | 4x（CDP throttling） | 223.5, 250.1, 254.5                | 397.9, 379.0, 417.2               |
+| 1,000 / 1,400（1,200）     | 4x（CDP throttling） | 829.2, 778.8, 771.2                | 1332.9, 1165.6, 1499.7            |
+| 3,000 / 4,200（3,600）     | 4x（CDP throttling） | 2865.1, 2524.9, 3136.8             | 3838.6, 4047.3, 4673.0            |
+
+- 同期描画部分（`loadCommits` の戻りまで）は前後同程度（例 1x 1,000行: 変更前 146.9〜186.6ms、変更後 135.1〜147.6ms）で、差は後続フレームの計測・折り畳みに相当する
+- 描画完了後2秒間の `requestAnimationFrame` 追加呼出しと ResizeObserver コールバックは全条件で0回（自己通知による継続レイアウトなし）。変更後の折り畳み結果は 300/1,000/3,000 行で counter 60/200/600個、隠れref 300/1,000/3,000個
+- 未検証: VS Code 実 webview 上での同計測。理由: 本環境に VS Code 実行環境がなく、headless Chromium の単体HTMLで代替した。実行スクリプトと結果JSONは作業セッションの scratchpad（`t6/browser.mjs`、`t6/browser-result-4.json`）に置き、リポジトリには含めない

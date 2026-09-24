@@ -92,7 +92,7 @@
 > Supersedes: -
 > Signature: `public loadCommits(commits, commitHead, moreAvailable, forceRender, authors?, worktrees?)` / `public loadRepos(repos, lastActiveRepo): boolean` / `public selectRepo(repo: string)` / repoDropdownの変更callback / `private renderShowLoading()` / `#scrollContainer` のscroll処理
 > Target Path: `web/main.ts`（上記各経路でのdetach / closePopup の呼出し。実装後に行範囲へ更新）
-> Test File: `tests/web/main.test.ts`
+> Test File: `tests/web/main.refOverflow.test.ts`
 
 表置換・loading表示・リポジトリ切替の開始では一覧と一覧起点メニューを閉じてcontrollerをdetachし、無変更更新・一覧内scrollでは一覧を保持する。一覧は実controllerでcounterをclickして開き、一覧起点メニューは複製の右クリックで開く。ホスト側の取得処理は対象外。
 
@@ -131,3 +131,8 @@
 - Type: excluded(メッセージ型は既存の責務)
 
 **失敗系/正常系比（煙感知器）**: 正常系7件、失敗系4件。
+
+### Feature 059-02 テスト対応と実行証跡（S59）
+
+- テストファイル: `tests/web/main.refOverflow.test.ts` の describe `ref list lifecycle on replacement, switching and scrolling (S59)`。TC-464〜TC-474 を各 `it` で検証（TC-467 は送信のたびに一覧数と `#content` の `min-width` を記録、TC-472 は Ctrl+R のハードリフレッシュで検証しクリックによる外側閉鎖と区別）
+- 実ブラウザ確認（Chromium headless）: 無変更 `loadCommits` で一覧維持・`min-width` 不変、コミット追加の `loadCommits` で一覧が閉じ counter 再描画、`selectRepo` で一覧が閉じ loading 表示・`#content` の `min-width` 解除、同リポジトリへ戻すと再計測（M=81）。表の縦スクロールで一覧が閉じる（CDPの縦ホイールは headless でスクロールを起こさなかったため `scrollBy` による実スクロールイベントで確認）。一覧内の縦横ホイールでは一覧維持

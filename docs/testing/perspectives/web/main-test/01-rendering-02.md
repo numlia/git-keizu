@@ -177,7 +177,7 @@ S48の描画・イベント契約を引き継ぎ、TC-295（context menu 0回）
 > Supersedes: -
 > Signature: `private renderTable(): void` / `private makeTableResizable(): void` / `private observeWindowSizeChanges(): void` と `RefOverflowController` の生成・`attachTable`・`onMinimumWidth` の接続、`FindWidgetCallbacks.onHighlightsChanged` の配線
 > Target Path: `web/main.ts`（controller生成、`renderTable()` 末尾のattach、`makeTableResizable()` の列幅・ドラッグ、`observeWindowSizeChanges()`。実装後に行範囲へ更新）
-> Test File: `tests/web/main.test.ts`
+> Test File: `tests/web/main.refOverflow.test.ts`
 
 実main描画に寸法モック（`getBoundingClientRect`・`getComputedStyle`・ResizeObserver・rAF）を与え、controllerの生成・attach・最小幅の適用・保存値の維持を検証する。幅判定の全分岐は `web/refOverflow-test.md` S1〜S3 の責務。最小幅の適用fixtureは、他4列の実使用外幅を40 / 80 / 120 / 90（計330）、表のborder差分を0とする。`TEST_REPO = "/test/repo"`。
 
@@ -227,3 +227,11 @@ S48の描画・イベント契約を引き継ぎ、TC-295（context menu 0回）
 - Type: excluded(DOM型はTypeScriptで保証される)
 
 **失敗系/正常系比（煙感知器）**: 正常系10件、失敗系8件。
+
+### Feature 059-02 テスト対応と実行証跡（S56）
+
+- テストファイル: `tests/web/main.refOverflow.test.ts` の describe `ref overflow rendering and the description column width (S56)` と子 describe `fixed layout column resizing`。`tests/web/main.test.ts` は FindWidget・contextMenu をファイル全体でモックしているため、実 FindWidget・実 contextMenu / dialogs（呼出し記録用のspyで実装を実行）を使う統合テストを既存の分割名規則（`tests/src/repoManager.*.test.ts` 等）に倣って別ファイルにした。本ファイルは `web/refOverflow.ts` をimportしない
+- Case対応: TC-427〜TC-444 は各 `it` 名の末尾と `// Case:` に記載（TC-432 は `min-width` の 64/null と、ドラッグ下限の null 経路を fixed layout 側の `it` で分けて検証。TC-441 は外寸同一/変更の2分岐を `it.each`）
+- TC-427 主回帰の RED/GREEN: 修正前 `b11c2ed` の一時 worktree（node_modules は symlink）に同じテストファイルを置き `vitest run -t TC-427` を実行すると、`expected [] to deeply equal [ '+4' ]`（counter不在）で失敗した。同時に描画されたrefは main と長い worktree 5件の計6件で、import・fixture は正常。修正後の作業ツリーでは pass（先頭2個、`+4`、一覧4件の元順、右クリックで `buildRefContextMenuItems(TEST_REPO, 4件目の名前, 複製, false, "main", undefined, { path, isMainWorktree: false })`）
+- TC-430 の期待結果の扱い: 「全件がBに収まる行」を含む表はバッジのある行を計測するため、対応プラン §3.4「全バッジが収まる場合も最小幅は自然幅のカウンター候補から算出する」と §3.5（数値を返した場合だけ通知）により数値の最小幅が適用される（`web/refOverflow-test.md` TC-046 と同じ契約）。このため `min-width` 空文字の期待はバッジなし行だけの表で検証し、全件収容行は counter なし・隠れref 0件・表示不変と、数値の `min-width`（405px）を検証した。ケース表は変更していない
+- 実ブラウザ確認（Chromium headless、手順は `web/refOverflow-test.md` の実行証跡と同じ環境）: viewport 1000×500 で変更前後の行高 `[24.5, 24, 24, …]`、行top、グラフ頂点 cx/cy、グラフと表の top が一致。devicePixelRatio 2、CSS zoom 1.25（行高 30.5/30）、viewport 600 でも前後一致。列ドラッグ（実マウス）後の説明セル内幅 81 = M（81）、保存は mouseup の1回だけ。保存幅 `[400,100,100,100]`・幅700 の再表示で内幅 81、表 scrollWidth 877 > clientWidth 685 で横スクロール、保存送信0回。スクリーンショットはリポジトリ外（scratchpad `t6/shots/step1-*.png`、`step2-after-drag.png`、`step2-narrow-saved-700.png`）

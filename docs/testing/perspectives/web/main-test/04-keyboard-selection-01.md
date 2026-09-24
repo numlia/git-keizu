@@ -203,7 +203,7 @@ ArrowUp/ArrowDown のコミット移動分岐に、event target が入力可能�
 > Supersedes: -
 > Signature: `handleEscape(): void`（`RefOverflowController.closePopup(): boolean` の呼出しを既存ドロップダウンの後、findWidgetの前へ追加）
 > Target Path: `web/main.ts`（`handleEscape()`。実装後に行範囲へ更新）
-> Test File: `tests/web/main.test.ts`
+> Test File: `tests/web/main.refOverflow.test.ts`
 
 Escの順序を `contextMenu → dialog → repoDropdown → branchDropdown → authorDropdown → ref一覧 → findWidget → expandedCommit` とし、`closePopup()` が `true` ならそのEscを終える。既存S40の順序は一覧が閉じている場合にそのまま成り立つため、本節はadditive。一覧は実controllerでcounterをclickして開く。
 
@@ -237,3 +237,9 @@ Escの順序を `contextMenu → dialog → repoDropdown → branchDropdown → 
 - Type: excluded(キー判定は既存S10の責務)
 
 **失敗系/正常系比（煙感知器）**: 正常系3件（TC-457、TC-458、TC-461）、失敗系4件。
+
+### Feature 059-02 テスト対応と実行証跡（S58）
+
+- テストファイル: `tests/web/main.refOverflow.test.ts` の describe `handleEscape with the ref list (S58)`。一覧は実controllerでcounterをclickして開き、メニューは実 contextMenu（spyで呼出し記録）、ダイアログは実 dialogs、検索は実 FindWidget（`FindWidget.prototype.close` をspy）、コミット詳細は `#commitDetails` の存在で判定
+- Case対応: TC-457/TC-458 は同じ `it` で1回目・2回目のEscを順に検証。TC-459、TC-460（3種のドロップダウンを `it.each`）、TC-461、TC-462、TC-463 は各 `it`
+- 実ブラウザ確認（Chromium headless、実キー入力）: 一覧起点メニュー表示中のEscでメニューだけ閉じ一覧維持、次のEscで一覧が閉じる。確認ダイアログ表示中のEscはダイアログだけ閉じ一覧維持

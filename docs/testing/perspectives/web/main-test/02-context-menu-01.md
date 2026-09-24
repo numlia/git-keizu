@@ -138,7 +138,7 @@
 > Supersedes: -
 > Signature: `showRefBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void`（行内 `.gitRef` のcontextmenuと `RefOverflowOptions.onRefContextMenu` の共通処理）
 > Target Path: `web/main.ts`（`addListenerToClass("gitRef", "contextmenu", ...)` から切り出す共通処理とcontroller生成時の接続。実装後に行範囲へ更新）
-> Test File: `tests/web/main.test.ts`
+> Test File: `tests/web/main.refOverflow.test.ts`
 
 行内refと一覧の複製の右クリックが同じ共通処理を通り、既存menu builderへ同じ値を渡すことを検証する。builder内の項目分岐は `web/refMenu-test/`・`web/worktreeMenu-test.md` の責務。TC-445〜TC-454は既存menuモックで引数の同値を確認し、TC-455は別describeで実contextMenuを使う。`TEST_REPO = "/test/repo"`。
 
@@ -179,3 +179,9 @@
 - Type: excluded(event targetのElement判定はTC-447・TC-448の境界で扱う)
 
 **失敗系/正常系比（煙感知器）**: 正常系9件、失敗系3件。共通化は既存引数の同値性の確認が主で、失敗源は上表で充足した。
+
+### Feature 059-02 テスト対応と実行証跡（S57）
+
+- テストファイル: `tests/web/main.refOverflow.test.ts`。TC-445〜TC-454・TC-456 は describe `ref badge right-click from the row and the list (S57)`（既存と同じく `buildRefContextMenuItems` / `buildDetachedWorktreeContextMenuItems` をモックして引数を記録し、`showContextMenu` は実装を呼ぶspy）。TC-455 は describe `listed badge operations through the real context menu (S57)` で実 `buildRefContextMenuItems` と実 contextMenu / dialogs を使い、行内と一覧の複製それぞれで More › Remove Worktree… → 確認ダイアログ → 実行を行い、ダイアログHTMLと `removeWorktree` の送信内容が一致し、メニュー・サブメニュー操作中に一覧が開いたままであることを確認
+- TC-453 は `buildStashContextMenuItems`（実装を呼ぶspy）の呼出し0回と、行内・一覧で同じ builder・引数（第3引数を除く）であることを確認
+- 実ブラウザ確認（Chromium headless、実マウス入力）: 一覧の複製右クリックで `#contextMenu` が表示され一覧は維持、More のサブメニュー（Rename / Delete / Remove Worktree）表示後も一覧は維持、Remove Worktree… で確認ダイアログ表示、Copy Branch Name の送信内容が `{ command: "copyToClipboard", type: "Branch Name", data: <隠れたref名> }`。検索マーク内の結合リモートを右クリックしたメニューはリモート用（Checkout Branch… / Merge into current branch… / More / Copy）で、マークなしのリモートラベルと一致し、ローカル側（Pull / Push / More / Copy）と異なる。一覧内に隠れた結合バッジのリモートマークでも同じリモート用メニュー

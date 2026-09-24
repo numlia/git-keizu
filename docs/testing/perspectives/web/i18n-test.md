@@ -50,3 +50,7 @@ counterのtitle/aria-labelに使う `t("refs.showHidden", hiddenCount)` が、�
 | キー欠落時のfallback                         | excluded(既存S1 TC-002で担保済み。本件で `t` を変更しない) |
 | 文言の誤り                                   | excluded(l10n各辞書の観点の責務)                           |
 | 外部依存・例外                               | excluded(`t` は辞書参照と置換だけでthrow経路を持たない)    |
+
+### Feature 059-02 テスト対応（S2）
+
+- テストファイル: `tests/web/i18n.test.ts` の describe `hidden ref badge counter label (Feature 059-02)`。TC-006・TC-007・TC-009 は各 `it`、TC-008 は n=9/10/99/100 を `it.each`。実辞書JSONを `globalThis.webviewMessages` に設定し、既存の `t` をそのまま呼ぶ

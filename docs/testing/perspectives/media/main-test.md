@@ -295,3 +295,19 @@ S1は層数を10定義に固定していたため、ref一覧層の追加で期�
 - Type: excluded(型分岐なし)
 
 **失敗系/正常系比（煙感知器）**: 正常系9件、失敗系3件。静的 CSS 契約は宣言の存在検証が正常系として並ぶ構造で、実効性は手動ケースで確認する。
+
+### Feature 059-02 テスト対応と実行証跡（S4・S5）
+
+**テスト対応**（`tests/web/overlayLayers.test.ts`）:
+
+- S4 TC-043〜TC-057: describe `media/main.css overlay layers (S4)`。S1 の TC-001〜TC-013 を検証していた既存テストを S4 の Case ID へ付け替え、層定数表へ `--git-keizu-z-index-ref-overflow: 13` を追加（既存10値は不変のまま完全一致で比較）。TC-053（`.refOverflowPopup` の参照）と TC-055（12 < 13 < 15）を追加し、TC-054 は13を含む10層の厳密昇順。S2 TC-025・S3 TC-039 の「既存z-index契約の不変」も同じ定数表で13を含めて比較する
+- S5 TC-065〜TC-072: describe `media/main.css ref overflow declarations (S5)`。宣言文字列の照合であり、実表示の確認ではない
+
+**手動確認（実ブラウザ）**: Chromium 1194 headless、viewport 1000×500（手順・環境は `web/refOverflow-test.md` の実行証跡と同じ）。VS Code 実 webview では未検証（理由: 本環境に VS Code 実行環境がない）。スクリーンショットはリポジトリ外（作業セッションの scratchpad `t6/shots/`）に保存。
+
+- TC-058〜TC-060・TC-062・TC-063（S1 からの引き継ぎ）: 高さ120pxのviewportで検索ウィジェットと重なるエラーダイアログの座標は `#dialog`、重ならない検索領域は `#dialogBacking` がヒットし、クリックしても検索入力へフォーカスしない。幅320pxでも同じ。context menu 表示中・scroll shadow（active）表示中のダイアログでも `#dialogBacking` が前面。TC-061（form / checkbox 系ダイアログ）は同じ `showDialog` 経路のため再実施していない
+- TC-064: 一覧を表ヘッダー・`#controls` と重なる位置へ移すと両座標とも一覧がヒット（z-index 13）。一覧の複製から開いた `#contextMenu` とMoreサブメニューは一覧の上でヒットし、一覧は開いたまま（`step5-list-menu-layers.png`）
+- TC-073: 変更前後で行高 `[24.5, 24, 24, …]`、行top、グラフ頂点 cx/cy、グラフと表の top が一致（viewport 1000・600、devicePixelRatio 2、CSS zoom 1.25 で前後比較）。変更後は AC-01 と同形の行で `main | origin` 可視・`+5`（W=584.688、フォント DejaVu Sans 13px、ズーム1）、counter 29.7×20・scrollWidth 28 = clientWidth 28 で全文表示、可視refとの重なりなし、説明文の可視幅 439.8px（Wの75%）、変更前のバッジ外幅は main 110.156・worktree 各343.188（`step1-*.png`）
+- TC-074: viewport 400px で表 scrollWidth 458 > clientWidth 385、横ホイールで scrollLeft 73（最大）まで到達し最終列が表示、グラフと表の left 差 8・top 一致・行高不変（`step2-hscroll.png`）
+- TC-075: 隠れ58件と300文字名を含む一覧が viewport 1000×500 に収まり（scrollHeight 1282 > clientHeight 483、scrollWidth 2173 > clientWidth 983）、縦横ホイールで最終行と長い名前の末尾へ到達し一覧は維持（`step2-big-list-scrolled.png`）
+- TC-076: 列ドラッグ（実マウス）、狭い保存幅の再表示（幅700、内幅81 = M）、ウィンドウ縮小（1000→700→520→400、内幅は常に81以上、400で横スクロール）、devicePixelRatio 2、CSS zoom 1.25（再計測1回、行高30）、フォント切替（`--vscode-font-family` を DejaVu Serif 15px へ）、テーマ切替（body class `vscode-dark`→`vscode-light`、再計測1回）、非表示→再表示（`html` を `display: none` にしている間は counter 2個・隠れref 63個を維持、rAF追加0回、再表示後に同じ折り畳みへ復帰）、無変更更新・追加読み込み・リポジトリ切替の各後に counter と説明文（W の40%以上）が表示され、各操作後の0.8〜2秒間に rAF・ResizeObserver の追加呼出し0回。隠れた一致の counter は背景 rgba(234, 92, 0, 0.35)・枠 rgba(234, 92, 0, 0.9) で表示（`step3-hidden-only.png`）

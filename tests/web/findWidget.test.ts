@@ -22,6 +22,7 @@ vi.mock("../../web/dates", () => ({
 }));
 
 import { getBranchLabels } from "../../web/branchLabels";
+import { getCommitDate } from "../../web/dates";
 
 /* === Helpers === */
 
@@ -794,5 +795,302 @@ describe("FindWidget", () => {
       expect(widget.getState().openCdvEnabled).toBe(false);
       expect(getOpenCdvElem().classList.contains(CLASS_ACTIVE)).toBe(false);
     });
+  });
+});
+
+/* --- S10: ref overflow exclusion and highlight notification --- */
+
+// @see docs/testing/perspectives/web/findWidget-test.md
+describe("FindWidget ref overflow exclusion and highlight notification (S10)", () => {
+  const HASH = "aaa1111100000000";
+  const DEFAULT_DATE = { title: "24 Feb 2026 12:00", value: "24 Feb 2026 12:00" };
+  let callbacks: FindWidgetCallbacks;
+  let onHighlightsChanged: Mock<() => void>;
+  let marksAtNotification: number[];
+  let widget: FindWidget;
+
+  function labelsFromRefs(refs: GG.GitRef[]) {
+    return {
+      heads: refs.filter((r) => r.type === "head").map((r) => ({ name: r.name, remotes: [] })),
+      remotes: refs.filter((r) => r.type === "remote"),
+      tags: refs.filter((r) => r.type === "tag")
+    };
+  }
+
+  // One commit row whose description cell holds the given markup (mirrors web/main.ts).
+  function setupRow(commit: GG.GitCommitNode, descriptionHtml: string): HTMLElement {
+    (callbacks.getCommits as Mock).mockReturnValue([commit]);
+    const row = document.createElement("tr");
+    row.className = "commit";
+    row.dataset.id = "0";
+    row.innerHTML = `<td></td><td>${descriptionHtml}</td><td>${commit.author}</td><td>${commit.hash.substring(0, ABBREV_LENGTH)}</td>`;
+    document.body.appendChild(row);
+    return row;
+  }
+
+  function hiddenRef(name: string): string {
+    return `<span class="gitRef head refOverflowHidden" data-name="${name}"><span class="gitRefName">${name}</span></span>`;
+  }
+
+  const COUNTER_HTML =
+    '<button type="button" class="refOverflowCounter" data-ref-overflow-ignore="">+4</button>';
+
+  function typeSearch(text: string): void {
+    const input = document.getElementById("findInput") as HTMLInputElement;
+    input.value = text;
+    input.dispatchEvent(new KeyboardEvent("keyup", { key: "x" }));
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+  }
+
+  function marksIn(root: ParentNode): number {
+    return root.querySelectorAll(`.${CLASS_FIND_MATCH}`).length;
+  }
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    document.body.innerHTML = "";
+    marksAtNotification = [];
+    onHighlightsChanged = vi.fn(() => {
+      marksAtNotification.push(marksIn(document));
+    });
+    callbacks = { ...createMockCallbacks(), onHighlightsChanged };
+    widget = new FindWidget(callbacks);
+    (getBranchLabels as Mock).mockImplementation(labelsFromRefs);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    (getBranchLabels as Mock).mockImplementation(() => ({ heads: [], remotes: [], tags: [] }));
+    vi.mocked(getCommitDate).mockImplementation(() => DEFAULT_DATE);
+    document.body.innerHTML = "";
+  });
+
+  it("searches a hidden original ref (TC-040)", () => {
+    // Case: TC-040 (AC-08)
+    // Given: a row whose only match is a hidden ref
+    const commit = makeCommit({
+      hash: HASH,
+      message: "plain",
+      refs: [{ hash: HASH, name: "feature/hidden-only", type: "head" }]
+    });
+    const row = setupRow(commit, `${hiddenRef("feature/hidden-only")}${COUNTER_HTML}plain`);
+
+    // When: the hidden branch name is searched
+    triggerSearch(widget, "hidden-only");
+
+    // Then: one commit and a mark inside the hidden ref
+    expect(getPositionText()).toBe("1 of 1");
+    const marks = row.querySelectorAll(`.refOverflowHidden .${CLASS_FIND_MATCH}`);
+    expect(marks).toHaveLength(1);
+    expect(marks[0].textContent).toBe("hidden-only");
+  });
+
+  it("never searches the counter text (TC-041)", () => {
+    // Case: TC-041 (AC-10)
+    // Given: a +4 counter and no "4" in any searched field
+    vi.mocked(getCommitDate).mockImplementation(() => ({
+      title: "01 Jan 2026 12:00",
+      value: "01 Jan 2026 12:00"
+    }));
+    const commit = makeCommit({ hash: HASH, message: "plain" });
+    const row = setupRow(commit, `${COUNTER_HTML}plain`);
+
+    // When: "4" is searched
+    triggerSearch(widget, "4");
+
+    // Then: no result and the counter button is untouched
+    expect(getPositionText()).toBe("No Results");
+    const counter = row.querySelector(".refOverflowCounter")!;
+    expect(counter.tagName).toBe("BUTTON");
+    expect(marksIn(counter)).toBe(0);
+  });
+
+  it("marks only outside the ignored subtrees (TC-042)", () => {
+    // Case: TC-042 (AC-10)
+    // Given: an ignored clone and counter holding the search word, and a matching message
+    const commit = makeCommit({ hash: HASH, message: "fix typo" });
+    const row = setupRow(
+      commit,
+      `${COUNTER_HTML}<span data-ref-overflow-ignore=""><span class="gitRef">fix-clone</span></span><span class="commitMessage">fix typo</span>`
+    );
+
+    // When: "fix" is searched
+    triggerSearch(widget, "fix");
+
+    // Then: one commit, the message is marked and the ignored subtrees are not
+    expect(getPositionText()).toBe("1 of 1");
+    expect(marksIn(row.querySelector(".commitMessage")!)).toBe(1);
+    const ignored = Array.from(row.querySelectorAll("[data-ref-overflow-ignore]"));
+    expect(ignored.map((elem) => marksIn(elem))).toEqual([0, 0]);
+  });
+
+  it("clears hidden-ref marks and leaves ignored subtrees as they were (TC-043)", () => {
+    // Case: TC-043
+    // Given: the TC-040 search, plus an ignored clone that already carries a copied mark
+    const commit = makeCommit({
+      hash: HASH,
+      message: "plain",
+      refs: [{ hash: HASH, name: "feature/hidden-only", type: "head" }]
+    });
+    const row = setupRow(
+      commit,
+      `${hiddenRef("feature/hidden-only")}${COUNTER_HTML}<span data-ref-overflow-ignore=""><span class="findMatch">hidden-only</span></span>plain`
+    );
+    const ignoredBefore = Array.from(row.querySelectorAll("[data-ref-overflow-ignore]")).map(
+      (elem) => elem.innerHTML
+    );
+    widget.show(false);
+    typeSearch("hidden-only");
+    expect(marksIn(row.querySelector(".refOverflowHidden")!)).toBe(1);
+
+    // When: the search text is emptied
+    typeSearch("");
+
+    // Then: the hidden ref is back to plain text; ignored subtrees are byte-identical
+    const hidden = row.querySelector(".refOverflowHidden .gitRefName")!;
+    expect(marksIn(hidden)).toBe(0);
+    expect(hidden.innerHTML).toBe("feature/hidden-only");
+    expect(
+      Array.from(row.querySelectorAll("[data-ref-overflow-ignore]")).map((elem) => elem.innerHTML)
+    ).toEqual(ignoredBefore);
+    expect(row.querySelector(".refOverflowCounter")!.tagName).toBe("BUTTON");
+  });
+
+  it("notifies once per search after the marks are inserted (TC-044)", () => {
+    // Case: TC-044 (AC-08)
+    // Given: a hidden-ref match
+    const commit = makeCommit({
+      hash: HASH,
+      message: "plain",
+      refs: [{ hash: HASH, name: "feature/hidden-only", type: "head" }]
+    });
+    setupRow(commit, `${hiddenRef("feature/hidden-only")}plain`);
+
+    // When: one search runs
+    triggerSearch(widget, "hidden-only");
+
+    // Then: one notification that already sees the mark
+    expect(onHighlightsChanged).toHaveBeenCalledTimes(1);
+    expect(marksAtNotification).toEqual([1]);
+  });
+
+  it.each([
+    { operation: "empty text", run: () => typeSearch("") },
+    { operation: "close()", run: () => widget.close() },
+    {
+      operation: "invalid regex [invalid",
+      run: () => {
+        (document.getElementById("findRegex") as HTMLElement).click();
+        typeSearch("[invalid");
+      }
+    },
+    {
+      operation: "zero-length regex (?:)",
+      run: () => {
+        (document.getElementById("findRegex") as HTMLElement).click();
+        typeSearch("(?:)");
+      }
+    }
+  ])("notifies after clearing the marks on $operation (TC-045)", (entry) => {
+    // Case: TC-045 (AC-09)
+    // Given: an active hidden-ref match
+    const commit = makeCommit({
+      hash: HASH,
+      message: "plain",
+      refs: [{ hash: HASH, name: "feature/hidden-only", type: "head" }]
+    });
+    setupRow(commit, `${hiddenRef("feature/hidden-only")}plain`);
+    widget.show(false);
+    typeSearch("hidden-only");
+    expect(marksIn(document)).toBe(1);
+    onHighlightsChanged.mockClear();
+    marksAtNotification = [];
+
+    // When: the marks are removed by the operation
+    entry.run();
+
+    // Then: at least one notification, the last one seeing no mark
+    expect(onHighlightsChanged).toHaveBeenCalled();
+    expect(marksAtNotification.at(-1)).toBe(0);
+    expect(marksIn(document)).toBe(0);
+  });
+
+  it("works without the optional callback (TC-046)", () => {
+    // Case: TC-046
+    // Given: callbacks without onHighlightsChanged
+    const plainCallbacks = createMockCallbacks();
+    document.body.innerHTML = "";
+    const plainWidget = new FindWidget(plainCallbacks);
+    (plainCallbacks.getCommits as Mock).mockReturnValue([
+      makeCommit({ hash: HASH, message: "fix bug" })
+    ]);
+    createCommitRow(0, ["fix bug"]);
+    plainWidget.show(false);
+
+    // When: a search and its clearing run
+    const input = document.getElementById("findInput") as HTMLInputElement;
+    input.value = "fix";
+    input.dispatchEvent(new KeyboardEvent("keyup", { key: "x" }));
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+    const found = getPositionText();
+    input.value = "";
+    input.dispatchEvent(new KeyboardEvent("keyup", { key: "x" }));
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+
+    // Then: both complete as before
+    expect(found).toBe("1 of 1");
+    expect(getPositionText()).toBe("No Results");
+  });
+
+  it("does not search again because of the notification (TC-047)", () => {
+    // Case: TC-047
+    // Given: a visible widget and a matching commit
+    setupRow(makeCommit({ hash: HASH, message: "fix bug" }), "fix bug");
+    widget.show(false);
+    (callbacks.getCommits as Mock).mockClear();
+
+    // When: one input is typed
+    typeSearch("fix");
+
+    // Then: one search and one notification
+    expect(callbacks.getCommits).toHaveBeenCalledTimes(1);
+    expect(onHighlightsChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not search a detached worktree label (TC-048)", () => {
+    // Case: TC-048
+    // Given: a detached worktree label /tmp/wt8 and no "wt8" in the searched fields
+    setupRow(
+      makeCommit({ hash: HASH, message: "plain" }),
+      '<span class="gitRef worktree detachedWorktree" data-worktree-path="/tmp/wt8">wt8</span>plain'
+    );
+
+    // When: "wt8" is searched
+    triggerSearch(widget, "wt8");
+
+    // Then: no result
+    expect(getPositionText()).toBe("No Results");
+  });
+
+  it.each([
+    { options: { caseSensitive: true }, text: "feature/hidden", expected: "No Results" },
+    { options: { regex: true }, text: "Feature/Hid.*", expected: "1 of 1" }
+  ])("keeps the search options for hidden refs ($text) (TC-049)", (entry) => {
+    // Case: TC-049 (AC-10)
+    // Given: a hidden ref Feature/Hidden
+    setupRow(
+      makeCommit({
+        hash: HASH,
+        message: "plain",
+        refs: [{ hash: HASH, name: "Feature/Hidden", type: "head" }]
+      }),
+      `${hiddenRef("Feature/Hidden")}plain`
+    );
+
+    // When: the search runs with the option
+    triggerSearch(widget, entry.text, entry.options);
+
+    // Then: the existing option semantics decide the result
+    expect(getPositionText()).toBe(entry.expected);
   });
 });

@@ -376,3 +376,7 @@ counterのtitle/aria-labelに使う新キーが en bundle に追加され、値�
 | 追加時の既存 key 誤削除・空値             | TC-028                                                                   |
 | 日本語値                                  | excluded(`web.l10n.ja.json-test.md` S11 の責務)                          |
 | 境界値・外部依存・例外・型                | excluded(静的 JSON に数値境界・外部依存・throw 経路・型分岐が存在しない) |
+
+### Feature 059-02 テスト対応（S10）
+
+- テストファイル: `tests/web/i18n.test.ts` の describe `hidden ref badge counter label (Feature 059-02)`。TC-026〜TC-028 は各 `it`（名前に `en l10n TC-0NN` を付記）

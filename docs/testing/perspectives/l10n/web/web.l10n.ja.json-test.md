@@ -397,3 +397,7 @@ counterのtitle/aria-labelに使う新キーが ja bundle に追加され、値�
 | 片 locale だけの追加 / placeholder 不一致 | TC-030                                                                   |
 | 英語値                                    | excluded(`web.l10n.en.json-test.md` S10 の責務)                          |
 | 境界値・外部依存・例外・型                | excluded(静的 JSON に数値境界・外部依存・throw 経路・型分岐が存在しない) |
+
+### Feature 059-02 テスト対応（S11）
+
+- テストファイル: `tests/web/i18n.test.ts` の describe `hidden ref badge counter label (Feature 059-02)`。TC-028〜TC-030 は各 `it`（名前に `ja l10n TC-0NN` を付記）
