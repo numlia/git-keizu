@@ -1766,6 +1766,36 @@ describe("RefOverflowController hidden-badge list", () => {
     expect(popups()).toHaveLength(0);
   });
 
+  it("repositions a kept list after a height-only resize and a counter move (TC-098)", () => {
+    // Case: TC-098 (AC-15)
+    // Given: an open list below its counter in an 800×600 viewport
+    const { table } = setupTable([{ refs: ac01Refs(), head: true }]);
+    const popup = openCounter(table);
+    expect({ left: popup.style.left, top: popup.style.top }).toEqual({
+      left: "100px",
+      top: "220px"
+    });
+
+    // When: only the viewport height shrinks to 350 and the resize layout runs
+    stubProperty(globalThis, "innerHeight", 350);
+    window.dispatchEvent(new Event("resize"));
+    flushFrames();
+    // Then: the same list flips above the counter inside the new viewport
+    expect(popups()).toEqual([popup]);
+    expect(popup.style.top).toBe("50px");
+
+    // When: the counter moves without changing the fold and another layout runs
+    fixture.counterRect = { left: 300, top: 250, bottom: 270 };
+    window.dispatchEvent(new Event("resize"));
+    flushFrames();
+    // Then: the list follows the counter
+    expect(popups()).toEqual([popup]);
+    expect({ left: popup.style.left, top: popup.style.top }).toEqual({
+      left: "300px",
+      top: "100px"
+    });
+  });
+
   it.each([
     { action: "detachTable", replace: false },
     { action: "attachTable with another table", replace: true }

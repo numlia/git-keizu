@@ -481,6 +481,10 @@ export class RefOverflowController {
     });
     // Refs moving in or out of the hidden set change which matches the counters stand for.
     if (foldingChanged) this.syncSearchHighlights();
+    // A kept list may now sit away from its counter or outside a resized viewport.
+    if (this.popup !== null && this.popupCounter !== null) {
+      positionPopup(this.popup, this.popupCounter);
+    }
   }
 
   // The list mirrors one row's hidden refs, so it closes once the column is really re-laid out or
