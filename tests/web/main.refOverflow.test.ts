@@ -9,7 +9,7 @@ import { vscode } from "../../web/utils";
  * the real contextMenu / dialogs modules (wrapped in call-through spies). They live apart from
  * tests/web/main.test.ts because that file replaces FindWidget and contextMenu with stubs for the
  * whole module graph. This file imports nothing from web/refOverflow.ts so the regression case
- * (TC-427) also runs against the commit before the feature and fails there for a missing counter.
+ * (TC-475) also runs against the commit before the feature and fails there for a missing counter.
  */
 
 /* ------------------------------------------------------------------ */
@@ -621,17 +621,17 @@ afterAll(() => {
 });
 
 /* ------------------------------------------------------------------ */
-/* S56: rendering connection and description minimum width            */
+/* S60: rendering connection and description minimum width            */
 /* ------------------------------------------------------------------ */
 
-// @see docs/testing/perspectives/web/main-test/01-rendering-02.md
-describe("ref overflow rendering and the description column width (S56)", () => {
+// @see docs/testing/perspectives/web/main-test/01-rendering-03.md
+describe("ref overflow rendering and the description column width (S60)", () => {
   beforeEach(async () => {
     await resetView(null);
   });
 
-  it("folds the AC-01 row to the first two badges and +4 and lists the other four (TC-427)", () => {
-    // Case: TC-427 (AC-01, main regression)
+  it("folds the AC-01 row to the first two badges and +4 and lists the other four (TC-475)", () => {
+    // Case: TC-475 (AC-01, main regression)
     // Given: W = 700, outer widths [96.4, 232.8, 284.1, 232.8, 284.1, 232.8] and counter 30.7
     // When: the commits were loaded and the layout frame ran (resetView)
     const cell = descriptionCell(0);
@@ -674,8 +674,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
     );
   });
 
-  it("never lets existing ref listeners reach the measuring clones (TC-428)", () => {
-    // Case: TC-428
+  it("never lets existing ref listeners reach the measuring clones (TC-476)", () => {
+    // Case: TC-476
     // Given: contextmenu and dblclick dispatched on every clone while it is being measured
     let measuredClones = 0;
     layout.onMeasureRef = (clone) => {
@@ -693,8 +693,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
     expect(refMenu.checkoutBranchAction).not.toHaveBeenCalled();
   });
 
-  it("keeps the in-row dblclick checkout on a visible badge (TC-429)", () => {
-    // Case: TC-429 (AC-14)
+  it("keeps the in-row dblclick checkout on a visible badge (TC-477)", () => {
+    // Case: TC-477 (AC-14)
     // Given: the folded AC-01 row
     const badge = descriptionCell(0).querySelector<HTMLElement>('.gitRef[data-name="main"]')!;
 
@@ -706,8 +706,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
     expect(refMenu.checkoutBranchAction).toHaveBeenCalledWith(TEST_REPO, badge, "main");
   });
 
-  it("adds nothing to a table without badges (TC-430)", () => {
-    // Case: TC-430 (AC-13, onMinimumWidth(null) path)
+  it("adds nothing to a table without badges (TC-478)", () => {
+    // Case: TC-478 (AC-13, onMinimumWidth(null) path)
     // Given/When: only rows without refs are rendered
     loadCommits({ commits: [commitOf(1, []), commitOf(2, [], { parentHashes: [] })] });
 
@@ -720,8 +720,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
     expect(tableElem().style.minWidth).toBe("");
   });
 
-  it("keeps a row whose badges all fit without a counter (TC-430)", () => {
-    // Case: TC-430 (AC-13, full-fit row; the minimum still comes from the counter candidates, §3.4)
+  it("keeps a row whose badges all fit without a counter (TC-479)", () => {
+    // Case: TC-479 (AC-13, full-fit row; the minimum still comes from the counter candidates, §3.4)
     // Given/When: a row with two small badges that fit B = 420
     loadCommits({
       commits: [
@@ -741,8 +741,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
     expect(tableElem().style.minWidth).toBe("405px");
   });
 
-  it("applies other columns + M to #content and the table (TC-431)", () => {
-    // Case: TC-431 (AC-11, AC-12)
+  it("applies other columns + M to #content and the table (TC-480)", () => {
+    // Case: TC-480 (AC-11, AC-12)
     // Given: counter candidates 35px wide → M = ceil(8 + 15 + 35 / 0.6) = 82
     layout.counterOuter = 35;
 
@@ -754,8 +754,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
     expect(tableElem().style.minWidth).toBe("412px");
   });
 
-  it("distinguishes a valid 64 from null (TC-432)", () => {
-    // Case: TC-432
+  it("distinguishes a valid 64 from null (TC-481)", () => {
+    // Case: TC-481
     // Given: counter 20px → 8 + 15 + max(33.3, 32.5) = 56.3 → floor 64
     layout.counterOuter = 20;
     loadCommits();
@@ -770,8 +770,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
     expect(tableElem().style.minWidth).toBe("");
   });
 
-  it("keeps the applied minimum while the cell cannot be measured (TC-433)", () => {
-    // Case: TC-433
+  it("keeps the applied minimum while the cell cannot be measured (TC-482)", () => {
+    // Case: TC-482
     // Given: M = 82 applied
     layout.counterOuter = 35;
     loadCommits();
@@ -787,8 +787,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
     expect(tableElem().style.minWidth).toBe("412px");
   });
 
-  it("pins the other columns for display only in auto layout (TC-440)", () => {
-    // Case: TC-440
+  it("pins the other columns for display only in auto layout (TC-489)", () => {
+    // Case: TC-489
     // Given/When: the auto layout table was rendered and measured (resetView)
     // Then: the other headers are pinned to their content widths (outer − padding 24)
     expect(document.getElementById("commitTable")!.className).toBe("autoLayout");
@@ -805,8 +805,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
   it.each([
     { branch: "unchanged outer size", outerWidth: null },
     { branch: "changed outer size", outerWidth: 1500 }
-  ])("releases the pinned widths and schedules a layout on resize ($branch) (TC-441)", (entry) => {
-    // Case: TC-441
+  ])("releases the pinned widths and schedules a layout on resize ($branch) (TC-490)", (entry) => {
+    // Case: TC-490
     // Given: the pinned auto layout
     if (entry.outerWidth !== null) stubProperty(globalThis, "outerWidth", entry.outerWidth);
 
@@ -825,8 +825,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
     ]);
   });
 
-  it("keeps the minimum without saving when the window shrinks (TC-438)", () => {
-    // Case: TC-438 (AC-11)
+  it("keeps the minimum without saving when the window shrinks (TC-487)", () => {
+    // Case: TC-487 (AC-11)
     // Given: M = 82 applied
     layout.counterOuter = 35;
     loadCommits();
@@ -844,8 +844,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
     expect(postedMessages("saveRepoState")).toHaveLength(0);
   });
 
-  it("uses a single controller across re-renders (TC-444)", () => {
-    // Case: TC-444 (AC-17)
+  it("uses a single controller across re-renders (TC-493)", () => {
+    // Case: TC-493 (AC-17)
     // Given: the table re-rendered three times
     loadCommits();
     loadCommits();
@@ -859,8 +859,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
     expect(frames.requested).toBe(1);
   });
 
-  it("wires the real FindWidget to the counter highlight (TC-443)", async () => {
-    // Case: TC-443 (AC-08)
+  it("wires the real FindWidget to the counter highlight (TC-492)", async () => {
+    // Case: TC-492 (AC-08)
     // Given: the folded AC-01 row and the real find widget opened with Ctrl+F
     pressShortcut("f");
     const input = document.getElementById("findInput") as HTMLInputElement;
@@ -915,8 +915,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
       );
     }
 
-    it("stops case 0 at the description inner width − M (TC-434)", () => {
-      // Case: TC-434 (AC-11)
+    it("stops case 0 at the description inner width − M (TC-483)", () => {
+      // Case: TC-483 (AC-11)
       // Given: M = 82 and a description cell inner width of 120
       // When: the graph / description boundary is dragged 100px right and released
       const header = drag(0, 100, 200);
@@ -927,8 +927,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
       expect(savedColumnWidths()).toEqual([[138, 100, 100, 100]]);
     });
 
-    it("stops case 1 at the description inner width − M (TC-435)", () => {
-      // Case: TC-435 (AC-11)
+    it("stops case 1 at the description inner width − M (TC-484)", () => {
+      // Case: TC-484 (AC-11)
       // When: the description / date boundary is dragged 100px left and released
       const header = drag(1, 200, 100);
       fire(header, "mouseup");
@@ -938,8 +938,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
       expect(savedColumnWidths()).toEqual([[100, 138, 100, 100]]);
     });
 
-    it("keeps the 40px floor between the other columns (TC-436)", () => {
-      // Case: TC-436
+    it("keeps the 40px floor between the other columns (TC-485)", () => {
+      // Case: TC-485
       // When: the date / author boundary is dragged 100px left and released
       const header = drag(2, 200, 100);
       fire(header, "mouseup");
@@ -950,8 +950,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
       expect(savedColumnWidths()).toEqual([[100, 40, 160, 100]]);
     });
 
-    it("applies the minimum to a narrow saved width without saving (TC-437)", async () => {
-      // Case: TC-437 (AC-11)
+    it("applies the minimum to a narrow saved width without saving (TC-486)", async () => {
+      // Case: TC-486 (AC-11)
       // Given: narrow saved widths [400, 100, 100, 100] whose headers are 424 / 124 / 124 / 124
       await resetView([400, 100, 100, 100]);
       layout.counterOuter = 35;
@@ -969,8 +969,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
       expect(postedMessages("saveRepoState")).toHaveLength(0);
     });
 
-    it("saves only the user's drag, not the automatic correction (TC-439)", () => {
-      // Case: TC-439 (AC-11)
+    it("saves only the user's drag, not the automatic correction (TC-488)", () => {
+      // Case: TC-488 (AC-11)
       // Given/When: a user drag of case 0 (+20) followed by a resize and another layout
       const header = drag(0, 100, 120);
       fire(header, "mouseup");
@@ -981,8 +981,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
       expect(savedColumnWidths()).toEqual([[120, 100, 100, 100]]);
     });
 
-    it("schedules a layout during and after a drag, once per frame (TC-442)", () => {
-      // Case: TC-442 (AC-11)
+    it("schedules a layout during and after a drag, once per frame (TC-491)", () => {
+      // Case: TC-491 (AC-11)
       // When: mousemove twice and mouseup happen in one frame
       const header = drag(0, 100, 110);
       fire(header, "mousemove", { clientX: 115 });
@@ -1001,8 +1001,8 @@ describe("ref overflow rendering and the description column width (S56)", () => 
       expect(frames.requested).toBe(1);
     });
 
-    it("falls back to the header 64px limit when M is null (TC-432)", () => {
-      // Case: TC-432 (null path of the drag limit)
+    it("falls back to the header 64px limit when M is null (TC-481)", () => {
+      // Case: TC-481 (null path of the drag limit)
       // Given: a table without badges (M = null) and a description header clientWidth of 200
       loadCommits({ commits: [commitOf(1, []), commitOf(2, [], { parentHashes: [] })] });
       expect(tableElem().style.minWidth).toBe("");

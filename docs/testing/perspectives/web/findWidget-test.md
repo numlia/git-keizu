@@ -234,4 +234,4 @@ stash の照合値を完全な `commit.stash.selector`（例 `stash@{0}`）か�
 
 - テストファイル: `tests/web/findWidget.test.ts` の describe `FindWidget ref overflow exclusion and highlight notification (S10)`。TC-040〜TC-049 を各 `it` で検証（TC-045 は4つの解除経路、TC-049 は2つの検索条件を `it.each`）。TC-043 は、行内の除外subtreeに既に複製された `span.findMatch` を置き、検索と解除の後も除外subtreeの `innerHTML` が検索前と一致することで、強調解除の走査除外も確認する
 - 変異確認: テキスト走査の除外を外すと TC-042/TC-043、強調解除の走査除外を外すと TC-043、`close()` 後の通知を外すと TC-045 が失敗することを確認した（変異は確認後に戻した）
-- 実FindWidgetとmainの配線は `web/main-test/01-rendering-02.md` TC-443 で確認。実ブラウザ（Chromium headless）では、隠れたref名だけの一致で `1 of 1`・counter強調（背景 rgba(234, 92, 0, 0.35)）・一覧は閉じたまま、説明文だけの一致で counter 強調なし、`+4` の検索で No Results かつ counter は BUTTON のまま、クリアと不正regex（`[inv`）で表のマーク0件
+- 実FindWidgetとmainの配線は `web/main-test/01-rendering-03.md` TC-492 で確認。実ブラウザ（Chromium headless）では、隠れたref名だけの一致で `1 of 1`・counter強調（背景 rgba(234, 92, 0, 0.35)）・一覧は閉じたまま、説明文だけの一致で counter 強調なし、`+4` の検索で No Results かつ counter は BUTTON のまま、クリアと不正regex（`[inv`）で表のマーク0件

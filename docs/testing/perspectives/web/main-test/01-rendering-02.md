@@ -173,7 +173,8 @@ S48の描画・イベント契約を引き継ぎ、TC-295（context menu 0回）
 
 > Origin: Feature 059-02 (light-spec-plan)
 > Added: 2026-09-24
-> Status: active
+> Status: superseded
+> Superseded By: S60
 > Supersedes: -
 > Signature: `private renderTable(): void` / `private makeTableResizable(): void` / `private observeWindowSizeChanges(): void` と `RefOverflowController` の生成・`attachTable`・`onMinimumWidth` の接続、`FindWidgetCallbacks.onHighlightsChanged` の配線
 > Target Path: `web/main.ts`（controller生成、`renderTable()` 末尾のattach、`makeTableResizable()` の列幅・ドラッグ、`observeWindowSizeChanges()`。実装後に行範囲へ更新）

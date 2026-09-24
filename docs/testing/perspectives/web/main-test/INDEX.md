@@ -5,16 +5,17 @@
 > Generated: 2026-09-24T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 13
+> Total Shards: 14
 > Total Sections: 54
-> Total Cases: 396
+> Total Cases: 397
 
 ## Shards
 
 | Shard File                  | Responsibility     | Sections | Cases | Last Updated |
 | --------------------------- | ------------------ | -------- | ----- | ------------ |
 | 01-rendering-01.md          | rendering          | 7        | 35    | 2026-03-05   |
-| 01-rendering-02.md          | rendering          | 2        | 51    | 2026-09-24   |
+| 01-rendering-02.md          | rendering          | 1        | 33    | 2026-09-13   |
+| 01-rendering-03.md          | rendering          | 1        | 19    | 2026-09-24   |
 | 02-context-menu-01.md       | context-menu       | 7        | 61    | 2026-09-24   |
 | 03-compare-find-01.md       | compare-find       | 3        | 25    | 2026-03-01   |
 | 04-keyboard-selection-01.md | keyboard-selection | 10       | 59    | 2026-09-24   |
@@ -56,7 +57,7 @@
 | Feature 055-07 (light-spec-plan) Task 8                              | 06-file-actions-01.md                                                                           |
 | Feature 055-09 (light-spec-plan)                                     | 06-file-actions-01.md                                                                           |
 | Feature 056 (retain-context-when-hidden) issue #48                   | 11-state-persistence-01.md                                                                      |
-| Feature 059-02 (light-spec-plan)                                     | 01-rendering-02.md, 02-context-menu-01.md, 04-keyboard-selection-01.md, 05-state-response-02.md |
+| Feature 059-02 (light-spec-plan)                                     | 01-rendering-03.md, 02-context-menu-01.md, 04-keyboard-selection-01.md, 05-state-response-02.md |
 | test-plan (既存コード網羅)                                           | 04-keyboard-selection-01.md                                                                     |
 | フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                                                         |
 | フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                                                         |
