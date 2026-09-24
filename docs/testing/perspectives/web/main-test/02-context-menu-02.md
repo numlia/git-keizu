@@ -13,7 +13,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `showRefBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void`（行内 `.gitRef` のcontextmenuと `RefOverflowOptions.onRefContextMenu` の共通入口。伝播停止直後のstash分岐）
-> Target Path: `web/main.ts`（`showRefBadgeContextMenu` のstash分岐と、`renderTable()` 内の `.gitRef.stash` ラベル生成への `data-stash-hash` 属性付与。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:1079-1145`（`showRefBadgeContextMenu` のstash分岐 1079-1084 と `showStashBadgeContextMenu` 1127-1145。`renderTable()` 内の `.gitRef.stash` ラベル生成への `data-stash-hash` 属性付与は 912）
 > Test File: `tests/web/main.refOverflow.test.ts`
 
 行内と折り畳み一覧のstashラベルから、対応する行の既存スタッシュメニューへ到達し、確認ダイアログと要求送信まで同じ対象を使うことを検証する。builder内の項目分岐と確認文言は S2（`tests/web/main.test.ts` TC-006〜TC-016）の責務。実controller・実contextMenu・実dialogsを使い、`buildStashContextMenuItems` / `buildRefContextMenuItems` / `buildDetachedWorktreeContextMenuItems` / `showContextMenu` は実装を呼ぶspyで回数と引数を記録する。`TEST_REPO = "/test/repo"`。
@@ -22,16 +22,16 @@ fixture: stash A = `hashOf(11)`・`stash@{2}`、stash B = `hashOf(22)`・`stash@
 
 | Case ID | Input / Precondition                                                                                                                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                       | Notes                                                            |
 | ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| TC-494  | stash A の行内ラベル内のSVG `path` をtargetにcontextmenu                                                                                                                    | Normal - 行内アイコンからの表示                                            | stash builderが1回 `(TEST_REPO, hashOf(11), "stash@{2}", Aの元の行)`、表示が1回で正常引数（第3引数はAの行内ラベル）。参照builderは0回                                                                                 | 修正前は参照builderへ流れる（RED対象）。AC 8.1                   |
+| TC-494  | stash A の行内ラベル内のアイコン要素（`span.codicon`。SVG `path` は描画されない）をtargetにcontextmenu                                                                      | Normal - 行内アイコンからの表示                                            | stash builderが1回 `(TEST_REPO, hashOf(11), "stash@{2}", Aの元の行)`、表示が1回で正常引数（第3引数はAの行内ラベル）。参照builderは0回                                                                                 | 修正前は参照builderへ流れる（RED対象）。AC 8.1                   |
 | TC-495  | 検索で stash A の行内ラベル文字が `span.findMatch` に囲まれ、その `span.findMatch` をtargetにcontextmenu                                                                    | Boundary - 検索マーク内の文字                                              | TC-494と同じ回数・引数（event.targetではなく引数のラベルで判定）。参照builderは0回                                                                                                                                    | RED対象                                                          |
 | TC-496  | stash A の行内ラベル本体（`.gitRef.stash` 自身）をtargetにcontextmenu                                                                                                       | Normal - ラベル本体（余白のDOM代替）                                       | TC-494と同じ回数・引数。参照builderは0回                                                                                                                                                                              | RED対象。余白の実座標は実画面で確認                              |
-| TC-497  | stash A のラベルが折り畳まれた一覧の複製内のSVG `path` をtargetにcontextmenu（操作前に複製の存在をassert）                                                                  | Normal - 一覧アイコンからの表示                                            | stash builderが1回 `(TEST_REPO, hashOf(11), "stash@{2}", Aの元の行)`（第4引数は複製ではなく `tableElem` 内の元の行、`toBe`）。表示が1回、第3引数は一覧の複製（`toBe`、行内ラベルと非同一）。参照builderは0回          | RED対象。AC 8.1                                                  |
+| TC-497  | stash A のラベルが折り畳まれた一覧の複製内のアイコン要素（`span.codicon`）をtargetにcontextmenu（操作前に複製の存在をassert）                                               | Normal - 一覧アイコンからの表示                                            | stash builderが1回 `(TEST_REPO, hashOf(11), "stash@{2}", Aの元の行)`（第4引数は複製ではなく `tableElem` 内の元の行、`toBe`）。表示が1回、第3引数は一覧の複製（`toBe`、行内ラベルと非同一）。参照builderは0回          | RED対象。AC 8.1                                                  |
 | TC-498  | 検索で一覧の複製内の stash A の文字が `span.findMatch` に囲まれ、その `span.findMatch` をtargetにcontextmenu                                                                | Boundary - 一覧の検索マーク内の文字                                        | TC-497と同じ回数・引数。参照builderは0回                                                                                                                                                                              | RED対象                                                          |
 | TC-499  | stash A の一覧の複製本体をtargetにcontextmenu                                                                                                                               | Normal - 一覧の複製本体（余白のDOM代替）                                   | TC-497と同じ回数・引数。参照builderは0回                                                                                                                                                                              | RED対象                                                          |
-| TC-500  | stash B の行内ラベル内のSVG `path` をtargetにcontextmenu                                                                                                                    | Normal - 別stashの行内アイコン                                             | stash builderが1回 `(TEST_REPO, hashOf(22), "stash@{7}", Bの元の行)`、表示が1回で正常引数（第3引数はBの行内ラベル）。引数にAのhash・selector・行を含まない。参照builderは0回                                          | RED対象。A/Bの対象分離                                           |
+| TC-500  | stash B の行内ラベル内のアイコン要素（`span.codicon`）をtargetにcontextmenu                                                                                                 | Normal - 別stashの行内アイコン                                             | stash builderが1回 `(TEST_REPO, hashOf(22), "stash@{7}", Bの元の行)`、表示が1回で正常引数（第3引数はBの行内ラベル）。引数にAのhash・selector・行を含まない。参照builderは0回                                          | RED対象。A/Bの対象分離                                           |
 | TC-501  | 検索で stash B の行内ラベル文字が `span.findMatch` に囲まれ、その `span.findMatch` をtargetにcontextmenu                                                                    | Boundary - 別stashの検索マーク内の文字                                     | TC-500と同じ回数・引数。参照builderは0回                                                                                                                                                                              | RED対象                                                          |
 | TC-502  | stash B の行内ラベル本体をtargetにcontextmenu                                                                                                                               | Normal - 別stashのラベル本体                                               | TC-500と同じ回数・引数。参照builderは0回                                                                                                                                                                              | RED対象                                                          |
-| TC-503  | stash B の一覧の複製内のSVG `path` をtargetにcontextmenu                                                                                                                    | Normal - 別stashの一覧アイコン                                             | stash builderが1回 `(TEST_REPO, hashOf(22), "stash@{7}", Bの元の行)`（第4引数は元の行、`toBe`）。表示が1回、第3引数はBの複製（`toBe`）。Aの値・行・複製を含まない。参照builderは0回                                   | RED対象                                                          |
+| TC-503  | stash B の一覧の複製内のアイコン要素（`span.codicon`）をtargetにcontextmenu                                                                                                 | Normal - 別stashの一覧アイコン                                             | stash builderが1回 `(TEST_REPO, hashOf(22), "stash@{7}", Bの元の行)`（第4引数は元の行、`toBe`）。表示が1回、第3引数はBの複製（`toBe`）。Aの値・行・複製を含まない。参照builderは0回                                   | RED対象                                                          |
 | TC-504  | 検索で一覧の複製内の stash B の文字が `span.findMatch` に囲まれ、その `span.findMatch` をtargetにcontextmenu                                                                | Boundary - 別stashの一覧の検索マーク内の文字                               | TC-503と同じ回数・引数。参照builderは0回                                                                                                                                                                              | RED対象                                                          |
 | TC-505  | stash B の一覧の複製本体をtargetにcontextmenu                                                                                                                               | Normal - 別stashの一覧の複製本体                                           | TC-503と同じ回数・引数。参照builderは0回                                                                                                                                                                              | RED対象                                                          |
 | TC-506  | stash A のラベルから `data-stash-hash` 属性を削除してcontextmenu                                                                                                            | Validation - ハッシュ属性の欠落                                            | 無効時の期待（表示・builder・要求0、例外なし）                                                                                                                                                                        | 行内・一覧で各実行。AC 8.3                                       |
@@ -105,65 +105,92 @@ fixture: stash A = `hashOf(11)`・`stash@{2}`、stash B = `hashOf(22)`・`stash@
 
 ### Feature 059-01 テスト対応と実行証跡（S61）
 
-- テストファイル: `tests/web/main.refOverflow.test.ts`。describe構成の予定は対応プラン Task 3 のとおり（`stash label routing (S61)`、`stash label operations (S61)`、`stash label lifecycle and clicks (S61)`）。実test名と結果は Task 3 で記入する。
-- TC-506〜TC-514 は行内・一覧でそれぞれ実行し、TC-522〜TC-529 は A/B × 行本体・行内ラベル・一覧の複製で実行する。parameterized testは入力と期待値を名前に含める。
+- テストファイル: `tests/web/main.refOverflow.test.ts`。describe構成は対応プラン Task 3 のとおり（`stash label routing (S61)`、`stash label operations (S61)`、`stash label lifecycle and clicks (S61)`）。2026-09-25 に 112 テスト（it ブロック 17 件、うち `it.each` 9 件）を追加し、全件成功。
+- TC-506〜TC-514 は行内・一覧でそれぞれ実行し、TC-522〜TC-529 は A/B × 行本体・行内ラベル・一覧の複製で実行する。parameterized testは入力と期待値を名前に含める。下表の `{row, list}` などは `it.each` の展開値で、実行時のテスト名には1値ずつ入る。
+- AUTO-CORRECTION（2026-09-25）: TC-494 / TC-497 / TC-500 / TC-503 の入力「SVG `path`」→「アイコン要素（`span.codicon`）」。根拠: `web/utils.ts:28` の `svgIcons.stash` は `<span class="codicon codicon-git-stash">` で、描画されたラベル内にSVG `path` は存在しない（S57 TC-448 も `.codicon` をアイコンとして扱う）。契約影響なし（ラベル内の任意の子要素から `currentTarget` のラベルで振り分ける経路は同一）。ケース数・IDは不変。
 
 対応表の先頭列はdescribeとし、Case IDは2列目に置く（派生索引の集計は先頭セルが `TC-` の行をケースとして数えるため）。
 
-| describe（予定）                         | Case ID | Test Method       | 結果              |
-| ---------------------------------------- | ------- | ----------------- | ----------------- |
-| `stash label routing (S61)`              | TC-494  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-495  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-496  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-497  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-498  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-499  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-500  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-501  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-502  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-503  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-504  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-505  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-506  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-507  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-508  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-509  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-510  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-511  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-512  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-513  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-514  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-515  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-516  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-517  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-518  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-519  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-520  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label operations (S61)`           | TC-521  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label operations (S61)`           | TC-522  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label operations (S61)`           | TC-523  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label operations (S61)`           | TC-524  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label operations (S61)`           | TC-525  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label operations (S61)`           | TC-526  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label operations (S61)`           | TC-527  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label operations (S61)`           | TC-528  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label operations (S61)`           | TC-529  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-530  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-531  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-532  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-533  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-534  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-535  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-536  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-537  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-538  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-539  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-540  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-541  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label lifecycle and clicks (S61)` | TC-542  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-543  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-544  | （Task 3 で記入） | （Task 3 で記入） |
-| `stash label routing (S61)`              | TC-545  | （Task 3 で記入） | （Task 3 で記入） |
+| describe                                 | Case ID | Test Method                                                                                                                                                | 結果                  |
+| ---------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
+| `stash label routing (S61)`              | TC-494  | opens the stash menu of stash A (stash@{2}) from the row label icon (TC-494)                                                                               | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-495  | opens the stash menu of stash A (stash@{2}) from the row label search mark (TC-495)                                                                        | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-496  | opens the stash menu of stash A (stash@{2}) from the row label body (TC-496)                                                                               | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-497  | opens the stash menu of stash A (stash@{2}) from the list label icon (TC-497)                                                                              | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-498  | opens the stash menu of stash A (stash@{2}) from the list label search mark (TC-498)                                                                       | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-499  | opens the stash menu of stash A (stash@{2}) from the list label body (TC-499)                                                                              | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-500  | opens the stash menu of stash B (stash@{7}) from the row label icon (TC-500)                                                                               | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-501  | opens the stash menu of stash B (stash@{7}) from the row label search mark (TC-501)                                                                        | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-502  | opens the stash menu of stash B (stash@{7}) from the row label body (TC-502)                                                                               | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-503  | opens the stash menu of stash B (stash@{7}) from the list label icon (TC-503)                                                                              | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-504  | opens the stash menu of stash B (stash@{7}) from the list label search mark (TC-504)                                                                       | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-505  | opens the stash menu of stash B (stash@{7}) from the list label body (TC-505)                                                                              | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-506  | opens nothing from the {row, list} label when the hash attribute is removed (TC-506)                                                                       | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-507  | opens nothing from the {row, list} label when the hash attribute is empty (TC-507)                                                                         | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-508  | opens nothing from the {row, list} label when the hash attribute is unknown (TC-508)                                                                       | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-509  | opens nothing from the {row, list} label when the lookup value is a string (TC-509)                                                                        | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-510  | opens nothing from the {row, list} label when the lookup index is out of range (TC-510)                                                                    | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-511  | opens nothing from the {row, list} label when the lookup points at another hash (TC-511)                                                                   | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-512  | opens nothing from the {row, list} label when the commit has a null stash (TC-512)                                                                         | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-513  | opens nothing from the {row, list} label when the commit has an undefined stash (TC-513)                                                                   | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-514  | opens nothing from the {row, list} label when the original row is gone (TC-514)                                                                            | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-515  | routes the local branch next to the stash label to its own builder in the {row, list} (TC-515)                                                             | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-516  | routes the combined remote next to the stash label to its own builder in the {row, list} (TC-516)                                                          | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-517  | routes the standalone remote next to the stash label to its own builder in the {row, list} (TC-517)                                                        | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-518  | routes the tag next to the stash label to its own builder in the {row, list} (TC-518)                                                                      | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-519  | routes the worktree branch next to the stash label to its own builder in the {row, list} (TC-519)                                                          | pass ×2（2026-09-25） |
+| `stash label routing (S61)`              | TC-520  | routes the detached worktree next to the stash label to its own builder in the {row, list} (TC-520)                                                        | pass ×2（2026-09-25） |
+| `stash label operations (S61)`           | TC-521  | renders the same seven-element stash menu from the {row body, in-row label, list clone} (TC-521)                                                           | pass ×3（2026-09-25） |
+| `stash label operations (S61)`           | TC-522  | sends applyStash for stash {A, B} ({stash@{2}, stash@{7}}) from the {row body, in-row label, list clone} via Apply Stash with Reinstate Index off (TC-522) | pass ×6（2026-09-25） |
+| `stash label operations (S61)`           | TC-523  | sends applyStash for stash {A, B} ({stash@{2}, stash@{7}}) from the {row body, in-row label, list clone} via Apply Stash with Reinstate Index on (TC-523)  | pass ×6（2026-09-25） |
+| `stash label operations (S61)`           | TC-524  | sends popStash for stash {A, B} ({stash@{2}, stash@{7}}) from the {row body, in-row label, list clone} via Pop Stash with Reinstate Index off (TC-524)     | pass ×6（2026-09-25） |
+| `stash label operations (S61)`           | TC-525  | sends popStash for stash {A, B} ({stash@{2}, stash@{7}}) from the {row body, in-row label, list clone} via Pop Stash with Reinstate Index on (TC-525)      | pass ×6（2026-09-25） |
+| `stash label operations (S61)`           | TC-526  | sends branchFromStash for stash {A, B} ({stash@{2}, stash@{7}}) from the {row body, in-row label, list clone} via More > Create Branch from Stash (TC-526) | pass ×6（2026-09-25） |
+| `stash label operations (S61)`           | TC-527  | sends dropStash for stash {A, B} ({stash@{2}, stash@{7}}) from the {row body, in-row label, list clone} via More > Drop Stash (TC-527)                     | pass ×6（2026-09-25） |
+| `stash label operations (S61)`           | TC-528  | sends copyToClipboard for stash {A, B} ({stash@{2}, stash@{7}}) from the {row body, in-row label, list clone} via Copy Stash Name (TC-528)                 | pass ×6（2026-09-25） |
+| `stash label operations (S61)`           | TC-529  | sends copyToClipboard for stash {A, B} ({stash@{2}, stash@{7}}) from the {row body, in-row label, list clone} via Copy Stash Hash (TC-529)                 | pass ×6（2026-09-25） |
+| `stash label lifecycle and clicks (S61)` | TC-530  | closes the menu and its More submenu when the list is closed without a choice (TC-530)                                                                     | pass（2026-09-25）    |
+| `stash label lifecycle and clicks (S61)` | TC-531  | closes the list menu when a find update regenerates the clones (TC-531)                                                                                    | pass（2026-09-25）    |
+| `stash label lifecycle and clicks (S61)` | TC-532  | confirms Apply Stash for the original row after the list is closed (TC-532)                                                                                | pass（2026-09-25）    |
+| `stash label lifecycle and clicks (S61)` | TC-533  | confirms Pop Stash for the original row after the list is closed (TC-533)                                                                                  | pass（2026-09-25）    |
+| `stash label lifecycle and clicks (S61)` | TC-534  | confirms Create Branch from Stash for the original row after the list is closed (TC-534)                                                                   | pass（2026-09-25）    |
+| `stash label lifecycle and clicks (S61)` | TC-535  | confirms Drop Stash for the original row after the list is closed (TC-535)                                                                                 | pass（2026-09-25）    |
+| `stash label lifecycle and clicks (S61)` | TC-536  | sends nothing when {Apply Stash, Pop Stash, Create Branch from Stash, Drop Stash} is dismissed after the list is closed (TC-536)                           | pass ×4（2026-09-25） |
+| `stash label lifecycle and clicks (S61)` | TC-537  | keeps a left click on the in-row stash label away from the row (TC-537)                                                                                    | pass（2026-09-25）    |
+| `stash label lifecycle and clicks (S61)` | TC-538  | closes the menu and dialog on an in-row stash label dblclick without a checkout (TC-538)                                                                   | pass（2026-09-25）    |
+| `stash label lifecycle and clicks (S61)` | TC-539  | stops a click on the listed stash clone inside the list (TC-539, TC-540)                                                                                   | pass（2026-09-25）    |
+| `stash label lifecycle and clicks (S61)` | TC-540  | stops a dblclick on the listed stash clone inside the list (TC-539, TC-540)                                                                                | pass（2026-09-25）    |
+| `stash label lifecycle and clicks (S61)` | TC-541  | requests the stash details from a left click on the row body (TC-541)                                                                                      | pass（2026-09-25）    |
+| `stash label lifecycle and clicks (S61)` | TC-542  | sends nothing for a dblclick alone on the row body (TC-542)                                                                                                | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-543  | keeps the commit menu for a normal commit row (TC-543)                                                                                                     | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-544  | keeps the stash menu from the stash row body (TC-544)                                                                                                      | pass（2026-09-25）    |
+| `stash label routing (S61)`              | TC-545  | uses the selector current at menu build time, not at render or confirm time (TC-545)                                                                       | pass（2026-09-25）    |
 
-- 旧実装でのRED確認（TC-494〜TC-505）: （Task 3 で記録。未実施）
-- 実画面確認（VS Code、行内・一覧のアイコン／文字／余白の右クリック、More操作、一覧閉鎖、確認の取消、左クリック・ダブルクリック）: （Task 3 で記録。未実施）
+- 旧実装でのRED確認（TC-494〜TC-505）: 2026-09-25 実施。対応プラン §6 の手順で `41ce0973f94efdb241f251c87adcf654c9e724ae` を `.tmp/git-keizu-059-red/` へ展開し、本テストファイルをコピーして `pnpm --dir .tmp/git-keizu-059-red exec vitest run tests/web/main.refOverflow.test.ts -t 'TC-(49[4-9]|50[0-5])'` を実行した。結果は `Test Files 1 failed (1)` / `Tests 12 failed | 154 skipped (166)`。12件すべてが `expectStashMenuFrom` 内の `expect(stashMenu.buildStashContextMenuItems).toHaveBeenCalledTimes(1)` で `AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times`（stash builder 未到達。旧実装は参照builderへ流れる）。import失敗・fixture不備・その他の例外は0件（ログに `TypeError` / `ReferenceError` / `SyntaxError` / `Cannot find` なし）。`-t` は TC-453 を含む他のテスト名には一致しない（154 skipped）。修正後（a854bb7 + 本テスト）は同12件を含む S61 112件が成功。隔離ディレクトリは実行後に削除した。
+- 実画面確認（VS Code）: 未実施（2026-09-25）。理由: 実装セッションでVS Code実画面を起動できない。代替確認（利用者による手動確認。使い捨てリポジトリで stash を2件以上作成し、A/B に相当する別selectorを用意する）:
+  1. 行内stashラベルのアイコン／文字／余白を右クリックし、そのstashのメニューが1回だけ表示される（別stash・参照メニューにならない）。
+  2. 参照が折り畳まれた行で `+N` を開き、一覧の複製のアイコン／文字／余白の右クリックでも同じメニューが表示される。
+  3. More → Create Branch from Stash… / Drop Stash… が元の行を対象に確認ダイアログを開き、確定で実行される。
+  4. 一覧からメニューとMoreを開いた状態で一覧外をクリックすると、一覧・メニュー・サブメニューが閉じ、操作は起きない。
+  5. 一覧から開いた確認ダイアログを、一覧が閉じた後に取消すると何も送信されない。
+  6. stashラベルの左クリック・ダブルクリックで詳細表示・checkoutが起きず、行本体の左クリックで詳細が開く。
+
+  残存リスク: 余白の実座標・描画位置・操作感は未検証で、jsdom の合成イベント（ラベル本体を target にした余白のDOM代替）による確認に留まる。jsdom の成功を実画面の成功とはみなさない。テスト戦略 §6 に従い、レビューでこの未確認事項を扱う。
+
+### Task 3 完了チェック（test-strategy.md §9、2026-09-25）
+
+- [x] 該当シナリオと失敗源: S61 の 52 ID すべてに test method が対応（上表）。自動化例外は実画面確認のみで、§6 に従い理由・代替確認・リスクを上記に記載。
+- [x] テストと期待結果の一致: 各テストは §3.4〜§3.6 の値（repo / hash / selector / payload）、要素同一性（元の行・クリックしたラベル・複製を `toBe`）、時点（TC-545）、null / undefined / 空文字の区別（TC-506 / TC-507 / TC-512 / TC-513）を検証する。
+- [x] 必要な確認の実行と記録: 下記のコマンドと結果。未検証範囲は実画面のみ。
+- [x] 観点管理: ケース行の文言修正（上記 AUTO-CORRECTION）は件数・IDを変えず、source manifest と root index は再生成不要（`rebuild_index.py --check .` が exit 0）。
+
+確認コマンドと結果（2026-09-25、`pnpm@10.34.5` / vitest 5.0.0）:
+
+- `pnpm run typecheck`: exit 0
+- `pnpm run lint`: exit 0
+- `pnpm exec vitest run tests/web/main.test.ts tests/web/main.refOverflow.test.ts tests/web/refOverflow.test.ts tests/web/contextMenu.test.ts tests/web/dialogs.test.ts tests/web/refMenu.test.ts`: 6 files passed, 797 passed / 0 failed
+- `pnpm exec vitest run tests/web/main.test.ts tests/web/main.refOverflow.test.ts -t 'buildStashContextMenuItems|S57|Escape'`: 50 passed / 465 skipped
+- `pnpm exec vitest run tests/web/main.refOverflow.test.ts -t 'S61'`: 112 passed / 54 skipped
+- `pnpm exec oxfmt --check tests/web/main.refOverflow.test.ts docs/testing/perspectives/web/main-test/02-context-menu-02.md`: pass
+- `python3 .agents/scripts/rebuild_index.py --check .`: exit 0
+- `git diff --check`: clean
