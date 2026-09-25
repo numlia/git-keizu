@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2026-09-25
+
+This release lets you act on a stash directly from its label: right-clicking the label now opens the stash menu, so you no longer have to aim for another part of the row.
+
+### Fixed
+
+- **Right-clicking a stash label opens the stash menu**: Right-clicking the icon, the text, or the padding of a stash label, whether in the commit row or in the **+N** list, did not open the stash menu; it was only available from the rest of the row. The label now opens the same menu as the row — **Apply**, **Pop**, **More** (**Create Branch**, **Drop**), **Copy Name**, and **Copy Hash** — with the same confirmations, and it always acts on the stash whose label was clicked. From the **+N** list the menu is shown once, and the list stays open while the menu is in use; closing the list closes the menu without running anything, while a confirmation dialog that is already open can still be confirmed or cancelled afterwards. If the stash behind a label can no longer be found in the loaded history, no menu is shown. Left-clicking and double-clicking a stash label, and right-clicking any other label, work as before.
+
 ## [1.3.0] - 2026-09-24
 
 This release keeps every label on a busy commit reachable: when a commit carries more branches, worktrees, remotes, tags, or stash labels than fit in its row, the ones that do not fit are folded into a **+N** badge that opens the rest in a list, so several worktrees on the same commit no longer disappear off the end of the row.
@@ -616,7 +624,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.3.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.3.1...HEAD
+[1.3.1]: https://github.com/numlia/git-keizu/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/numlia/git-keizu/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/numlia/git-keizu/compare/v1.1.3...v1.2.0
 [1.1.3]: https://github.com/numlia/git-keizu/compare/v1.1.2...v1.1.3
