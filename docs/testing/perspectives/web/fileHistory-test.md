@@ -229,7 +229,7 @@ visible が `[h0(anchor), h1]`（`getCommits()` の順）で current が h0 の 
 > Status: active
 > Supersedes: S6
 > Signature: `navigate(delta: -1 | 1, useExpandedCommit: boolean = false): string | null` / private `prev(): void` / `next(): void`（bar button 経由。`navigate(-1)` / `navigate(1)` へ委譲）/ `handleCommitRowClick(hash: string): void`
-> Target Path: `web/fileHistory.ts`（`navigate()`・`prev()`・`next()`・`handleCommitRowClick()`。実装後に行範囲へ更新）
+> Target Path: `web/fileHistory.ts:225-245`（`navigate()`）、`web/fileHistory.ts:340-352`（起点を決める `resolveOrigin()`）、`web/fileHistory.ts:113-126`（移動先を選ぶ `findAdjacentMatch()`）、`web/fileHistory.ts:354-360`（`prev()`・`next()`）、`web/fileHistory.ts:219-223`（`handleCommitRowClick()`）
 > Test File: `tests/web/fileHistory.test.ts`
 
 S6 は端での一周（TC-032 / TC-033）と一致1件での再スクロール（TC-035）を要求していたため、本節で置き換える。S6 の表は改変せず、影響しない TC-031 / TC-034 / TC-036〜TC-040 を新しい ID で引き継ぐ（TC-089〜TC-095）。S1〜S9 の失敗源インベントリにある wrap の行は S6 とともに履歴として残す。古い response・`entries` が空・anchor 不在の破棄は S3 / S5、解除と復元ガードは S8 が引き続き担当し、本節は移動と組み合わさる時点別のケースだけを加える。キーイベントの消費と詳細の要求・描画は `web/main-test/04-keyboard-selection-02.md` S64 と `web/main-test/10-file-history-01.md` S66 の責務で本表には含めない。

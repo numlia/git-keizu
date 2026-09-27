@@ -150,7 +150,7 @@ controller は mock のまま、`restoreExpandedCommit` と `applyFileHistoryToF
 > Status: active
 > Supersedes: -
 > Signature: `handleKeyboardShortcut(e: KeyboardEvent): void`（履歴用 Arrow 分岐）→ private `loadCommitDetails(sourceElem: HTMLElement)` → `public showCommitDetails(commitDetails: GG.GitCommitDetails, fileTree: GitFolder)` → private `applyFileHistoryToFileRows()`
-> Target Path: `web/main.ts`（`handleKeyboardShortcut()` の履歴用 Arrow 分岐・`findCommitRowByHash()`・`loadCommitDetails()`・`showCommitDetails()`・`applyFileHistoryToFileRows()`。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:1529-1550`（履歴用 Arrow 分岐の `handleFileHistoryArrowKey()`）、`web/main.ts:1814-1816`（`findCommitRowByHash()`）、`web/main.ts:1666-1690`（`loadCommitDetails()`）、`web/main.ts:1753-1813`（`showCommitDetails()`）、`web/main.ts:1836-1863`（`applyFileHistoryToFileRows()`）
 > Test File: `tests/web/main.test.ts`
 
 キーで履歴を移動した後の詳細要求から応答描画までを、実際のキーイベント・実際の `commitDetails` response の発火・`showCommitDetails()` の描画を通して確かめる結合の観点。controllerは `vi.mock` のままで、`isActive` / `navigate` / `getHistoricalPathFor` の戻り値をmockで制御する。移動先の選定とcurrentの進行は `web/fileHistory-test.md` S10、キーの振り分けとイベント消費は `04-keyboard-selection-02.md` S64の責務で本表には含めない。詳細の描画契約は変えないため、S50とS63はactiveのまま残り、注記の位置と表示切替はS63（TC-556〜TC-558）が引き続き担当する。S51の期待は復活させない。

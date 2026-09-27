@@ -13,7 +13,7 @@
 > Status: active
 > Supersedes: S32, S33
 > Signature: `handleKeyboardShortcut(e: KeyboardEvent): void`（Arrow 分岐。履歴モードでは `FileHistoryController.navigate(delta: -1 | 1, useExpandedCommit: boolean = false): string | null` を `navigate(delta, true)` で呼ぶ）
-> Target Path: `web/main.ts`（`handleKeyboardShortcut()` の履歴用 Arrow 分岐と通常の Arrow 分岐。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:1529-1550`（履歴用 Arrow 分岐の `handleFileHistoryArrowKey()`）、`web/main.ts:1455-1504`（`handleKeyboardShortcut()` の IME ガード・履歴分岐の呼出し・通常の Arrow 分岐）
 > Test File: `tests/web/main.test.ts`
 
 S32 の「詳細が閉じていれば Arrow を処理しない」と S33 の「移動できなければイベントを消費しない」は、ファイル履歴の強調中・取得待ち中には成り立たなくなる。S32 / S33 の表は改変せず、全 9 ケースを通常モードの前提つきで本節へ引き継ぎ（TC-562〜TC-570）、履歴モードの振り分けを加える。`04-keyboard-selection-01.md` の S29〜S31、S46、S58 は active のまま変えない。移動先の選定・current・位置表示・復元は `web/fileHistory-test.md` S10、キー移動後の詳細描画は `10-file-history-01.md` S66 の責務で本表には含めない。
@@ -59,6 +59,7 @@ S32 の「詳細が閉じていれば Arrow を処理しない」と S33 の「�
 | TC-591  | 強調のみ、`<input>` を target に Ctrl+F（config find="f"）                                                                                                                                        | Normal - 入力可能要素からの Find の維持                                    | `exit(true)` が 1 回呼ばれた後に `findWidget.show(true)` が 1 回、`navigate` が 0 回                                                                       | K5。画面テスト。`04-keyboard-selection-01.md` S46 TC-262、`10-file-history-01.md` S50 TC-323 と同じ経路 |
 | TC-592  | 強調のみと取得待ちの各状態で、詳細を開き、Shift のみ + ArrowUp / ArrowDown                                                                                                                        | Validation - Shift のみは履歴分岐で捕捉しない                              | どの組み合わせも `navigate` が 0 回、非消費、詳細要求が 0 件                                                                                               | K6。画面テスト                                                                                          |
 | TC-593  | 強調のみと取得待ちの各状態で、詳細を開き、Alt + ArrowUp、Ctrl+Alt + ArrowDown、Cmd+Alt + ArrowUp、Ctrl+Shift+Alt + ArrowDown                                                                      | Validation - Alt を含む組み合わせは履歴分岐で捕捉しない                    | どの組み合わせも `navigate` が 0 回、非消費、graph 移動が 0 回、詳細要求が 0 件                                                                            | K6。画面テスト                                                                                          |
+| TC-622  | 強調のみ、詳細 `h1` を開いたまま、`navigate` が同じ `"h1"` を返す状態で ArrowDown（bar の button で current を動かした後など、移動先が開いている詳細と同じ行）                                    | Boundary - 移動先が開いている詳細と同じ行                                  | 詳細要求が `commitHash: "h1"` の 1 件、`#commitDetails` が `h1` 行の直後で読み込み中（詳細を閉じない）、`handleCommitRowClick` が 0 回、消費               | K2。画面テスト。行 click を擬似発火させない（確定仕様 §4.1 規則 5、対応プラン §3.4）                    |
 
 ### 失敗源インベントリ（include-or-justify）— Feature 060-02 追加分（S64）
 
@@ -66,6 +67,7 @@ S32 の「詳細が閉じていれば Arrow を処理しない」と S33 の「�
 | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
 | 強調中の矢印が非一致行・graph の親子へ移る                      | TC-571〜TC-573、TC-577、TC-578                                                                           |
 | 移動先なし・行不在で通常移動へ流れる、イベントを消費しない      | TC-574〜TC-576                                                                                           |
+| キー移動が行 click を経由し、開いている詳細を閉じる             | TC-622                                                                                                   |
 | 取得待ち中に移動・詳細要求・scroll が起きる、受理後に再実行する | TC-579〜TC-585                                                                                           |
 | 入力可能要素・比較・IME で消費または移動する                    | TC-586〜TC-590                                                                                           |
 | 入力可能要素からの Find が止まる                                | TC-591                                                                                                   |
@@ -81,7 +83,7 @@ S32 の「詳細が閉じていれば Arrow を処理しない」と S33 の「�
 > Status: active
 > Supersedes: S40
 > Signature: `handleEscape(): void`（詳細の段階の後に `FileHistoryController.exit(restore: boolean): void` を `exit(true)` で呼ぶ）
-> Target Path: `web/main.ts`（`handleEscape()`。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:1591-1625`（`handleEscape()`。履歴の段階は 1621-1624）
 > Test File: `tests/web/main.test.ts`
 
 Esc の順序を `contextMenu → dialog → repoDropdown → branchDropdown → authorDropdown → ref一覧 → findWidget → expandedCommit → fileHistory` とする。`04-keyboard-selection-01.md` の S40（handleEscape() 優先順位チェーン）は詳細（`expandedCommit`）を最終段階としていたため本節で置き換える（`08-request-queue-01.md` にある同じ番号の S40 は対象外）。S40 の表は改変せず、全 8 ケースを非強調の前提つきで引き継ぐ（TC-594〜TC-601）。各段階は該当する UI だけを閉じて return し、先行段階を閉じた同じ Esc で履歴を終了しない。ref一覧の段階そのものは `04-keyboard-selection-01.md` S58 が active のまま担当する。Esc は実際の keyup で発火し、controller は `vi.mock` のまま状態を mock で制御する。解除と復元の実状態は `web/fileHistory-test.md` S8 と S10（TC-099〜TC-102）の責務で本表には含めない。

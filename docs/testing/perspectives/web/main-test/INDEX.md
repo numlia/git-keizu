@@ -7,7 +7,7 @@
 > Test Framework: Vitest
 > Total Shards: 16
 > Total Sections: 56
-> Total Cases: 498
+> Total Cases: 499
 
 ## Shards
 
@@ -20,7 +20,7 @@
 | 02-context-menu-02.md       | context-menu       | 1        | 52    | 2026-09-25   |
 | 03-compare-find-01.md       | compare-find       | 3        | 25    | 2026-03-01   |
 | 04-keyboard-selection-01.md | keyboard-selection | 7        | 42    | 2026-09-24   |
-| 04-keyboard-selection-02.md | keyboard-selection | 2        | 54    | 2026-09-28   |
+| 04-keyboard-selection-02.md | keyboard-selection | 2        | 55    | 2026-09-28   |
 | 05-state-response-01.md     | state-response     | 10       | 38    | 2026-05-10   |
 | 05-state-response-02.md     | state-response     | 5        | 33    | 2026-09-24   |
 | 06-file-actions-01.md       | file-actions       | 3        | 34    | 2026-09-13   |
