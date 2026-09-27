@@ -43,7 +43,8 @@
 
 > Origin: Feature 055-07 (light-spec-plan)
 > Added: 2026-09-08
-> Status: active
+> Status: superseded
+> Superseded By: S63
 > Supersedes: -
 > Signature: private `restoreExpandedCommit(snapshot: FileHistoryExpandedSnapshot): boolean` / private `applyFileHistoryToFileRows(): void`
 > Target Path: `web/main.ts`（`restoreExpandedCommit()`・`applyFileHistoryToFileRows()`・`showCommitDetails()` / `handleFileViewToggle()` の bind 直後。実装後に行範囲へ更新）
@@ -93,3 +94,51 @@ controller は mock のまま、`restoreExpandedCommit` と `applyFileHistoryToF
 - Normal: TC-316〜TC-319、TC-321〜TC-324、TC-326、TC-328〜TC-333、TC-336〜TC-338、TC-349
 
 **失敗系/正常系比（煙感知器）**: 正常系19件、失敗系8件。配線の観点は「呼ばれること」の正常系が構造的に多く、失敗源は未接続・過剰呼出・DOM 不在・mode 外に限られることを上表で列挙した。比率合わせのためのケース追加・削除は行わない。
+
+## S63: restoreExpandedCommit() のDOM再解決とapplyFileHistoryToFileRows() のファイル行強調・一覧先頭の注記
+
+> Origin: Feature 060 (light-spec-plan)
+> Added: 2026-09-27
+> Status: active
+> Supersedes: S51
+> Signature: private `restoreExpandedCommit(snapshot: FileHistoryExpandedSnapshot): boolean` / private `applyFileHistoryToFileRows(): void`
+> Target Path: `web/main.ts:1784-1802`（`restoreExpandedCommit()`）、`web/main.ts:1803-1830`（`applyFileHistoryToFileRows()`）、`web/main.ts:1777-1778`・`web/main.ts:1945-1946`（詳細全体の描画と表示切替での再適用）。調査基準 `11841ea` 時点。実装後に行範囲へ更新
+> Test File: `tests/web/main.test.ts`
+
+表示切替ボタンが一覧の外へ移るため、S51 TC-337 / TC-338の「注記は切替ボタンの直後」という期待結果が成り立たなくなる。S51の表は改変せず、全10シナリオを本節へ引き継ぐ。復元（TC-551〜TC-554）と一致行の強調（TC-555）、ガード（TC-559〜TC-561）の期待結果はS51と同じで、注記の位置（TC-556）と表示切替後の再適用（TC-557 / TC-558）を訂正する。旧TC-338は一致と不一致で期待結果が異なるため2ケースに分けた。controllerはmockのまま実DOMで検証し、`isActive` / `getHistoricalPathFor` の戻り値はmockで制御する。ボタンと一覧のDOM構成・保存件数は `01-rendering-03.md` S62の責務で本表には含めない。
+
+| Case ID | Input / Precondition                                                                                                                                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                               | Notes                                                                      |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| TC-551  | `.commit[data-hash="e1"]` が存在する状態で `{ hash: "e1", compareWithHash: null, commitDetails, fileTree }` を復元                                                       | Normal - DOM 再解決と詳細再表示                                            | 戻り値が `true`、`#commitDetails` が当該行の直後に生成され、`expandedCommit.srcElem` が現在の DOM 要素（`toBe`）、`expandedCommit.commitDetails` / `fileTree` が snapshot の値、`loading` が `false`                                                                                          | S51/TC-332 の引き継ぎ。`showCommitDetails()` 経由                          |
+| TC-552  | `compareWithHash: "c1"` で比較行 `.commit[data-hash="c1"]` も存在                                                                                                        | Normal - 比較行の再解決                                                    | 比較行に `compareTarget` class が付き、`expandedCommit.compareWithSrcElem` が当該 DOM 要素                                                                                                                                                                                                    | S51/TC-333 の引き継ぎ                                                      |
+| TC-553  | `compareWithHash: "c1"` だが比較行が存在しない                                                                                                                           | Boundary - 比較行の unload                                                 | 戻り値が `true` で `expandedCommit.compareWithSrcElem` が `null`、`compareTarget` class を持つ行が 0 件                                                                                                                                                                                       | S51/TC-334 の引き継ぎ。詳細だけ復元                                        |
+| TC-554  | `.commit[data-hash="e1"]` が存在しない                                                                                                                                   | Validation - 行の不在                                                      | 戻り値が `false` で `#commitDetails` が生成されず、`expandedCommit` が呼出前と同じ                                                                                                                                                                                                            | S51/TC-335 の引き継ぎ。DOM 不変                                            |
+| TC-555  | `isActive()` が `true`、`expandedCommit.compareWithHash === null`、`getHistoricalPathFor(hash)` が `"src/a.txt"`、CDV に `.gitFile[data-newfilepath="src%2Fa.txt"]` あり | Normal - 一致行の強調                                                      | 当該 `.gitFile` に `fileHistoryCurrent` が付き、`.fileHistoryNote` が 0 件                                                                                                                                                                                                                    | S51/TC-336 の引き継ぎ。decode 後に照合                                     |
+| TC-556  | 同条件でCDVに一致行がない（CE4のmerge）                                                                                                                                  | Normal - 一覧先頭への注記の挿入                                            | `.fileHistoryNote` が1件で、`textContent` が `"This file's change is not part of the diff against the first parent."`。注記の親が `#commitDetailsFiles`、`#commitDetailsFiles` の最初の子要素が注記、注記の次の兄弟要素がルートの `ul.gitFolderContents`。`.gitFile.fileHistoryCurrent` が0件 | S51/TC-337の訂正（旧: 切替ボタンの直後）。注記は一覧とともにスクロールする |
+| TC-557  | TC-555の状態（一致行あり）で、表示切替をtree→list、list→treeの順に実行                                                                                                   | Normal - 一致時の表示切替後の再適用                                        | どちらの切替後も、再生成された一致行に `fileHistoryCurrent` が付き直し、`.gitFile.fileHistoryCurrent` がちょうど1件、`.fileHistoryNote` が0件                                                                                                                                                 | S51/TC-338のうち一致の分を引き継ぎ。両方向を確認                           |
+| TC-558  | TC-556の状態（一致行なし）で、表示切替をtree→list、list→treeの順に実行                                                                                                   | Normal - 不一致時の表示切替後の注記                                        | どちらの切替後も `.fileHistoryNote` が1件（重複0）で、文言・親・一覧先頭の位置・次の兄弟要素がTC-556と同じ。`.gitFile.fileHistoryCurrent` が0件                                                                                                                                               | S51/TC-338のうち不一致の分を訂正。一覧の内容を置換してから注記を追加する   |
+| TC-559  | `getHistoricalPathFor()` が `null`                                                                                                                                       | Validation - 非 match commit の CDV                                        | `fileHistoryCurrent` を持つ `.gitFile` と `.fileHistoryNote` がともに 0 件                                                                                                                                                                                                                    | S51/TC-339 の引き継ぎ                                                      |
+| TC-560  | `expandedCommit.compareWithHash !== null`（比較 mode）                                                                                                                   | Validation - 比較 mode                                                     | `fileHistoryCurrent` を持つ `.gitFile` と `.fileHistoryNote` がともに 0 件                                                                                                                                                                                                                    | S51/TC-340 の引き継ぎ                                                      |
+| TC-561  | `isActive()` が `false`                                                                                                                                                  | Boundary - inactive                                                        | `fileHistoryCurrent` を持つ `.gitFile` と `.fileHistoryNote` がともに 0 件                                                                                                                                                                                                                    | S51/TC-341 の引き継ぎ。no-op                                               |
+
+### 失敗源インベントリ（include-or-justify）— Feature 060追加分（S63）
+
+| 失敗源                                                                           | 対応ケースまたは除外理由                                                                                     |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| DOM 再生成後の旧 `srcElem` 使用・行不在での復元                                  | TC-551、TC-554                                                                                               |
+| 比較行の unload・`compareTarget` 漏れ                                            | TC-552、TC-553                                                                                               |
+| 一致行の取り違え（encode 済み path との直接比較）                                | TC-555                                                                                                       |
+| 移動した切替ボタンを挿入基準にして注記が一覧の外へ出る、ルートリストの後ろへ入る | TC-556、TC-558                                                                                               |
+| 表示切替後の強調の付け直し漏れ・注記の重複                                       | TC-557、TC-558                                                                                               |
+| 非 match / 比較 mode / inactive での強調・注記                                   | TC-559〜TC-561                                                                                               |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）                            | `null` 戻り: TC-559。比較行 `null`: TC-553。inactive: TC-561。maximum / +/-1: excluded(数値閾値が存在しない) |
+| 外部依存×失敗モード                                                              | excluded(S51と同じくcontrollerはmockで、Git失敗は `web/fileHistory-test.md` S3がresponse経由で扱う)          |
+| 例外・エラー経路                                                                 | excluded(復元と強調の処理はthrow分岐を持たない)                                                              |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-554、TC-559、TC-560
+- Exception: excluded(上表のとおりthrow経路なし)
+- External: excluded(上表のとおり)
+- Boundary: TC-553、TC-561
+- Type: excluded(引数の型は `src/types-test.md` S9とTypeScriptの型検査で担保)
