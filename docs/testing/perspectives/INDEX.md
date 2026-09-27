@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-09-27T12:54:11+09:00
+> Auto-generated: 2026-09-28T07:35:28+09:00
 > Total sources: 52
-> Total physical files: 93
+> Total physical files: 94
 > Total sections: 570
-> Total cases: 3404
+> Total cases: 3482
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -45,14 +45,14 @@
 | `web/dates.ts` | single-file | `web/dates-test.md` | 1 | 8 | 31 | 2026-07-04 |
 | `web/dialogs.ts` | single-file | `web/dialogs-test.md` | 1 | 7 | 38 | 2026-08-23 |
 | `web/dropdown.ts` | single-file | `web/dropdown-test.md` | 1 | 10 | 38 | 2026-03-07 |
-| `web/fileHistory.ts` | single-file | `web/fileHistory-test.md` | 1 | 9 | 57 | 2026-09-08 |
+| `web/fileHistory.ts` | single-file | `web/fileHistory-test.md` | 1 | 9 | 92 | 2026-09-28 |
 | `web/fileMenu.ts` | single-file | `web/fileMenu-test.md` | 1 | 4 | 39 | 2026-09-13 |
 | `web/fileTree.ts` | single-file | `web/fileTree-test.md` | 1 | 4 | 35 | 2026-09-13 |
 | `web/findWidget.ts` | single-file | `web/findWidget-test.md` | 1 | 10 | 49 | 2026-09-24 |
 | `web/graph.ts` | single-file | `web/graph-test.md` | 1 | 20 | 77 | 2026-09-12 |
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 2 | 9 | 2026-09-24 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 15 | 56 | 455 | 2026-09-27 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 16 | 56 | 498 | 2026-09-28 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
 | `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 15 | 64 | 2026-09-13 |
 | `web/refMenu.ts` | single-file | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md` | 1 | 14 | 74 | 2026-07-19 |
@@ -138,11 +138,12 @@
 | Feature 059-02 (PR #82 実機確認) | `media/main-test.md` |
 | Feature 059-02 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `web/findWidget-test.md`, `web/i18n-test.md`, `web/main-test/INDEX.md`, `web/refOverflow-test.md` |
 | Feature 060 (light-spec-plan) | `media/main-test.md`, `web/main-test/INDEX.md` |
+| Feature 060-02 (light-spec-plan) | `web/fileHistory-test.md`, `web/main-test/INDEX.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
 | test-plan | `web/stashMenu-test.md` |
 | test-plan (既存コード分析) | `src/avatarManager-test.md`, `src/diffDocProvider-test.md`, `src/extension-test.md`, `src/extensionState-test.md`, `src/repoFileWatcher-test.md`, `src/statusBarItem-test.md`, `web/branchLabels-test.md`, `web/dates-test.md` |
-| test-plan (既存コード網羅) | `src/gitGraphView-test/INDEX.md`, `src/repoManager-test.md`, `web/main-test/INDEX.md` |
+| test-plan (既存コード網羅) | `src/gitGraphView-test/INDEX.md`, `src/repoManager-test.md` |
 | test-plan (既存テスト) | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md`, `src/dataSource-test/INDEX.md` |
 | フェーズ1 修正 H1 (commit-details-tree-escape) | `web/fileTree-test.md` |
 | フェーズ1 修正 H2 (rename-tracking-repair) | `src/dataSource-test/INDEX.md` |

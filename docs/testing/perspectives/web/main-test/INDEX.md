@@ -2,12 +2,12 @@
 
 > Source: `web/main.ts`
 > Storage Mode: sharded
-> Generated: 2026-09-27T00:00:00Z
+> Generated: 2026-09-28T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 15
+> Total Shards: 16
 > Total Sections: 56
-> Total Cases: 455
+> Total Cases: 498
 
 ## Shards
 
@@ -19,14 +19,15 @@
 | 02-context-menu-01.md       | context-menu       | 7        | 61    | 2026-09-25   |
 | 02-context-menu-02.md       | context-menu       | 1        | 52    | 2026-09-25   |
 | 03-compare-find-01.md       | compare-find       | 3        | 25    | 2026-03-01   |
-| 04-keyboard-selection-01.md | keyboard-selection | 10       | 59    | 2026-09-24   |
+| 04-keyboard-selection-01.md | keyboard-selection | 7        | 42    | 2026-09-24   |
+| 04-keyboard-selection-02.md | keyboard-selection | 2        | 54    | 2026-09-28   |
 | 05-state-response-01.md     | state-response     | 10       | 38    | 2026-05-10   |
 | 05-state-response-02.md     | state-response     | 5        | 33    | 2026-09-24   |
 | 06-file-actions-01.md       | file-actions       | 3        | 34    | 2026-09-13   |
 | 07-load-count-01.md         | load-count         | 1        | 5     | 2026-05-17   |
 | 08-request-queue-01.md      | request-queue      | 2        | 14    | 2026-08-04   |
 | 09-branch-cleanup-01.md     | branch-cleanup     | 1        | 11    | 2026-08-25   |
-| 10-file-history-01.md       | file-history       | 2        | 28    | 2026-09-27   |
+| 10-file-history-01.md       | file-history       | 3        | 34    | 2026-09-28   |
 | 11-state-persistence-01.md  | state-persistence  | 1        | 3     | 2026-09-12   |
 
 ## Origin Coverage
@@ -47,7 +48,6 @@
 | Feature 013 (scroll-position-restore) (aidd-spec-tasks-test)         | 05-state-response-01.md                                                                         |
 | Feature 015 (commit-sort-order) (aidd-spec-tasks-test)               | 02-context-menu-01.md                                                                           |
 | Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)         | 06-file-actions-01.md                                                                           |
-| Feature 027 (commit-file-context-menu) (aidd-spec-tasks-test)        | 06-file-actions-01.md                                                                           |
 | Feature 039 (show-recent-actions-runtime-sync) (light-spec-plan)     | 05-state-response-01.md                                                                         |
 | Feature 040 (settings-and-copy-polish) (light-spec-plan)             | 07-load-count-01.md                                                                             |
 | Feature 041 (refresh-contention-and-dialog-escape) (light-spec-plan) | 08-request-queue-01.md                                                                          |
@@ -61,7 +61,7 @@
 | Feature 059-01 (stash-label-context-menu)                            | 02-context-menu-02.md                                                                           |
 | Feature 059-02 (light-spec-plan)                                     | 01-rendering-03.md, 02-context-menu-01.md, 04-keyboard-selection-01.md, 05-state-response-02.md |
 | Feature 060 (light-spec-plan)                                        | 01-rendering-03.md, 10-file-history-01.md                                                       |
-| test-plan (既存コード網羅)                                           | 04-keyboard-selection-01.md                                                                     |
+| Feature 060-02 (light-spec-plan)                                     | 04-keyboard-selection-02.md, 10-file-history-01.md                                              |
 | フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                                                         |
 | フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                                                         |
 | フェーズ3 修正 L15 (avatar-raw-email-compare)                        | 05-state-response-02.md                                                                         |
