@@ -2,12 +2,12 @@
 
 > Source: `web/main.ts`
 > Storage Mode: sharded
-> Generated: 2026-09-25T00:00:00Z
+> Generated: 2026-09-27T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 15
-> Total Sections: 55
-> Total Cases: 449
+> Total Sections: 56
+> Total Cases: 455
 
 ## Shards
 
@@ -15,7 +15,7 @@
 | --------------------------- | ------------------ | -------- | ----- | ------------ |
 | 01-rendering-01.md          | rendering          | 7        | 35    | 2026-03-05   |
 | 01-rendering-02.md          | rendering          | 1        | 33    | 2026-09-13   |
-| 01-rendering-03.md          | rendering          | 1        | 19    | 2026-09-24   |
+| 01-rendering-03.md          | rendering          | 2        | 24    | 2026-09-27   |
 | 02-context-menu-01.md       | context-menu       | 7        | 61    | 2026-09-25   |
 | 02-context-menu-02.md       | context-menu       | 1        | 52    | 2026-09-25   |
 | 03-compare-find-01.md       | compare-find       | 3        | 25    | 2026-03-01   |
@@ -26,7 +26,7 @@
 | 07-load-count-01.md         | load-count         | 1        | 5     | 2026-05-17   |
 | 08-request-queue-01.md      | request-queue      | 2        | 14    | 2026-08-04   |
 | 09-branch-cleanup-01.md     | branch-cleanup     | 1        | 11    | 2026-08-25   |
-| 10-file-history-01.md       | file-history       | 2        | 27    | 2026-09-12   |
+| 10-file-history-01.md       | file-history       | 2        | 28    | 2026-09-27   |
 | 11-state-persistence-01.md  | state-persistence  | 1        | 3     | 2026-09-12   |
 
 ## Origin Coverage
@@ -60,6 +60,7 @@
 | Feature 056 (retain-context-when-hidden) issue #48                   | 11-state-persistence-01.md                                                                      |
 | Feature 059-01 (stash-label-context-menu)                            | 02-context-menu-02.md                                                                           |
 | Feature 059-02 (light-spec-plan)                                     | 01-rendering-03.md, 02-context-menu-01.md, 04-keyboard-selection-01.md, 05-state-response-02.md |
+| Feature 060 (light-spec-plan)                                        | 01-rendering-03.md, 10-file-history-01.md                                                       |
 | test-plan (既存コード網羅)                                           | 04-keyboard-selection-01.md                                                                     |
 | フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                                                         |
 | フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                                                         |

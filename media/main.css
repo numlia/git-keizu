@@ -325,7 +325,7 @@ body.unableToLoad p {
   bottom: 2px;
   left: 45%;
   border-right: 1px solid rgba(128, 128, 128, 0.2);
-  overflow-x: hidden;
+  overflow-x: auto;
   overflow-y: scroll;
   padding-top: 4px;
   padding-bottom: 8px;
@@ -340,13 +340,14 @@ body.unableToLoad p {
   -webkit-padding-start: 30px;
 }
 #commitDetailsFiles > ul {
+  width: max-content;
+  min-width: 100%;
+  box-sizing: border-box;
   -webkit-padding-start: 10px;
 }
 #commitDetailsFiles li {
   margin-top: 4px;
   white-space: nowrap;
-  text-overflow: ellipsis;
-  overflow-x: hidden;
 }
 /* Loading state */
 #cdvLoading {
@@ -367,12 +368,18 @@ body.unableToLoad p {
   cursor: pointer;
 }
 /* File view toggle */
-.fileViewToggleBtn {
-  display: inline-block;
-  float: right;
+#commitDetails #fileViewToggle {
+  position: absolute;
+  right: 4px;
+  top: 36px;
+  width: 24px;
+  height: 24px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   padding: 2px 4px;
-  margin-right: 4px;
 }
 /* Git file / folder entries */
 .gitFolderContents.hidden {
