@@ -8130,11 +8130,11 @@ describe("Branch cleanup panel wiring (S49)", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* S50 / S51: file history controller wiring and CDV file rows        */
+/* S50 / S63: file history controller wiring and CDV file rows        */
 /* ------------------------------------------------------------------ */
 
 // @see docs/testing/perspectives/web/main-test/10-file-history-01.md
-describe("File history integration (S50 / S51)", () => {
+describe("File history integration (S50 / S63)", () => {
   const STASH_HASH = "eee555eee555eee5";
   const OTHER_REPO = "/test/other-repo";
   const FILE_HISTORY_NOTE_TEXT =
@@ -8142,8 +8142,10 @@ describe("File history integration (S50 / S51)", () => {
   const HISTORICAL_PATH = "src/a.txt";
   const MATCH_TREE_HTML =
     '<table><tr class="gitFile M gitDiffPossible" data-oldfilepath="src%2Fa.txt" data-newfilepath="src%2Fa.txt" data-type="M"><td>a</td></tr></table>';
-  const OTHER_TREE_HTML =
-    '<table><tr class="gitFile M gitDiffPossible" data-oldfilepath="src%2Fb.txt" data-newfilepath="src%2Fb.txt" data-type="M"><td>b</td></tr></table>';
+  const MATCH_NESTED_TREE_HTML =
+    '<ul class="gitFolderContents"><li><span class="gitFolder" data-folderpath="src"><span class="gitFolderIcon"></span><span class="gitFolderName">src</span></span><ul class="gitFolderContents"><li class="gitFile M gitDiffPossible" data-oldfilepath="src%2Fa.txt" data-newfilepath="src%2Fa.txt" data-type="M">a.txt</li></ul></li></ul>';
+  const OTHER_NESTED_TREE_HTML =
+    '<ul class="gitFolderContents"><li><span class="gitFolder" data-folderpath="src"><span class="gitFolderIcon"></span><span class="gitFolderName">src</span></span><ul class="gitFolderContents"><li class="gitFile M gitDiffPossible" data-oldfilepath="src%2Fb.txt" data-newfilepath="src%2Fb.txt" data-type="M">b.txt</li></ul></li></ul>';
   const MATCH_LIST_HTML =
     '<ul class="gitFolderContents"><li class="gitFile M gitDiffPossible" data-oldfilepath="src%2Fa.txt" data-newfilepath="src%2Fa.txt" data-type="M">a</li></ul>';
   const OTHER_LIST_HTML =
@@ -8582,7 +8584,7 @@ describe("File history integration (S50 / S51)", () => {
     });
   });
 
-  describe("restoreExpandedCommit() (S51)", () => {
+  describe("restoreExpandedCommit() (S63)", () => {
     function restore(snapshot: FileHistoryExpandedSnapshot): boolean {
       return (callbacks().restoreExpandedCommit as (s: FileHistoryExpandedSnapshot) => boolean)(
         snapshot
@@ -8593,8 +8595,8 @@ describe("File history integration (S50 / S51)", () => {
       return (callbacks().getExpandedCommit as () => ExpandedCommit | null)();
     }
 
-    it("re-resolves the row and shows the details from the snapshot (TC-332)", () => {
-      // Case: TC-332
+    it("re-resolves the row and shows the details from the snapshot (TC-551)", () => {
+      // Case: TC-551
       // Given: a rendered row for the snapshot hash
       const details = makeCommitDetails(COMMIT_HASH_1);
 
@@ -8617,8 +8619,8 @@ describe("File history integration (S50 / S51)", () => {
       expect(state.loading).toBe(false);
     });
 
-    it("re-resolves the compare row and marks it (TC-333)", () => {
-      // Case: TC-333
+    it("re-resolves the compare row and marks it (TC-552)", () => {
+      // Case: TC-552
       // Given: rows for both the snapshot hash and the compare hash
       // When: the snapshot is restored
       const result = restore({
@@ -8638,8 +8640,8 @@ describe("File history integration (S50 / S51)", () => {
       expect(expanded()!.compareWithHash).toBe(COMMIT_HASH_2);
     });
 
-    it("restores the details alone when the compare row is unloaded (TC-334)", () => {
-      // Case: TC-334
+    it("restores the details alone when the compare row is unloaded (TC-553)", () => {
+      // Case: TC-553
       // Given: a compare hash that is not rendered
       // When: the snapshot is restored
       const result = restore({
@@ -8656,8 +8658,8 @@ describe("File history integration (S50 / S51)", () => {
       expect(document.getElementById("commitDetails")).not.toBeNull();
     });
 
-    it("returns false and leaves the DOM alone when the row is missing (TC-335)", () => {
-      // Case: TC-335
+    it("returns false and leaves the DOM alone when the row is missing (TC-554)", () => {
+      // Case: TC-554
       // Given: a snapshot hash that is not rendered
       const tableBefore = document.getElementById("commitTable")!.innerHTML;
       const expandedBefore = expanded();
@@ -8678,9 +8680,38 @@ describe("File history integration (S50 / S51)", () => {
     });
   });
 
-  describe("applyFileHistoryToFileRows() (S51)", () => {
-    it("highlights the file row whose decoded path matches the historical path (TC-336)", () => {
-      // Case: TC-336
+  describe("applyFileHistoryToFileRows() (S63)", () => {
+    function startInTreeView(): void {
+      dispatchMessage({
+        command: "loadRepos",
+        repos: { [TEST_REPO]: { columnWidths: null, fileViewType: "tree" } },
+        lastActiveRepo: TEST_REPO
+      });
+    }
+
+    function clickFileViewToggle(): void {
+      const toggle = document.getElementById("fileViewToggle");
+      expect(toggle).not.toBeNull();
+      toggle!.click();
+    }
+
+    function expectSingleNoteBeforeRootList(): void {
+      const noteList = notes();
+      expect(noteList).toHaveLength(1);
+      const note = noteList[0];
+      expect(note.textContent).toBe(FILE_HISTORY_NOTE_TEXT);
+      const panel = document.getElementById("commitDetailsFiles");
+      expect(panel).not.toBeNull();
+      expect(note.parentElement).toBe(panel);
+      expect(panel!.firstElementChild).toBe(note);
+      const rootList = note.nextElementSibling;
+      expect(rootList).not.toBeNull();
+      expect(rootList!.matches("ul.gitFolderContents")).toBe(true);
+      expect(currentFileRows()).toHaveLength(0);
+    }
+
+    it("highlights the file row whose decoded path matches the historical path (TC-555)", () => {
+      // Case: TC-555
       // Given: active mode and a historical path that matches the encoded data-newfilepath
       mockFileHistoryInstance.isActive.mockReturnValue(true);
       mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
@@ -8696,59 +8727,85 @@ describe("File history integration (S50 / S51)", () => {
       expect(notes()).toHaveLength(0);
     });
 
-    it("inserts the first parent diff note after the view toggle when no row matches (TC-337)", () => {
-      // Case: TC-337
-      // Given: active mode and a CDV without the historical path
+    it("inserts the first parent diff note before the root list when no row matches (TC-556)", () => {
+      // Case: TC-556
+      // Given: active mode and a tree view without the historical path
+      startInTreeView();
       mockFileHistoryInstance.isActive.mockReturnValue(true);
       mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
 
       // When: the commit details view opens
-      expandCommitWithTree(COMMIT_HASH_1, OTHER_TREE_HTML);
+      expandCommitWithTree(COMMIT_HASH_1, OTHER_NESTED_TREE_HTML);
 
-      // Then: exactly one note with the fixed text directly after #fileViewToggle, no highlighted row
-      const noteList = notes();
-      expect(noteList).toHaveLength(1);
-      expect(noteList[0].textContent).toBe(FILE_HISTORY_NOTE_TEXT);
-      expect(document.getElementById("fileViewToggle")!.nextElementSibling).toBe(noteList[0]);
-      expect(currentFileRows()).toHaveLength(0);
+      // Then: exactly one note with the fixed text leads the file panel, right before the root
+      // list, and no row is highlighted
+      expectSingleNoteBeforeRootList();
     });
 
-    it("re-applies the highlight and keeps a single note after the view toggle (TC-338)", () => {
-      // Case: TC-338
-      // Given: active mode with a matching tree and list
+    it("re-applies the highlight after switching the view in both directions (TC-557)", () => {
+      // Case: TC-557
+      // Given: active mode and a tree view whose row matches the historical path
+      startInTreeView();
       mockFileHistoryInstance.isActive.mockReturnValue(true);
       mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
-      vi.mocked(liveFileListHtml).mockReturnValueOnce(MATCH_LIST_HTML);
-      expandCommitWithTree(COMMIT_HASH_1, MATCH_TREE_HTML);
-
-      // When: the view is toggled to the list
-      document.getElementById("fileViewToggle")!.click();
-
-      // Then: the list row is highlighted again and there is no note
+      expandCommitWithTree(COMMIT_HASH_1, MATCH_NESTED_TREE_HTML);
       expect(currentFileRows()).toHaveLength(1);
+      const treeRow = currentFileRows()[0];
+
+      // When: the view is switched from the tree to the list
+      vi.mocked(liveFileListHtml).mockReturnValueOnce(MATCH_LIST_HTML);
+      clickFileViewToggle();
+
+      // Then: the regenerated list row is the only highlighted row and there is no note
+      expect(liveFileListHtml).toHaveBeenCalledTimes(1);
+      expect(currentFileRows()).toHaveLength(1);
+      const listRow = currentFileRows()[0];
+      expect(listRow).not.toBe(treeRow);
+      expect(listRow.getAttribute("data-newfilepath")).toBe("src%2Fa.txt");
       expect(notes()).toHaveLength(0);
 
-      // Given: a non-matching tree and list after a reset
-      resetCommitState();
-      resetFileHistoryMocks();
-      mockFileHistoryInstance.isActive.mockReturnValue(true);
-      mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
-      vi.mocked(liveFileTreeHtml).mockReturnValueOnce(OTHER_TREE_HTML);
-      vi.mocked(liveFileListHtml).mockReturnValueOnce(OTHER_LIST_HTML);
-      expandCommitWithTree(COMMIT_HASH_1, OTHER_TREE_HTML);
-      expect(notes()).toHaveLength(1);
+      // When: the view is switched back from the list to the tree
+      vi.mocked(liveFileTreeHtml).mockReturnValueOnce(MATCH_NESTED_TREE_HTML);
+      clickFileViewToggle();
 
-      // When: the view is toggled again
-      document.getElementById("fileViewToggle")!.click();
-
-      // Then: still exactly one note right after the toggle and no highlighted row
-      expect(notes()).toHaveLength(1);
-      expect(document.getElementById("fileViewToggle")!.nextElementSibling).toBe(notes()[0]);
-      expect(currentFileRows()).toHaveLength(0);
+      // Then: the regenerated tree row is the only highlighted row and there is still no note
+      expect(liveFileTreeHtml).toHaveBeenCalledTimes(2);
+      expect(liveFileListHtml).toHaveBeenCalledTimes(1);
+      expect(currentFileRows()).toHaveLength(1);
+      expect(currentFileRows()[0]).not.toBe(listRow);
+      expect(currentFileRows()[0].getAttribute("data-newfilepath")).toBe("src%2Fa.txt");
+      expect(notes()).toHaveLength(0);
     });
 
-    it("applies nothing for a commit without a historical path (TC-339)", () => {
-      // Case: TC-339
+    it("keeps a single note before the root list after switching the view in both directions (TC-558)", () => {
+      // Case: TC-558
+      // Given: active mode and a tree view without the historical path
+      startInTreeView();
+      mockFileHistoryInstance.isActive.mockReturnValue(true);
+      mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
+      expandCommitWithTree(COMMIT_HASH_1, OTHER_NESTED_TREE_HTML);
+      expectSingleNoteBeforeRootList();
+
+      // When: the view is switched from the tree to the list
+      vi.mocked(liveFileListHtml).mockReturnValueOnce(OTHER_LIST_HTML);
+      clickFileViewToggle();
+
+      // Then: still exactly one note leading the file panel and no highlighted row
+      expect(liveFileListHtml).toHaveBeenCalledTimes(1);
+      expectSingleNoteBeforeRootList();
+
+      // When: the view is switched back from the list to the tree
+      vi.mocked(liveFileTreeHtml).mockReturnValueOnce(OTHER_NESTED_TREE_HTML);
+      clickFileViewToggle();
+
+      // Then: still exactly one note leading the file panel and no highlighted row
+      expect(liveFileTreeHtml).toHaveBeenCalledTimes(2);
+      expect(liveFileListHtml).toHaveBeenCalledTimes(1);
+      expectSingleNoteBeforeRootList();
+    });
+
+    it("applies nothing for a commit without a historical path (TC-559)", () => {
+      // Case: TC-559
       // Given: active mode but getHistoricalPathFor returns null
       mockFileHistoryInstance.isActive.mockReturnValue(true);
 
@@ -8760,8 +8817,8 @@ describe("File history integration (S50 / S51)", () => {
       expect(notes()).toHaveLength(0);
     });
 
-    it("applies nothing in comparison mode (TC-340)", () => {
-      // Case: TC-340
+    it("applies nothing in comparison mode (TC-560)", () => {
+      // Case: TC-560
       // Given: active mode and an expanded commit compared with another commit
       mockFileHistoryInstance.isActive.mockReturnValue(true);
       mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
@@ -8793,8 +8850,8 @@ describe("File history integration (S50 / S51)", () => {
       expect(notes()).toHaveLength(0);
     });
 
-    it("applies nothing while the mode is inactive (TC-341)", () => {
-      // Case: TC-341
+    it("applies nothing while the mode is inactive (TC-561)", () => {
+      // Case: TC-561
       // Given: inactive mode even though a historical path would resolve
       mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(HISTORICAL_PATH);
 

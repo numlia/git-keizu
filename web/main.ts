@@ -1774,6 +1774,9 @@ class GitKeizuView {
     document.getElementById("commitDetailsClose")!.addEventListener("click", () => {
       this.hideCommitDetails();
     });
+    document.getElementById("fileViewToggle")?.addEventListener("click", () => {
+      this.handleFileViewToggle();
+    });
     this.bindFileViewListeners();
     this.applyFileHistoryToFileRows();
     this.bindParentHashListeners();
@@ -1821,12 +1824,12 @@ class GitKeizuView {
       matchedRow.classList.add(CLASS_FILE_HISTORY_CURRENT);
       return;
     }
-    const toggleElem = document.getElementById("fileViewToggle");
-    if (toggleElem === null) return;
+    const filesElem = document.getElementById("commitDetailsFiles");
+    if (filesElem === null) return;
     const noteElem = document.createElement("div");
     noteElem.className = CLASS_FILE_HISTORY_NOTE;
     noteElem.textContent = t("fileHistory.notInFirstParentDiff");
-    insertAfter(noteElem, toggleElem);
+    filesElem.insertBefore(noteElem, filesElem.firstChild);
   }
   private buildCompareSummaryHtml(compareWithHash: string): string {
     const order = this.getCommitOrder(this.expandedCommit!.hash, compareWithHash);
@@ -1896,7 +1899,8 @@ class GitKeizuView {
     fileTree: GitFolder
   ): string {
     const innerHtml = this.buildFilesSectionInnerHtml(fileViewType, fileChanges, fileTree);
-    return `<div id="commitDetailsFiles">${innerHtml}</div>`;
+    const { icon, title } = getFileViewToggle(fileViewType);
+    return `<div id="commitDetailsFiles">${innerHtml}</div><span id="fileViewToggle" class="fileViewToggleBtn" title="${title}">${icon}</span>`;
   }
   private scrollToExpandedCommit(detailsElem: HTMLElement) {
     if (this.expandedCommit === null || this.expandedCommit.srcElem === null) return;
@@ -1942,6 +1946,12 @@ class GitKeizuView {
         this.expandedCommit.commitDetails.fileChanges,
         this.expandedCommit.fileTree!
       );
+      const toggleElem = document.getElementById("fileViewToggle");
+      if (toggleElem !== null) {
+        const { icon, title } = getFileViewToggle(newMode);
+        toggleElem.innerHTML = icon;
+        toggleElem.title = title;
+      }
       this.bindFileViewListeners();
       this.applyFileHistoryToFileRows();
     }
@@ -1964,17 +1974,11 @@ class GitKeizuView {
     fileTree: GitFolder
   ): string {
     const canHighlight = this.buildFileHistoryActionPredicate();
-    const fileListHtml =
-      fileViewType === FILE_VIEW_LIST
-        ? generateGitFileListHtml(fileChanges, canHighlight)
-        : generateGitFileTreeHtml(fileTree, fileChanges, canHighlight);
-    const { icon, title } = getFileViewToggle(fileViewType);
-    return `<span id="fileViewToggle" class="fileViewToggleBtn" title="${title}">${icon}</span>${fileListHtml}`;
+    return fileViewType === FILE_VIEW_LIST
+      ? generateGitFileListHtml(fileChanges, canHighlight)
+      : generateGitFileTreeHtml(fileTree, fileChanges, canHighlight);
   }
   private bindFileViewListeners() {
-    document.getElementById("fileViewToggle")?.addEventListener("click", () => {
-      this.handleFileViewToggle();
-    });
     addListenerToClass("gitFolder", "click", (e) => {
       let sourceElem = <HTMLElement>(<Element>e.target!).closest(".gitFolder");
       let parent = sourceElem.parentElement!;
