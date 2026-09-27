@@ -51,7 +51,7 @@ Select a commit to inspect its files and diffs, or Ctrl/Cmd+click a second commi
 
 ![2-commit comparison](./resources/screenshots/commit-comparison.png)
 
-- Switch commit files between a folder tree and a flat list.
+- Switch commit files between a folder tree and a flat list; long file rows scroll sideways, so change counts and row actions stay reachable.
 - Open working-tree files directly from commit details; renamed files are resolved through Git rename tracking.
 - Navigate commits with the keyboard, follow parent links, and keep comparison state when switching tabs.
 - **Highlight File History**, started from the history icon on a file's row or from its context menu, follows a single file backwards from a commit — through renames and the merges that touched it — and highlights its commits on the graph without hiding anything else, with previous/next navigation and the file's row highlighted in each commit's details.
