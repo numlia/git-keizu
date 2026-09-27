@@ -1618,6 +1618,10 @@ class GitKeizuView {
       this.hideCommitDetails();
       return;
     }
+    if (this.fileHistory.isActive() || this.fileHistory.isPending()) {
+      this.fileHistory.exit(true);
+      return;
+    }
   }
 
   /* Commit Details */
