@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2026-09-27
+
+This release makes every file in a commit's details readable to the end: long or deeply nested file rows now scroll sideways instead of being cut off, so their change counts and row actions are always within reach.
+
+### Fixed
+
+- **Long file rows in commit details are no longer cut off**: A file row that did not fit the width of the file list, such as a file several folders deep or one with a long name, was truncated with an ellipsis, hiding the rest of its change count (for example `(+91 | -123)` shown as `(+91 |...`) and the **Open File** and **Highlight File History** icons. The file list now scrolls horizontally when its content is wider than the list, so every file and folder row stays on one line and can be scrolled to its last icon, in both the folder tree and the flat list. The row actions still appear only on hover, and the history highlight of a file row extends to its last icon. A list whose rows all fit, an empty list, and long names inside a collapsed folder do not add horizontal scrolling, and the width of the commit summary is unchanged.
+
+### Changed
+
+- **The tree/list toggle sits below the close button**: The button that switches commit files between the folder tree and the flat list has moved from the top right of the file list to just below the close button of the commit details. It no longer scrolls with the files in either direction and does not take up a row of the list. The note shown in Highlight File History when a commit's change to the file is not part of its diff against the first parent now appears at the top of the file list and scrolls with the files.
+
 ## [1.3.1] - 2026-09-25
 
 This release lets you act on a stash directly from its label: right-clicking the label now opens the stash menu, so you no longer have to aim for another part of the row.
@@ -624,7 +636,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.3.2...HEAD
+[1.3.2]: https://github.com/numlia/git-keizu/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/numlia/git-keizu/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/numlia/git-keizu/compare/v1.2.0...v1.3.0
 [1.2.0]: https://github.com/numlia/git-keizu/compare/v1.1.3...v1.2.0
