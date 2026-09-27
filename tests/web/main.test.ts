@@ -340,6 +340,7 @@ import {
   escapeHtml,
   refreshGraphOrDisplayError,
   sendMessage,
+  svgIcons,
   vscode
 } from "../../web/utils";
 import { buildDetachedWorktreeContextMenuItems } from "../../web/worktreeMenu";
@@ -3794,6 +3795,208 @@ describe("File View Toggle (Tree/List)", () => {
     // Then: toggle button now shows tree icon (to switch TO tree)
     const toggleBtnAfter = document.getElementById("fileViewToggle");
     expect(toggleBtnAfter!.getAttribute("title")).toBe("Switch to Tree View");
+  });
+
+  // @see docs/testing/perspectives/web/main-test/01-rendering-03.md
+  describe("file panel structure and persistent toggle (S62)", () => {
+    type FileViewMode = "tree" | "list";
+
+    const FILE_CHANGE: GitFileChange = {
+      oldFilePath: "src/file.ts",
+      newFilePath: "src/file.ts",
+      type: "M",
+      additions: 1,
+      deletions: 0
+    };
+    const TREE_ROOT_HTML =
+      '<ul class="gitFolderContents"><li><span class="gitFolder" data-folderpath="src"><span class="gitFolderIcon"></span><span class="gitFolderName">src</span></span><ul class="gitFolderContents"><li class="gitFile M gitDiffPossible" data-oldfilepath="src%2Ffile.ts" data-newfilepath="src%2Ffile.ts" data-type="M">file.ts</li></ul></li></ul>';
+    const LIST_ROOT_HTML =
+      '<ul class="gitFolderContents"><li class="gitFile M gitDiffPossible" data-oldfilepath="src%2Ffile.ts" data-newfilepath="src%2Ffile.ts" data-type="M">src/file.ts</li></ul>';
+    const EMPTY_ROOT_HTML = '<ul class="gitFolderContents"></ul>';
+    // The toggle offers the mode it switches to, not the mode being displayed.
+    const TOGGLE_IN_TREE_VIEW = { icon: svgIcons.listView, title: "Switch to List View" };
+    const TOGGLE_IN_LIST_VIEW = { icon: svgIcons.treeView, title: "Switch to Tree View" };
+
+    beforeEach(() => {
+      vi.mocked(freshFileTreeHtml).mockReturnValue(TREE_ROOT_HTML);
+      vi.mocked(freshFileListHtml).mockReturnValue(LIST_ROOT_HTML);
+    });
+
+    afterEach(() => {
+      vi.mocked(freshFileTreeHtml).mockReset();
+      vi.mocked(freshFileListHtml).mockReset();
+    });
+
+    function startInView(fileViewType: FileViewMode): void {
+      dispatchMessage({
+        command: "loadRepos",
+        repos: { [TEST_REPO]: { columnWidths: null, fileViewType } },
+        lastActiveRepo: TEST_REPO
+      });
+    }
+
+    function sendCommitDetails(fileChanges: GitFileChange[]): void {
+      dispatchMessage({
+        command: "commitDetails",
+        commitDetails: { ...makeCommitDetails(COMMIT_HASH_1), fileChanges }
+      });
+    }
+
+    function openCommitDetails(fileViewType: FileViewMode, fileChanges: GitFileChange[]): void {
+      startInView(fileViewType);
+      clickCommit(COMMIT_HASH_1);
+      sendCommitDetails(fileChanges);
+    }
+
+    function onlyElement(selector: string): HTMLElement {
+      const elements = document.querySelectorAll<HTMLElement>(selector);
+      expect(elements, selector).toHaveLength(1);
+      return elements[0];
+    }
+
+    function expectSingleRootAndSiblingToggle(): void {
+      const panel = onlyElement("#commitDetailsFiles");
+      expect(panel.children).toHaveLength(1);
+      expect(panel.children[0].matches("ul.gitFolderContents")).toBe(true);
+      const toggle = onlyElement("#fileViewToggle");
+      expect(toggle.classList.contains("fileViewToggleBtn")).toBe(true);
+      expect(panel.contains(toggle)).toBe(false);
+      expect(panel.nextElementSibling).toBe(toggle);
+      expect(toggle.parentElement).toBe(onlyElement("#commitDetailsClose").parentElement);
+    }
+
+    function expectToggleShows(expected: { icon: string; title: string }): void {
+      const toggle = onlyElement("#fileViewToggle");
+      expect(toggle.innerHTML).toBe(expected.icon);
+      expect(toggle.getAttribute("title")).toBe(expected.title);
+    }
+
+    // Counting only the messages sent by one click exposes a listener registered twice.
+    function clickAndCollectSavedRepoStates(toggle: HTMLElement): unknown[] {
+      const sentBeforeClick = vi.mocked(freshVscode.postMessage).mock.calls.length;
+      toggle.click();
+      return vi
+        .mocked(freshVscode.postMessage)
+        .mock.calls.slice(sentBeforeClick)
+        .map((call) => call[0])
+        .filter((message) => (message as { command: string }).command === "saveRepoState");
+    }
+
+    function savedRepoState(fileViewType: FileViewMode): Record<string, unknown> {
+      return {
+        command: "saveRepoState",
+        repo: TEST_REPO,
+        state: { columnWidths: null, fileViewType }
+      };
+    }
+
+    it("renders one root list in the panel and one sibling toggle for the tree view (TC-546)", () => {
+      // Case: TC-546
+      // Given: a repository whose file view type is "tree"
+      // When: the details response renders the whole commit details view
+      openCommitDetails("tree", [FILE_CHANGE]);
+
+      // Then: the panel holds the root list only and the toggle follows the panel as a sibling
+      expectSingleRootAndSiblingToggle();
+      expect(freshFileTreeHtml).toHaveBeenCalledTimes(1);
+      expect(freshFileListHtml).toHaveBeenCalledTimes(0);
+      expectToggleShows(TOGGLE_IN_TREE_VIEW);
+    });
+
+    it("renders the same structure for a saved list view (TC-547)", () => {
+      // Case: TC-547
+      // Given: a repository whose saved file view type is "list"
+      // When: the details response renders the whole commit details view
+      openCommitDetails("list", [FILE_CHANGE]);
+
+      // Then: the structure matches the tree case, rendered by the list renderer
+      expectSingleRootAndSiblingToggle();
+      expect(freshFileListHtml).toHaveBeenCalledTimes(1);
+      expect(freshFileTreeHtml).toHaveBeenCalledTimes(0);
+      expectToggleShows(TOGGLE_IN_LIST_VIEW);
+    });
+
+    it("keeps the panel and the toggle while switching tree, list and tree again (TC-548)", () => {
+      // Case: TC-548
+      // Given: the details rendered in the tree view
+      openCommitDetails("tree", [FILE_CHANGE]);
+      const panel = onlyElement("#commitDetailsFiles");
+      const toggle = onlyElement("#fileViewToggle");
+      const treeRoot = panel.children[0];
+
+      // When: the toggle is clicked once (tree to list)
+      const savedByFirstClick = clickAndCollectSavedRepoStates(toggle);
+
+      // Then: both nodes survive, only the root list is replaced, one render and one save
+      expect(onlyElement("#commitDetailsFiles")).toBe(panel);
+      expect(onlyElement("#fileViewToggle")).toBe(toggle);
+      expectSingleRootAndSiblingToggle();
+      const listRoot = panel.children[0];
+      expect(listRoot).not.toBe(treeRoot);
+      expect(freshFileListHtml).toHaveBeenCalledTimes(1);
+      expect(freshFileTreeHtml).toHaveBeenCalledTimes(1);
+      expect(savedByFirstClick).toEqual([savedRepoState("list")]);
+      expectToggleShows(TOGGLE_IN_LIST_VIEW);
+
+      // When: the same toggle is clicked again (list to tree)
+      const savedBySecondClick = clickAndCollectSavedRepoStates(toggle);
+
+      // Then: the same nodes survive again, with one more tree render and one save
+      expect(onlyElement("#commitDetailsFiles")).toBe(panel);
+      expect(onlyElement("#fileViewToggle")).toBe(toggle);
+      expectSingleRootAndSiblingToggle();
+      expect(panel.children[0]).not.toBe(listRoot);
+      expect(freshFileTreeHtml).toHaveBeenCalledTimes(2);
+      expect(freshFileListHtml).toHaveBeenCalledTimes(1);
+      expect(savedBySecondClick).toEqual([savedRepoState("tree")]);
+      expectToggleShows(TOGGLE_IN_TREE_VIEW);
+
+      // When: the whole details view is rendered again and its toggle is clicked once
+      sendCommitDetails([FILE_CHANGE]);
+      expectSingleRootAndSiblingToggle();
+      expect(freshFileTreeHtml).toHaveBeenCalledTimes(3);
+      const savedAfterRerender = clickAndCollectSavedRepoStates(onlyElement("#fileViewToggle"));
+
+      // Then: the click still causes exactly one render and one save
+      expect(freshFileListHtml).toHaveBeenCalledTimes(2);
+      expect(freshFileTreeHtml).toHaveBeenCalledTimes(3);
+      expect(savedAfterRerender).toEqual([savedRepoState("list")]);
+      expectSingleRootAndSiblingToggle();
+      expectToggleShows(TOGGLE_IN_LIST_VIEW);
+    });
+
+    it("creates the toggle only after the details response replaces the loading view (TC-549)", () => {
+      // Case: TC-549
+      // Given: a commit row clicked while its details response has not arrived
+      startInView("tree");
+      clickCommit(COMMIT_HASH_1);
+
+      // Then: the loading view has the loading indicator and the close control but no toggle
+      expect(document.querySelectorAll("#fileViewToggle")).toHaveLength(0);
+      expect(document.querySelectorAll("#cdvLoading")).toHaveLength(1);
+      expect(document.querySelectorAll("#commitDetailsClose")).toHaveLength(1);
+
+      // When: the details response arrives
+      sendCommitDetails([FILE_CHANGE]);
+
+      // Then: exactly one toggle exists, outside the file panel
+      const toggle = onlyElement("#fileViewToggle");
+      expect(onlyElement("#commitDetailsFiles").contains(toggle)).toBe(false);
+    });
+
+    it("keeps the root list and the toggle for a commit without file changes (TC-550)", () => {
+      // Case: TC-550
+      // Given: details without any file change, rendered as an empty root list
+      vi.mocked(freshFileTreeHtml).mockReturnValue(EMPTY_ROOT_HTML);
+
+      // When: the details response renders the whole commit details view
+      openCommitDetails("tree", []);
+
+      // Then: the empty root list and the sibling toggle are both present
+      expect(vi.mocked(freshFileTreeHtml).mock.calls.map((call) => call[1])).toEqual([[]]);
+      expectSingleRootAndSiblingToggle();
+      expect(document.querySelectorAll("#commitDetailsFiles .gitFile")).toHaveLength(0);
+    });
   });
 });
 

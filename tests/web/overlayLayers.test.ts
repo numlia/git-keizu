@@ -541,7 +541,7 @@ describe("media/main.css file history declarations (S3)", () => {
   });
 
   it("highlights the matching file row in the commit details view (TC-037)", () => {
-    // Case: TC-037
+    // Case: TC-037, TC-086
     // Given: the .gitFile.fileHistoryCurrent rule
     // When/Then: the 0.25 alpha background exists
     expect(
@@ -829,5 +829,147 @@ describe("media/main.css search marks in the ref list (S6)", () => {
     // Then: none exist, so the table keeps its row-level match highlight only
     expect(ruleBodiesFor(".findMatch")).toEqual([]);
     expect(ruleBodiesFor("span.findMatch")).toEqual([]);
+  });
+});
+
+// S7: horizontal scrolling, content-sized root list and fixed view toggle of the commit details
+// file panel
+// @see docs/testing/perspectives/media/main-test.md
+describe("media/main.css commit details file panel declarations (S7)", () => {
+  // TC-088 to TC-094 are manual real-webview verifications (reaching the row end, scroll ranges,
+  // hover, control overlap, scroll position retention); jsdom resolves no layout, so the text
+  // checks below are not a substitute. TC-086 asserts the declaration already checked by the S3
+  // test of TC-037 and has no separate test. See docs/testing/perspectives/media/main-test.md.
+
+  const FILE_PANEL = "#commitDetailsFiles";
+  const ROOT_LIST = "#commitDetailsFiles > ul";
+  const ANY_LIST = "#commitDetailsFiles ul";
+  const LIST_ROW = "#commitDetailsFiles li";
+  const VIEW_TOGGLE = "#commitDetails #fileViewToggle";
+  const VIEW_TOGGLE_CLASS = ".fileViewToggleBtn";
+
+  const declarationsFor = (selector: string): Map<string, string> =>
+    declarationsOf(ruleBodiesFor(selector).join(";"));
+
+  const expectDeclarations = (selector: string, expected: Record<string, string>): void => {
+    const declarations = declarationsFor(selector);
+    for (const [property, value] of Object.entries(expected)) {
+      expect(declarations.get(property), `${selector} ${property}`).toBe(value);
+    }
+  };
+
+  it("scrolls the file panel horizontally and keeps its bounds (TC-080)", () => {
+    // Case: TC-080
+    // Given/When: the #commitDetailsFiles rule
+    // Then: horizontal auto scroll joins the unchanged vertical scroll, bounds, padding and border
+    expectDeclarations(FILE_PANEL, {
+      "overflow-x": "auto",
+      "overflow-y": "scroll",
+      position: "absolute",
+      right: "32px",
+      left: "45%",
+      top: "0",
+      bottom: "2px",
+      "padding-top": "4px",
+      "padding-bottom": "8px",
+      "border-right": "1px solid rgba(128, 128, 128, 0.2)",
+      "box-sizing": "border-box"
+    });
+  });
+
+  it("sizes the root list to its content with the panel width as the minimum (TC-081)", () => {
+    // Case: TC-081
+    // Given/When: the root list rule and the rule shared by every list in the panel
+    // Then: the root list grows to its content, never below the panel, and both indents are kept
+    expectDeclarations(ROOT_LIST, {
+      width: "max-content",
+      "min-width": "100%",
+      "box-sizing": "border-box",
+      "-webkit-padding-start": "10px"
+    });
+    expectDeclarations(ANY_LIST, { "-webkit-padding-start": "30px" });
+  });
+
+  it("keeps rows on one line without truncating them (TC-082)", () => {
+    // Case: TC-082
+    // Given: the row rule and both list rules, which also style folder ancestors
+    expectDeclarations(LIST_ROW, { "white-space": "nowrap", "margin-top": "4px" });
+
+    // When: declarations that cut a row short are collected from those rules
+    const truncating = [LIST_ROW, ANY_LIST, ROOT_LIST].flatMap((selector) =>
+      [...declarationsFor(selector)]
+        .filter(
+          ([property, value]) =>
+            (property === "text-overflow" && value === "ellipsis") ||
+            ((property === "overflow" || property === "overflow-x") &&
+              /\b(?:hidden|clip)\b/.test(value))
+        )
+        .map(([property, value]) => `${selector} { ${property}: ${value} }`)
+    );
+
+    // Then: no ellipsis and no hidden or clipped overflow remain
+    expect(truncating).toEqual([]);
+  });
+
+  it("fixes the view toggle below the close control (TC-083)", () => {
+    // Case: TC-083
+    // Given: the toggle rule scoped to the commit details
+    expect(ruleBodiesFor(VIEW_TOGGLE)).toHaveLength(1);
+
+    // When/Then: it is absolutely positioned as a centered 24px box with the existing padding
+    expectDeclarations(VIEW_TOGGLE, {
+      position: "absolute",
+      right: "4px",
+      top: "36px",
+      width: "24px",
+      height: "24px",
+      "box-sizing": "border-box",
+      display: "flex",
+      "align-items": "center",
+      "justify-content": "center",
+      cursor: "pointer",
+      padding: "2px 4px"
+    });
+
+    // Then: neither the scoped rule nor a class rule floats the toggle or adds a right margin
+    for (const selector of [VIEW_TOGGLE, VIEW_TOGGLE_CLASS]) {
+      const declarations = declarationsFor(selector);
+      expect(declarations.has("float"), `${selector} float`).toBe(false);
+      expect(declarations.has("margin-right"), `${selector} margin-right`).toBe(false);
+    }
+  });
+
+  it("keeps the close control box and the summary width (TC-084)", () => {
+    // Case: TC-084
+    // Given/When: the #commitDetailsClose and #commitDetailsSummary rules
+    // Then: the close control stays a 24px box at 4px / 4px and the summary stays 45% wide
+    expectDeclarations("#commitDetailsClose", {
+      position: "absolute",
+      right: "4px",
+      top: "4px",
+      width: "24px",
+      height: "24px"
+    });
+    expectDeclarations("#commitDetailsSummary", { width: "45%" });
+  });
+
+  it("keeps the row actions occupying their width and visible only on hover (TC-085)", () => {
+    // Case: TC-085
+    // Given/When: the .gitFileActions rule and its hover rule
+    // Then: the actions keep their box while transparent, and hover changes the opacity only
+    expectDeclarations(".gitFileActions", {
+      display: "inline-flex",
+      opacity: "0",
+      "margin-left": "8px",
+      transition: "opacity 0.15s"
+    });
+    expect([...declarationsFor(".gitFile:hover .gitFileActions")]).toEqual([["opacity", "1"]]);
+  });
+
+  it("removes collapsed folder contents from the layout (TC-087)", () => {
+    // Case: TC-087
+    // Given/When: the .gitFolderContents.hidden rule
+    // Then: display none, so a collapsed subtree cannot widen the root list
+    expectDeclarations(".gitFolderContents.hidden", { display: "none" });
   });
 });

@@ -102,7 +102,7 @@ controller は mock のまま、`restoreExpandedCommit` と `applyFileHistoryToF
 > Status: active
 > Supersedes: S51
 > Signature: private `restoreExpandedCommit(snapshot: FileHistoryExpandedSnapshot): boolean` / private `applyFileHistoryToFileRows(): void`
-> Target Path: `web/main.ts:1784-1802`（`restoreExpandedCommit()`）、`web/main.ts:1803-1830`（`applyFileHistoryToFileRows()`）、`web/main.ts:1777-1778`・`web/main.ts:1945-1946`（詳細全体の描画と表示切替での再適用）。調査基準 `11841ea` 時点。実装後に行範囲へ更新
+> Target Path: `web/main.ts:1787-1805`（`restoreExpandedCommit()`）、`web/main.ts:1806-1833`（`applyFileHistoryToFileRows()`）、`web/main.ts:1780-1781`・`web/main.ts:1955-1956`（詳細全体の描画と表示切替での再適用）
 > Test File: `tests/web/main.test.ts`
 
 表示切替ボタンが一覧の外へ移るため、S51 TC-337 / TC-338の「注記は切替ボタンの直後」という期待結果が成り立たなくなる。S51の表は改変せず、全10シナリオを本節へ引き継ぐ。復元（TC-551〜TC-554）と一致行の強調（TC-555）、ガード（TC-559〜TC-561）の期待結果はS51と同じで、注記の位置（TC-556）と表示切替後の再適用（TC-557 / TC-558）を訂正する。旧TC-338は一致と不一致で期待結果が異なるため2ケースに分けた。controllerはmockのまま実DOMで検証し、`isActive` / `getHistoricalPathFor` の戻り値はmockで制御する。ボタンと一覧のDOM構成・保存件数は `01-rendering-03.md` S62の責務で本表には含めない。

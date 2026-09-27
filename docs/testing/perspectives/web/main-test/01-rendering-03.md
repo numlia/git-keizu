@@ -84,7 +84,7 @@ S56の描画接続・最小幅・保存値維持の契約を引き継ぎ、S56 T
 > Status: active
 > Supersedes: -
 > Signature: `getFileViewToggle(mode: FileViewType): { icon: string; title: string }` / private `buildFilesSectionHtml(fileViewType: FileViewType, fileChanges: GG.GitFileChange[], fileTree: GitFolder): string` / private `buildFilesSectionInnerHtml(fileViewType: FileViewType, fileChanges: GG.GitFileChange[], fileTree: GitFolder): string` / private `handleFileViewToggle(): void` / private `bindFileViewListeners(): void` / `public showCommitDetails(commitDetails: GG.GitCommitDetails, fileTree: GitFolder)` / private `renderCommitDetailsView()`
-> Target Path: `web/main.ts:99-103`（アイコンとtitleの選択）、`web/main.ts:1661-1691`（読み込み中の描画）、`web/main.ts:1723-1780`（詳細全体の描画とクリック登録）、`web/main.ts:1893-1900`・`web/main.ts:1961-1973`（一覧のHTML生成）、`web/main.ts:1930-1954`（表示切替）、`web/main.ts:1974-1977`（行イベント登録内の切替登録）。調査基準 `11841ea` 時点。実装後に行範囲へ更新
+> Target Path: `web/main.ts:99-103`（アイコンとtitleの選択）、`web/main.ts:1661-1691`（読み込み中の描画）、`web/main.ts:1723-1783`（詳細全体の描画。切替クリックの登録は1777-1779）、`web/main.ts:1896-1904`・`web/main.ts:1971-1980`（一覧のHTML生成）、`web/main.ts:1934-1964`（表示切替）、`web/main.ts:1981-2046`（行イベント登録。切替クリックの登録を含まない）
 > Test File: `tests/web/main.test.ts`
 
 表示切替ボタンを一覧（スクロール領域）の外へ移し、詳細全体の描画と表示切替でDOMの寿命を分ける契約の観点。`01-rendering-01.md` S15（TC-101〜TC-106）のモード変更・保存・既定値・アイコンの期待結果は変わらないため現行のまま残し、本節は一覧外のボタン配置、ノードの同一性、クリックごとの描画回数と保存件数、読み込み中の構成を追加する。CSSの実寸・位置は `media/main-test.md` S7、行の内容と操作条件は `web/fileTree-test.md` / `web/fileMenu-test.md`、履歴の強調と注記は `10-file-history-01.md` S63の責務で本表には含めない。

@@ -353,7 +353,7 @@ S1は層数を10定義に固定していたため、ref一覧層の追加で期�
 > Status: active
 > Supersedes: -
 > Signature: `#commitDetailsFiles` / `#commitDetailsFiles > ul` / `#commitDetailsFiles ul` / `#commitDetailsFiles li` / `#commitDetails #fileViewToggle` / `#commitDetailsClose` / `#commitDetailsSummary` / `.gitFileActions` / `.gitFile:hover .gitFileActions` / `.gitFile.fileHistoryCurrent` / `.gitFolderContents.hidden` の宣言
-> Target Path: `media/main.css:278-428`（調査基準 `11841ea` 時点。要約278、一覧321、リスト334・342、行345、閉じるボタン361、切替ボタン370、折り畳み378、操作415・421、履歴背景428。実装後に行範囲へ更新）
+> Target Path: `media/main.css:278-437`（要約278、一覧321、リスト334・342、行348、閉じるボタン362、切替ボタン371、折り畳み385、操作422・428、履歴背景435）
 > Test File: `tests/web/overlayLayers.test.ts`
 
 ツリー・リスト表示の長いファイル行を最後の操作アイコンまで横スクロールで読めるようにし、表示切替ボタンを一覧の外（閉じるボタンの下）へ固定する表示契約の観点。TC-080〜TC-087は `readFileSync` で読んだ宣言テキストの照合で、存在すべき宣言と、切り詰め・float・右marginの不在を組にして確認する（不在だけの確認にしない）。jsdomは寸法・スクロール・hover・重なりを解決しないため、TC-088〜TC-094は実際のVS Code Webviewで手動確認し、自動テスト済み件数に含めない。S3（TC-037の履歴背景色を含む）は現行のまま残す。切替ボタン・注記のDOM構成と保存回数は `web/main-test/01-rendering-03.md` S62と `web/main-test/10-file-history-01.md` S63の責務で本表には含めない。
