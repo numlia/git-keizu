@@ -7,7 +7,9 @@ import type {
   GitCommitStash,
   GitFileChange,
   GitFileChangeType,
-  GitRef
+  GitRef,
+  RequestCommitDetails,
+  RequestMessage
 } from "../../src/types";
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 
@@ -34,6 +36,7 @@ const {
     onCommitsRendered: vi.fn(),
     onRepositoryChanged: vi.fn(),
     handleCommitRowClick: vi.fn(),
+    navigate: vi.fn<(delta: -1 | 1, useExpandedCommit?: boolean) => string | null>(() => null),
     exit: vi.fn(),
     isActive: vi.fn((): boolean => false),
     isPending: vi.fn((): boolean => false),
@@ -2987,6 +2990,107 @@ describe("GitKeizuView frontend integration", () => {
         // Then: the global find shortcut still runs exactly once
         expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(1);
         expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
+      });
+    });
+
+    /* S64: file history mode routing */
+    // @see docs/testing/perspectives/web/main-test/04-keyboard-selection-02.md
+
+    describe("file history mode (S64)", () => {
+      const FIRST_MATCH = "h0";
+      const ADJACENT_NON_MATCH = "x1";
+      const RETURNED_MATCH = "h1";
+      // Names describe table positions, not commit dates.
+      const HISTORY_TABLE_HASHES = [FIRST_MATCH, ADJACENT_NON_MATCH, RETURNED_MATCH, "x2", "h2"];
+
+      function historyCommit(hash: string): GitCommitNode {
+        return {
+          hash,
+          parentHashes: [],
+          author: "Alice",
+          email: "alice@test.com",
+          date: 1700000000,
+          message: `Commit ${hash}`,
+          refs: [],
+          stash: null
+        };
+      }
+
+      function commitDetailsRequests(): RequestMessage[] {
+        return vi
+          .mocked(vscode.postMessage)
+          .mock.calls.map((call) => call[0])
+          .filter((message) => message.command === "commitDetails");
+      }
+
+      function commitDetailsRequestFor(hash: string): RequestCommitDetails {
+        return {
+          command: "commitDetails",
+          repo: TEST_REPO,
+          commitHash: hash,
+          hasParents: false,
+          isStash: false
+        };
+      }
+
+      beforeEach(() => {
+        dispatchMessage({
+          command: "loadCommits",
+          commits: HISTORY_TABLE_HASHES.map(historyCommit),
+          head: FIRST_MATCH,
+          moreCommitsAvailable: false,
+          hard: true
+        });
+        vi.clearAllMocks();
+      });
+
+      afterEach(() => {
+        mockFileHistoryInstance.isActive.mockReturnValue(false);
+        mockFileHistoryInstance.isPending.mockReturnValue(false);
+        mockFileHistoryInstance.navigate.mockReturnValue(null);
+      });
+
+      it("file history regression: ArrowDown without details requests the returned match (TC-571)", () => {
+        // Case: TC-571
+        // Given: highlighted only, no details open, and the controller resolves ArrowDown to h1
+        mockFileHistoryInstance.isActive.mockReturnValue(true);
+        mockFileHistoryInstance.navigate.mockReturnValue(RETURNED_MATCH);
+        expect(document.getElementById("commitDetails")).toBeNull();
+
+        // When: ArrowDown pressed with no modifiers
+        const spies = dispatchArrowKey("ArrowDown");
+
+        // Then: the only request is the details of h1 (none for the adjacent x1)
+        expect(commitDetailsRequests()).toEqual([commitDetailsRequestFor(RETURNED_MATCH)]);
+        expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(1);
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledWith(1, true);
+        expect(spies.preventDefault).toHaveBeenCalledTimes(1);
+        expect(spies.stopPropagation).toHaveBeenCalledTimes(1);
+      });
+
+      it("file history regression: ArrowDown with details skips the adjacent non-match (TC-572)", () => {
+        // Case: TC-572
+        // Given: highlighted only, the details of h0 open, and the controller resolves
+        // ArrowDown to h1
+        mockFileHistoryInstance.isActive.mockReturnValue(true);
+        expandCommit(FIRST_MATCH);
+        mockFileHistoryInstance.navigate.mockReturnValue(RETURNED_MATCH);
+
+        // When: ArrowDown pressed with no modifiers
+        const spies = dispatchArrowKey("ArrowDown");
+
+        // Then: the only request is the details of h1 (none for the adjacent x1), without
+        // falling back to the table order or the graph
+        expect(commitDetailsRequests()).toEqual([commitDetailsRequestFor(RETURNED_MATCH)]);
+        expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(1);
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledWith(1, true);
+        expect(spies.preventDefault).toHaveBeenCalledTimes(1);
+        expect(spies.stopPropagation).toHaveBeenCalledTimes(1);
+        for (const graphMove of Object.values(mockGraphNavigation)) {
+          expect(graphMove).toHaveBeenCalledTimes(0);
+        }
       });
     });
   });
@@ -6801,6 +6905,7 @@ describe("highlightFileHistory icon wiring and click handler (S54)", () => {
     resetCommitState();
     mockFileHistoryInstance.isActive.mockReturnValue(false);
     mockFileHistoryInstance.isPending.mockReturnValue(false);
+    mockFileHistoryInstance.navigate.mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -8438,6 +8543,7 @@ describe("File history integration (S50 / S63)", () => {
   function resetFileHistoryMocks(): void {
     mockFileHistoryInstance.isActive.mockReturnValue(false);
     mockFileHistoryInstance.isPending.mockReturnValue(false);
+    mockFileHistoryInstance.navigate.mockReturnValue(null);
     mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(null);
   }
 

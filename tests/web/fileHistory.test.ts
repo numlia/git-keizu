@@ -27,6 +27,9 @@ const FILE_PATH = "src/a.txt";
 const OTHER_FILE_PATH = "src/b.txt";
 const ENTRY_HASHES = ["h0", "h1", "h2"];
 const DEFAULT_COMMITS = ["h0", "h1", "x1", "x2"];
+// Names describe table positions, not commit dates.
+const FIXTURE_A_COMMITS = ["h0", "x1", "h1", "x2", "h2"];
+const FIXTURE_B_COMMITS = ["before", "h0", "after"];
 const SCROLL_TOP = 120;
 const EXPANDED_HASH = "e1";
 const ERROR_TITLE = "Unable to load file history";
@@ -183,6 +186,43 @@ function postedMessages(): Record<string, unknown>[] {
 
 function lastHighlight(h: Harness): GraphFileHistoryHighlight {
   return h.callbacks.setGraphHighlight.mock.lastCall![0] as GraphFileHistoryHighlight;
+}
+
+interface ObservedState {
+  currentHash: string | null;
+  matchRows: string[];
+  currentRows: string[];
+  dimRows: string[];
+  position: string;
+  path: string;
+  barClasses: string[];
+  scrollToCommitCalls: number;
+  setGraphHighlightCalls: number;
+  hideCommitDetailsCalls: number;
+  restoreExpandedCommitCalls: number;
+  setScrollTopCalls: number;
+  postMessageCalls: number;
+  showErrorDialogCalls: number;
+}
+
+/** Everything a rejected move must leave untouched, captured for a before / after comparison. */
+function observe(h: Harness): ObservedState {
+  return {
+    currentHash: h.controller.getCurrentHash(),
+    matchRows: h.rowsWith(CLASS_FILE_HISTORY_MATCH),
+    currentRows: h.rowsWith(CLASS_FILE_HISTORY_CURRENT),
+    dimRows: h.rowsWith(CLASS_FILE_HISTORY_DIM),
+    position: h.text(POSITION_ID),
+    path: h.text(PATH_ID),
+    barClasses: Array.from(h.bar().classList),
+    scrollToCommitCalls: h.callbacks.scrollToCommit.mock.calls.length,
+    setGraphHighlightCalls: h.callbacks.setGraphHighlight.mock.calls.length,
+    hideCommitDetailsCalls: h.callbacks.hideCommitDetails.mock.calls.length,
+    restoreExpandedCommitCalls: h.callbacks.restoreExpandedCommit.mock.calls.length,
+    setScrollTopCalls: h.callbacks.setScrollTop.mock.calls.length,
+    postMessageCalls: vi.mocked(vscode.postMessage).mock.calls.length,
+    showErrorDialogCalls: vi.mocked(showErrorDialog).mock.calls.length
+  };
 }
 
 beforeEach(() => {
@@ -749,13 +789,75 @@ describe("FileHistoryController.onCommitsRendered() (S5)", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* S6: prev() / next() and handleCommitRowClick()                     */
+/* S10: bounded prev() / next() and handleCommitRowClick()            */
 /* ------------------------------------------------------------------ */
 
 // @see docs/testing/perspectives/web/fileHistory-test.md
-describe("FileHistoryController prev / next / row click (S6)", () => {
-  it("moves to the older match on next (TC-031)", () => {
-    // Case: TC-031
+describe("FileHistoryController bounded prev / next / row click (S10)", () => {
+  it("file history regression: prev stops at the first match without wrapping (TC-070)", () => {
+    // Case: TC-070
+    // Given: fixture A without details, current at h0 (the first match)
+    const h = setup(FIXTURE_A_COMMITS);
+    h.callbacks.getExpandedCommit.mockReturnValue(null);
+    activate(h);
+    const before = observe(h);
+    expect(before.position).toBe("1 of 3");
+
+    // When: prev is clicked
+    h.click(PREV_ID);
+
+    // Then: current does not wrap to h2 and nothing observable changes
+    expect(h.controller.getCurrentHash()).toBe("h0");
+    expect(h.callbacks.scrollToCommit).toHaveBeenCalledTimes(before.scrollToCommitCalls);
+    expect(observe(h)).toEqual(before);
+  });
+
+  it("file history regression: next stops at the last match without wrapping (TC-072)", () => {
+    // Case: TC-072
+    // Given: fixture A without details, current moved to h2 (the last match)
+    const h = setup(FIXTURE_A_COMMITS);
+    h.callbacks.getExpandedCommit.mockReturnValue(null);
+    activate(h);
+    h.controller.handleCommitRowClick("h2");
+    const before = observe(h);
+    expect(before.currentHash).toBe("h2");
+    expect(before.position).toBe("3 of 3");
+
+    // When: next is clicked
+    h.click(NEXT_ID);
+
+    // Then: current does not wrap to h0 and nothing observable changes
+    expect(h.controller.getCurrentHash()).toBe("h2");
+    expect(h.callbacks.scrollToCommit).toHaveBeenCalledTimes(before.scrollToCommitCalls);
+    expect(observe(h)).toEqual(before);
+  });
+
+  it("file history regression: prev and next do not scroll again with a single match (TC-074)", () => {
+    // Case: TC-074
+    // Given: fixture B without details, h0 is the only match
+    const h = setup(FIXTURE_B_COMMITS);
+    h.callbacks.getExpandedCommit.mockReturnValue(null);
+    h.controller.request(ANCHOR, FILE_PATH);
+    h.controller.handleResponse(response({ entries: [entry(ANCHOR)] }));
+    const before = observe(h);
+    expect(before.currentHash).toBe(ANCHOR);
+    expect(before.position).toBe("1 of 1");
+
+    for (const buttonId of [PREV_ID, NEXT_ID]) {
+      // When: the button is clicked
+      h.click(buttonId);
+
+      // Then: no scroll to the same row and nothing observable changes
+      expect(h.callbacks.scrollToCommit, buttonId).toHaveBeenCalledTimes(
+        before.scrollToCommitCalls
+      );
+      expect(h.text(POSITION_ID), buttonId).toBe("1 of 1");
+      expect(observe(h), buttonId).toEqual(before);
+    }
+  });
+
+  it("moves to the older match on next (TC-089)", () => {
+    // Case: TC-089
     // Given: visible [h0, h1] with h0 current
     const h = setup();
     activate(h);
@@ -771,72 +873,26 @@ describe("FileHistoryController prev / next / row click (S6)", () => {
     expect(lastHighlight(h).currentHash).toBe("h1");
   });
 
-  it("wraps from the last match to the first on next (TC-032)", () => {
-    // Case: TC-032
-    // Given: current at h1 (the last match)
+  it("moves to the newer match on prev (TC-090)", () => {
+    // Case: TC-090
+    // Given: current moved to h1 (the last match) by next
     const h = setup();
     activate(h);
     h.click(NEXT_ID);
-
-    // When: next is clicked again
-    h.click(NEXT_ID);
-
-    // Then: back to h0 with a centered scroll and position "1 of 2"
-    expect(h.rowsWith(CLASS_FILE_HISTORY_CURRENT)).toEqual(["h0"]);
-    expect(h.callbacks.scrollToCommit).toHaveBeenLastCalledWith("h0", true);
-    expect(h.text(POSITION_ID)).toBe("1 of 2");
-  });
-
-  it("wraps from the first match to the last on prev (TC-033)", () => {
-    // Case: TC-033
-    // Given: current at h0 (the first match)
-    const h = setup();
-    activate(h);
+    expect(h.controller.getCurrentHash()).toBe("h1");
+    const scrollsBefore = h.callbacks.scrollToCommit.mock.calls.length;
 
     // When: prev is clicked
     h.click(PREV_ID);
 
-    // Then: h1 is current with one centered scroll for the move
-    expect(h.controller.getCurrentHash()).toBe("h1");
-    expect(h.callbacks.scrollToCommit).toHaveBeenCalledTimes(2);
-    expect(h.callbacks.scrollToCommit).toHaveBeenLastCalledWith("h1", true);
-  });
-
-  it("moves to the newer match on prev (TC-034)", () => {
-    // Case: TC-034
-    // Given: current at h1
-    const h = setup();
-    activate(h);
-    h.click(PREV_ID);
-    expect(h.controller.getCurrentHash()).toBe("h1");
-
-    // When: prev is clicked
-    h.click(PREV_ID);
-
-    // Then: h0 is current and the last scroll targets h0
+    // Then: h0 is current and this click scrolls once to h0
     expect(h.controller.getCurrentHash()).toBe("h0");
-    expect(h.callbacks.scrollToCommit).toHaveBeenCalledTimes(3);
+    expect(h.callbacks.scrollToCommit).toHaveBeenCalledTimes(scrollsBefore + 1);
     expect(h.callbacks.scrollToCommit).toHaveBeenLastCalledWith("h0", true);
   });
 
-  it("stays on the anchor with a single visible match (TC-035)", () => {
-    // Case: TC-035
-    // Given: only the anchor visible
-    const h = setup(["h0", "x1"]);
-    activate(h);
-
-    // When: next is clicked
-    h.click(NEXT_ID);
-
-    // Then: current unchanged, one more centered scroll to the anchor, "1 of 1"
-    expect(h.controller.getCurrentHash()).toBe(ANCHOR);
-    expect(h.callbacks.scrollToCommit).toHaveBeenCalledTimes(2);
-    expect(h.callbacks.scrollToCommit).toHaveBeenLastCalledWith(ANCHOR, true);
-    expect(h.text(POSITION_ID)).toBe("1 of 1");
-  });
-
-  it("does not open commit details when moving (TC-036)", () => {
-    // Case: TC-036
+  it("does not open commit details when moving (TC-091)", () => {
+    // Case: TC-091
     // Given: an active mode (hideCommitDetails ran once on accept)
     const h = setup();
     activate(h);
@@ -850,8 +906,8 @@ describe("FileHistoryController prev / next / row click (S6)", () => {
     expect(postedMessages().filter((m) => m.command === "commitDetails")).toHaveLength(0);
   });
 
-  it("syncs current to a clicked match row without scrolling (TC-037)", () => {
-    // Case: TC-037
+  it("syncs current to a clicked match row without scrolling (TC-092)", () => {
+    // Case: TC-092
     // Given: an active mode
     const h = setup();
     activate(h);
@@ -865,8 +921,8 @@ describe("FileHistoryController prev / next / row click (S6)", () => {
     expect(h.callbacks.scrollToCommit).toHaveBeenCalledTimes(1);
   });
 
-  it("ignores a click on a non-match row (TC-038)", () => {
-    // Case: TC-038
+  it("ignores a click on a non-match row (TC-093)", () => {
+    // Case: TC-093
     // Given: an active mode
     const h = setup();
     activate(h);
@@ -882,8 +938,8 @@ describe("FileHistoryController prev / next / row click (S6)", () => {
     expect(h.callbacks.setGraphHighlight).toHaveBeenCalledTimes(highlightCalls);
   });
 
-  it("ignores a row click while inactive (TC-039)", () => {
-    // Case: TC-039
+  it("ignores a row click while inactive (TC-094)", () => {
+    // Case: TC-094
     // Given: a fresh controller
     const h = setup();
 
@@ -895,8 +951,8 @@ describe("FileHistoryController prev / next / row click (S6)", () => {
     expectNoHighlightClasses(h);
   });
 
-  it("ignores next while only pending (TC-040)", () => {
-    // Case: TC-040
+  it("ignores next while only pending (TC-095)", () => {
+    // Case: TC-095
     // Given: a pending request without an accepted response
     const h = setup();
     h.controller.request(ANCHOR, FILE_PATH);
