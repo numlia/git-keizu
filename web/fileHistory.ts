@@ -110,6 +110,21 @@ function buildEntryMap(entries: readonly GG.FileHistoryEntry[]): Map<string, GG.
   return new Map(entries.map((entry) => [entry.hash, entry]));
 }
 
+function findAdjacentMatch(
+  loadedHashes: readonly string[],
+  matchHashes: readonly string[],
+  originHash: string,
+  delta: -1 | 1
+): string | null {
+  const originIndex = loadedHashes.indexOf(originHash);
+  if (originIndex === -1) return null;
+  for (let index = originIndex + delta; index >= 0 && index < loadedHashes.length; index += delta) {
+    const hash = loadedHashes[index];
+    if (hash !== undefined && matchHashes.includes(hash)) return hash;
+  }
+  return null;
+}
+
 /* === Controller === */
 
 export class FileHistoryController {
@@ -207,6 +222,28 @@ export class FileHistoryController {
     this.applyClasses();
   }
 
+  public navigate(delta: -1 | 1, useExpandedCommit: boolean = false): string | null {
+    if (this.pending !== null || this.state === null) return null;
+    const state = this.state;
+    // Read directly instead of recomputing: recomputing exits the mode when current is unloaded.
+    const loadedHashes = this.callbacks.getCommits().map((commit) => commit.hash);
+    if (
+      !state.visibleHashes.includes(state.currentHash) ||
+      !loadedHashes.includes(state.currentHash)
+    ) {
+      return null;
+    }
+    const originHash = this.resolveOrigin(state, loadedHashes, useExpandedCommit);
+    if (originHash === null) return null;
+    const hash = findAdjacentMatch(loadedHashes, state.visibleHashes, originHash, delta);
+    // The row is confirmed before the state changes so a missing row leaves nothing half-updated.
+    if (hash === null || !getCommitRows().some((row) => row.dataset.hash === hash)) return null;
+    this.state = { ...state, currentHash: hash };
+    this.applyClasses();
+    this.callbacks.scrollToCommit(hash, true);
+    return hash;
+  }
+
   public exit(restore: boolean): void {
     const state = this.state;
     this.pending = null;
@@ -300,25 +337,26 @@ export class FileHistoryController {
     return true;
   }
 
-  private step(delta: number): void {
-    if (this.state === null) return;
-    const { visibleHashes, currentHash } = this.state;
-    const count = visibleHashes.length;
-    if (count === 0) return;
-    const index = (visibleHashes.indexOf(currentHash) + delta + count) % count;
-    const hash = visibleHashes[index];
-    if (hash === undefined) return;
-    this.state = { ...this.state, currentHash: hash };
-    this.applyClasses();
-    this.callbacks.scrollToCommit(hash, true);
+  private resolveOrigin(
+    state: FileHistoryState,
+    loadedHashes: readonly string[],
+    useExpandedCommit: boolean
+  ): string | null {
+    const expanded = useExpandedCommit ? this.callbacks.getExpandedCommit() : null;
+    if (expanded === null) return state.currentHash;
+    if (!loadedHashes.includes(expanded.hash)) return null;
+    // Details of a match can stay open after the buttons move current, so only a dim row overrides.
+    const isDimRowDetails =
+      expanded.compareWithHash === null && !state.visibleHashes.includes(expanded.hash);
+    return isDimRowDetails ? expanded.hash : state.currentHash;
   }
 
   private prev(): void {
-    this.step(-1);
+    this.navigate(-1);
   }
 
   private next(): void {
-    this.step(1);
+    this.navigate(1);
   }
 
   /* === Rendering === */
