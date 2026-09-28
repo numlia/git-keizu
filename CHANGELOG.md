@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2026-09-28
+
+This release lets you walk a file's history from the keyboard: while **Highlight File History** is active, `↑` / `↓` step through the highlighted commits only, opening each one's details, and `ESC` leaves the highlight.
+
+### Added
+
+- **Arrow keys move between highlighted commits**: While **Highlight File History** is active, `↑` / `↓` move to the previous or next matching commit in the table, skipping the dimmed commits in between. Each move marks the destination as the current match, updates the position shown on the file history bar (such as **3 of 12**), scrolls the commit into view, and opens its details with the file's row highlighted, just as clicking the commit does. The keys also work right after the highlight starts, when no commit details are open. If the details of a dimmed commit are open, a key press moves to the nearest matching commit in that direction. Only matching commits that are already loaded are visited; the keys stop at the first and last of them instead of wrapping around, and pressing `↓` at the end does not load more commits. When scrolling loads more commits, the new matches can then be reached with `↓`. While the highlight is active, `CTRL/CMD + ↑` / `↓` and `CTRL/CMD + SHIFT + ↑` / `↓` do nothing, so they cannot jump to a commit outside the history.
+- **`ESC` ends Highlight File History**: After commit details are closed, pressing `ESC` again ends the file history with the same restore as its **Exit** button, returning to the commit details and scroll position from before the highlight started. While a file history is still loading, `ESC` cancels it. Items that `ESC` already closed keep their order, so open commit details are closed first, one press at a time.
+
+### Changed
+
+- **Previous match and Next match stop at the ends**: The buttons on the file history bar no longer wrap from the last match to the first or from the first to the last. Wrapping to the end used to trigger loading more commits, so the "last" match was not really the last one. The buttons now stop at the first and last loaded match, and with a single match they do nothing. As before, they highlight and scroll to the commit without opening its details.
+- **Arrow keys wait while a file history is loading**: While a file history is being loaded, the arrow keys no longer move between commits, even when commit details are open. This applies both to starting a highlight and to switching it to another file. Moving resumes once the history has loaded, and other shortcuts such as Find keep working.
+
 ## [1.3.2] - 2026-09-27
 
 This release makes every file in a commit's details readable to the end: long or deeply nested file rows now scroll sideways instead of being cut off, so their change counts and row actions are always within reach.
@@ -636,7 +650,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.3.2...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/numlia/git-keizu/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/numlia/git-keizu/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/numlia/git-keizu/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/numlia/git-keizu/compare/v1.2.0...v1.3.0
