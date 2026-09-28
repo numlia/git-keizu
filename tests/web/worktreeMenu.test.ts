@@ -80,44 +80,45 @@ function clickTerminalItemOfDetachedMenu(worktreePath: string) {
   getItem(items, TITLE_OPEN_TERMINAL).onClick();
 }
 
-// S1: getWorktreeLabelName() / buildWorktreeActionItems() /
-// buildDetachedWorktreeContextMenuItems() detached worktree menu 契約
+// S2: getWorktreeLabelName() / buildWorktreeActionItems() /
+// buildDetachedWorktreeContextMenuItems() detached worktree menu contract with confirmed removal
+// recorded in Recent actions
 // @see docs/testing/perspectives/web/worktreeMenu-test.md
 describe("getWorktreeLabelName", () => {
-  it("returns the final path component (TC-001)", () => {
-    // Case: TC-001
+  it("returns the final path component (TC-022)", () => {
+    // Case: TC-022
     expect(menu.getWorktreeLabelName("/tmp/wt8")).toBe("wt8");
   });
 
-  it("ignores a trailing slash (TC-002)", () => {
-    // Case: TC-002
+  it("ignores a trailing slash (TC-023)", () => {
+    // Case: TC-023
     expect(menu.getWorktreeLabelName("/tmp/wt8/")).toBe("wt8");
   });
 
-  it("ignores a trailing backslash on a Windows path (TC-003)", () => {
-    // Case: TC-003
+  it("ignores a trailing backslash on a Windows path (TC-024)", () => {
+    // Case: TC-024
     expect(menu.getWorktreeLabelName("C:\\wt\\x\\")).toBe("x");
   });
 
-  it("falls back to the whole path when the final component is empty (TC-004)", () => {
-    // Case: TC-004
+  it("falls back to the whole path when the final component is empty (TC-025)", () => {
+    // Case: TC-025
     expect(menu.getWorktreeLabelName("/")).toBe("/");
   });
 
-  it("falls back to the whole path for a lone backslash (TC-005)", () => {
-    // Case: TC-005
+  it("falls back to the whole path for a lone backslash (TC-026)", () => {
+    // Case: TC-026
     expect(menu.getWorktreeLabelName("\\")).toBe("\\");
   });
 });
 
 // @see docs/testing/perspectives/web/worktreeMenu-test.md
 describe("buildDetachedWorktreeContextMenuItems", () => {
-  it("lists the four worktree actions, a divider and Remove Worktree in order (TC-006)", () => {
-    // Case: TC-006
+  it("lists the four worktree actions, a divider and Remove Worktree in order with history IDs on all but Copy (TC-027)", () => {
+    // Case: TC-027
     // When: The detached worktree menu is built
     const items = menu.buildDetachedWorktreeContextMenuItems(REPO, WORKTREE_PATH);
 
-    // Then: Six elements in the confirmed order, with history IDs only on the first three
+    // Then: Six elements in the confirmed order, with history IDs on the first three and Remove Worktree
     expect(items).toHaveLength(DETACHED_MENU_LENGTH);
     expect(items.map(getTitle)).toEqual([
       TITLE_OPEN_IN_NEW_WINDOW,
@@ -134,11 +135,11 @@ describe("buildDetachedWorktreeContextMenuItems", () => {
       "ref.openTerminal"
     ]);
     expect("recentActionId" in items[3]!).toBe(false);
-    expect("recentActionId" in items[5]!).toBe(false);
+    expect(getRecentActionId(items[5])).toBe("ref.removeWorktree");
   });
 
-  it("requests opening the worktree in a new window and records the action (TC-007)", () => {
-    // Case: TC-007
+  it("requests opening the worktree in a new window and records the action (TC-028)", () => {
+    // Case: TC-028
     const items = menu.buildDetachedWorktreeContextMenuItems(REPO, WORKTREE_PATH);
 
     getItem(items, TITLE_OPEN_IN_NEW_WINDOW).onClick();
@@ -153,8 +154,8 @@ describe("buildDetachedWorktreeContextMenuItems", () => {
     expect(recordRecentAction).toHaveBeenCalledWith(REPO, "ref.openWorktreeInNewWindow");
   });
 
-  it("requests revealing the worktree in the file manager and records the action (TC-008)", () => {
-    // Case: TC-008
+  it("requests revealing the worktree in the file manager and records the action (TC-029)", () => {
+    // Case: TC-029
     const items = menu.buildDetachedWorktreeContextMenuItems(REPO, WORKTREE_PATH);
 
     getItem(items, TITLE_REVEAL).onClick();
@@ -169,8 +170,8 @@ describe("buildDetachedWorktreeContextMenuItems", () => {
     expect(recordRecentAction).toHaveBeenCalledWith(REPO, "ref.revealWorktreeInOS");
   });
 
-  it("requests a terminal named after the final path component and records the action (TC-009)", () => {
-    // Case: TC-009
+  it("requests a terminal named after the final path component and records the action (TC-030)", () => {
+    // Case: TC-030
     const items = menu.buildDetachedWorktreeContextMenuItems(REPO, WORKTREE_PATH);
 
     getItem(items, TITLE_OPEN_TERMINAL).onClick();
@@ -186,8 +187,8 @@ describe("buildDetachedWorktreeContextMenuItems", () => {
     expect(recordRecentAction).toHaveBeenCalledWith(REPO, "ref.openTerminal");
   });
 
-  it("copies the worktree path without recording a recent action (TC-010)", () => {
-    // Case: TC-010
+  it("copies the worktree path without recording a recent action (TC-031)", () => {
+    // Case: TC-031
     const items = menu.buildDetachedWorktreeContextMenuItems(REPO, WORKTREE_PATH);
 
     getItem(items, TITLE_COPY_PATH).onClick();
@@ -201,8 +202,8 @@ describe("buildDetachedWorktreeContextMenuItems", () => {
     expect(recordRecentAction).toHaveBeenCalledTimes(0);
   });
 
-  it("asks for confirmation before sending any removal request (TC-011)", () => {
-    // Case: TC-011
+  it("asks for confirmation before sending any removal request (TC-032)", () => {
+    // Case: TC-032
     // When: Remove Worktree is clicked
     openRemoveConfirmation(WORKTREE_PATH_WITH_SPACE);
 
@@ -218,8 +219,8 @@ describe("buildDetachedWorktreeContextMenuItems", () => {
     expect(recordRecentAction).toHaveBeenCalledTimes(0);
   });
 
-  it("renders a Yes / No dialog showing the path without a checkbox (TC-012)", () => {
-    // Case: TC-012
+  it("renders a Yes / No dialog showing the path without a checkbox (TC-033)", () => {
+    // Case: TC-033
     openRemoveConfirmation(WORKTREE_PATH_WITH_SPACE);
 
     expect(getDialog().textContent).toContain(`'${WORKTREE_PATH_WITH_SPACE}'`);
@@ -228,13 +229,19 @@ describe("buildDetachedWorktreeContextMenuItems", () => {
     expect(getDialog().querySelectorAll('input[type="checkbox"]')).toHaveLength(0);
   });
 
-  it("sends one removal request without a branch name after Yes (TC-013)", () => {
-    // Case: TC-013
+  it("records Remove Worktree once and then sends one removal request without a branch name after Yes (TC-034)", () => {
+    // Case: TC-034
     openRemoveConfirmation(WORKTREE_PATH_WITH_SPACE);
 
     document.getElementById("dialogAction")!.click();
 
+    // Then: The removal is recorded exactly once, before the unchanged removal request
+    expect(recordRecentAction).toHaveBeenCalledTimes(1);
+    expect(recordRecentAction).toHaveBeenCalledWith(REPO, "ref.removeWorktree");
     expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(recordRecentAction).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(vscode.postMessage).mock.invocationCallOrder[0]
+    );
     expect(vi.mocked(vscode.postMessage).mock.calls[0][0]).toStrictEqual({
       command: "removeWorktree",
       repo: REPO,
@@ -244,28 +251,30 @@ describe("buildDetachedWorktreeContextMenuItems", () => {
     expect(getDialog().className).toBe("");
   });
 
-  it("sends nothing and closes the dialog after No (TC-014)", () => {
-    // Case: TC-014
+  it("records and sends nothing and closes the dialog after No (TC-035)", () => {
+    // Case: TC-035
     openRemoveConfirmation(WORKTREE_PATH_WITH_SPACE);
 
     document.getElementById("dialogDismiss")!.click();
 
     expect(vscode.postMessage).toHaveBeenCalledTimes(0);
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
     expect(getDialog().className).toBe("");
   });
 
-  it("sends nothing when the dialog is closed without an answer (TC-015)", () => {
-    // Case: TC-015
+  it("records and sends nothing when the dialog is closed without an answer (TC-036)", () => {
+    // Case: TC-036
     openRemoveConfirmation(WORKTREE_PATH_WITH_SPACE);
 
     dialogs.hideDialog();
 
     expect(vscode.postMessage).toHaveBeenCalledTimes(0);
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
     expect(document.getElementById("dialogAction")).toBeNull();
   });
 
-  it("shows markup in the path as text and sends the original path (TC-016)", () => {
-    // Case: TC-016
+  it("shows markup in the path as text and sends the original path (TC-037)", () => {
+    // Case: TC-037
     openRemoveConfirmation(WORKTREE_PATH_WITH_MARKUP);
 
     // Then: The path is rendered as text, not as an element
@@ -280,8 +289,8 @@ describe("buildDetachedWorktreeContextMenuItems", () => {
     expect(request.worktreePath).toBe(WORKTREE_PATH_WITH_MARKUP);
   });
 
-  it("keeps entity-like text in the path literal in the dialog and the request (TC-017)", () => {
-    // Case: TC-017
+  it("keeps entity-like text in the path literal in the dialog and the request (TC-038)", () => {
+    // Case: TC-038
     openRemoveConfirmation(WORKTREE_PATH_WITH_ENTITY);
 
     // Then: "&quot;" stays as written instead of being decoded to a double quote
@@ -294,24 +303,24 @@ describe("buildDetachedWorktreeContextMenuItems", () => {
     expect(request.worktreePath).toBe(WORKTREE_PATH_WITH_ENTITY);
   });
 
-  it("names the terminal after the final component of a path with a trailing slash (TC-019)", () => {
-    // Case: TC-019
+  it("names the terminal after the final component of a path with a trailing slash (TC-040)", () => {
+    // Case: TC-040
     clickTerminalItemOfDetachedMenu("/tmp/wt8/");
 
     expect(vscode.postMessage).toHaveBeenCalledTimes(1);
     expect(vi.mocked(vscode.postMessage).mock.calls[0][0].name).toBe("Worktree: wt8");
   });
 
-  it("names the terminal after the final component of a backslash path (TC-020)", () => {
-    // Case: TC-020
+  it("names the terminal after the final component of a backslash path (TC-041)", () => {
+    // Case: TC-041
     clickTerminalItemOfDetachedMenu("C:\\wt\\x\\");
 
     expect(vscode.postMessage).toHaveBeenCalledTimes(1);
     expect(vi.mocked(vscode.postMessage).mock.calls[0][0].name).toBe("Worktree: x");
   });
 
-  it("names the terminal after the whole path for the root path (TC-021)", () => {
-    // Case: TC-021
+  it("names the terminal after the whole path for the root path (TC-042)", () => {
+    // Case: TC-042
     clickTerminalItemOfDetachedMenu("/");
 
     expect(vscode.postMessage).toHaveBeenCalledTimes(1);
@@ -321,8 +330,8 @@ describe("buildDetachedWorktreeContextMenuItems", () => {
 
 // @see docs/testing/perspectives/web/worktreeMenu-test.md
 describe("buildWorktreeActionItems", () => {
-  it("names the terminal after the given label instead of the path (TC-018)", () => {
-    // Case: TC-018
+  it("names the terminal after the given label instead of the path (TC-039)", () => {
+    // Case: TC-039
     const items = menu.buildWorktreeActionItems(REPO, WORKTREE_PATH, "feature/x");
 
     getItem(items, TITLE_OPEN_TERMINAL).onClick();

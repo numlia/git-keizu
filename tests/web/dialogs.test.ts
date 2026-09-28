@@ -809,3 +809,167 @@ describe("showErrorDialog explanation", () => {
     expect(dialogEl.querySelector("details")).toBeNull();
   });
 });
+
+// S8: error-dialog-active state used to keep error dialogs open across refresh
+// @see docs/testing/perspectives/web/dialogs-test.md
+describe("isErrorDialogActive", () => {
+  const BRANCH_ERROR_TITLE = "Unable to Delete Branch";
+  const BRANCH_ERROR_REASON = "error: the branch 'feature' is not fully merged.";
+
+  let dialogsModule: typeof import("../../web/dialogs");
+
+  beforeAll(async () => {
+    dialogsModule = await import("../../web/dialogs");
+  });
+
+  // Case: TC-039
+  it("returns false before any dialog is shown (TC-039)", async () => {
+    // Given: a freshly loaded dialogs module and no active dialog in the DOM
+    vi.resetModules();
+    const freshModule = await import("../../web/dialogs");
+
+    // When: both queries are read before any dialog has been shown
+    const errorActive = freshModule.isErrorDialogActive();
+    const dialogActive = freshModule.isDialogActive();
+
+    // Then: neither an error dialog nor any dialog is active
+    expect(errorActive).toBe(false);
+    expect(dialogActive).toBe(false);
+  });
+
+  // Case: TC-040
+  it("returns true while an error dialog is shown (TC-040)", () => {
+    // Given: no dialog is shown
+    // When: the branch deletion error is shown with the three-argument call
+    dialogsModule.showErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON, null);
+
+    // Then: the error dialog and the dialog are both active
+    expect(dialogsModule.isErrorDialogActive()).toBe(true);
+    expect(dialogsModule.isDialogActive()).toBe(true);
+  });
+
+  // Case: TC-041
+  it.each([
+    {
+      name: "showConfirmationDialog",
+      message: "Confirm next action?",
+      show: (message: string) => dialogsModule.showConfirmationDialog(message, vi.fn(), null)
+    },
+    {
+      name: "showRefInputDialog",
+      message: "Enter a branch name",
+      show: (message: string) =>
+        dialogsModule.showRefInputDialog(message, "feature", "Create", vi.fn(), null)
+    },
+    {
+      name: "showCheckboxDialog",
+      message: "Delete the branch?",
+      show: (message: string) =>
+        dialogsModule.showCheckboxDialog(message, "Force", false, "Delete", vi.fn(), null)
+    },
+    {
+      name: "showSelectDialog",
+      message: "Select a mode",
+      show: (message: string) =>
+        dialogsModule.showSelectDialog(
+          message,
+          "soft",
+          [{ name: "Soft", value: "soft" }],
+          "Reset",
+          vi.fn(),
+          null
+        )
+    },
+    {
+      name: "showFormDialog",
+      message: "Fill in the form",
+      show: (message: string) =>
+        dialogsModule.showFormDialog(message, [createTextInput("Message")], "OK", vi.fn(), null)
+    }
+  ])("returns false after $name replaces the error dialog (TC-041)", ({ message, show }) => {
+    // Given: the branch deletion error dialog is shown
+    dialogsModule.showErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON, null);
+
+    // When: another kind of dialog is shown
+    show(message);
+
+    // Then: only the generic dialog state stays active
+    expect(dialogsModule.isErrorDialogActive()).toBe(false);
+    expect(dialogsModule.isDialogActive()).toBe(true);
+
+    // And: the new dialog replaces the error text
+    expect(dialogEl.textContent).toContain(message);
+    expect(dialogEl.textContent).not.toContain(BRANCH_ERROR_REASON);
+    expect(dialogEl.querySelector(".errorReason")).toBeNull();
+  });
+
+  // Case: TC-042
+  it("returns false after hideDialog closes the error dialog (TC-042)", () => {
+    // Given: the branch deletion error dialog is shown
+    dialogsModule.showErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON, null);
+
+    // When: the dialog is hidden by code
+    dialogsModule.hideDialog();
+
+    // Then: neither an error dialog nor any dialog is active
+    expect(dialogsModule.isErrorDialogActive()).toBe(false);
+    expect(dialogsModule.isDialogActive()).toBe(false);
+  });
+
+  // Case: TC-043
+  it("returns false after the user clicks Dismiss (TC-043)", () => {
+    // Given: the branch deletion error dialog is shown
+    dialogsModule.showErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON, null);
+
+    // When: the Dismiss button is clicked
+    document.getElementById("dialogDismiss")!.click();
+
+    // Then: the dialog is closed and the error state is cleared
+    expect(dialogEl.classList.contains("active")).toBe(false);
+    expect(dialogsModule.isErrorDialogActive()).toBe(false);
+  });
+
+  // Case: TC-044
+  it("stays true when another error dialog replaces the first one (TC-044)", () => {
+    // Given: the branch deletion error dialog is shown
+    dialogsModule.showErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON, null);
+
+    // When: a pull error dialog replaces it
+    dialogsModule.showErrorDialog("Unable to Pull", "CONFLICT", null);
+
+    // Then: the error state stays active and the second error text is shown
+    expect(dialogsModule.isErrorDialogActive()).toBe(true);
+    expect(dialogEl.querySelector(".errorReason")!.textContent).toBe("CONFLICT");
+    expect(dialogEl.textContent).toContain("Unable to Pull");
+    expect(dialogEl.textContent).not.toContain(BRANCH_ERROR_REASON);
+  });
+
+  // Case: TC-045
+  it("returns false while only a confirmation dialog is shown (TC-045)", () => {
+    // Given: no earlier error dialog
+    // When: a confirmation dialog is shown
+    dialogsModule.showConfirmationDialog("Are you sure?", vi.fn(), null);
+
+    // Then: the dialog is active but it is not an error dialog
+    expect(dialogsModule.isErrorDialogActive()).toBe(false);
+    expect(dialogsModule.isDialogActive()).toBe(true);
+  });
+
+  // Case: TC-046
+  it("keeps the error dialog DOM free of any state marker (TC-046)", () => {
+    // Given: no dialog is shown
+    // When: an error dialog is shown with the three-argument call
+    dialogsModule.showErrorDialog("title", "error message", null);
+
+    // Then: the dialog and its backing carry exactly the active class
+    expect(dialogEl.className).toBe("active");
+    expect(document.getElementById("dialogBacking")!.className).toBe("active");
+
+    // And: the dialog has no attribute other than id and class
+    expect(dialogEl.getAttributeNames().sort()).toEqual(["class", "id"]);
+
+    // And: it contains one dismiss button and no action button
+    expect(dialogEl.querySelectorAll("#dialogDismiss")).toHaveLength(1);
+    expect(dialogEl.querySelector("#dialogAction")).toBeNull();
+  });
+});

@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-09-28T08:33:14+09:00
+> Auto-generated: 2026-09-29T07:47:14+09:00
 > Total sources: 52
 > Total physical files: 94
-> Total sections: 570
-> Total cases: 3483
+> Total sections: 577
+> Total cases: 3527
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -41,9 +41,9 @@
 | `web/branchCleanupPanel.ts` | single-file | `web/branchCleanupPanel-test.md` | 1 | 5 | 44 | 2026-08-29 |
 | `web/branchLabels.ts` | single-file | `web/branchLabels-test.md` | 1 | 1 | 17 | 2026-03-21 |
 | `web/commitMenu.ts` | single-file | `web/commitMenu-test.md` | 1 | 11 | 50 | 2026-07-19 |
-| `web/contextMenu.ts` | single-file | `web/contextMenu-test.md` | 1 | 4 | 26 | 2026-09-13 |
+| `web/contextMenu.ts` | single-file | `web/contextMenu-test.md` | 1 | 6 | 48 | 2026-09-29 |
 | `web/dates.ts` | single-file | `web/dates-test.md` | 1 | 8 | 31 | 2026-07-04 |
-| `web/dialogs.ts` | single-file | `web/dialogs-test.md` | 1 | 7 | 38 | 2026-08-23 |
+| `web/dialogs.ts` | single-file | `web/dialogs-test.md` | 1 | 8 | 46 | 2026-09-29 |
 | `web/dropdown.ts` | single-file | `web/dropdown-test.md` | 1 | 10 | 38 | 2026-03-07 |
 | `web/fileHistory.ts` | single-file | `web/fileHistory-test.md` | 1 | 9 | 92 | 2026-09-28 |
 | `web/fileMenu.ts` | single-file | `web/fileMenu-test.md` | 1 | 4 | 39 | 2026-09-13 |
@@ -52,16 +52,16 @@
 | `web/graph.ts` | single-file | `web/graph-test.md` | 1 | 20 | 77 | 2026-09-12 |
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 2 | 9 | 2026-09-24 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 16 | 56 | 499 | 2026-09-28 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 16 | 57 | 506 | 2026-09-29 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
-| `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 15 | 64 | 2026-09-13 |
+| `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 17 | 67 | 2026-09-29 |
 | `web/refMenu.ts` | single-file | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md` | 1 | 14 | 74 | 2026-07-19 |
-| `web/refMenu.ts` | sharded | `web/refMenu-test/INDEX.md` | 3 | 18 | 94 | 2026-09-13 |
+| `web/refMenu.ts` | sharded | `web/refMenu-test/INDEX.md` | 3 | 19 | 98 | 2026-09-29 |
 | `web/refOverflow.ts` | single-file | `web/refOverflow-test.md` | 1 | 5 | 98 | 2026-09-24 |
 | `web/stashMenu.ts` | single-file | `web/stashMenu-test.md` | 1 | 8 | 30 | 2026-04-30 |
 | `web/uncommittedMenu.ts` | single-file | `web/uncommittedMenu-test.md` | 1 | 1 | 3 | 2026-03-09 |
 | `web/utils.ts` | single-file | `web/utils-test.md` | 1 | 5 | 31 | 2026-08-08 |
-| `web/worktreeMenu.ts` | single-file | `web/worktreeMenu-test.md` | 1 | 1 | 21 | 2026-09-13 |
+| `web/worktreeMenu.ts` | single-file | `web/worktreeMenu-test.md` | 1 | 1 | 21 | 2026-09-29 |
 
 ## Feature/Issue -> Perspectives (Reverse Lookup)
 
@@ -95,7 +95,7 @@
 | Feature 013 (scroll-position-restore) (aidd-spec-tasks-test) | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md`, `web/main-test/INDEX.md` |
 | Feature 014 (dialog-defaults) (aidd-spec-tasks-test) | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md`, `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md`, `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md`, `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, `src/config-test/INDEX.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `web/commitMenu-test.md`, `web/dialogs-test.md`, `web/refMenu-test/INDEX.md`, `web/uncommittedMenu-test.md` |
 | Feature 015 (commit-sort-order) (aidd-spec-tasks-test) | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md`, `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md`, `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md`, `archive/web/main-test/2026-03-22-pre-sharding-main-test.md`, `src/config-test/INDEX.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `web/main-test/INDEX.md` |
-| Feature 016 (worktree-support) (aidd-spec-tasks-test) | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md`, `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md`, `archive/web/main-test/2026-03-22-pre-sharding-main-test.md`, `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md`, `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `web/commitMenu-test.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md`, `web/utils-test.md` |
+| Feature 016 (worktree-support) (aidd-spec-tasks-test) | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md`, `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md`, `archive/web/main-test/2026-03-22-pre-sharding-main-test.md`, `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md`, `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `web/commitMenu-test.md`, `web/messageHandler-test/INDEX.md`, `web/utils-test.md` |
 | Feature 019 (worktree-enhancements) (aidd-spec-tasks-test) | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md`, `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md`, `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md`, `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, `src/config-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | Feature 020 (legacy-branding-cleanup) (aidd-spec-tasks-test) | `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md`, `src/gitGraphView-test/INDEX.md` |
 | Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test) | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md`, `src/config-test/INDEX.md` |
@@ -123,7 +123,7 @@
 | Feature 050 (pnpm-security-update) (light-spec-plan) | `package.json-test.md` |
 | Feature 051 (remote-checkout-pull) (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | Feature 052 (detached-worktree-display) (light-spec-plan) | `src/dataSource-test/INDEX.md`, `src/repoFileWatcher-test.md`, `src/types-test.md`, `src/utils-test.md`, `src/worktree-test.md`, `web/utils-test.md` |
-| Feature 053 (detached-worktree-menu) (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/contextMenu-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md`, `web/worktreeMenu-test.md` |
+| Feature 053 (detached-worktree-menu) (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | Feature 055-01 (light-spec-plan) | `web/dialogs-test.md`, `web/messageHandler-test/INDEX.md` |
 | Feature 055-02 (light-spec-plan) | `media/dropdown-test.md`, `media/findwidget-test.md` |
 | Feature 055-03 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `src/branchCleanup-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/i18n-test.md`, `src/types-test.md`, `web/branchCleanupPanel-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
@@ -139,6 +139,8 @@
 | Feature 059-02 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `web/findWidget-test.md`, `web/i18n-test.md`, `web/main-test/INDEX.md`, `web/refOverflow-test.md` |
 | Feature 060 (light-spec-plan) | `media/main-test.md`, `web/main-test/INDEX.md` |
 | Feature 060-02 (light-spec-plan) | `web/fileHistory-test.md`, `web/main-test/INDEX.md` |
+| Feature 060-03 (light-spec-plan) | `web/contextMenu-test.md`, `web/refMenu-test/INDEX.md`, `web/worktreeMenu-test.md` |
+| Feature 060-03 addendum (light-spec-plan) | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
 | test-plan | `web/stashMenu-test.md` |

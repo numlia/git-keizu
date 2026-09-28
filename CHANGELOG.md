@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Remove Worktree is now available in Recent actions for branch and detached worktree labels after confirmation. Selecting it opens the confirmation for the current worktree.
+
+### Fixed
+
+- Error dialogs, such as the branch deletion failure shown after removing a worktree, no longer close by themselves when the graph refreshes.
+
 ## [1.4.0] - 2026-09-28
 
 This release lets you walk a file's history from the keyboard: while **Highlight File History** is active, `↑` / `↓` step through the highlighted commits only, opening each one's details, and `ESC` leaves the highlight after first closing any open commit details.

@@ -2789,3 +2789,317 @@ describe("stash label lifecycle and clicks (S61)", () => {
     expect(document.getElementById("commitDetails")).toBeNull();
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* S67 / S20 / S21: refresh-driven closing keeps error dialogs open    */
+/* ------------------------------------------------------------------ */
+
+const BRANCH_ERROR_TITLE = "Unable to Delete Branch";
+const BRANCH_ERROR_REASON = "error: the branch 'feature' is not fully merged.";
+const PULL_ERROR_TITLE = "Unable to Pull";
+const PULL_ERROR_REASON = "CONFLICT";
+const CONFIRMATION_MESSAGE = "Are you sure?";
+// Responses needed to drain a load chain left by an earlier test: branches, commits, queued commits.
+const SETTLE_ROUNDS = 3;
+const NEW_COMMIT_INDEX = 9;
+
+// The last linked worktree is gone after a successful removal; its branch remains.
+const WORKTREES_AFTER_REMOVAL: WorktreeCollection = {
+  branches: Object.fromEntries(Object.entries(AC01_WORKTREES.branches).slice(0, -1)),
+  detached: []
+};
+
+function loadBranchesResponse(hard: boolean): void {
+  dispatchMessage({
+    command: "loadBranches",
+    branches: ["main"],
+    head: "main",
+    hard,
+    isRepo: true
+  });
+}
+
+// Adds one commit on top of the AC-01 commits so the commit list counts as changed.
+function commitsWithNewCommit(): GitCommitNode[] {
+  return [commitOf(NEW_COMMIT_INDEX, [], { parentHashes: [hashOf(1)] }), ...ac01Commits()];
+}
+
+// Answers any load still in flight with the current data, so each case starts idle.
+function settleLoads(): void {
+  for (let round = 0; round < SETTLE_ROUNDS; round++) {
+    loadBranchesResponse(false);
+    loadCommits({ hard: false });
+  }
+  vi.clearAllMocks();
+}
+
+function isDialogOpen(): boolean {
+  return dialogElem().classList.contains("active");
+}
+
+function loadingHeader(): HTMLElement | null {
+  return document.getElementById("loadingHeader");
+}
+
+function expectErrorDialog(title: string, reason: string): void {
+  expect(isDialogOpen()).toBe(true);
+  expect(dialogElem().textContent).toContain(title);
+  expect(dialogElem().querySelector(".errorReason")!.textContent).toBe(reason);
+}
+
+// Starts a soft refresh from idle; exactly one soft branch request proves nothing was in flight.
+function startSoftRefresh(): void {
+  dispatchMessage({ command: "refresh" });
+  expect(postedMessages("loadBranches")).toEqual([expect.objectContaining({ hard: false })]);
+}
+
+function answerSoftRefreshWithChanges(): void {
+  loadBranchesResponse(false);
+  loadCommits({ commits: commitsWithNewCommit(), hard: false });
+}
+
+// @see docs/testing/perspectives/web/main-test/08-request-queue-01.md
+describe("refresh-driven closing keeps error dialogs open (S67)", () => {
+  beforeEach(async () => {
+    await resetView(null);
+    settleLoads();
+  });
+
+  afterEach(() => {
+    settleLoads();
+  });
+
+  // Case: TC-623
+  it("keeps an error dialog open on a soft refresh with changes (TC-623)", () => {
+    // Given: an error dialog is open
+    dialogs.showErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON, null);
+    expect(dialogs.isErrorDialogActive()).toBe(true);
+    expect(dialogs.isDialogActive()).toBe(true);
+    vi.clearAllMocks();
+
+    // When: a soft refresh receives a commit list with changes
+    startSoftRefresh();
+    answerSoftRefreshWithChanges();
+
+    // Then: the error dialog was not hidden and is still open
+    expect(dialogs.hideDialog).not.toHaveBeenCalled();
+    expectErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON);
+
+    // And: the graph shows the new commit
+    expect(document.querySelectorAll("#commitTable tr.commit")).toHaveLength(3);
+  });
+
+  // Case: TC-624
+  it("keeps an error dialog open on a forceRender refresh (TC-624)", () => {
+    // Given: an error dialog is open
+    dialogs.showErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON, null);
+    vi.clearAllMocks();
+
+    // When: a forceRender refresh receives its branch and commit responses
+    dispatchMessage({ command: "checkoutBranch", kind: "completed", status: null });
+    expect(postedMessages("loadBranches")).toEqual([expect.objectContaining({ hard: true })]);
+    loadBranchesResponse(true);
+    loadCommits({ hard: true });
+
+    // Then: the error dialog was not hidden, is still open, and no loading view was shown
+    expect(dialogs.hideDialog).not.toHaveBeenCalled();
+    expectErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON);
+    expect(loadingHeader()).toBeNull();
+  });
+
+  // Case: TC-625
+  it("still closes a confirmation dialog on a soft refresh with changes (TC-625)", () => {
+    // Given: a confirmation dialog is open
+    dialogs.showConfirmationDialog(CONFIRMATION_MESSAGE, vi.fn(), null);
+    expect(dialogs.isErrorDialogActive()).toBe(false);
+    vi.clearAllMocks();
+
+    // When: a soft refresh receives a commit list with changes
+    startSoftRefresh();
+    answerSoftRefreshWithChanges();
+
+    // Then: the dialog was hidden once and is closed
+    expect(dialogs.hideDialog).toHaveBeenCalledTimes(1);
+    expect(isDialogOpen()).toBe(false);
+  });
+
+  // Case: TC-626
+  it("closes the context menu while keeping the error dialog open (TC-626)", () => {
+    // Given: the context menu is active and an error dialog is open
+    contextMenu.showContextMenu(
+      new MouseEvent("contextmenu", { clientX: 10, clientY: 10 }),
+      [{ title: "Item", onClick: vi.fn() }],
+      commitRow(0)
+    );
+    dialogs.showErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON, null);
+    expect(contextMenu.isContextMenuActive()).toBe(true);
+    vi.clearAllMocks();
+
+    // When: a soft refresh receives a commit list with changes
+    startSoftRefresh();
+    answerSoftRefreshWithChanges();
+
+    // Then: only the context menu was hidden
+    expect(contextMenu.hideContextMenu).toHaveBeenCalledTimes(1);
+    expect(contextMenu.isContextMenuActive()).toBe(false);
+    expect(dialogs.hideDialog).not.toHaveBeenCalled();
+    expectErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON);
+  });
+
+  // Case: TC-627
+  it("closes a confirmation dialog opened after an error dialog (TC-627)", () => {
+    // Given: an error dialog is replaced by a confirmation dialog
+    dialogs.showErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON, null);
+    dialogs.showConfirmationDialog(CONFIRMATION_MESSAGE, vi.fn(), null);
+    vi.clearAllMocks();
+
+    // When: a soft refresh receives a commit list with changes
+    startSoftRefresh();
+    answerSoftRefreshWithChanges();
+
+    // Then: the confirmation dialog was hidden once and is closed
+    expect(dialogs.hideDialog).toHaveBeenCalledTimes(1);
+    expect(isDialogOpen()).toBe(false);
+  });
+
+  // Case: TC-628
+  it("closes an error dialog on a hard refresh before any response (TC-628)", () => {
+    // Given: an error dialog is open
+    dialogs.showErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON, null);
+    vi.clearAllMocks();
+
+    // When: a hard refresh starts from the refresh button
+    fire(document.getElementById("refreshBtn")!, "click");
+
+    // Then: the loading view replaced the graph and the error dialog was hidden once
+    expect(loadingHeader()).not.toBeNull();
+    expect(dialogs.hideDialog).toHaveBeenCalledTimes(1);
+    expect(isDialogOpen()).toBe(false);
+
+    // And: no load response has arrived yet
+    expect(postedMessages("loadBranches")).toEqual([expect.objectContaining({ hard: true })]);
+    expect(postedMessages("loadCommits")).toHaveLength(0);
+  });
+
+  // Case: TC-629
+  it("keeps a confirmation dialog open when the refresh finds no changes (TC-629)", () => {
+    // Given: a confirmation dialog is open
+    dialogs.showConfirmationDialog(CONFIRMATION_MESSAGE, vi.fn(), null);
+    vi.clearAllMocks();
+
+    // When: a soft refresh receives branches and commits identical to the current data
+    startSoftRefresh();
+    loadBranchesResponse(false);
+    loadCommits({ hard: false });
+
+    // Then: nothing was hidden and the dialog is still open
+    expect(dialogs.hideDialog).not.toHaveBeenCalled();
+    expect(contextMenu.hideContextMenu).not.toHaveBeenCalled();
+    expect(isDialogOpen()).toBe(true);
+    expect(dialogElem().textContent).toContain(CONFIRMATION_MESSAGE);
+  });
+});
+
+const REMOVE_WORKTREE_BRANCH_FAILURE = {
+  command: "removeWorktree",
+  status: null,
+  branchStatus: BRANCH_ERROR_REASON
+};
+
+// @see docs/testing/perspectives/web/messageHandler-test/02-worktree-and-details-01.md
+describe("branch deletion error after worktree removal across the refresh (S20)", () => {
+  beforeEach(async () => {
+    await resetView(null);
+    settleLoads();
+  });
+
+  afterEach(() => {
+    settleLoads();
+  });
+
+  // Case: TC-087
+  it("keeps the branch deletion error open after the refresh responses (TC-087)", () => {
+    // Given: the graph is loaded and no load is in flight
+    // When: the removal succeeds but the branch deletion fails
+    dispatchMessage(REMOVE_WORKTREE_BRANCH_FAILURE);
+
+    // Then: one soft branch request is posted and the error is shown before any response
+    expect(postedMessages("loadBranches")).toEqual([expect.objectContaining({ hard: false })]);
+    expectErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON);
+
+    // When: the refresh responses arrive without the removed worktree
+    loadBranchesResponse(false);
+    loadCommits({ worktrees: WORKTREES_AFTER_REMOVAL, hard: false });
+
+    // Then: the same error is still open
+    expectErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON);
+
+    // When: the user clicks Dismiss
+    document.getElementById("dialogDismiss")!.click();
+
+    // Then: the error dialog closes
+    expect(isDialogOpen()).toBe(false);
+  });
+
+  // Case: TC-088
+  it("keeps the branch deletion error open across a queued refresh (TC-088)", () => {
+    // Given: a soft branch load is already in flight
+    startSoftRefresh();
+
+    // When: the removal response arrives and its refresh is queued
+    dispatchMessage(REMOVE_WORKTREE_BRANCH_FAILURE);
+    expect(postedMessages("loadBranches")).toHaveLength(1);
+    expectErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON);
+
+    // And: the in-flight branch load returns, which also starts the queued refresh
+    loadBranchesResponse(false);
+    expect(postedMessages("loadBranches")).toHaveLength(2);
+    expectErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON);
+
+    // And: the in-flight commit load returns with changes
+    loadCommits({ worktrees: WORKTREES_AFTER_REMOVAL, hard: false });
+    expectErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON);
+
+    // And: the queued branch and commit loads return with changes
+    loadBranchesResponse(false);
+    expectErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON);
+    loadCommits({
+      commits: commitsWithNewCommit(),
+      worktrees: WORKTREES_AFTER_REMOVAL,
+      hard: false
+    });
+
+    // Then: the error is still open after every response
+    expect(postedMessages("loadCommits")).toHaveLength(2);
+    expectErrorDialog(BRANCH_ERROR_TITLE, BRANCH_ERROR_REASON);
+  });
+});
+
+// @see docs/testing/perspectives/web/messageHandler-test/03-git-operation-responses-01.md
+describe("pull error after checkout across the forceRender refresh (S21)", () => {
+  beforeEach(async () => {
+    await resetView(null);
+    settleLoads();
+  });
+
+  afterEach(() => {
+    settleLoads();
+  });
+
+  // Case: TC-089
+  it("keeps the pull error open after the forced load responses (TC-089)", () => {
+    // Given: the graph is loaded and no load is in flight
+    // When: the checkout succeeds but the pull fails
+    dispatchMessage({ command: "checkoutBranch", kind: "pullFailed", status: PULL_ERROR_REASON });
+    expect(postedMessages("loadBranches")).toEqual([expect.objectContaining({ hard: true })]);
+
+    // And: the forced branch and commit responses arrive
+    loadBranchesResponse(true);
+    expect(postedMessages("loadCommits")).toEqual([expect.objectContaining({ hard: true })]);
+    loadCommits({ hard: true });
+
+    // Then: the pull error is still open and no loading view was shown
+    expectErrorDialog(PULL_ERROR_TITLE, PULL_ERROR_REASON);
+    expect(loadingHeader()).toBeNull();
+  });
+});

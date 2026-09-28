@@ -2,12 +2,12 @@
 
 > Source: `web/main.ts`
 > Storage Mode: sharded
-> Generated: 2026-09-28T00:00:00Z
+> Generated: 2026-09-29T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 16
-> Total Sections: 56
-> Total Cases: 499
+> Total Sections: 57
+> Total Cases: 506
 
 ## Shards
 
@@ -25,7 +25,7 @@
 | 05-state-response-02.md     | state-response     | 5        | 33    | 2026-09-24   |
 | 06-file-actions-01.md       | file-actions       | 3        | 34    | 2026-09-13   |
 | 07-load-count-01.md         | load-count         | 1        | 5     | 2026-05-17   |
-| 08-request-queue-01.md      | request-queue      | 2        | 14    | 2026-08-04   |
+| 08-request-queue-01.md      | request-queue      | 3        | 21    | 2026-09-29   |
 | 09-branch-cleanup-01.md     | branch-cleanup     | 1        | 11    | 2026-08-25   |
 | 10-file-history-01.md       | file-history       | 3        | 34    | 2026-09-28   |
 | 11-state-persistence-01.md  | state-persistence  | 1        | 3     | 2026-09-12   |
@@ -62,6 +62,7 @@
 | Feature 059-02 (light-spec-plan)                                     | 01-rendering-03.md, 02-context-menu-01.md, 04-keyboard-selection-01.md, 05-state-response-02.md |
 | Feature 060 (light-spec-plan)                                        | 01-rendering-03.md, 10-file-history-01.md                                                       |
 | Feature 060-02 (light-spec-plan)                                     | 04-keyboard-selection-02.md, 10-file-history-01.md                                              |
+| Feature 060-03 addendum (light-spec-plan)                            | 08-request-queue-01.md                                                                          |
 | フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                                                         |
 | フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                                                         |
 | フェーズ3 修正 L15 (avatar-raw-email-compare)                        | 05-state-response-02.md                                                                         |

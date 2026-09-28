@@ -157,3 +157,42 @@ S6 TC-017 / TC-018、S7 TC-020〜TC-023は維持する。本sectionは回数を�
 - External: TC-086
 - Boundary: excluded(同上)
 - Type: excluded(同上)
+
+## S20: Branch deletion error after worktree removal stays open across the refresh
+
+> Origin: Feature 060-03 addendum (light-spec-plan)
+> Added: 2026-09-29
+> Status: active
+> Supersedes: -
+> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void` (`case "removeWorktree"`), with the real `GitKeizuView.refresh(mode)` and `web/dialogs.ts`
+> Target Path: `web/messageHandler.ts:218-227`, integrated with `web/main.ts:720-736` and `web/dialogs.ts:7, 203-259` (line ranges after the Feature 060-03 addendum implementation)
+> Test File: `tests/web/main.refOverflow.test.ts` (runs the real `web/main.ts`, `web/messageHandler.ts` and `web/dialogs.ts` together)
+
+Integration of the TC-052 path (spec addendum `追補（2026-09-29）再読み込みでエラーダイアログを閉じない`). A successful removal starts a soft refresh and then shows the branch deletion error; the refresh result arrives after the error dialog is open. The response order, the error title and text, and the call counts of S7 TC-022 and S19 TC-085 / TC-086 are unchanged. Which dialogs a refresh closes is owned by `web/main-test/08-request-queue-01.md` S67.
+
+| Case ID | Input / Precondition                                                                                                                                                                                                                                                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                             | Notes                                                           |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| TC-087  | Graph loaded and no load in flight. `{ command: "removeWorktree", status: null, branchStatus: "error: the branch 'feature' is not fully merged." }` is received, then the `loadBranches` and `loadCommits` responses of the refresh arrive with changes (the removed worktree is gone from the commits) | External - branch deletion failure after worktree removal                  | One `loadBranches` request with `hard: false` is posted. `#dialog` shows `Unable to Delete Branch` with the `branchStatus` text before the responses, and after both responses it still has the `active` class with the same text. Clicking `#dialogDismiss` then closes it | Automated counterpart of S8 TC-060 in `web/contextMenu-test.md` |
+| TC-088  | Same response as TC-087 while an earlier soft `loadBranches` is still in flight, so the refresh is queued; the in-flight and the queued loads both return with changes                                                                                                                                  | Boundary - queued refresh after the error is shown                         | After every load response, `#dialog` still has the `active` class and shows `Unable to Delete Branch` with the `branchStatus` text                                                                                                                                          | A host-triggered refresh can overlap with the removal response  |
+
+### Failure source inventory (include-or-justify) - Feature 060-03 addendum (S20)
+
+| Failure source                                  | Case or reason                                                                              |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Refresh result closes the branch deletion error | TC-087                                                                                      |
+| Queued or overlapping refresh closes the error  | TC-088                                                                                      |
+| Error no longer closable by the user            | TC-087 (Dismiss)                                                                            |
+| Removal failure (`status` string) path          | excluded (no refresh runs; S19 TC-086 keeps the call counts)                                |
+| Success without branch error                    | excluded (no error dialog is shown; S19 TC-085)                                             |
+| Malformed response fields                       | excluded (`branchStatus` typing is checked by the TypeScript compiler; S7 keeps the values) |
+
+### Feature 060-03 addendum test mapping and execution evidence (S20)
+
+Test file: `tests/web/main.refOverflow.test.ts`, describe `branch deletion error after worktree removal across the refresh (S20)` (`@see` this file). The file runs the real `web/main.ts`, `web/messageHandler.ts` and `web/dialogs.ts`; the responses are dispatched as window `message` events. "Without the removed worktree" drops the last linked worktree from the worktree collection while its branch stays. The section column comes first because the perspectives index counts rows whose first cell is a Case ID.
+
+| Section | Case ID | Test Method                                                               | Result                                |
+| ------- | ------- | ------------------------------------------------------------------------- | ------------------------------------- |
+| S20     | TC-087  | keeps the branch deletion error open after the refresh responses (TC-087) | pass (2026-09-29); RED before the fix |
+| S20     | TC-088  | keeps the branch deletion error open across a queued refresh (TC-088)     | pass (2026-09-29); RED before the fix |
+
+- RED and GREEN (2026-09-29): recorded with the main regression in `web/main-test/08-request-queue-01.md` S67. At the base `web/main.ts`, both cases failed with `expected false to be true` on the dialog `active` class right after the first commit load response with changes.
