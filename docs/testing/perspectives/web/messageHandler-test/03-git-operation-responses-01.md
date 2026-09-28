@@ -181,3 +181,19 @@ S14 の checkout / Push 表示契約を引き継ぎ、remote 不在は専用 loc
 - Type: excluded(`src/types-test.md` S6 の責務)
 
 **失敗系/正常系比（煙感知器）**: 正常系3件（TC-057、TC-060、TC-062）、失敗系7件（残り）。比は約 2.3:1 で、5 checkout kind と既存 Push phase の分岐から導出した結果である。
+
+## S21: Pull error after checkout stays open across the forceRender refresh
+
+> Origin: Feature 060-03 addendum (light-spec-plan)
+> Added: 2026-09-29
+> Status: active
+> Supersedes: -
+> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void` (`case "checkoutBranch"`, kind `pullFailed`), with the real `GitKeizuView.refresh(mode)` and `web/dialogs.ts`
+> Target Path: `web/messageHandler.ts:63-66`, integrated with `web/main.ts:720-736` and `web/dialogs.ts:202-251` (line ranges before the Feature 060-03 addendum implementation)
+> Test File: same test file as `02-worktree-and-details-01.md` S20 (chosen in Task 5)
+
+Side effect of the spec addendum: the pull-failed response is built the same way as the worktree removal (refresh first, then the error), so the same rule keeps its error open. A forceRender response always counts as a change, so before the fix the pull error closed whenever the refresh completed. Not checked on screen. S15 TC-059 (call order and arguments) stays active.
+
+| Case ID | Input / Precondition                                                                                                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                 | Notes                                              |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| TC-089  | Graph loaded and no load in flight. `{ command: "checkoutBranch", kind: "pullFailed", status: "CONFLICT" }` is received, then the forced `loadBranches` and `loadCommits` responses arrive | External - pull failure after checkout (side effect)                       | The load requests are posted with `hard: true`, and after both responses `#dialog` still has the `active` class and shows the `t("error.pull")` title with `CONFLICT`; no loading view is shown | Side effect of the addendum; not checked on screen |

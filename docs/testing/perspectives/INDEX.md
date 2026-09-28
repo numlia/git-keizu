@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-09-29T06:50:18+09:00
+> Auto-generated: 2026-09-29T07:47:14+09:00
 > Total sources: 52
 > Total physical files: 94
-> Total sections: 573
-> Total cases: 3509
+> Total sections: 577
+> Total cases: 3527
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -43,7 +43,7 @@
 | `web/commitMenu.ts` | single-file | `web/commitMenu-test.md` | 1 | 11 | 50 | 2026-07-19 |
 | `web/contextMenu.ts` | single-file | `web/contextMenu-test.md` | 1 | 6 | 48 | 2026-09-29 |
 | `web/dates.ts` | single-file | `web/dates-test.md` | 1 | 8 | 31 | 2026-07-04 |
-| `web/dialogs.ts` | single-file | `web/dialogs-test.md` | 1 | 7 | 38 | 2026-08-23 |
+| `web/dialogs.ts` | single-file | `web/dialogs-test.md` | 1 | 8 | 46 | 2026-09-29 |
 | `web/dropdown.ts` | single-file | `web/dropdown-test.md` | 1 | 10 | 38 | 2026-03-07 |
 | `web/fileHistory.ts` | single-file | `web/fileHistory-test.md` | 1 | 9 | 92 | 2026-09-28 |
 | `web/fileMenu.ts` | single-file | `web/fileMenu-test.md` | 1 | 4 | 39 | 2026-09-13 |
@@ -52,9 +52,9 @@
 | `web/graph.ts` | single-file | `web/graph-test.md` | 1 | 20 | 77 | 2026-09-12 |
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 2 | 9 | 2026-09-24 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 16 | 56 | 499 | 2026-09-28 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 16 | 57 | 506 | 2026-09-29 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
-| `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 15 | 64 | 2026-09-13 |
+| `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 17 | 67 | 2026-09-29 |
 | `web/refMenu.ts` | single-file | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md` | 1 | 14 | 74 | 2026-07-19 |
 | `web/refMenu.ts` | sharded | `web/refMenu-test/INDEX.md` | 3 | 19 | 98 | 2026-09-29 |
 | `web/refOverflow.ts` | single-file | `web/refOverflow-test.md` | 1 | 5 | 98 | 2026-09-24 |
@@ -140,6 +140,7 @@
 | Feature 060 (light-spec-plan) | `media/main-test.md`, `web/main-test/INDEX.md` |
 | Feature 060-02 (light-spec-plan) | `web/fileHistory-test.md`, `web/main-test/INDEX.md` |
 | Feature 060-03 (light-spec-plan) | `web/contextMenu-test.md`, `web/refMenu-test/INDEX.md`, `web/worktreeMenu-test.md` |
+| Feature 060-03 addendum (light-spec-plan) | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
 | test-plan | `web/stashMenu-test.md` |
