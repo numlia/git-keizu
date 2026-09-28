@@ -57,10 +57,12 @@ export function buildWorktreeActionItems(
 function buildRemoveDetachedWorktreeItem(repo: string, worktreePath: string): ContextMenuItem {
   return {
     title: `${t("Remove Worktree")}${ELLIPSIS}`,
+    recentActionId: "ref.removeWorktree",
     onClick: () => {
       showConfirmationDialog(
         t("Are you sure you want to remove the worktree at {0}?", `'${escapeHtml(worktreePath)}'`),
         () => {
+          recordRecentAction(repo, "ref.removeWorktree");
           sendMessage({
             command: "removeWorktree",
             repo: repo,

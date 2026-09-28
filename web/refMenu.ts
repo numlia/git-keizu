@@ -325,6 +325,7 @@ export function buildRefContextMenuItems(
       worktreeInfo !== null && worktreeInfo !== undefined && !worktreeInfo.isMainWorktree
         ? {
             title: `${t("Remove Worktree")}${ELLIPSIS}`,
+            recentActionId: "ref.removeWorktree",
             onClick: () => {
               showFormDialog(
                 t(
@@ -342,6 +343,7 @@ export function buildRefContextMenuItems(
                 ],
                 t("Remove"),
                 (values) => {
+                  recordRecentAction(repo, "ref.removeWorktree");
                   sendMessage({
                     command: "removeWorktree",
                     repo: repo,

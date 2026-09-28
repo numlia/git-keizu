@@ -112,12 +112,12 @@ describe("getWorktreeLabelName", () => {
 
 // @see docs/testing/perspectives/web/worktreeMenu-test.md
 describe("buildDetachedWorktreeContextMenuItems", () => {
-  it("lists the four worktree actions, a divider and Remove Worktree in order (TC-006)", () => {
-    // Case: TC-006
+  it("lists the four worktree actions, a divider and Remove Worktree in order with history IDs on all but Copy (TC-027)", () => {
+    // Case: TC-027
     // When: The detached worktree menu is built
     const items = menu.buildDetachedWorktreeContextMenuItems(REPO, WORKTREE_PATH);
 
-    // Then: Six elements in the confirmed order, with history IDs only on the first three
+    // Then: Six elements in the confirmed order, with history IDs on the first three and Remove Worktree
     expect(items).toHaveLength(DETACHED_MENU_LENGTH);
     expect(items.map(getTitle)).toEqual([
       TITLE_OPEN_IN_NEW_WINDOW,
@@ -134,7 +134,7 @@ describe("buildDetachedWorktreeContextMenuItems", () => {
       "ref.openTerminal"
     ]);
     expect("recentActionId" in items[3]!).toBe(false);
-    expect("recentActionId" in items[5]!).toBe(false);
+    expect(getRecentActionId(items[5])).toBe("ref.removeWorktree");
   });
 
   it("requests opening the worktree in a new window and records the action (TC-007)", () => {

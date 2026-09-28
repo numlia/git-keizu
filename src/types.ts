@@ -77,6 +77,7 @@ export type RecentActionId =
   | "ref.openWorktreeInNewWindow"
   | "ref.pull"
   | "ref.push"
+  | "ref.removeWorktree"
   | "ref.revealWorktreeInOS";
 
 export type GitRepoSet = { [repo: string]: GitRepoState };
