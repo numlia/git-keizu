@@ -125,3 +125,16 @@ Esc の順序を `contextMenu → dialog → repoDropdown → branchDropdown →
 | ref一覧の開閉・メニューとの順序                     | excluded(`04-keyboard-selection-01.md` S58 TC-457〜TC-463 が維持)                                |
 | snapshot の復元・解除後の response の無視           | excluded(`web/fileHistory-test.md` S8、S10 TC-099〜TC-102 の責務。`exit` の mock では検証しない) |
 | 外部依存・例外                                      | excluded(DOM 状態と mock の判定だけで外部依存と throw 経路を持たない)                            |
+
+### 実画面確認（VS Code）— Feature 060-02
+
+- 実施: 2026-09-28、利用者による手動確認。作業ブランチ `feat/060-02-file-history-keyboard-navigation` の `34581a9` から `pnpm run package` で作成した VSIX を使用した。
+- 結果: 問題なし（利用者報告）。項目ごとの結果と、VS Code のバージョン・OS・テーマは受領していない。
+- 確認項目（関係のないコミットを挟んで3件以上の履歴があるファイルで強調を開始して確認）:
+  1. 矢印キーの移動: 強調直後（詳細なし）の↓、一致の詳細を開いたままの↑↓、暗い行の詳細からの↑↓、詳細の応答待ち中の連打。関連: TC-571〜TC-573、`web/fileHistory-test.md` S10 TC-058〜TC-063、TC-088
+  2. 端での動き: 先頭の↑・末尾の↓、バーの Previous match / Next match、スクロールによる追加読み込み後の↓。関連: `web/fileHistory-test.md` S10 TC-069〜TC-074、TC-085、TC-086
+  3. 詳細の表示: リネーム前のパスのファイル行の強調、対象パスのないマージでの一覧先頭の注記、一覧内の自動スクロールとフォルダー展開が起きないこと。関連: `10-file-history-01.md` S66 TC-616〜TC-618
+  4. 無効・除外: 強調中の Ctrl/Cmd 付き矢印（Shift あり・なし）、Find の入力欄、比較中、IME 変換中、履歴の読み込み待ち中。関連: TC-577〜TC-590
+  5. Esc: 詳細ありで2回、詳細なしで1回、Exit ボタンと同じ復元、Find・ドロップダウンの優先。関連: TC-602〜TC-615、`web/fileHistory-test.md` S10 TC-099〜TC-102
+  6. 通常モードの維持: 強調していない状態での↑↓と Ctrl/Cmd 付き矢印、詳細を閉じた状態で反応しないこと。関連: TC-562〜TC-570
+- 補足: 4 のうち IME 変換中と読み込み待ち中は、再現が難しい場合は省略してよいとして依頼した。省略の有無は受領していない。手動確認は自動テストの成功件数に含めない。

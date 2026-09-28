@@ -177,3 +177,7 @@ controller は mock のまま、`restoreExpandedCommit` と `applyFileHistoryToF
 | 表示切替後の強調の付け直し・注記の重複                 | excluded(S63 TC-557、TC-558が維持)                                                              |
 | 移動先の選定・端での停止                               | excluded(`web/fileHistory-test.md` S10の責務。mockの戻り値を移動先選定の検証として扱わない)     |
 | 例外・エラー経路                                       | excluded(file treeの生成失敗は `web/messageHandler-test/` の責務で、本変更は応答処理を変えない) |
+
+### 実画面確認（VS Code）— Feature 060-02（S66）
+
+- 2026-09-28、利用者による手動確認で問題なし。条件と項目は [04-keyboard-selection-02.md](04-keyboard-selection-02.md) の「実画面確認（VS Code）— Feature 060-02」に記録した。S66 に対応するのは同記録の項目 3。
