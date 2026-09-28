@@ -140,7 +140,7 @@ S8のTC-034 / TC-039 / TC-040は`toContain`で項目の有無を見る。本sect
 > Status: active
 > Supersedes: S8
 > Signature: `buildRefContextMenuItems(repo: string, refName: string, sourceElem: HTMLElement, isRemoteCombined: boolean, gitBranchHead: string | null, remotes?: string[], worktreeInfo?: { path: string; isMainWorktree: boolean } | null): ContextMenuElement[]`
-> Target Path: `web/refMenu.ts:254-297` (`worktreeItems`, `createWorktreeItem`), `web/refMenu.ts:324-357` (`removeWorktreeItem`), `web/refMenu.ts:396-438` (placement) (line ranges at base `2a3cc5f`; update after implementation)
+> Target Path: `web/refMenu.ts:254-297` (`worktreeItems`, `createWorktreeItem`), `web/refMenu.ts:324-359` (`removeWorktreeItem`), `web/refMenu.ts:398-440` (placement) (line ranges after the Feature 060-03 implementation `3709547`)
 > Test File: `tests/web/refMenu.test.ts`
 
 Replaces S8 so that the Remove Worktree selection case matches the implemented and tested form dialog. TC-108 to TC-116 carry over S8's TC-033 to TC-041 in the same order (old ID in Notes). Only TC-116 is corrected: S8 TC-041 named `showConfirmationDialog`, while the item opens `showFormDialog`. Other expectations are unchanged. Fixture: `REPO = "/test/repo"`, `WORKTREE_PATH = "/home/user/project-feature"`, `createMockElement(["head"])` as `sourceElem`, `refName = "feature/x"` and `gitBranchHead = "main"` unless stated, `viewState.dialogDefaults.createWorktree.openTerminal = true` and `removeWorktree.deleteBranch = true`. Titles are read from the menu flattened through submenus. The removal ID and the record after confirmation are owned by S24 / S25; the order and More placement stay with S22 TC-107 and `03-context-menu-recent-actions-01.md` S13.
@@ -164,7 +164,7 @@ Replaces S8 so that the Remove Worktree selection case matches the implemented a
 > Status: active
 > Supersedes: S12
 > Signature: `buildRefContextMenuItems(repo: string, refName: string, sourceElem: HTMLElement, isRemoteCombined: boolean, gitBranchHead: string | null, remotes?: string[], worktreeInfo?: { path: string; isMainWorktree: boolean } | null): ContextMenuElement[]` (the `removeWorktreeItem` form and its confirm callback)
-> Target Path: `web/refMenu.ts:324-357` (line range at base `2a3cc5f`; update after implementation)
+> Target Path: `web/refMenu.ts:324-359` (line range after the Feature 060-03 implementation `3709547`)
 > Test File: `tests/web/refMenu.test.ts`
 
 Replaces S12 because confirming the form with Remove now records `ref.removeWorktree` once before the unchanged removal request. TC-117 to TC-124 carry over S12's TC-050 to TC-057 in the same order (old ID in Notes). Only TC-121 and TC-122 change expectations. Fixture: `REPO = "/test/repo"`, `WORKTREE_PATH = "/home/user/project-feature"`, `createMockElement(["head"])`, `refName = "feature/x"`, `gitBranchHead = "main"`, `worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false }`; the item is selected from the built menu and the dialog is the mocked `showFormDialog`. "Confirm" means invoking the captured action callback (fourth argument) with the checkbox values. `recordRecentAction` and `sendMessage` are mocks, so each is counted separately and their order is compared with `mock.invocationCallOrder`. Not recording on open, cancel or close is owned by S25; the raw checkbox name by S16.
@@ -199,3 +199,30 @@ Replaces S12 because confirming the form with Remove now records `ref.removeWork
 - External: excluded (dialogs and messaging are mocked; Git outcomes are host-owned)
 - Boundary: TC-119 (default OFF)
 - Type: excluded (`RecentActionId` membership is checked by `pnpm run typecheck`)
+
+### Feature 060-03 test mapping and execution evidence (S23 / S24)
+
+Test file: `tests/web/refMenu.test.ts`. The existing S8 and S12 tests were renamed to their successor IDs, given `// Case:` comments and an `@see` to this shard; only TC-121 and TC-122 changed assertions (record exactly once with `(REPO, "ref.removeWorktree")`, which also rules out an extra `ref.deleteBranch`; `mock.invocationCallOrder` record before send; the whole request with `toStrictEqual`). The describe column comes first because the perspectives index counts rows whose first cell is a Case ID.
+
+| describe                                             | Case ID | Test Method                                                                                                      | Result                                       |
+| ---------------------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `buildRefContextMenuItems worktree menu items (S23)` | TC-108  | includes 'Create Worktree...' for local branch with worktreeInfo=null (TC-108)                                   | pass (2026-09-29)                            |
+| `buildRefContextMenuItems worktree menu items (S23)` | TC-109  | includes 3 worktree items for local branch with worktreeInfo (non-main) (TC-109)                                 | pass (2026-09-29)                            |
+| `buildRefContextMenuItems worktree menu items (S23)` | TC-110  | excludes Remove Worktree for main worktree (TC-110)                                                              | pass (2026-09-29)                            |
+| `buildRefContextMenuItems worktree menu items (S23)` | TC-111  | does not include worktree items for remote branch (TC-111)                                                       | pass (2026-09-29)                            |
+| `buildRefContextMenuItems worktree menu items (S23)` | TC-112  | showFormDialog is called with 2 fields when Create Worktree is selected (TC-112)                                 | pass (2026-09-29)                            |
+| `buildRefContextMenuItems worktree menu items (S23)` | TC-113  | Path default value uses the normalized branch name (TC-113)                                                      | pass (2026-09-29)                            |
+| `buildRefContextMenuItems worktree menu items (S23)` | TC-114  | Open Terminal Here sends openTerminal message (TC-114)                                                           | pass (2026-09-29)                            |
+| `buildRefContextMenuItems worktree menu items (S23)` | TC-115  | Copy Worktree Path sends copyToClipboard message (TC-115)                                                        | pass (2026-09-29)                            |
+| `buildRefContextMenuItems worktree menu items (S23)` | TC-116  | Remove Worktree shows form dialog with branch name and path (TC-116)                                             | pass (2026-09-29)                            |
+| `Remove Worktree branch deletion dialog (S24)`       | TC-117  | showFormDialog is called with checkbox input for Remove Worktree (TC-117)                                        | pass (2026-09-29)                            |
+| `Remove Worktree branch deletion dialog (S24)`       | TC-118  | checkbox default is checked when deleteBranch=true (TC-118)                                                      | pass (2026-09-29)                            |
+| `Remove Worktree branch deletion dialog (S24)`       | TC-119  | checkbox default is unchecked when deleteBranch=false (TC-119)                                                   | pass (2026-09-29)                            |
+| `Remove Worktree branch deletion dialog (S24)`       | TC-120  | checkbox has info property with safe delete explanation (TC-120)                                                 | pass (2026-09-29)                            |
+| `Remove Worktree branch deletion dialog (S24)`       | TC-121  | records only Remove Worktree before sending the request with deleteBranch=true when checkbox is checked (TC-121) | pass (2026-09-29); RED before implementation |
+| `Remove Worktree branch deletion dialog (S24)`       | TC-122  | records Remove Worktree before sending the request with deleteBranch=false when checkbox is unchecked (TC-122)   | pass (2026-09-29); RED before implementation |
+| `Remove Worktree branch deletion dialog (S24)`       | TC-123  | action button name is 'Remove' (TC-123)                                                                          | pass (2026-09-29)                            |
+| `Remove Worktree branch deletion dialog (S24)`       | TC-124  | dialog message contains branch name and worktree path (TC-124)                                                   | pass (2026-09-29)                            |
+
+- RED before implementation (2026-09-29): the base commit `2a3cc5f` was extracted with `git archive` into a temporary directory outside the checkout, the updated test files and the `src/types.ts` union were copied in, and `web/refMenu.ts` stayed at the base. `pnpm exec vitest run tests/web/refMenu.test.ts -t 'TC-(121|122|125)'` gave `Tests 3 failed | 100 skipped (103)`; TC-121 and TC-122 failed with `AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times` (no record on confirmation; TC-125 is in `03-context-menu-recent-actions-01.md` S25). No failure came from dependency resolution, DOM setup or types. The temporary copy was removed afterwards.
+- GREEN after implementation (2026-09-29): the same command in the checkout gave `Tests 3 passed | 100 skipped (103)`.

@@ -121,6 +121,17 @@ Replaces S4 only to keep its fixed fixture in line with the detached menu: the s
 | TC-029  | `showRecentActions = true`, `recentActions = ["ref.openTerminal"]`                   | Normal - one matching entry prepended                                      | `#contextMenu li` has 9 elements. li[0] is `.contextMenuLabel` whose `textContent` contains `Recent`, li[1]'s `textContent` is `Open Terminal Here`, li[2] is `.contextMenuDivider`, and li[3] to li[8] keep TC-027's order | Successor of TC-025. Fixture synchronized |
 | TC-030  | `showRecentActions = true`, `recentActions = ["commit.merge"]` (non-empty, no match) | Boundary - no matching entry                                               | `#contextMenu li` has 6 elements and `.contextMenuLabel` 0                                                                                                                                                                  | Successor of TC-026. Fixture synchronized |
 
+### Feature 060-03 test mapping and execution evidence (S5)
+
+Test file: `tests/web/contextMenu.test.ts`, describe renamed to `showContextMenu detached worktree menu recent actions (S5)` with an `@see` to this file. The fixed fixture's `Remove Worktree&#8230;` item now carries `recentActionId: "ref.removeWorktree"`; the four tests keep their S4 assertions under the successor IDs. The describe column comes first because the perspectives index counts rows whose first cell is a Case ID.
+
+| describe                                                     | Case ID | Test Method                                                                    | Result            |
+| ------------------------------------------------------------ | ------- | ------------------------------------------------------------------------------ | ----------------- |
+| `showContextMenu detached worktree menu recent actions (S5)` | TC-027  | renders only the six menu elements when showRecentActions is disabled (TC-027) | pass (2026-09-29) |
+| `showContextMenu detached worktree menu recent actions (S5)` | TC-028  | renders no Recent block when the history is empty (TC-028)                     | pass (2026-09-29) |
+| `showContextMenu detached worktree menu recent actions (S5)` | TC-029  | prepends the matching recent action above the unchanged menu (TC-029)          | pass (2026-09-29) |
+| `showContextMenu detached worktree menu recent actions (S5)` | TC-030  | renders no Recent block when no history entry matches a menu item (TC-030)     | pass (2026-09-29) |
+
 ## S6: Recent worktree removal composed from the current menu and persisted on confirmation
 
 > Origin: Feature 060-03 (light-spec-plan)
@@ -181,6 +192,29 @@ Harness and fixture:
 - Boundary: TC-039 to TC-042
 - Type: excluded (`RecentActionId` membership is checked by `pnpm run typecheck`)
 
+### Feature 060-03 test mapping and execution evidence (S6)
+
+Test file: `tests/web/contextMenu.test.ts`, new describe `Recent worktree removal integration` with an `@see` to this file. It imports the real `web/refMenu.ts`, `web/worktreeMenu.ts` and `web/dialogs.ts` after `#contextMenu`, `#dialog` and `#dialogBacking` are created in the file-level `beforeAll`; only the VS Code API of `tests/web/setup.ts` is mocked, and `getState()` / `setState()` keep a state with `gitRepos` in memory. Every A-then-B test takes the history actually written by A's confirmation. Each confirmation, Cancel / No and close is wrapped so that only its own `postMessage` calls are read; save and removal requests are filtered by `command`, counted separately, ordered by `invocationCallOrder` and compared whole with `toStrictEqual`. Parameterized rows (`it.each`) put the varying value and the Case ID in the test name. The describe column comes first because the perspectives index counts rows whose first cell is a Case ID.
+
+| describe                              | Case ID | Test Method                                                                                                                           | Result               |
+| ------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| `Recent worktree removal integration` | TC-031  | opens branch B's form from Recent after branch A was removed and sends B's request with Also delete branch {true, false} (TC-031)     | pass x2 (2026-09-29) |
+| `Recent worktree removal integration` | TC-032  | opens detached B's confirmation from Recent after branch A was removed and sends B's request (TC-032)                                 | pass (2026-09-29)    |
+| `Recent worktree removal integration` | TC-033  | opens branch B's form from Recent after detached A was removed and sends B's request with the checkbox default {true, false} (TC-033) | pass x2 (2026-09-29) |
+| `Recent worktree removal integration` | TC-034  | opens detached B's confirmation from Recent after detached A was removed and sends B's request (TC-034)                               | pass (2026-09-29)    |
+| `Recent worktree removal integration` | TC-035  | shows no removal in the normal or Recent part for the HEAD branch (TC-035)                                                            | pass (2026-09-29)    |
+| `Recent worktree removal integration` | TC-036  | shows no removal in the normal or Recent part for a branch in the main worktree (TC-036)                                              | pass (2026-09-29)    |
+| `Recent worktree removal integration` | TC-037  | shows no removal in the normal or Recent part for a branch without a worktree (TC-037)                                                | pass (2026-09-29)    |
+| `Recent worktree removal integration` | TC-038  | records a confirmed removal through the {branch, detached} entrance while Recent display is off (TC-038)                              | pass x2 (2026-09-29) |
+| `Recent worktree removal integration` | TC-039  | renders no Recent block for branch B when the history is empty (TC-039)                                                               | pass (2026-09-29)    |
+| `Recent worktree removal integration` | TC-040  | does not synthesize a removal when the current menu has no removal item (TC-040)                                                      | pass (2026-09-29)    |
+| `Recent worktree removal integration` | TC-041  | renders no Recent block when the removal is the only eligible item (TC-041)                                                           | pass (2026-09-29)    |
+| `Recent worktree removal integration` | TC-042  | keeps five entries by dropping the oldest when the removal is new, also on a repeated confirmation (TC-042)                           | pass (2026-09-29)    |
+| `Recent worktree removal integration` | TC-043  | moves an existing removal entry to the front without duplicating it (TC-043)                                                          | pass (2026-09-29)    |
+| `Recent worktree removal integration` | TC-044  | updates only the confirming repository and keeps unrelated webview state (TC-044)                                                     | pass (2026-09-29)    |
+
+- Before the implementation (2026-09-29, same temporary copy of `2a3cc5f` as `web/refMenu-test/02-worktree-actions-01.md`): 12 of these 17 tests failed because neither entrance records the removal (`expected [] to have a length of 1 but got +0` for the save request) or the removal item has no ID (TC-041 finds no item). TC-035 to TC-037, TC-039 and TC-040 passed there, as expected for cases that keep existing behavior. These are supporting results; the designated main regressions are the menu-level cases in `web/worktreeMenu-test.md` S2 and `web/refMenu-test` S24 / S25.
+
 ## S7: Feature 060-03 manual verification
 
 > Origin: Feature 060-03 (light-spec-plan)
@@ -188,7 +222,7 @@ Harness and fixture:
 > Status: active
 > Supersedes: -
 > Signature: `showContextMenu(e: MouseEvent, items: ContextMenuElement[], sourceElem: HTMLElement, recentActions?: RecentActionId[]): void` / `recordRecentAction(repo: string, actionId: RecentActionId): void`
-> Target Path: `web/contextMenu.ts:176-208, 359-391`, with the removal entries `web/refMenu.ts:324-357` and `web/worktreeMenu.ts:57-75` and the response handling `web/messageHandler.ts:218-227` (line ranges at base `2a3cc5f`)
+> Target Path: `web/contextMenu.ts:176-208, 359-391`, with the removal entries `web/refMenu.ts:324-359` and `web/worktreeMenu.ts:57-77` and the response handling `web/messageHandler.ts:218-227` (line ranges after the Feature 060-03 implementation `3709547`)
 > Test File: - (manual, Extension Development Host)
 
 Real-screen checks that automated tests cannot replace: the rendered VS Code menu, actual Git removal and its failures, and history persisted across menus. These cases are not automated coverage (`.agents/docs/test-strategy.md` Section 6). Preparation: run `pnpm run compile` and launch the changed extension with the existing Extension Development Host configuration in `.vscode/launch.json`. Use a disposable repository, never a real user repository, with at least two non-HEAD branches that have linked worktrees and at least two detached worktrees. `git-keizu.menu.showRecentActions` is ON unless stated. Replenish removed worktrees for each combination and do not run other recorded actions in between, so the removal is not pushed out of the history. In TC-045 to TC-048, cancel once and confirm that nothing is removed, then reopen from Recent and confirm.
@@ -206,23 +240,23 @@ Real-screen checks that automated tests cannot replace: the rendered VS Code men
 
 ### S7 execution record
 
-Execution state: not executed (as of 2026-09-29). No case in this section has been performed in VS Code yet, so none of them may be reported as passed, and unit test results do not replace them. Record the results below in English. If a case cannot be performed, record the reason, the alternative check and the unverified scope instead of a result. The result table starts with the Result column so that each manual case is counted only once by the perspectives index.
+Execution state: not executed (as of 2026-09-29, after the automated tests of Feature 060-03 Task 3 passed). No case in this section has been performed in VS Code yet, so none of them may be reported as passed, and unit test results do not replace them. Until every row below records a passing on-screen result, the manual acceptance item of Feature 060-03 remains unmet. Record the results below in English, replacing the placeholder text of each row. The result table starts with the Result column so that each manual case is counted only once by the perspectives index.
 
-| Item                                                          | Value        |
-| ------------------------------------------------------------- | ------------ |
-| Execution date                                                | Not executed |
-| VS Code version                                               | -            |
-| Extension version / commit                                    | -            |
-| Repository setup                                              | -            |
-| Reason if not executed / alternative check / unverified scope | -            |
+| Item                                                          | Value                                                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Execution date                                                | Not executed                                                                                                                                                                                                                                                                                                                                                                                                |
+| VS Code version                                               | - (to be filled by the person running the checks)                                                                                                                                                                                                                                                                                                                                                           |
+| Extension version / commit                                    | - (build of `3709547` or later, via `pnpm run compile`)                                                                                                                                                                                                                                                                                                                                                     |
+| Repository setup                                              | - (disposable repository as described above)                                                                                                                                                                                                                                                                                                                                                                |
+| Reason if not executed / alternative check / unverified scope | Reason: the checks need the user's interactive VS Code Extension Development Host session, which the automated Task 3 worker cannot operate. Alternative check: the automated cases named per row (jsdom with the real menus, dialogs and Recent composition). Unverified scope: rendering in the real webview, real Git worktree and branch removal, host error dialogs, and history persisted by the host |
 
-| Result       | Case ID | Conditions | Observed behavior | Evidence |
-| ------------ | ------- | ---------- | ----------------- | -------- |
-| Not executed | TC-045  | -          | -                 | -        |
-| Not executed | TC-046  | -          | -                 | -        |
-| Not executed | TC-047  | -          | -                 | -        |
-| Not executed | TC-048  | -          | -                 | -        |
-| Not executed | TC-049  | -          | -                 | -        |
-| Not executed | TC-050  | -          | -                 | -        |
-| Not executed | TC-051  | -          | -                 | -        |
-| Not executed | TC-052  | -          | -                 | -        |
+| Result       | Case ID | Conditions | Observed behavior                                           | Evidence                                                                                                                                                                                                                                             |
+| ------------ | ------- | ---------- | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Not executed | TC-045  | -          | Not executed (needs the user's interactive VS Code session) | Automated alternative: S6 TC-031, `web/refMenu-test/03-context-menu-recent-actions-01.md` S13 TC-063 (More placement). Unverified: on-screen menu and form, actual removal of B's worktree                                                           |
+| Not executed | TC-046  | -          | Not executed (needs the user's interactive VS Code session) | Automated alternative: S6 TC-032, `web/worktreeMenu-test.md` S2 TC-027 (last position). Unverified: on-screen confirmation, actual removal of detached B                                                                                             |
+| Not executed | TC-047  | -          | Not executed (needs the user's interactive VS Code session) | Automated alternative: S6 TC-033. Unverified: on-screen form, actual removal of B's worktree                                                                                                                                                         |
+| Not executed | TC-048  | -          | Not executed (needs the user's interactive VS Code session) | Automated alternative: S6 TC-034. Unverified: on-screen confirmation, actual removal of detached B                                                                                                                                                   |
+| Not executed | TC-049  | -          | Not executed (needs the user's interactive VS Code session) | Automated alternative: `web/refMenu-test/02-worktree-actions-01.md` S24 TC-121 / TC-122, S6 TC-031. Unverified: Git branch deletion by the host and the Recent entry shown on screen                                                                 |
+| Not executed | TC-050  | -          | Not executed (needs the user's interactive VS Code session) | Automated alternative: S6 TC-038. Unverified: the `git-keizu.menu.showRecentActions` setting change reaching the webview and the Recent block after switching back to ON                                                                             |
+| Not executed | TC-051  | -          | Not executed (needs the user's interactive VS Code session) | Automated alternative: none for the Git failure; S6 TC-031 to TC-034 show the history is saved before the removal request, and `web/messageHandler.ts:218-221` does not touch the history. Unverified: Git refusal, error dialog, history afterwards |
+| Not executed | TC-052  | -          | Not executed (needs the user's interactive VS Code session) | Automated alternative: none for the branch deletion failure; S24 TC-121 sends `deleteBranch: true`, and `web/messageHandler.ts:222-225` does not touch the history. Unverified: worktree removal, branch deletion failure, error dialog, history     |

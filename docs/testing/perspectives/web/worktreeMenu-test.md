@@ -73,7 +73,7 @@ path起点のworktree操作（表示名helper、共通4操作builder、detached�
 > Status: active
 > Supersedes: S1
 > Signature: `getWorktreeLabelName(worktreePath: string): string` / `buildWorktreeActionItems(repo: string, worktreePath: string, terminalLabel: string): ContextMenuItem[]` / `buildDetachedWorktreeContextMenuItems(repo: string, worktreePath: string): ContextMenuElement[]`
-> Target Path: `web/worktreeMenu.ts:6-86` (line range at base `2a3cc5f`; the removal item is `buildRemoveDetachedWorktreeItem()` at 57-75. Update after implementation)
+> Target Path: `web/worktreeMenu.ts:6-88` (the removal item is `buildRemoveDetachedWorktreeItem()` at 57-77; line ranges after the Feature 060-03 implementation `3709547`)
 > Test File: `tests/web/worktreeMenu.test.ts`
 
 Replaces S1 because the detached Remove Worktree item now carries `recentActionId: "ref.removeWorktree"` and records it once after Yes, before the removal request. S1's table is kept as history. TC-022 to TC-042 carry over S1's TC-001 to TC-021 in the same order (old ID in Notes). Only TC-027, TC-034, TC-035 and TC-036 change expectations; every other case keeps S1's expectation. `REPO = "/test/repo"`. `recordRecentAction` is mocked here, so the `saveRepoState` request it sends is not observed; that ordering is owned by `web/contextMenu-test.md` S6. Path recovery from DOM attributes stays with `web/main-test/01-rendering-02.md` S55, Recent composition with `web/contextMenu-test.md` S5 / S6, and Git success or failure with `src/gitGraphView-test/03-worktree-actions-01.md` S41 and `src/dataSource-test/02-branch-worktree-01.md` S51.
@@ -120,3 +120,34 @@ Replaces S1 because the detached Remove Worktree item now carries `recentActionI
 - External: excluded (dependencies are mocked; Git outcomes belong to the gitGraphView / dataSource owners and the manual S7 in `web/contextMenu-test.md`)
 - Boundary: TC-023 to TC-026, TC-037, TC-038, TC-040 to TC-042
 - Type: excluded (arguments are `string`, guaranteed at compile time)
+
+### Feature 060-03 test mapping and execution evidence (S2)
+
+Test file: `tests/web/worktreeMenu.test.ts`. The existing tests of S1 were renamed to their successor IDs (test name, `// Case:`) and the describe comment now points to S2; only TC-034, TC-035 and TC-036 gained assertions (TC-027 was synchronized in the product commit `3709547`). The describe column comes first because the perspectives index counts rows whose first cell is a Case ID.
+
+| describe                                | Case ID | Test Method                                                                                                       | Result                                       |
+| --------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| `getWorktreeLabelName`                  | TC-022  | returns the final path component (TC-022)                                                                         | pass (2026-09-29)                            |
+| `getWorktreeLabelName`                  | TC-023  | ignores a trailing slash (TC-023)                                                                                 | pass (2026-09-29)                            |
+| `getWorktreeLabelName`                  | TC-024  | ignores a trailing backslash on a Windows path (TC-024)                                                           | pass (2026-09-29)                            |
+| `getWorktreeLabelName`                  | TC-025  | falls back to the whole path when the final component is empty (TC-025)                                           | pass (2026-09-29)                            |
+| `getWorktreeLabelName`                  | TC-026  | falls back to the whole path for a lone backslash (TC-026)                                                        | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-027  | lists the four worktree actions, a divider and Remove Worktree in order with history IDs on all but Copy (TC-027) | pass (2026-09-29); RED before implementation |
+| `buildDetachedWorktreeContextMenuItems` | TC-028  | requests opening the worktree in a new window and records the action (TC-028)                                     | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-029  | requests revealing the worktree in the file manager and records the action (TC-029)                               | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-030  | requests a terminal named after the final path component and records the action (TC-030)                          | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-031  | copies the worktree path without recording a recent action (TC-031)                                               | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-032  | asks for confirmation before sending any removal request (TC-032)                                                 | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-033  | renders a Yes / No dialog showing the path without a checkbox (TC-033)                                            | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-034  | records Remove Worktree once and then sends one removal request without a branch name after Yes (TC-034)          | pass (2026-09-29); RED before implementation |
+| `buildDetachedWorktreeContextMenuItems` | TC-035  | records and sends nothing and closes the dialog after No (TC-035)                                                 | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-036  | records and sends nothing when the dialog is closed without an answer (TC-036)                                    | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-037  | shows markup in the path as text and sends the original path (TC-037)                                             | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-038  | keeps entity-like text in the path literal in the dialog and the request (TC-038)                                 | pass (2026-09-29)                            |
+| `buildWorktreeActionItems`              | TC-039  | names the terminal after the given label instead of the path (TC-039)                                             | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-040  | names the terminal after the final component of a path with a trailing slash (TC-040)                             | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-041  | names the terminal after the final component of a backslash path (TC-041)                                         | pass (2026-09-29)                            |
+| `buildDetachedWorktreeContextMenuItems` | TC-042  | names the terminal after the whole path for the root path (TC-042)                                                | pass (2026-09-29)                            |
+
+- RED before implementation (2026-09-29): the base commit `2a3cc5f` was extracted with `git archive` into a temporary directory outside the checkout, the updated test file and the `src/types.ts` union were copied in, and `web/worktreeMenu.ts` stayed at the base. `pnpm exec vitest run tests/web/worktreeMenu.test.ts -t 'TC-(027|034)'` gave `Tests 2 failed | 19 skipped (21)`: TC-027 `AssertionError: expected undefined to be 'ref.removeWorktree'` (no ID on the removal item) and TC-034 `AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times` (no record on Yes). No failure came from dependency resolution, DOM setup or types. The temporary copy was removed afterwards.
+- GREEN after implementation (2026-09-29): the same command in the checkout gave `Tests 2 passed | 19 skipped (21)`.

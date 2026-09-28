@@ -727,9 +727,9 @@ describe("buildMergeBranchMenuItem Merge dialog (S7)", () => {
   });
 });
 
-// --- S8: buildRefContextMenuItems() worktree 関連メニュー項目 ---
-
-describe("buildRefContextMenuItems worktree menu items (S8)", () => {
+// S23: buildRefContextMenuItems() worktree menu items
+// @see docs/testing/perspectives/web/refMenu-test/02-worktree-actions-01.md
+describe("buildRefContextMenuItems worktree menu items (S23)", () => {
   const WORKTREE_PATH = "/home/user/project-feature";
 
   beforeEach(() => {
@@ -745,7 +745,8 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
     };
   });
 
-  it("includes 'Create Worktree...' for local branch with worktreeInfo=null (TC-033)", () => {
+  it("includes 'Create Worktree...' for local branch with worktreeInfo=null (TC-108)", () => {
+    // Case: TC-108
     // Given: A local branch element with no worktree (worktreeInfo is null)
     const sourceElem = createMockElement(["head"]);
 
@@ -765,7 +766,8 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
     expect(titles).toContain("Create Worktree&#8230;");
   });
 
-  it("includes 3 worktree items for local branch with worktreeInfo (non-main) (TC-034)", () => {
+  it("includes 3 worktree items for local branch with worktreeInfo (non-main) (TC-109)", () => {
+    // Case: TC-109
     // Given: A local branch with worktree info (non-main worktree)
     const sourceElem = createMockElement(["head"]);
     const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
@@ -788,7 +790,8 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
     expect(titles).toContain("Remove Worktree&#8230;");
   });
 
-  it("excludes Remove Worktree for main worktree (TC-035)", () => {
+  it("excludes Remove Worktree for main worktree (TC-110)", () => {
+    // Case: TC-110
     // Given: A local branch with worktree info (main worktree)
     const sourceElem = createMockElement(["head"]);
     const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: true };
@@ -811,7 +814,8 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
     expect(titles).not.toContain("Remove Worktree&#8230;");
   });
 
-  it("does not include worktree items for remote branch (TC-036)", () => {
+  it("does not include worktree items for remote branch (TC-111)", () => {
+    // Case: TC-111
     // Given: A remote branch element
     const sourceElem = createMockElement(["remote"]);
 
@@ -834,7 +838,8 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
     expect(titles).not.toContain("Remove Worktree&#8230;");
   });
 
-  it("showFormDialog is called with 2 fields when Create Worktree is selected (TC-037)", () => {
+  it("showFormDialog is called with 2 fields when Create Worktree is selected (TC-112)", () => {
+    // Case: TC-112
     // Given: A local branch with no worktree
     const sourceElem = createMockElement(["head"]);
     const menu = buildRefContextMenuItems(
@@ -862,7 +867,8 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
     expect((inputs[1] as DialogCheckboxInput).value).toBe(true);
   });
 
-  it("Path default value uses the normalized branch name (TC-038)", () => {
+  it("Path default value uses the normalized branch name (TC-113)", () => {
+    // Case: TC-113
     // Given: A local branch with no worktree
     const sourceElem = createMockElement(["head"]);
     const menu = buildRefContextMenuItems(
@@ -887,7 +893,8 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
     expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("feature/x");
   });
 
-  it("Open Terminal Here sends openTerminal message (TC-039)", () => {
+  it("Open Terminal Here sends openTerminal message (TC-114)", () => {
+    // Case: TC-114
     // Given: A local branch with worktree info
     const sourceElem = createMockElement(["head"]);
     const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
@@ -915,7 +922,8 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
     });
   });
 
-  it("Copy Worktree Path sends copyToClipboard message (TC-040)", () => {
+  it("Copy Worktree Path sends copyToClipboard message (TC-115)", () => {
+    // Case: TC-115
     // Given: A local branch with worktree info
     const sourceElem = createMockElement(["head"]);
     const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
@@ -942,7 +950,8 @@ describe("buildRefContextMenuItems worktree menu items (S8)", () => {
     });
   });
 
-  it("Remove Worktree shows form dialog with branch name and path (TC-041)", () => {
+  it("Remove Worktree shows form dialog with branch name and path (TC-116)", () => {
+    // Case: TC-116
     // Given: A local branch with non-main worktree info
     const sourceElem = createMockElement(["head"]);
     const worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false };
@@ -1200,9 +1209,9 @@ describe("Create Worktree dialog Open Terminal setting (S11)", () => {
   });
 });
 
-// --- S12: Remove Worktree ブランチ同時削除ダイアログ ---
-
-describe("Remove Worktree branch deletion dialog (S12)", () => {
+// S24: Remove Worktree dialog with branch deletion, recorded in Recent actions on confirmation
+// @see docs/testing/perspectives/web/refMenu-test/02-worktree-actions-01.md
+describe("Remove Worktree branch deletion dialog (S24)", () => {
   const WORKTREE_PATH = "/home/user/project-feature";
 
   beforeEach(() => {
@@ -1246,7 +1255,8 @@ describe("Remove Worktree branch deletion dialog (S12)", () => {
     return menu;
   }
 
-  it("showFormDialog is called with checkbox input for Remove Worktree (TC-050)", () => {
+  it("showFormDialog is called with checkbox input for Remove Worktree (TC-117)", () => {
+    // Case: TC-117
     // Given: A non-main worktree with deleteBranch default = true
     // When: Remove Worktree item is clicked
     clickRemoveWorktree(true);
@@ -1258,7 +1268,8 @@ describe("Remove Worktree branch deletion dialog (S12)", () => {
     expect(inputs[0].type).toBe("checkbox");
   });
 
-  it("checkbox default is checked when deleteBranch=true (TC-051)", () => {
+  it("checkbox default is checked when deleteBranch=true (TC-118)", () => {
+    // Case: TC-118
     // Given: viewState.dialogDefaults.removeWorktree.deleteBranch = true
     // When: Remove Worktree item is clicked
     clickRemoveWorktree(true);
@@ -1269,7 +1280,8 @@ describe("Remove Worktree branch deletion dialog (S12)", () => {
     expect(checkbox.value).toBe(true);
   });
 
-  it("checkbox default is unchecked when deleteBranch=false (TC-052)", () => {
+  it("checkbox default is unchecked when deleteBranch=false (TC-119)", () => {
+    // Case: TC-119
     // Given: viewState.dialogDefaults.removeWorktree.deleteBranch = false
     // When: Remove Worktree item is clicked
     clickRemoveWorktree(false);
@@ -1280,7 +1292,8 @@ describe("Remove Worktree branch deletion dialog (S12)", () => {
     expect(checkbox.value).toBe(false);
   });
 
-  it("checkbox has info property with safe delete explanation (TC-053)", () => {
+  it("checkbox has info property with safe delete explanation (TC-120)", () => {
+    // Case: TC-120
     // Given: Remove Worktree dialog is displayed
     // When: Remove Worktree item is clicked
     clickRemoveWorktree(true);
@@ -1292,41 +1305,48 @@ describe("Remove Worktree branch deletion dialog (S12)", () => {
     expect(checkbox.info).toContain("unmerged");
   });
 
-  it("sendMessage includes deleteBranch=true when checkbox is checked (TC-054)", () => {
+  function expectRemovalRecordedOnceBeforeRequest(deleteBranch: boolean): void {
+    expect(recordRecentAction).toHaveBeenCalledTimes(1);
+    expect(recordRecentAction).toHaveBeenCalledWith(REPO, "ref.removeWorktree");
+    expect(sendMessage).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(sendMessage).mock.calls[0][0]).toStrictEqual({
+      command: "removeWorktree",
+      repo: REPO,
+      worktreePath: WORKTREE_PATH,
+      branchName: "feature/x",
+      deleteBranch
+    });
+    expect(vi.mocked(recordRecentAction).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(sendMessage).mock.invocationCallOrder[0]
+    );
+  }
+
+  it("records only Remove Worktree before sending the request with deleteBranch=true when checkbox is checked (TC-121)", () => {
+    // Case: TC-121
     // Given: Remove Worktree dialog with checkbox checked
     // When: Form dialog callback is invoked with "checked"
     clickRemoveWorktree(true);
     const callback = vi.mocked(showFormDialog).mock.calls[0][3];
     callback(["checked"]);
 
-    // Then: sendMessage is called with deleteBranch: true
-    expect(sendMessage).toHaveBeenCalledTimes(1);
-    expect(sendMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        command: "removeWorktree",
-        deleteBranch: true
-      })
-    );
+    // Then: ref.removeWorktree alone is recorded once, before the whole request with deleteBranch: true
+    expectRemovalRecordedOnceBeforeRequest(true);
   });
 
-  it("sendMessage includes deleteBranch=false when checkbox is unchecked (TC-055)", () => {
+  it("records Remove Worktree before sending the request with deleteBranch=false when checkbox is unchecked (TC-122)", () => {
+    // Case: TC-122
     // Given: Remove Worktree dialog with checkbox unchecked
     // When: Form dialog callback is invoked with unchecked value
     clickRemoveWorktree(true);
     const callback = vi.mocked(showFormDialog).mock.calls[0][3];
     callback(["unchecked"]);
 
-    // Then: sendMessage is called with deleteBranch: false
-    expect(sendMessage).toHaveBeenCalledTimes(1);
-    expect(sendMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        command: "removeWorktree",
-        deleteBranch: false
-      })
-    );
+    // Then: ref.removeWorktree is recorded once, before the whole request with deleteBranch: false
+    expectRemovalRecordedOnceBeforeRequest(false);
   });
 
-  it("action button name is 'Remove' (TC-056)", () => {
+  it("action button name is 'Remove' (TC-123)", () => {
+    // Case: TC-123
     // Given: Remove Worktree dialog is displayed
     // When: Remove Worktree item is clicked
     clickRemoveWorktree(true);
@@ -1336,7 +1356,8 @@ describe("Remove Worktree branch deletion dialog (S12)", () => {
     expect(actionButton).toBe("Remove");
   });
 
-  it("dialog message contains branch name and worktree path (TC-057)", () => {
+  it("dialog message contains branch name and worktree path (TC-124)", () => {
+    // Case: TC-124
     // Given: Branch "feature/x" with worktree at WORKTREE_PATH
     // When: Remove Worktree item is clicked
     clickRemoveWorktree(true);
@@ -1898,6 +1919,97 @@ describe("buildRefContextMenuItems tag menu recent actions exclusion (S15)", () 
   // TC-078 (Type - union extension): "ref.deleteBranch" / "ref.deleteRemoteBranch" を
   // GG.RecentActionId として渡せることは、本ファイル内の recordRecentAction 呼び出し箇所
   // (TC-072 / TC-073 / TC-074) が `pnpm run typecheck` を通過することで担保される。
+});
+
+// S25: Remove Worktree recent action ID and no effect before confirmation
+// @see docs/testing/perspectives/web/refMenu-test/03-context-menu-recent-actions-01.md
+describe("Remove Worktree recent action", () => {
+  const WORKTREE_PATH = "/home/user/project-feature";
+  const REMOVE_WORKTREE_TITLE = "Remove Worktree&#8230;";
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
+  });
+
+  function getRemoveWorktreeItemFromMore(): ContextMenuItem {
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      createMockElement(["head"]),
+      false,
+      "main",
+      undefined,
+      { path: WORKTREE_PATH, isMainWorktree: false }
+    );
+    const removeItem = getTopLevelSubmenu(menu)?.submenu.find(
+      (item): item is ContextMenuItem =>
+        isContextMenuItem(item) && item.title === REMOVE_WORKTREE_TITLE
+    );
+    if (removeItem === undefined) {
+      throw new Error(`${REMOVE_WORKTREE_TITLE} not found in More...`);
+    }
+    return removeItem;
+  }
+
+  function openRemoveWorktreeForm(): (values: string[]) => void {
+    getRemoveWorktreeItemFromMore().onClick();
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    return vi.mocked(showFormDialog).mock.calls[0][3];
+  }
+
+  it("assigns ref.removeWorktree to Remove Worktree in the More submenu (TC-125)", () => {
+    // Case: TC-125
+    // Given: a non-HEAD local branch with a non-main worktree
+    // When: Remove Worktree is taken from the More submenu of the real menu
+    const removeItem = getRemoveWorktreeItemFromMore();
+
+    // Then: it carries the same history ID as the detached worktree removal
+    expect(removeItem.recentActionId).toBe("ref.removeWorktree");
+  });
+
+  it("records and sends nothing when Remove Worktree only opens the form (TC-126)", () => {
+    // Case: TC-126
+    // When: the removal item is selected and the form is shown
+    getRemoveWorktreeItemFromMore().onClick();
+
+    // Then: only the form is opened
+    expect(showFormDialog).toHaveBeenCalledTimes(1);
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
+    expect(sendMessage).toHaveBeenCalledTimes(0);
+  });
+
+  it("records and sends nothing when the form is cancelled (TC-127)", () => {
+    // Case: TC-127
+    // Given: the form is open and its action callback is captured
+    const confirm = openRemoveWorktreeForm();
+
+    // When: the form is cancelled, so the action callback is never invoked
+    // Then: nothing is recorded or sent
+    expect(confirm).toBeTypeOf("function");
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
+    expect(sendMessage).toHaveBeenCalledTimes(0);
+  });
+
+  it("records and sends nothing when the form is closed without confirming (TC-128)", () => {
+    // Case: TC-128
+    // Given: the form is open and its action callback is captured
+    const confirm = openRemoveWorktreeForm();
+
+    // When: the form is closed without an answer, so the action callback is never invoked
+    // Then: nothing is recorded or sent
+    expect(confirm).toBeTypeOf("function");
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
+    expect(sendMessage).toHaveBeenCalledTimes(0);
+  });
 });
 
 // --- S16: Remove Worktree チェックボックス名の raw 引き渡し（単一エスケープ境界） ---

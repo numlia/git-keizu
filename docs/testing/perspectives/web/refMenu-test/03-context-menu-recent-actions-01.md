@@ -71,7 +71,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `buildRefContextMenuItems(repo: string, refName: string, sourceElem: HTMLElement, isRemoteCombined: boolean, gitBranchHead: string | null, remotes?: string[], worktreeInfo?: { path: string; isMainWorktree: boolean } | null): ContextMenuElement[]`
-> Target Path: `web/refMenu.ts:324-357` (`removeWorktreeItem`), `web/refMenu.ts:416-420` (More submenu) (line ranges at base `2a3cc5f`; update after implementation)
+> Target Path: `web/refMenu.ts:324-359` (`removeWorktreeItem`), `web/refMenu.ts:418-422` (More submenu) (line ranges after the Feature 060-03 implementation `3709547`)
 > Test File: `tests/web/refMenu.test.ts`
 
 Adds the branch-side removal to the Recent actions targets. Fixture: `REPO = "/test/repo"`, `WORKTREE_PATH = "/home/user/project-feature"`, `createMockElement(["head"])`, `refName = "feature/x"`, `gitBranchHead = "main"` (non-HEAD), `worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false }`. The removal item is found by searching the real builder output (inside `More...`), not written by hand. `showFormDialog`, `recordRecentAction` and `sendMessage` are mocks; "cancel" and "close" are represented by never invoking the captured action callback, and are kept as separate scenarios. Real-DOM Cancel and `hideDialog()` on the branch form are exercised through the composed menu in `web/contextMenu-test.md` S6 (Cancel in TC-031 / TC-033, `hideDialog()` in TC-031). The record and payload after confirmation are owned by `02-worktree-actions-01.md` S24. S13 (TC-061 / TC-063) and S14 TC-065 keep their expectations: TC-065 checks the remote and HEAD targets and is not an exhaustive ID list, and the HEAD and main-worktree menus still have no removal item.
@@ -99,3 +99,17 @@ Adds the branch-side removal to the Recent actions targets. Fixture: `REPO = "/t
 - External: excluded (dialogs and messaging are mocked)
 - Boundary: TC-126
 - Type: excluded (`RecentActionId` membership is checked by `pnpm run typecheck`)
+
+### Feature 060-03 test mapping and execution evidence (S25)
+
+Test file: `tests/web/refMenu.test.ts`, new describe `Remove Worktree recent action` with an `@see` to this shard. TC-127 and TC-128 capture the action callback of the mocked form and never invoke it; the real-DOM Cancel and `hideDialog()` are exercised in `web/contextMenu-test.md` S6 TC-031 / TC-033. S14 TC-065 (`assigns recentActionId to supported remote and HEAD actions only (TC-065)`) is unchanged. The describe column comes first because the perspectives index counts rows whose first cell is a Case ID.
+
+| describe                        | Case ID | Test Method                                                                   | Result                                       |
+| ------------------------------- | ------- | ----------------------------------------------------------------------------- | -------------------------------------------- |
+| `Remove Worktree recent action` | TC-125  | assigns ref.removeWorktree to Remove Worktree in the More submenu (TC-125)    | pass (2026-09-29); RED before implementation |
+| `Remove Worktree recent action` | TC-126  | records and sends nothing when Remove Worktree only opens the form (TC-126)   | pass (2026-09-29)                            |
+| `Remove Worktree recent action` | TC-127  | records and sends nothing when the form is cancelled (TC-127)                 | pass (2026-09-29)                            |
+| `Remove Worktree recent action` | TC-128  | records and sends nothing when the form is closed without confirming (TC-128) | pass (2026-09-29)                            |
+
+- RED before implementation (2026-09-29): in the temporary copy of the base commit `2a3cc5f` described in `02-worktree-actions-01.md` (updated tests and `src/types.ts`, `web/refMenu.ts` at the base), `pnpm exec vitest run tests/web/refMenu.test.ts -t 'TC-(121|122|125)'` failed TC-125 with `AssertionError: expected undefined to be 'ref.removeWorktree'` (no ID on the branch removal item). No failure came from dependency resolution, DOM setup or types.
+- GREEN after implementation (2026-09-29): the same command in the checkout gave `Tests 3 passed | 100 skipped (103)`.
