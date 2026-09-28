@@ -63,3 +63,39 @@
 | TC-076  | `deleteRemoteBranchItem` confirm dialog を cancel する（confirm callback 未呼び出し） | Boundary - cancel path                                                     | `recordRecentAction(...)` が呼ばれない / `sendMessage(...)` も呼ばれない                                                                                 | キャンセル時は記録しない                    |
 | TC-077  | tag 分岐の `Delete Tag...` / `Push Tag...`                                            | Validation - excluded branch type                                          | tag 固有 action には `recentActionId` プロパティが付与されない                                                                                           | TC-066 と整合                               |
 | TC-078  | `RecentActionId` 共用体に `"ref.deleteBranch"` / `"ref.deleteRemoteBranch"` を渡せる  | Type - union extension                                                     | TypeScript コンパイルが通る（型エラーなし）                                                                                                              | `pnpm run typecheck` 成功で担保（型レベル） |
+
+## S25: Remove Worktree recent action ID and no effect before confirmation
+
+> Origin: Feature 060-03 (light-spec-plan)
+> Added: 2026-09-29
+> Status: active
+> Supersedes: -
+> Signature: `buildRefContextMenuItems(repo: string, refName: string, sourceElem: HTMLElement, isRemoteCombined: boolean, gitBranchHead: string | null, remotes?: string[], worktreeInfo?: { path: string; isMainWorktree: boolean } | null): ContextMenuElement[]`
+> Target Path: `web/refMenu.ts:324-357` (`removeWorktreeItem`), `web/refMenu.ts:416-420` (More submenu) (line ranges at base `2a3cc5f`; update after implementation)
+> Test File: `tests/web/refMenu.test.ts`
+
+Adds the branch-side removal to the Recent actions targets. Fixture: `REPO = "/test/repo"`, `WORKTREE_PATH = "/home/user/project-feature"`, `createMockElement(["head"])`, `refName = "feature/x"`, `gitBranchHead = "main"` (non-HEAD), `worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false }`. The removal item is found by searching the real builder output (inside `More...`), not written by hand. `showFormDialog`, `recordRecentAction` and `sendMessage` are mocks; "cancel" and "close" are represented by never invoking the captured action callback, and are kept as separate scenarios. Real-DOM Cancel and `hideDialog()` on the branch form are exercised through the composed menu in `web/contextMenu-test.md` S6 (Cancel in TC-031 / TC-033, `hideDialog()` in TC-031). The record and payload after confirmation are owned by `02-worktree-actions-01.md` S24. S13 (TC-061 / TC-063) and S14 TC-065 keep their expectations: TC-065 checks the remote and HEAD targets and is not an exhaustive ID list, and the HEAD and main-worktree menus still have no removal item.
+
+| Case ID | Input / Precondition                                                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                         | Notes                                                                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| TC-125  | Build the menu and take `Remove Worktree&#8230;` from the `More...` submenu                             | Normal - target id                                                         | That item's `recentActionId` is `"ref.removeWorktree"` (`toBe`)                         | Main regression (RED before implementation). Same value as the detached item in `web/worktreeMenu-test.md` S2 TC-027 |
+| TC-126  | Call the removal item's `onClick()` only                                                                | Boundary - dialog opened, not answered                                     | `showFormDialog` is called once. `recordRecentAction` 0 times and `sendMessage` 0 times | Opening the dialog does not record                                                                                   |
+| TC-127  | Call `onClick()`, then cancel the form (the captured action callback is never invoked)                  | Validation - cancelled                                                     | `recordRecentAction` 0 times and `sendMessage` 0 times                                  | Unit representation of Cancel                                                                                        |
+| TC-128  | Call `onClick()`, then close the form without an answer (the captured action callback is never invoked) | Validation - closed without confirming                                     | `recordRecentAction` 0 times and `sendMessage` 0 times                                  | Unit representation of closing, for example `hideDialog()`                                                           |
+
+### Failure source inventory (include-or-justify) - Feature 060-03 (S25)
+
+| Failure source                                                                      | Covering case or reason for exclusion                                         |
+| ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| Branch removal item missing the ID, or using an ID different from the detached item | TC-125                                                                        |
+| Record or request when the menu item is chosen                                      | TC-126                                                                        |
+| Record or request on cancel or close                                                | TC-127, TC-128                                                                |
+| Removal item appearing for HEAD or main-worktree branches                           | excluded here (kept by S13 TC-061 and `02-worktree-actions-01.md` S23 TC-110) |
+
+**Failure category coverage (diversity floor)**:
+
+- Validation: TC-127, TC-128
+- Exception: excluded (no throw path)
+- External: excluded (dialogs and messaging are mocked)
+- Boundary: TC-126
+- Type: excluded (`RecentActionId` membership is checked by `pnpm run typecheck`)
