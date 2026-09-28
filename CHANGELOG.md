@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.4.0] - 2026-09-28
 
-This release lets you walk a file's history from the keyboard: while **Highlight File History** is active, `↑` / `↓` step through the highlighted commits only, opening each one's details, and `ESC` leaves the highlight.
+This release lets you walk a file's history from the keyboard: while **Highlight File History** is active, `↑` / `↓` step through the highlighted commits only, opening each one's details, and `ESC` leaves the highlight after first closing any open commit details.
 
 ### Added
 

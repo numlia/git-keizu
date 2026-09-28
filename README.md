@@ -54,7 +54,7 @@ Select a commit to inspect its files and diffs, or Ctrl/Cmd+click a second commi
 - Switch commit files between a folder tree and a flat list; long file rows scroll sideways, so change counts and row actions stay reachable.
 - Open working-tree files directly from commit details; renamed files are resolved through Git rename tracking.
 - Navigate commits with the keyboard, follow parent links, and keep comparison state when switching tabs.
-- **Highlight File History**, started from the history icon on a file's row or from its context menu, follows a single file backwards from a commit — through renames and the merges that touched it — and highlights its commits on the graph without hiding anything else, with previous/next navigation and the file's row highlighted in each commit's details. While it is active, `↑` / `↓` step through the highlighted commits only and open their details, and `ESC` leaves the highlight.
+- **Highlight File History**, started from the history icon on a file's row or from its context menu, follows a single file backwards from a commit — through renames and the merges that touched it — and highlights its commits on the graph without hiding anything else, with previous/next navigation and the file's row highlighted in each commit's details. While it is active, `↑` / `↓` step through the highlighted commits only and open their details, and `ESC` leaves the highlight once any open commit details are closed.
 
 ### Run Git actions from the graph
 
