@@ -194,8 +194,8 @@ multiフォーム（`multiElementForm === true`）のcheckbox名セルをプレ�
 > Added: 2026-09-29
 > Status: active
 > Supersedes: -
-> Signature: `isErrorDialogActive(): boolean` (intended name of the new query next to `isDialogActive()`; set by `showErrorDialog(...)`, cleared by every other dialog shown through `showDialog(...)` and by `hideDialog(): void`)
-> Target Path: `web/dialogs.ts:202-251` (`showErrorDialog`, `showDialog`, `hideDialog`, `isDialogActive`; line ranges before the Feature 060-03 addendum implementation, update after Task 5)
+> Signature: `isErrorDialogActive(): boolean` (new query next to `isDialogActive()`; set by `showErrorDialog(...)`, cleared by every other dialog shown through `showDialog(...)` and by `hideDialog(): void`)
+> Target Path: `web/dialogs.ts:7, 203-259` (module state `errorDialogShown`, `showErrorDialog`, `showDialog`, `hideDialog`, `isDialogActive`, `isErrorDialogActive`; line ranges after the Feature 060-03 addendum implementation)
 > Test File: `tests/web/dialogs.test.ts`
 
 The refresh-driven auto-close in `web/main.ts` needs to tell error dialogs apart from other dialogs (spec addendum `追補（2026-09-29）再読み込みでエラーダイアログを閉じない`). This section fixes only the state kept by `web/dialogs.ts`: it is true while the dialog on screen was opened by `showErrorDialog`, and false otherwise. The state is not exposed in the DOM, so the error dialog DOM of S7 (TC-035 to TC-038) is unchanged. Which dialogs a refresh closes is owned by `web/main-test/08-request-queue-01.md` S67.
@@ -222,3 +222,20 @@ The refresh-driven auto-close in `web/main.ts` needs to tell error dialogs apart
 | The error dialog DOM gains a marker or changes structure              | TC-046                                                                                                          |
 | Refresh, hard refresh and context menu decisions                      | excluded (owned by `web/main-test/08-request-queue-01.md` S67)                                                  |
 | Invalid argument types                                                | excluded (the query takes no argument; `showErrorDialog` argument types are checked by the TypeScript compiler) |
+
+### Feature 060-03 addendum test mapping and execution evidence (S8)
+
+Test file: `tests/web/dialogs.test.ts`, describe `isErrorDialogActive` (`@see` this file). TC-039 loads a fresh copy of the module with `vi.resetModules()` so the initial state is observed. TC-041 is one parameterized test with one row per dialog function. The describe column comes first because the perspectives index counts rows whose first cell is a Case ID.
+
+| describe              | Case ID | Test Method                                                                                                                                                                      | Result            |
+| --------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| `isErrorDialogActive` | TC-039  | returns false before any dialog is shown (TC-039)                                                                                                                                | pass (2026-09-29) |
+| `isErrorDialogActive` | TC-040  | returns true while an error dialog is shown (TC-040)                                                                                                                             | pass (2026-09-29) |
+| `isErrorDialogActive` | TC-041  | returns false after $name replaces the error dialog (TC-041), 5 rows: `showConfirmationDialog`, `showRefInputDialog`, `showCheckboxDialog`, `showSelectDialog`, `showFormDialog` | pass (2026-09-29) |
+| `isErrorDialogActive` | TC-042  | returns false after hideDialog closes the error dialog (TC-042)                                                                                                                  | pass (2026-09-29) |
+| `isErrorDialogActive` | TC-043  | returns false after the user clicks Dismiss (TC-043)                                                                                                                             | pass (2026-09-29) |
+| `isErrorDialogActive` | TC-044  | stays true when another error dialog replaces the first one (TC-044)                                                                                                             | pass (2026-09-29) |
+| `isErrorDialogActive` | TC-045  | returns false while only a confirmation dialog is shown (TC-045)                                                                                                                 | pass (2026-09-29) |
+| `isErrorDialogActive` | TC-046  | keeps the error dialog DOM free of any state marker (TC-046)                                                                                                                     | pass (2026-09-29) |
+
+- GREEN (2026-09-29): `pnpm exec vitest run tests/web/dialogs.test.ts` gave `Tests 50 passed (50)`. The query does not exist at the base `1339842`, so these cases have no RED run of their own; the main regression RED is recorded in `web/main-test/08-request-queue-01.md` S67.

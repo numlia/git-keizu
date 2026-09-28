@@ -182,13 +182,13 @@ Harness and fixture:
 | Display threshold regressions (empty history, one eligible kind)                            | TC-039, TC-041                                                                |
 | History limit, dedupe and repository isolation                                              | TC-042 to TC-044                                                              |
 | Normal menu order or `More...` structure changed by composition                             | TC-031 to TC-034                                                              |
-| Git removal or branch deletion failing after the record                                     | excluded here (Git runs in the host; covered on screen by S7 TC-051 / TC-052) |
+| Git removal or branch deletion failing after the record                                     | excluded here (Git runs in the host; covered on screen by S8 TC-059 / TC-060) |
 
 **Failure category coverage (diversity floor)**:
 
 - Validation: TC-035 to TC-038
 - Exception: excluded (composition and recording have no throw path)
-- External: excluded (only the VS Code API is mocked; Git failures are manual S7 TC-051 / TC-052)
+- External: excluded (only the VS Code API is mocked; Git failures are manual S8 TC-059 / TC-060)
 - Boundary: TC-039 to TC-042
 - Type: excluded (`RecentActionId` membership is checked by `pnpm run typecheck`)
 

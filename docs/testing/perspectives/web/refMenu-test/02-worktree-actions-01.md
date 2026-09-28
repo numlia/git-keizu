@@ -190,7 +190,7 @@ Replaces S12 because confirming the form with Remove now records `ref.removeWork
 | Dialog kind, inputs, defaults, button or message regressed              | TC-116 to TC-120, TC-123, TC-124                                                                                    |
 | Removal offered for the main worktree or a remote branch                | TC-110, TC-111                                                                                                      |
 | Record or request before confirmation                                   | excluded here (owned by `03-context-menu-recent-actions-01.md` S25 TC-126 to TC-128)                                |
-| Git removal or branch deletion failure after a confirmed record         | excluded (the menu does not observe Git results; covered on screen by `web/contextMenu-test.md` S7 TC-051 / TC-052) |
+| Git removal or branch deletion failure after a confirmed record         | excluded (the menu does not observe Git results; covered on screen by `web/contextMenu-test.md` S8 TC-059 / TC-060) |
 
 **Failure category coverage (diversity floor)**:
 

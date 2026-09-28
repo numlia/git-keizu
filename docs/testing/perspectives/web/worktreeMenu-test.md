@@ -111,13 +111,13 @@ Replaces S1 because the detached Remove Worktree item now carries `recentActionI
 | Record or request when the dialog is dismissed or closed                | TC-032, TC-035, TC-036                                                                                     |
 | Removal request shape changed (branch name added, path escaped)         | TC-034, TC-037, TC-038                                                                                     |
 | Existing menu order, payloads, dialog text and terminal names regressed | TC-022 to TC-033, TC-037 to TC-042                                                                         |
-| Git removal failure after a confirmed record                            | excluded (the menu does not observe Git results; covered on screen by `web/contextMenu-test.md` S7 TC-051) |
+| Git removal failure after a confirmed record                            | excluded (the menu does not observe Git results; covered on screen by `web/contextMenu-test.md` S8 TC-059) |
 
 **Failure category coverage (diversity floor)**:
 
 - Validation: TC-035, TC-036
 - Exception: excluded (no throw path)
-- External: excluded (dependencies are mocked; Git outcomes belong to the gitGraphView / dataSource owners and the manual S7 in `web/contextMenu-test.md`)
+- External: excluded (dependencies are mocked; Git outcomes belong to the gitGraphView / dataSource owners and the manual S8 in `web/contextMenu-test.md`)
 - Boundary: TC-023 to TC-026, TC-037, TC-038, TC-040 to TC-042
 - Type: excluded (arguments are `string`, guaranteed at compile time)
 

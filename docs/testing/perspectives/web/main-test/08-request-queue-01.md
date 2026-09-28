@@ -71,8 +71,8 @@ checkout 成功時は `forceRender` により、ブランチ・コミットの�
 > Status: active
 > Supersedes: -
 > Signature: `GitKeizuView.refresh(mode) / requestLoadBranchesAndCommits(forceRender) / renderShowLoading()`
-> Target Path: `web/main.ts:661-673, 720-736, 1151-1158` (line ranges before the Feature 060-03 addendum implementation, update after Task 5)
-> Test File: `tests/web/main.test.ts` or `tests/web/main.refOverflow.test.ts` (chosen in Task 5)
+> Target Path: `web/main.ts:661-673, 720-736, 1151-1158` (line ranges after the Feature 060-03 addendum implementation, unchanged by it; the close condition is line 729)
+> Test File: `tests/web/main.refOverflow.test.ts` (runs the real `web/main.ts`, `web/messageHandler.ts` and `web/dialogs.ts`; `tests/web/main.test.ts` replaces `web/dialogs` with stubs)
 
 When a soft or forceRender refresh finds branch or commit changes, the load callback closes the open dialog and the context menu. Error dialogs are now excluded from that close; confirmation, input, form, checkbox and select dialogs and the context menu still close (spec addendum `追補（2026-09-29）再読み込みでエラーダイアログを閉じない`). A forceRender response always counts as a change (`loadBranches` / `loadCommits` skip the equality check). A hard refresh still closes every dialog immediately through the loading view, and Esc keeps its order in `04-keyboard-selection-02.md`. The error-dialog-active state itself is `web/dialogs-test.md` S8; the response-to-refresh integration is `web/messageHandler-test/02-worktree-and-details-01.md` S20 and `03-git-operation-responses-01.md` S21. S47 stays active.
 
@@ -98,3 +98,20 @@ When a soft or forceRender refresh finds branch or commit changes, the load call
 | Esc no longer closes an error dialog                              | excluded (Esc chain unchanged; `04-keyboard-selection-02.md` TC-595 closes any active dialog)                                         |
 | Queued refreshes (load in flight) close the kept error dialog     | covered at the integration level by `web/messageHandler-test/02-worktree-and-details-01.md` S20 TC-088; the queue itself is S40 / S47 |
 | Invalid types or malformed responses                              | excluded (no new input; the load response types are checked by the TypeScript compiler)                                               |
+
+### Feature 060-03 addendum test mapping and execution evidence (S67)
+
+Test file: `tests/web/main.refOverflow.test.ts`, describe `refresh-driven closing keeps error dialogs open (S67)` (`@see` this file). The real dialogs and context menu run behind call-through spies, so each case checks both the `hideDialog` / `hideContextMenu` calls and the `#dialog` DOM. Every case starts idle: any load left in flight is answered with the current data, and a soft refresh must post exactly one `loadBranches` request. A soft refresh is started by the `refresh` response, a forceRender refresh by `checkoutBranch` with kind `completed` and status `null`, and a hard refresh by clicking `#refreshBtn`. "With changes" adds one commit on top of the loaded commits. The section column comes first because the perspectives index counts rows whose first cell is a Case ID.
+
+| Section | Case ID | Test Method                                                                 | Result                                 |
+| ------- | ------- | --------------------------------------------------------------------------- | -------------------------------------- |
+| S67     | TC-623  | keeps an error dialog open on a soft refresh with changes (TC-623)          | pass (2026-09-29); RED before the fix  |
+| S67     | TC-624  | keeps an error dialog open on a forceRender refresh (TC-624)                | pass (2026-09-29); RED before the fix  |
+| S67     | TC-625  | still closes a confirmation dialog on a soft refresh with changes (TC-625)  | pass (2026-09-29); also passes at base |
+| S67     | TC-626  | closes the context menu while keeping the error dialog open (TC-626)        | pass (2026-09-29); RED before the fix  |
+| S67     | TC-627  | closes a confirmation dialog opened after an error dialog (TC-627)          | pass (2026-09-29); also passes at base |
+| S67     | TC-628  | closes an error dialog on a hard refresh before any response (TC-628)       | pass (2026-09-29); also passes at base |
+| S67     | TC-629  | keeps a confirmation dialog open when the refresh finds no changes (TC-629) | pass (2026-09-29); also passes at base |
+
+- RED before the fix (2026-09-29): the base `1339842` was extracted with `git archive` into a temporary directory outside the checkout, the updated `tests/web/main.refOverflow.test.ts`, `tests/web/dialogs.test.ts` and `web/dialogs.ts` (so the new query exists) were copied in, `web/main.ts` stayed at the base, and `node_modules` was a symlink to the checkout. `vitest run tests/web/main.refOverflow.test.ts -t "TC-62[3-9]|TC-08[7-9]"` gave `Tests 6 failed | 4 passed | 166 skipped (176)`. TC-623, TC-624 and TC-626 failed with `AssertionError: expected "vi.fn()" to not be called at all, but actually been called 1 times` on `hideDialog`, after the commit load response; S20 TC-087 / TC-088 and S21 TC-089 failed with `expected false to be true` on the dialog `active` class right after the commit load response. No failure came from dependency resolution, DOM setup or types. TC-625, TC-627, TC-628 and TC-629 pass at the base because they keep existing behavior. The temporary copy was removed afterwards.
+- GREEN after the fix (2026-09-29): the same command in the checkout gave `Tests 10 passed | 166 skipped (176)`.

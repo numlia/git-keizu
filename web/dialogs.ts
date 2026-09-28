@@ -4,6 +4,7 @@ import { escapeHtml, refInvalid, svgIcons } from "./utils";
 const dialog = document.getElementById("dialog")!;
 const dialogBacking = document.getElementById("dialogBacking")!;
 let dialogMenuSource: HTMLElement | null = null;
+let errorDialogShown = false;
 
 const DIALOG_CLASS_NO_INPUT = "active noInput";
 const DIALOG_CLASS_INPUT_INVALID = "active inputInvalid";
@@ -216,6 +217,7 @@ export function showErrorDialog(
     null,
     sourceElem
   );
+  errorDialogShown = true;
 }
 
 function showDialog(
@@ -234,12 +236,14 @@ function showDialog(
 
   dialogMenuSource = sourceElem;
   if (dialogMenuSource !== null) dialogMenuSource.classList.add("dialogActive");
+  errorDialogShown = false;
 }
 
 export function hideDialog() {
   dialogBacking.className = "";
   dialog.className = "";
   dialog.innerHTML = "";
+  errorDialogShown = false;
   if (dialogMenuSource !== null) {
     dialogMenuSource.classList.remove("dialogActive");
     dialogMenuSource = null;
@@ -248,4 +252,8 @@ export function hideDialog() {
 
 export function isDialogActive() {
   return dialog.classList.contains("active");
+}
+
+export function isErrorDialogActive(): boolean {
+  return errorDialogShown && isDialogActive();
 }

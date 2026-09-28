@@ -8,7 +8,7 @@ import {
   showContextMenu
 } from "./contextMenu";
 import { getCommitDate } from "./dates";
-import { hideDialog, isDialogActive, showErrorDialog } from "./dialogs";
+import { hideDialog, isDialogActive, isErrorDialogActive, showErrorDialog } from "./dialogs";
 import { Dropdown } from "./dropdown";
 import {
   CLASS_FILE_HISTORY_CURRENT,
@@ -726,7 +726,7 @@ class GitKeizuView {
       if (isRepo) {
         this.requestLoadCommits(forceRender || branchChanges, (commitChanges: boolean) => {
           if (branchChanges || commitChanges) {
-            if (isDialogActive()) hideDialog();
+            if (isDialogActive() && !isErrorDialogActive()) hideDialog();
             if (isContextMenuActive()) hideContextMenu();
           }
         });
