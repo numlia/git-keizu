@@ -101,7 +101,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
-> Status: active
+> Status: superseded
+> Superseded By: S64（[04-keyboard-selection-02.md](04-keyboard-selection-02.md)）
 > Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
@@ -118,7 +119,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
-> Status: active
+> Status: superseded
+> Superseded By: S64（[04-keyboard-selection-02.md](04-keyboard-selection-02.md)）
 > Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
@@ -134,7 +136,8 @@
 
 > Origin: test-plan (既存コード網羅)
 > Added: 2026-05-17
-> Status: active
+> Status: superseded
+> Superseded By: S65（[04-keyboard-selection-02.md](04-keyboard-selection-02.md)）
 > Supersedes: -
 > Signature: `handleEscape(): void`
 > Target Path: `web/main.ts`

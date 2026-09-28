@@ -1455,6 +1455,8 @@ class GitKeizuView {
   private handleKeyboardShortcut(e: KeyboardEvent) {
     if (e.isComposing) return;
 
+    if (this.handleFileHistoryArrowKey(e)) return;
+
     // Arrow key navigation (REQ-2.1, REQ-2.2, REQ-2.3, REQ-2.4, REQ-2.5)
     if (
       this.expandedCommit !== null &&
@@ -1521,6 +1523,30 @@ class GitKeizuView {
       e.preventDefault();
       this.scrollToStash(!e.shiftKey);
     }
+  }
+
+  // Returns true when the file history mode consumed the arrow key.
+  private handleFileHistoryArrowKey(e: KeyboardEvent): boolean {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return false;
+    if (!this.fileHistory.isActive() && !this.fileHistory.isPending()) return false;
+    if (this.expandedCommit !== null && this.expandedCommit.compareWithHash !== null) return false;
+    if (isEditableEventTarget(e.target)) return false;
+
+    const hasNoModifier = !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey;
+    const hasCtrlOrCmdWithoutAlt = (e.ctrlKey || e.metaKey) && !e.altKey;
+    if (!hasNoModifier && !hasCtrlOrCmdWithoutAlt) return false;
+
+    // Consumed even when nothing moves, so the view does not scroll at an end and the key
+    // never reaches the table order or graph navigation.
+    e.preventDefault();
+    e.stopPropagation();
+    if (!hasNoModifier || this.fileHistory.isPending()) return true;
+
+    const hash = this.fileHistory.navigate(e.key === "ArrowUp" ? -1 : 1, true);
+    if (hash === null) return true;
+    const sourceElem = this.findCommitRowByHash(hash);
+    if (sourceElem !== null) this.loadCommitDetails(sourceElem);
+    return true;
   }
 
   /* Stash Navigation */
@@ -1590,6 +1616,10 @@ class GitKeizuView {
     }
     if (this.expandedCommit !== null) {
       this.hideCommitDetails();
+      return;
+    }
+    if (this.fileHistory.isActive() || this.fileHistory.isPending()) {
+      this.fileHistory.exit(true);
       return;
     }
   }

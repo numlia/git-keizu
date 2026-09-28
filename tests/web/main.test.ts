@@ -1,5 +1,14 @@
 // @vitest-environment jsdom
-import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  type MockInstance,
+  vi
+} from "vitest";
 
 import type {
   GitCommitDetails,
@@ -7,7 +16,9 @@ import type {
   GitCommitStash,
   GitFileChange,
   GitFileChangeType,
-  GitRef
+  GitRef,
+  RequestCommitDetails,
+  RequestMessage
 } from "../../src/types";
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 
@@ -34,11 +45,12 @@ const {
     onCommitsRendered: vi.fn(),
     onRepositoryChanged: vi.fn(),
     handleCommitRowClick: vi.fn(),
+    navigate: vi.fn<(delta: -1 | 1, useExpandedCommit?: boolean) => string | null>(() => null),
     exit: vi.fn(),
     isActive: vi.fn((): boolean => false),
     isPending: vi.fn((): boolean => false),
     getCurrentHash: vi.fn((): string | null => null),
-    getHistoricalPathFor: vi.fn((): string | null => null)
+    getHistoricalPathFor: vi.fn<(hash: string) => string | null>(() => null)
   };
   return {
     capturedConfig: { ref: null as Record<string, unknown> | null },
@@ -332,6 +344,7 @@ import {
   generateGitFileTreeHtml
 } from "../../web/fileTree";
 import { buildRefContextMenuItems, checkoutBranchAction } from "../../web/refMenu";
+import { RefOverflowController } from "../../web/refOverflow";
 import { buildStashContextMenuItems } from "../../web/stashMenu";
 import { buildUncommittedContextMenuItems } from "../../web/uncommittedMenu";
 import {
@@ -1199,6 +1212,42 @@ function expandCommitWithCompare(fromHash: string, toHash: string): void {
     toHash
   });
   vi.clearAllMocks();
+}
+
+/** File history states of the mocked controller that the key and Escape routing depend on. */
+interface HistoryMode {
+  name: string;
+  isActive: boolean;
+  isPending: boolean;
+}
+
+const HIGHLIGHTED_ONLY: HistoryMode = {
+  name: "highlighted only",
+  isActive: true,
+  isPending: false
+};
+const INITIAL_PENDING: HistoryMode = {
+  name: "the first request pending",
+  isActive: false,
+  isPending: true
+};
+const SWITCH_PENDING: HistoryMode = {
+  name: "highlighted with a switch pending",
+  isActive: true,
+  isPending: true
+};
+const PENDING_MODES = [INITIAL_PENDING, SWITCH_PENDING];
+const HISTORY_MODES = [HIGHLIGHTED_ONLY, ...PENDING_MODES];
+
+function enterHistoryMode(mode: HistoryMode): void {
+  mockFileHistoryInstance.isActive.mockReturnValue(mode.isActive);
+  mockFileHistoryInstance.isPending.mockReturnValue(mode.isPending);
+}
+
+function leaveHistoryMode(): void {
+  mockFileHistoryInstance.isActive.mockReturnValue(false);
+  mockFileHistoryInstance.isPending.mockReturnValue(false);
+  mockFileHistoryInstance.navigate.mockReturnValue(null);
 }
 
 /* ------------------------------------------------------------------ */
@@ -2511,7 +2560,7 @@ describe("GitKeizuView frontend integration", () => {
   });
 
   /* ---------------------------------------------------------------- */
-  /* handleKeyboardShortcut() Arrow key navigation (S29-S33)         */
+  /* handleKeyboardShortcut() Arrow key navigation (S29-S31, S46, S64) */
   /* ---------------------------------------------------------------- */
 
   describe("handleKeyboardShortcut() Arrow key navigation", () => {
@@ -2528,6 +2577,7 @@ describe("GitKeizuView frontend integration", () => {
         shiftKey?: boolean;
         altKey?: boolean;
         isComposing?: boolean;
+        target?: HTMLElement;
       }
     ): ArrowKeySpies {
       const event = new KeyboardEvent("keydown", {
@@ -2544,7 +2594,7 @@ describe("GitKeizuView frontend integration", () => {
       }
       const preventDefaultSpy = vi.spyOn(event, "preventDefault");
       const stopPropagationSpy = vi.spyOn(event, "stopPropagation");
-      document.dispatchEvent(event);
+      (options?.target ?? document).dispatchEvent(event);
       return { preventDefault: preventDefaultSpy, stopPropagation: stopPropagationSpy };
     }
 
@@ -2717,34 +2767,41 @@ describe("GitKeizuView frontend integration", () => {
       });
     });
 
-    /* S32: precondition checks */
+    /* S64: normal mode precondition checks */
+    // @see docs/testing/perspectives/web/main-test/04-keyboard-selection-02.md
 
-    describe("precondition checks (S32)", () => {
-      it("expandedCommit null skips Arrow processing (TC-175)", () => {
-        // Given: no commit is expanded (expandedCommit === null)
+    describe("normal mode precondition checks (S64)", () => {
+      it("expandedCommit null skips Arrow processing (TC-562)", () => {
+        // Case: TC-562
+        // Given: normal mode and no commit is expanded (expandedCommit === null)
         resetCommitState();
 
         // When: ArrowDown pressed
         const spies = dispatchArrowKey("ArrowDown");
 
-        // Then: no navigation occurs
+        // Then: no details request, the event is not consumed and the history is not asked
         expect(vscode.postMessage).not.toHaveBeenCalled();
         expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
+        expect(mockFileHistoryInstance.navigate).not.toHaveBeenCalled();
       });
 
-      it("compareWithHash non-null skips Arrow processing (TC-176)", () => {
-        // Given: commit is expanded in comparison mode
+      it("compareWithHash non-null skips Arrow processing (TC-563)", () => {
+        // Case: TC-563
+        // Given: normal mode and a commit is expanded in comparison mode
         expandCommitWithCompare(COMMIT_HASH_2, COMMIT_HASH_3);
 
         // When: ArrowDown pressed
         const spies = dispatchArrowKey("ArrowDown");
 
-        // Then: Arrow navigation is skipped (compare mode active)
+        // Then: Arrow navigation is skipped (compare mode active) and the event is not consumed
         expect(vscode.postMessage).not.toHaveBeenCalled();
         expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
       });
 
-      it("hash not in commitLookup skips navigation (TC-177)", () => {
+      it("hash not in commitLookup skips navigation (TC-564)", () => {
+        // Case: TC-564
         // Given: expand a commit, then reload with different commits so hash is stale
         expandCommit(COMMIT_HASH_2);
         // Load different commits that don't include COMMIT_HASH_2
@@ -2772,9 +2829,10 @@ describe("GitKeizuView frontend integration", () => {
         // When: ArrowDown pressed (expandedCommit hash not in new commitLookup)
         const spies = dispatchArrowKey("ArrowDown");
 
-        // Then: no navigation (hash not found in commitLookup)
+        // Then: no navigation (hash not found in commitLookup) and the event is not consumed
         expect(vscode.postMessage).not.toHaveBeenCalled();
         expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
 
         // Cleanup: restore original commits
         dispatchMessage({
@@ -2786,80 +2844,97 @@ describe("GitKeizuView frontend integration", () => {
         });
       });
 
-      it("isComposing true skips all processing (TC-178)", () => {
-        // Given: commit is expanded
+      it("isComposing true skips all processing (TC-565)", () => {
+        // Case: TC-565
+        // Given: normal mode and a commit is expanded
         expandCommit(COMMIT_HASH_2);
 
         // When: ArrowDown pressed during IME composition
         const spies = dispatchArrowKey("ArrowDown", { isComposing: true });
 
-        // Then: entire handler is skipped
+        // Then: entire handler is skipped and the event is not consumed
         expect(vscode.postMessage).not.toHaveBeenCalled();
         expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
       });
 
-      it("ArrowLeft key skips Arrow processing (TC-179)", () => {
-        // Given: commit is expanded
+      it("ArrowLeft key skips Arrow processing (TC-566)", () => {
+        // Case: TC-566
+        // Given: normal mode and a commit is expanded
         expandCommit(COMMIT_HASH_2);
 
         // When: ArrowLeft pressed
         const spies = dispatchArrowKey("ArrowLeft");
 
-        // Then: Arrow navigation is not triggered
+        // Then: Arrow navigation is not triggered and the event is not consumed
         expect(vscode.postMessage).not.toHaveBeenCalled();
         expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
       });
     });
 
-    /* S33: event control */
+    /* S64: normal mode event control */
+    // @see docs/testing/perspectives/web/main-test/04-keyboard-selection-02.md
 
-    describe("event control (S33)", () => {
-      it("successful navigation calls preventDefault and stopPropagation (TC-180)", () => {
-        // Given: commit at index 1 is expanded
+    describe("normal mode event control (S64)", () => {
+      it("successful navigation calls preventDefault and stopPropagation (TC-567)", () => {
+        // Case: TC-567
+        // Given: normal mode and the commit at index 1 is expanded
         expandCommit(COMMIT_HASH_2);
 
         // When: ArrowDown pressed (navigates to index 2)
         const spies = dispatchArrowKey("ArrowDown");
 
-        // Then: event is consumed
+        // Then: event is consumed, the adjacent row is requested once and the history is not asked
         expect(spies.preventDefault).toHaveBeenCalledTimes(1);
         expect(spies.stopPropagation).toHaveBeenCalledTimes(1);
+        expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+        expect(vscode.postMessage).toHaveBeenCalledWith(
+          expect.objectContaining({ command: "commitDetails", commitHash: COMMIT_HASH_3 })
+        );
+        expect(mockFileHistoryInstance.navigate).not.toHaveBeenCalled();
       });
 
-      it("failed navigation does not consume event (TC-181)", () => {
-        // Given: commit at index 0 is expanded (table start)
+      it("failed navigation does not consume event (TC-568)", () => {
+        // Case: TC-568
+        // Given: normal mode and the commit at index 0 is expanded (table start)
         expandCommit(COMMIT_HASH_1);
 
         // When: ArrowUp pressed (no previous commit)
         const spies = dispatchArrowKey("ArrowUp");
 
-        // Then: event is not consumed
+        // Then: event is not consumed and no details are requested
         expect(spies.preventDefault).not.toHaveBeenCalled();
         expect(spies.stopPropagation).not.toHaveBeenCalled();
+        expect(vscode.postMessage).not.toHaveBeenCalled();
       });
 
-      it("Shift-only + ArrowUp skips Arrow processing (TC-182)", () => {
-        // Given: commit is expanded
+      it("Shift-only + ArrowUp skips Arrow processing (TC-569)", () => {
+        // Case: TC-569
+        // Given: normal mode and a commit is expanded
         expandCommit(COMMIT_HASH_2);
 
         // When: Shift+ArrowUp pressed (no Ctrl/Cmd)
         const spies = dispatchArrowKey("ArrowUp", { shiftKey: true });
 
-        // Then: Arrow processing is skipped (modifier pattern mismatch)
+        // Then: Arrow processing is skipped (modifier pattern mismatch), event not consumed
         expect(vscode.postMessage).not.toHaveBeenCalled();
         expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
       });
 
-      it("Alt + ArrowUp skips Arrow processing (TC-183)", () => {
-        // Given: commit is expanded
+      it("Alt + ArrowUp skips Arrow processing (TC-570)", () => {
+        // Case: TC-570
+        // Given: normal mode and a commit is expanded
         expandCommit(COMMIT_HASH_2);
 
         // When: Alt+ArrowUp pressed
         const spies = dispatchArrowKey("ArrowUp", { altKey: true });
 
-        // Then: Arrow processing is skipped (modifier pattern mismatch)
+        // Then: Arrow processing is skipped (modifier pattern mismatch), event not consumed
         expect(vscode.postMessage).not.toHaveBeenCalled();
         expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
       });
     });
 
@@ -2987,6 +3062,586 @@ describe("GitKeizuView frontend integration", () => {
         // Then: the global find shortcut still runs exactly once
         expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(1);
         expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
+      });
+    });
+
+    /* S64: file history mode routing */
+    // @see docs/testing/perspectives/web/main-test/04-keyboard-selection-02.md
+
+    describe("file history mode (S64)", () => {
+      const FIRST_MATCH = "h0";
+      const ADJACENT_NON_MATCH = "x1";
+      const RETURNED_MATCH = "h1";
+      // h1 sits between two dim rows, so a leak into the table order would request x1 or x2.
+      const MIDDLE_MATCH = RETURNED_MATCH;
+      const OTHER_NON_MATCH = "x2";
+      const LAST_MATCH = "h2";
+      const MISSING_ROW_HASH = "zz";
+      // Names describe table positions, not commit dates.
+      const HISTORY_TABLE_HASHES = [
+        FIRST_MATCH,
+        ADJACENT_NON_MATCH,
+        RETURNED_MATCH,
+        OTHER_NON_MATCH,
+        LAST_MATCH
+      ];
+      const LAST_MATCH_INDEX = HISTORY_TABLE_HASHES.indexOf(LAST_MATCH);
+      const SCROLL_TOP_SENTINEL = 37;
+      const ARROW_KEYS = ["ArrowUp", "ArrowDown"];
+
+      interface ArrowModifier {
+        name: string;
+        init: { ctrlKey?: boolean; metaKey?: boolean };
+      }
+
+      const CTRL: ArrowModifier = { name: "Ctrl", init: { ctrlKey: true } };
+      const CMD: ArrowModifier = { name: "Cmd", init: { metaKey: true } };
+
+      const appendedTargets: HTMLElement[] = [];
+
+      function appendTarget<T extends HTMLElement>(element: T): T {
+        document.body.appendChild(element);
+        appendedTargets.push(element);
+        return element;
+      }
+
+      function createContentEditableHost(): HTMLElement {
+        const host = appendTarget(document.createElement("div"));
+        host.setAttribute("contenteditable", "true");
+        return host;
+      }
+
+      function createContentEditableDescendant(): HTMLElement {
+        const child = createContentEditableHost().appendChild(document.createElement("span"));
+        // jsdom does not implement isContentEditable, which a browser inherits from the host.
+        Object.defineProperty(child, "isContentEditable", { value: true, configurable: true });
+        return child;
+      }
+
+      const EDITABLE_TARGETS: { name: string; create: () => HTMLElement }[] = [
+        { name: "an input", create: () => appendTarget(document.createElement("input")) },
+        { name: "a textarea", create: () => appendTarget(document.createElement("textarea")) },
+        { name: "a select", create: () => appendTarget(document.createElement("select")) },
+        { name: "a contenteditable element", create: createContentEditableHost },
+        {
+          name: "a descendant of a contenteditable element",
+          create: createContentEditableDescendant
+        }
+      ];
+
+      function resolveGraphMovesTo(index: number): void {
+        for (const graphMove of Object.values(mockGraphNavigation)) {
+          graphMove.mockReturnValue(index);
+        }
+      }
+
+      function scrollContainer(): HTMLElement {
+        return document.getElementById("scrollContainer")!;
+      }
+
+      /** Hash of the row the details view sits under, or null while no details are open. */
+      function detailsOwnerHash(): string | null {
+        const details = document.getElementById("commitDetails");
+        if (details === null) return null;
+        const owner = details.previousElementSibling;
+        return owner instanceof HTMLElement ? (owner.dataset.hash ?? null) : null;
+      }
+
+      function expectConsumed(spies: ArrowKeySpies): void {
+        expect(spies.preventDefault).toHaveBeenCalledTimes(1);
+        expect(spies.stopPropagation).toHaveBeenCalledTimes(1);
+      }
+
+      function expectNotConsumed(spies: ArrowKeySpies): void {
+        expect(spies.preventDefault).toHaveBeenCalledTimes(0);
+        expect(spies.stopPropagation).toHaveBeenCalledTimes(0);
+      }
+
+      function expectNoGraphMove(): void {
+        for (const [name, graphMove] of Object.entries(mockGraphNavigation)) {
+          expect(graphMove, name).toHaveBeenCalledTimes(0);
+        }
+      }
+
+      function historyCommit(hash: string): GitCommitNode {
+        return {
+          hash,
+          parentHashes: [],
+          author: "Alice",
+          email: "alice@test.com",
+          date: 1700000000,
+          message: `Commit ${hash}`,
+          refs: [],
+          stash: null
+        };
+      }
+
+      function commitDetailsRequests(): RequestMessage[] {
+        return vi
+          .mocked(vscode.postMessage)
+          .mock.calls.map((call) => call[0])
+          .filter((message) => message.command === "commitDetails");
+      }
+
+      function commitDetailsRequestFor(hash: string): RequestCommitDetails {
+        return {
+          command: "commitDetails",
+          repo: TEST_REPO,
+          commitHash: hash,
+          hasParents: false,
+          isStash: false
+        };
+      }
+
+      beforeEach(() => {
+        dispatchMessage({
+          command: "loadCommits",
+          commits: HISTORY_TABLE_HASHES.map(historyCommit),
+          head: FIRST_MATCH,
+          moreCommitsAvailable: false,
+          hard: true
+        });
+        vi.clearAllMocks();
+      });
+
+      afterEach(() => {
+        leaveHistoryMode();
+        scrollContainer().scrollTop = 0;
+        for (const target of appendedTargets.splice(0)) {
+          target.remove();
+        }
+      });
+
+      it("file history regression: ArrowDown without details requests the returned match (TC-571)", () => {
+        // Case: TC-571
+        // Given: highlighted only, no details open, and the controller resolves ArrowDown to h1
+        mockFileHistoryInstance.isActive.mockReturnValue(true);
+        mockFileHistoryInstance.navigate.mockReturnValue(RETURNED_MATCH);
+        expect(document.getElementById("commitDetails")).toBeNull();
+
+        // When: ArrowDown pressed with no modifiers
+        const spies = dispatchArrowKey("ArrowDown");
+
+        // Then: the only request is the details of h1 (none for the adjacent x1)
+        expect(commitDetailsRequests()).toEqual([commitDetailsRequestFor(RETURNED_MATCH)]);
+        expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(1);
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledWith(1, true);
+        expect(spies.preventDefault).toHaveBeenCalledTimes(1);
+        expect(spies.stopPropagation).toHaveBeenCalledTimes(1);
+      });
+
+      it("file history regression: ArrowDown with details skips the adjacent non-match (TC-572)", () => {
+        // Case: TC-572
+        // Given: highlighted only, the details of h0 open, and the controller resolves
+        // ArrowDown to h1
+        mockFileHistoryInstance.isActive.mockReturnValue(true);
+        expandCommit(FIRST_MATCH);
+        mockFileHistoryInstance.navigate.mockReturnValue(RETURNED_MATCH);
+
+        // When: ArrowDown pressed with no modifiers
+        const spies = dispatchArrowKey("ArrowDown");
+
+        // Then: the only request is the details of h1 (none for the adjacent x1), without
+        // falling back to the table order or the graph
+        expect(commitDetailsRequests()).toEqual([commitDetailsRequestFor(RETURNED_MATCH)]);
+        expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(1);
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledWith(1, true);
+        expect(spies.preventDefault).toHaveBeenCalledTimes(1);
+        expect(spies.stopPropagation).toHaveBeenCalledTimes(1);
+        for (const graphMove of Object.values(mockGraphNavigation)) {
+          expect(graphMove).toHaveBeenCalledTimes(0);
+        }
+      });
+
+      it("ArrowUp with details requests the returned match above (TC-573)", () => {
+        // Case: TC-573
+        // Given: highlighted only, the details of h1 open, and the controller resolves ArrowUp
+        // to h0
+        enterHistoryMode(HIGHLIGHTED_ONLY);
+        expandCommit(MIDDLE_MATCH);
+        mockFileHistoryInstance.navigate.mockReturnValue(FIRST_MATCH);
+
+        // When: ArrowUp pressed with no modifiers
+        const spies = dispatchArrowKey("ArrowUp");
+
+        // Then: the only request is the details of h0 (none for the adjacent x1)
+        expect(commitDetailsRequests()).toEqual([commitDetailsRequestFor(FIRST_MATCH)]);
+        expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(1);
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledWith(-1, true);
+        expectConsumed(spies);
+      });
+
+      it("ArrowDown reloads the details when the destination row is already open (TC-622)", () => {
+        // Case: TC-622
+        // Given: highlighted only, the details of h1 open, and the controller resolves ArrowDown
+        // to the same h1 (the bar buttons moved current away from the open details)
+        enterHistoryMode(HIGHLIGHTED_ONLY);
+        expandCommit(MIDDLE_MATCH);
+        mockFileHistoryInstance.navigate.mockReturnValue(MIDDLE_MATCH);
+
+        // When: ArrowDown pressed with no modifiers
+        const spies = dispatchArrowKey("ArrowDown");
+
+        // Then: the details of h1 are requested once and stay under h1 while loading, because a
+        // simulated click on the open row would close them and sync current a second time
+        expect(commitDetailsRequests()).toEqual([commitDetailsRequestFor(MIDDLE_MATCH)]);
+        expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+        expect(detailsOwnerHash()).toBe(MIDDLE_MATCH);
+        expect(document.getElementById("cdvLoading")).not.toBeNull();
+        expect(mockFileHistoryInstance.handleCommitRowClick).toHaveBeenCalledTimes(0);
+        expectConsumed(spies);
+      });
+
+      it.each(ARROW_KEYS)(
+        "%s with details is consumed without moving when there is no destination (TC-574)",
+        (key) => {
+          // Case: TC-574
+          // Given: highlighted only, the details of h1 open between the dim rows x1 and x2, and
+          // the controller finds no destination
+          enterHistoryMode(HIGHLIGHTED_ONLY);
+          expandCommit(MIDDLE_MATCH);
+          expect(detailsOwnerHash()).toBe(MIDDLE_MATCH);
+
+          // When: the arrow is pressed with no modifiers
+          const spies = dispatchArrowKey(key);
+
+          // Then: the controller was asked once, nothing falls back to the table order or the
+          // graph, the event is consumed and the details stay under h1
+          expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(1);
+          expect(commitDetailsRequests()).toEqual([]);
+          expect(vscode.postMessage).toHaveBeenCalledTimes(0);
+          expectNoGraphMove();
+          expectConsumed(spies);
+          expect(detailsOwnerHash()).toBe(MIDDLE_MATCH);
+        }
+      );
+
+      it.each(ARROW_KEYS)(
+        "%s without details is consumed without moving when there is no destination (TC-575)",
+        (key) => {
+          // Case: TC-575
+          // Given: highlighted only, no details open, and the controller finds no destination
+          enterHistoryMode(HIGHLIGHTED_ONLY);
+          expect(detailsOwnerHash()).toBeNull();
+
+          // When: the arrow is pressed with no modifiers
+          const spies = dispatchArrowKey(key);
+
+          // Then: the controller was asked once, no details are requested, the event is consumed
+          expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(1);
+          expect(commitDetailsRequests()).toEqual([]);
+          expect(vscode.postMessage).toHaveBeenCalledTimes(0);
+          expectConsumed(spies);
+          expect(detailsOwnerHash()).toBeNull();
+        }
+      );
+
+      it.each([
+        { detailsState: "open", hasDetails: true },
+        { detailsState: "closed", hasDetails: false }
+      ])(
+        "ArrowDown with details $detailsState is consumed when the returned hash has no row (TC-576)",
+        ({ hasDetails }) => {
+          // Case: TC-576
+          // Given: highlighted only and the controller returns a hash that has no row
+          enterHistoryMode(HIGHLIGHTED_ONLY);
+          if (hasDetails) expandCommit(MIDDLE_MATCH);
+          mockFileHistoryInstance.navigate.mockReturnValue(MISSING_ROW_HASH);
+          const detailsOwnerBefore = detailsOwnerHash();
+
+          // When: ArrowDown pressed with no modifiers
+          const spies = dispatchArrowKey("ArrowDown");
+
+          // Then: no details request and no fallback to the table order or the graph, while the
+          // event is still consumed
+          expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(1);
+          expect(commitDetailsRequests()).toEqual([]);
+          expect(vscode.postMessage).toHaveBeenCalledTimes(0);
+          expectNoGraphMove();
+          expectConsumed(spies);
+          expect(detailsOwnerHash()).toBe(detailsOwnerBefore);
+        }
+      );
+
+      describe.each([
+        { caseId: "TC-577", mode: HIGHLIGHTED_ONLY, modifier: CTRL },
+        { caseId: "TC-578", mode: HIGHLIGHTED_ONLY, modifier: CMD },
+        { caseId: "TC-579", mode: INITIAL_PENDING, modifier: CTRL },
+        { caseId: "TC-580", mode: INITIAL_PENDING, modifier: CMD },
+        { caseId: "TC-581", mode: SWITCH_PENDING, modifier: CTRL },
+        { caseId: "TC-582", mode: SWITCH_PENDING, modifier: CMD }
+      ])("$modifier.name + arrow while $mode.name ($caseId)", ({ mode, modifier }) => {
+        it.each([
+          { key: "ArrowUp", shiftKey: false },
+          { key: "ArrowUp", shiftKey: true },
+          { key: "ArrowDown", shiftKey: false },
+          { key: "ArrowDown", shiftKey: true }
+        ])("$key with shiftKey=$shiftKey is consumed without moving", ({ key, shiftKey }) => {
+          // Case: TC-577 / TC-578 / TC-579 / TC-580 / TC-581 / TC-582
+          // Given: the mode, the details of h1 open, a controller and a graph that would both
+          // resolve a destination
+          enterHistoryMode(mode);
+          expandCommit(MIDDLE_MATCH);
+          mockFileHistoryInstance.navigate.mockReturnValue(FIRST_MATCH);
+          resolveGraphMovesTo(LAST_MATCH_INDEX);
+
+          // When: the arrow is pressed with Ctrl or Cmd, without Alt
+          const spies = dispatchArrowKey(key, { ...modifier.init, shiftKey });
+
+          // Then: consumed, and neither the controller nor the graph nor the details are used
+          expectConsumed(spies);
+          expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
+          expectNoGraphMove();
+          expect(commitDetailsRequests()).toEqual([]);
+          expect(vscode.postMessage).toHaveBeenCalledTimes(0);
+          expect(detailsOwnerHash()).toBe(MIDDLE_MATCH);
+        });
+      });
+
+      describe.each([
+        { caseId: "TC-583", mode: INITIAL_PENDING },
+        { caseId: "TC-584", mode: SWITCH_PENDING }
+      ])("plain arrow while $mode.name ($caseId)", ({ mode }) => {
+        it.each([
+          { key: "ArrowUp", detailsState: "open", hasDetails: true },
+          { key: "ArrowUp", detailsState: "closed", hasDetails: false },
+          { key: "ArrowDown", detailsState: "open", hasDetails: true },
+          { key: "ArrowDown", detailsState: "closed", hasDetails: false }
+        ])(
+          "$key with details $detailsState is consumed without moving or scrolling",
+          ({ key, hasDetails }) => {
+            // Case: TC-583 / TC-584
+            // Given: the pending mode, a controller that would resolve a destination, and a
+            // known scroll position
+            enterHistoryMode(mode);
+            if (hasDetails) expandCommit(MIDDLE_MATCH);
+            mockFileHistoryInstance.navigate.mockReturnValue(FIRST_MATCH);
+            scrollContainer().scrollTop = SCROLL_TOP_SENTINEL;
+            const detailsOwnerBefore = detailsOwnerHash();
+            expect(detailsOwnerBefore).toBe(hasDetails ? MIDDLE_MATCH : null);
+
+            // When: the arrow is pressed with no modifiers
+            const spies = dispatchArrowKey(key);
+
+            // Then: consumed, without asking the controller, requesting details, scrolling or
+            // moving the details (the table order navigation is stopped as well)
+            expectConsumed(spies);
+            expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
+            expect(commitDetailsRequests()).toEqual([]);
+            expect(vscode.postMessage).toHaveBeenCalledTimes(0);
+            expect(scrollContainer().scrollTop).toBe(SCROLL_TOP_SENTINEL);
+            expect(detailsOwnerHash()).toBe(detailsOwnerBefore);
+          }
+        );
+      });
+
+      it("moves only on a new key after the pending request is accepted (TC-585)", () => {
+        // Case: TC-585
+        // Given: ArrowDown was pressed while the first request was pending
+        enterHistoryMode(INITIAL_PENDING);
+        const pendingSpies = dispatchArrowKey("ArrowDown");
+        expectConsumed(pendingSpies);
+
+        // When: the response is accepted and the controller can resolve h1
+        enterHistoryMode(HIGHLIGHTED_ONLY);
+        mockFileHistoryInstance.navigate.mockReturnValue(RETURNED_MATCH);
+
+        // Then: the key pressed while pending is not replayed
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
+        expect(commitDetailsRequests()).toEqual([]);
+
+        // When: a new ArrowDown is pressed
+        const spies = dispatchArrowKey("ArrowDown");
+
+        // Then: the controller is asked once and the details of h1 are requested once
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(1);
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledWith(1, true);
+        expect(commitDetailsRequests()).toEqual([commitDetailsRequestFor(RETURNED_MATCH)]);
+        expect(vscode.postMessage).toHaveBeenCalledTimes(1);
+        expectConsumed(spies);
+      });
+
+      it.each(EDITABLE_TARGETS)(
+        "ArrowDown from $name is left alone while highlighted (TC-586)",
+        ({ create }) => {
+          // Case: TC-586
+          // Given: highlighted only, a controller that would resolve h1, and an editable target
+          enterHistoryMode(HIGHLIGHTED_ONLY);
+          mockFileHistoryInstance.navigate.mockReturnValue(RETURNED_MATCH);
+          const target = create();
+
+          // When: ArrowDown is dispatched from the editable target with no modifiers
+          const spies = dispatchArrowKey("ArrowDown", { target });
+
+          // Then: the controller is not asked, the event is not consumed, no details request
+          expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
+          expectNotConsumed(spies);
+          expect(commitDetailsRequests()).toEqual([]);
+        }
+      );
+
+      describe.each(PENDING_MODES)("editable targets while $name (TC-587)", (mode) => {
+        it.each(EDITABLE_TARGETS)("ArrowDown from $name is left alone", ({ create }) => {
+          // Case: TC-587
+          // Given: the pending mode and an editable target
+          enterHistoryMode(mode);
+          mockFileHistoryInstance.navigate.mockReturnValue(RETURNED_MATCH);
+          const target = create();
+
+          // When: ArrowDown is dispatched from the editable target with no modifiers
+          const spies = dispatchArrowKey("ArrowDown", { target });
+
+          // Then: the controller is not asked, the event is not consumed, no details request
+          expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
+          expectNotConsumed(spies);
+          expect(commitDetailsRequests()).toEqual([]);
+        });
+      });
+
+      describe.each(HISTORY_MODES)("modified arrows from an input while $name (TC-588)", (mode) => {
+        it.each([
+          { key: "ArrowDown", modifier: CTRL },
+          { key: "ArrowUp", modifier: CMD }
+        ])("$modifier.name + $key is left alone", ({ key, modifier }) => {
+          // Case: TC-588
+          // Given: the mode, the details of h1 open, a graph that would resolve a destination,
+          // and an input target
+          enterHistoryMode(mode);
+          expandCommit(MIDDLE_MATCH);
+          mockFileHistoryInstance.navigate.mockReturnValue(FIRST_MATCH);
+          resolveGraphMovesTo(LAST_MATCH_INDEX);
+          const target = appendTarget(document.createElement("input"));
+
+          // When: the modified arrow is dispatched from the input
+          const spies = dispatchArrowKey(key, { ...modifier.init, target });
+
+          // Then: the controller and the graph are not used and the event is not consumed
+          expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
+          expectNotConsumed(spies);
+          expectNoGraphMove();
+          expect(commitDetailsRequests()).toEqual([]);
+        });
+      });
+
+      describe.each(HISTORY_MODES)("comparison mode while $name (TC-589)", (mode) => {
+        it.each([
+          { modifierName: "no modifier", init: {} },
+          { modifierName: CTRL.name, init: CTRL.init }
+        ])("ArrowDown with $modifierName is left alone", ({ init }) => {
+          // Case: TC-589
+          // Given: the mode, the details of h1 compared with x2, a controller and a graph that
+          // would both resolve a destination
+          enterHistoryMode(mode);
+          expandCommitWithCompare(MIDDLE_MATCH, OTHER_NON_MATCH);
+          mockFileHistoryInstance.navigate.mockReturnValue(FIRST_MATCH);
+          resolveGraphMovesTo(LAST_MATCH_INDEX);
+
+          // When: ArrowDown is pressed
+          const spies = dispatchArrowKey("ArrowDown", init);
+
+          // Then: nothing moves and the event is not consumed
+          expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
+          expectNotConsumed(spies);
+          expect(commitDetailsRequests()).toEqual([]);
+          expectNoGraphMove();
+        });
+      });
+
+      it.each(HISTORY_MODES)(
+        "ArrowDown during IME composition is ignored while $name (TC-590)",
+        (mode) => {
+          // Case: TC-590
+          // Given: the mode and a controller that would resolve h1
+          enterHistoryMode(mode);
+          mockFileHistoryInstance.navigate.mockReturnValue(RETURNED_MATCH);
+
+          // When: ArrowDown keydown arrives during IME composition
+          const spies = dispatchArrowKey("ArrowDown", { isComposing: true });
+
+          // Then: the controller is not asked, the event is not consumed, no details request
+          expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
+          expectNotConsumed(spies);
+          expect(commitDetailsRequests()).toEqual([]);
+        }
+      );
+
+      it("Ctrl+F from an input still exits the mode and opens the find widget (TC-591)", () => {
+        // Case: TC-591
+        // Given: highlighted only and an input target
+        enterHistoryMode(HIGHLIGHTED_ONLY);
+        const target = appendTarget(document.createElement("input"));
+
+        // When: the configured find shortcut is dispatched from the input
+        dispatchArrowKey("f", { ctrlKey: true, target });
+
+        // Then: exit(true) runs once before findWidget.show(true), without any history move
+        expect(mockFileHistoryInstance.exit).toHaveBeenCalledTimes(1);
+        expect(mockFileHistoryInstance.exit).toHaveBeenCalledWith(true);
+        expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(1);
+        expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
+        expect(mockFileHistoryInstance.exit.mock.invocationCallOrder[0]).toBeLessThan(
+          mockFindWidgetInstance.show.mock.invocationCallOrder[0]
+        );
+        expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
+      });
+
+      describe.each(HISTORY_MODES)("Shift-only arrows while $name (TC-592)", (mode) => {
+        it.each(ARROW_KEYS)("Shift + %s is not captured by the history branch", (key) => {
+          // Case: TC-592
+          // Given: the mode, the details of h1 open, and a controller that would resolve h0
+          enterHistoryMode(mode);
+          expandCommit(MIDDLE_MATCH);
+          mockFileHistoryInstance.navigate.mockReturnValue(FIRST_MATCH);
+
+          // When: the arrow is pressed with Shift only
+          const spies = dispatchArrowKey(key, { shiftKey: true });
+
+          // Then: the controller is not asked, the event is not consumed, no details request
+          expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
+          expectNotConsumed(spies);
+          expect(commitDetailsRequests()).toEqual([]);
+        });
+      });
+
+      describe.each(HISTORY_MODES)("arrows with Alt while $name (TC-593)", (mode) => {
+        it.each([
+          { combination: "Alt + ArrowUp", key: "ArrowUp", init: { altKey: true } },
+          {
+            combination: "Ctrl+Alt + ArrowDown",
+            key: "ArrowDown",
+            init: { ctrlKey: true, altKey: true }
+          },
+          {
+            combination: "Cmd+Alt + ArrowUp",
+            key: "ArrowUp",
+            init: { metaKey: true, altKey: true }
+          },
+          {
+            combination: "Ctrl+Shift+Alt + ArrowDown",
+            key: "ArrowDown",
+            init: { ctrlKey: true, shiftKey: true, altKey: true }
+          }
+        ])("$combination is not captured by the history branch", ({ key, init }) => {
+          // Case: TC-593
+          // Given: the mode, the details of h1 open, a controller and a graph that would both
+          // resolve a destination
+          enterHistoryMode(mode);
+          expandCommit(MIDDLE_MATCH);
+          mockFileHistoryInstance.navigate.mockReturnValue(FIRST_MATCH);
+          resolveGraphMovesTo(LAST_MATCH_INDEX);
+
+          // When: the arrow is pressed with a combination that includes Alt
+          const spies = dispatchArrowKey(key, init);
+
+          // Then: nothing moves and the event is not consumed
+          expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
+          expectNotConsumed(spies);
+          expectNoGraphMove();
+          expect(commitDetailsRequests()).toEqual([]);
+        });
       });
     });
   });
@@ -3322,12 +3977,13 @@ describe("GitKeizuView frontend integration", () => {
     });
 
     /* -------------------------------------------------------------- */
-    /* S40: handleEscape() priority chain (test-plan 既存コード網羅)  */
+    /* S65: handleEscape() priority chain and file history exit       */
     /* -------------------------------------------------------------- */
+    // @see docs/testing/perspectives/web/main-test/04-keyboard-selection-02.md
 
-    it("hideContextMenu wins as the first priority (TC-221)", () => {
-      // Case: TC-221
-      // Given: only the context menu is active
+    it("hideContextMenu wins as the first priority (TC-594)", () => {
+      // Case: TC-594
+      // Given: not highlighted, and only the context menu is active
       vi.mocked(isContextMenuActive).mockReturnValue(true);
 
       // When: Escape is pressed
@@ -3338,26 +3994,28 @@ describe("GitKeizuView frontend integration", () => {
       expect(hideDialog).not.toHaveBeenCalled();
       expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
       expect(mockFindWidgetInstance.close).not.toHaveBeenCalled();
+      expect(mockFileHistoryInstance.exit).not.toHaveBeenCalled();
     });
 
-    it("hideDialog wins as the second priority (TC-222)", () => {
-      // Case: TC-222
-      // Given: only the dialog is active (context menu inactive)
+    it("hideDialog wins as the second priority (TC-595)", () => {
+      // Case: TC-595
+      // Given: not highlighted, and only the dialog is active (context menu inactive)
       vi.mocked(isDialogActive).mockReturnValue(true);
 
       // When: Escape is pressed
       pressEscape();
 
-      // Then: hideDialog is called once and no dropdown/findWidget handler runs
+      // Then: hideDialog is called once and no dropdown/findWidget/history handler runs
       expect(hideDialog).toHaveBeenCalledTimes(1);
       expect(hideContextMenu).not.toHaveBeenCalled();
       expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
       expect(mockFindWidgetInstance.close).not.toHaveBeenCalled();
+      expect(mockFileHistoryInstance.exit).not.toHaveBeenCalled();
     });
 
-    it("repoDropdown.close wins as the third priority (TC-223)", () => {
-      // Case: TC-223
-      // Given: only the repo dropdown is open
+    it("repoDropdown.close wins as the third priority (TC-596)", () => {
+      // Case: TC-596
+      // Given: not highlighted, and only the repo dropdown is open
       mockRepoDropdownInstance.isOpen.mockReturnValue(true);
 
       // When: Escape is pressed
@@ -3366,26 +4024,31 @@ describe("GitKeizuView frontend integration", () => {
       // Then: only repoDropdown.close() is invoked
       expect(mockRepoDropdownInstance.close).toHaveBeenCalledTimes(1);
       expect(mockBranchDropdownInstance.close).not.toHaveBeenCalled();
+      expect(mockAuthorDropdownInstance.close).not.toHaveBeenCalled();
       expect(mockFindWidgetInstance.close).not.toHaveBeenCalled();
+      expect(mockFileHistoryInstance.exit).not.toHaveBeenCalled();
     });
 
-    it("findWidget.close runs when all menus/dialogs/dropdowns are inactive (TC-224)", () => {
-      // Case: TC-224
-      // Given: only the find widget is visible
+    it("findWidget.close runs when all menus/dialogs/dropdowns are inactive (TC-597)", () => {
+      // Case: TC-597
+      // Given: not highlighted, the find widget is visible and a commit is expanded
+      expandCommit(COMMIT_HASH_1);
       mockFindWidgetInstance.isVisible.mockReturnValue(true);
 
       // When: Escape is pressed
       pressEscape();
 
-      // Then: only findWidget.close() is invoked
+      // Then: only findWidget.close() is invoked, the commit details stay open
       expect(mockFindWidgetInstance.close).toHaveBeenCalledTimes(1);
       expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
       expect(hideDialog).not.toHaveBeenCalled();
+      expect(document.getElementById("commitDetails")).not.toBeNull();
+      expect(mockFileHistoryInstance.exit).not.toHaveBeenCalled();
     });
 
-    it("hideCommitDetails runs as the final fallback when only expandedCommit is set (TC-225)", () => {
-      // Case: TC-225
-      // Given: a commit is expanded and no other UI is active
+    it("hideCommitDetails runs at the details stage when only expandedCommit is set (TC-598)", () => {
+      // Case: TC-598
+      // Given: not highlighted, a commit is expanded and no other UI is active
       expandCommit(COMMIT_HASH_1);
       vi.clearAllMocks();
       resetAllUIStates();
@@ -3393,29 +4056,34 @@ describe("GitKeizuView frontend integration", () => {
       // When: Escape is pressed
       pressEscape();
 
-      // Then: the commit details DOM element is removed (hideCommitDetails was invoked)
+      // Then: the commit details DOM element is removed (hideCommitDetails was invoked) and the
+      // history stage that follows does not exit
       const detailsElem = document.getElementById("commitDetails");
       expect(detailsElem).toBeNull();
+      expect(mockFileHistoryInstance.exit).not.toHaveBeenCalled();
     });
 
-    it("no-op when no UI components are active and no commit is expanded (TC-226)", () => {
-      // Case: TC-226
-      // Given: every UI state is inactive (resetAllUIStates ran in beforeEach) and no expandedCommit
+    it("no-op when no UI components are active and no commit is expanded (TC-599)", () => {
+      // Case: TC-599
+      // Given: not highlighted, every UI state is inactive (resetAllUIStates ran in beforeEach)
+      // and no expandedCommit
 
       // When: Escape is pressed
       pressEscape();
 
-      // Then: every hide/close handler is left untouched
+      // Then: every hide/close handler and the history exit are left untouched
       expect(hideContextMenu).not.toHaveBeenCalled();
       expect(hideDialog).not.toHaveBeenCalled();
       expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
       expect(mockBranchDropdownInstance.close).not.toHaveBeenCalled();
+      expect(mockAuthorDropdownInstance.close).not.toHaveBeenCalled();
       expect(mockFindWidgetInstance.close).not.toHaveBeenCalled();
+      expect(mockFileHistoryInstance.exit).not.toHaveBeenCalled();
     });
 
-    it("contextMenu takes priority over dialog when both are active (TC-227)", () => {
-      // Case: TC-227
-      // Given: both contextMenu and dialog are active simultaneously
+    it("contextMenu takes priority over dialog when both are active (TC-600)", () => {
+      // Case: TC-600
+      // Given: not highlighted, both contextMenu and dialog are active simultaneously
       vi.mocked(isContextMenuActive).mockReturnValue(true);
       vi.mocked(isDialogActive).mockReturnValue(true);
 
@@ -3427,9 +4095,9 @@ describe("GitKeizuView frontend integration", () => {
       expect(hideDialog).not.toHaveBeenCalled();
     });
 
-    it("repoDropdown takes priority over branchDropdown when both are open (TC-228)", () => {
-      // Case: TC-228
-      // Given: both repoDropdown and branchDropdown report isOpen()=true
+    it("repoDropdown takes priority over branchDropdown when both are open (TC-601)", () => {
+      // Case: TC-601
+      // Given: not highlighted, both repoDropdown and branchDropdown report isOpen()=true
       mockRepoDropdownInstance.isOpen.mockReturnValue(true);
       mockBranchDropdownInstance.isOpen.mockReturnValue(true);
 
@@ -3439,6 +4107,213 @@ describe("GitKeizuView frontend integration", () => {
       // Then: only repoDropdown.close() is invoked, branchDropdown.close is suppressed
       expect(mockRepoDropdownInstance.close).toHaveBeenCalledTimes(1);
       expect(mockBranchDropdownInstance.close).not.toHaveBeenCalled();
+    });
+
+    // @see docs/testing/perspectives/web/main-test/04-keyboard-selection-02.md
+    describe("file history stage (S65)", () => {
+      interface StageCloses {
+        contextMenu: number;
+        dialog: number;
+        repoDropdown: number;
+        branchDropdown: number;
+        authorDropdown: number;
+        refList: number;
+        findWidget: number;
+        fileHistory: number;
+      }
+
+      const NO_STAGE_CLOSED: StageCloses = {
+        contextMenu: 0,
+        dialog: 0,
+        repoDropdown: 0,
+        branchDropdown: 0,
+        authorDropdown: 0,
+        refList: 0,
+        findWidget: 0,
+        fileHistory: 0
+      };
+
+      const PRECEDING_STAGES: { caseId: string; stage: keyof StageCloses; open: () => void }[] = [
+        {
+          caseId: "TC-608",
+          stage: "contextMenu",
+          open: () => vi.mocked(isContextMenuActive).mockReturnValue(true)
+        },
+        {
+          caseId: "TC-609",
+          stage: "dialog",
+          open: () => vi.mocked(isDialogActive).mockReturnValue(true)
+        },
+        {
+          caseId: "TC-610",
+          stage: "repoDropdown",
+          open: () => mockRepoDropdownInstance.isOpen.mockReturnValue(true)
+        },
+        {
+          caseId: "TC-611",
+          stage: "branchDropdown",
+          open: () => mockBranchDropdownInstance.isOpen.mockReturnValue(true)
+        },
+        {
+          caseId: "TC-612",
+          stage: "authorDropdown",
+          open: () => mockAuthorDropdownInstance.isOpen.mockReturnValue(true)
+        },
+        {
+          caseId: "TC-613",
+          stage: "refList",
+          // The list itself is owned by S58; this chain only depends on closePopup() returning true.
+          open: () => closePopupSpy.mockReturnValue(true)
+        },
+        {
+          caseId: "TC-614",
+          stage: "findWidget",
+          open: () => mockFindWidgetInstance.isVisible.mockReturnValue(true)
+        }
+      ];
+
+      let closePopupSpy: MockInstance<RefOverflowController["closePopup"]>;
+
+      /** How many times each stage of the chain closed its own target. */
+      function stageCloses(): StageCloses {
+        return {
+          contextMenu: vi.mocked(hideContextMenu).mock.calls.length,
+          dialog: vi.mocked(hideDialog).mock.calls.length,
+          repoDropdown: mockRepoDropdownInstance.close.mock.calls.length,
+          branchDropdown: mockBranchDropdownInstance.close.mock.calls.length,
+          authorDropdown: mockAuthorDropdownInstance.close.mock.calls.length,
+          refList: closePopupSpy.mock.results.filter((result) => result.value === true).length,
+          findWidget: mockFindWidgetInstance.close.mock.calls.length,
+          fileHistory: mockFileHistoryInstance.exit.mock.calls.length
+        };
+      }
+
+      function detailsRow(): HTMLElement {
+        return document.querySelector<HTMLElement>(`.commit[data-hash="${COMMIT_HASH_1}"]`)!;
+      }
+
+      function expectDetailsOpen(): void {
+        expect(detailsRow().nextElementSibling!.id).toBe("commitDetails");
+        expect(detailsRow().classList.contains("commitDetailsOpen")).toBe(true);
+      }
+
+      /** The details stage ran once: the view is removed, the state saved and the graph redrawn. */
+      function expectDetailsClosedOnce(): void {
+        expect(document.getElementById("commitDetails")).toBeNull();
+        expect(detailsRow().classList.contains("commitDetailsOpen")).toBe(false);
+        expect(vscode.setState).toHaveBeenCalledTimes(1);
+      }
+
+      /** The details stage did not run: nothing was saved or redrawn and no view came back. */
+      function expectDetailsStageSkipped(): void {
+        expect(document.getElementById("commitDetails")).toBeNull();
+        expect(vscode.setState).toHaveBeenCalledTimes(0);
+        expect(mockGraphHighlight.render).toHaveBeenCalledTimes(0);
+      }
+
+      beforeEach(() => {
+        mockAuthorDropdownInstance.isOpen.mockReturnValue(false);
+        closePopupSpy = vi.spyOn(RefOverflowController.prototype, "closePopup");
+      });
+
+      afterEach(() => {
+        closePopupSpy.mockRestore();
+        mockAuthorDropdownInstance.isOpen.mockReturnValue(false);
+        resetAllUIStates();
+        leaveHistoryMode();
+      });
+
+      it.each([
+        { caseId: "TC-602", mode: HIGHLIGHTED_ONLY },
+        { caseId: "TC-603", mode: INITIAL_PENDING },
+        { caseId: "TC-604", mode: SWITCH_PENDING }
+      ])(
+        "closes the details first and exits on the next Escape while $mode.name ($caseId)",
+        ({ mode }) => {
+          // Case: TC-602 / TC-603 / TC-604
+          // Given: the mode with a commit expanded
+          enterHistoryMode(mode);
+          expandCommit(COMMIT_HASH_1);
+          expectDetailsOpen();
+
+          // When: Escape is pressed once
+          pressEscape();
+
+          // Then: only the details close and the history is kept
+          expectDetailsClosedOnce();
+          expect(stageCloses()).toEqual(NO_STAGE_CLOSED);
+
+          // When: Escape is pressed again
+          vi.clearAllMocks();
+          pressEscape();
+
+          // Then: the history exits once with restore, and the details stage does not run again
+          expect(stageCloses()).toEqual({ ...NO_STAGE_CLOSED, fileHistory: 1 });
+          expect(mockFileHistoryInstance.exit).toHaveBeenCalledWith(true);
+          expectDetailsStageSkipped();
+        }
+      );
+
+      it.each([
+        { caseId: "TC-605", mode: HIGHLIGHTED_ONLY },
+        { caseId: "TC-606", mode: INITIAL_PENDING },
+        { caseId: "TC-607", mode: SWITCH_PENDING }
+      ])("exits on the first Escape without details while $mode.name ($caseId)", ({ mode }) => {
+        // Case: TC-605 / TC-606 / TC-607
+        // Given: the mode without an expanded commit
+        enterHistoryMode(mode);
+        expect(document.getElementById("commitDetails")).toBeNull();
+
+        // When: Escape is pressed once
+        pressEscape();
+
+        // Then: the history exits once with restore, and the details stage does not run
+        expect(stageCloses()).toEqual({ ...NO_STAGE_CLOSED, fileHistory: 1 });
+        expect(mockFileHistoryInstance.exit).toHaveBeenCalledWith(true);
+        expectDetailsStageSkipped();
+      });
+
+      describe.each(PRECEDING_STAGES)("$stage before the history ($caseId)", ({ stage, open }) => {
+        it.each(HISTORY_MODES)("closes only its own target while $name", (mode) => {
+          // Case: TC-608 / TC-609 / TC-610 / TC-611 / TC-612 / TC-613 / TC-614
+          // Given: the mode, a commit expanded, and the preceding stage open
+          enterHistoryMode(mode);
+          expandCommit(COMMIT_HASH_1);
+          open();
+
+          // When: Escape is pressed once
+          pressEscape();
+
+          // Then: only that stage closes; the later stages, the details and the history are kept
+          expect(stageCloses()).toEqual({ ...NO_STAGE_CLOSED, [stage]: 1 });
+          expectDetailsOpen();
+          expect(vscode.setState).toHaveBeenCalledTimes(0);
+        });
+      });
+
+      it("exits the accepted history when the response arrives between two Escapes (TC-615)", () => {
+        // Case: TC-615
+        // Given: the first request pending with a commit expanded
+        enterHistoryMode(INITIAL_PENDING);
+        expandCommit(COMMIT_HASH_1);
+
+        // When: Escape is pressed once
+        pressEscape();
+
+        // Then: only the details close
+        expectDetailsClosedOnce();
+        expect(stageCloses()).toEqual(NO_STAGE_CLOSED);
+
+        // When: the response is accepted, then Escape is pressed again
+        enterHistoryMode(HIGHLIGHTED_ONLY);
+        vi.clearAllMocks();
+        pressEscape();
+
+        // Then: the accepted history exits once with restore and the details are not reopened
+        expect(stageCloses()).toEqual({ ...NO_STAGE_CLOSED, fileHistory: 1 });
+        expect(mockFileHistoryInstance.exit).toHaveBeenCalledWith(true);
+        expectDetailsStageSkipped();
+      });
     });
   });
 
@@ -6801,6 +7676,7 @@ describe("highlightFileHistory icon wiring and click handler (S54)", () => {
     resetCommitState();
     mockFileHistoryInstance.isActive.mockReturnValue(false);
     mockFileHistoryInstance.isPending.mockReturnValue(false);
+    mockFileHistoryInstance.navigate.mockReturnValue(null);
   });
 
   afterEach(() => {
@@ -8333,11 +9209,11 @@ describe("Branch cleanup panel wiring (S49)", () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* S50 / S63: file history controller wiring and CDV file rows        */
+/* S50 / S63 / S66: file history wiring, CDV file rows, key movement   */
 /* ------------------------------------------------------------------ */
 
 // @see docs/testing/perspectives/web/main-test/10-file-history-01.md
-describe("File history integration (S50 / S63)", () => {
+describe("File history integration (S50 / S63 / S66)", () => {
   const STASH_HASH = "eee555eee555eee5";
   const OTHER_REPO = "/test/other-repo";
   const FILE_HISTORY_NOTE_TEXT =
@@ -8438,6 +9314,7 @@ describe("File history integration (S50 / S63)", () => {
   function resetFileHistoryMocks(): void {
     mockFileHistoryInstance.isActive.mockReturnValue(false);
     mockFileHistoryInstance.isPending.mockReturnValue(false);
+    mockFileHistoryInstance.navigate.mockReturnValue(null);
     mockFileHistoryInstance.getHistoricalPathFor.mockReturnValue(null);
   }
 
@@ -9064,6 +9941,276 @@ describe("File history integration (S50 / S63)", () => {
       // Then: no highlighted row and no note
       expect(currentFileRows()).toHaveLength(0);
       expect(notes()).toHaveLength(0);
+    });
+  });
+
+  describe("key movement to the details view (S66)", () => {
+    const FIRST_DESTINATION = "h1";
+    const SECOND_DESTINATION = "h2";
+    const MERGE_MATCH = "m1";
+    const RENAMED_PATH = "lib/a.txt";
+    const UNRELATED_PATH = "src/b.txt";
+    const COMMIT_DETAILS_ERROR_TITLE = "Unable to load commit details";
+    // Names describe table positions, not commit dates.
+    const HISTORY_COMMITS: GitCommitNode[] = [
+      historyCommit("h0"),
+      historyCommit("x1"),
+      historyCommit(FIRST_DESTINATION),
+      historyCommit("x2"),
+      historyCommit(SECOND_DESTINATION),
+      historyCommit(MERGE_MATCH, ["h0", "x1"])
+    ];
+
+    let liveShowErrorDialog: typeof showErrorDialog;
+    let liveFileTree: typeof import("../../web/fileTree");
+    let actualFileTree: typeof import("../../web/fileTree");
+
+    function historyCommit(hash: string, parentHashes: string[] = []): GitCommitNode {
+      return {
+        hash,
+        parentHashes,
+        author: "Alice",
+        email: "alice@test.com",
+        date: 1700000000,
+        message: `Commit ${hash}`,
+        refs: [],
+        stash: null
+      };
+    }
+
+    function fileChange(path: string): GitFileChange {
+      return { oldFilePath: path, newFilePath: path, type: "M", additions: 1, deletions: 0 };
+    }
+
+    function respondWithDetails(hash: string, paths: string[]): void {
+      dispatchMessage({
+        command: "commitDetails",
+        commitDetails: { ...makeCommitDetails(hash), fileChanges: paths.map(fileChange) }
+      });
+    }
+
+    function commitDetailsRequests(): RequestMessage[] {
+      return vi
+        .mocked(liveVscode.postMessage)
+        .mock.calls.map((call) => call[0])
+        .filter((message) => message.command === "commitDetails");
+    }
+
+    function commitDetailsRequestFor(hash: string, hasParents = false): RequestCommitDetails {
+      return {
+        command: "commitDetails",
+        repo: TEST_REPO,
+        commitHash: hash,
+        hasParents,
+        isStash: false
+      };
+    }
+
+    function resolveHistoricalPaths(paths: Record<string, string>): void {
+      mockFileHistoryInstance.getHistoricalPathFor.mockImplementation(
+        (hash: string) => paths[hash] ?? null
+      );
+    }
+
+    // Only the view imported by this describe is driven; earlier views still listen on document.
+    function pressArrowDown(): void {
+      liveKeydownHandler(
+        new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true })
+      );
+    }
+
+    function expandedCommit(): ExpandedCommit | null {
+      return (callbacks().getExpandedCommit as () => ExpandedCommit | null)();
+    }
+
+    function commitRow(hash: string): HTMLElement {
+      return document.querySelector<HTMLElement>(`.commit[data-hash="${hash}"]`)!;
+    }
+
+    function highlightedPaths(): string[] {
+      return Array.from(currentFileRows()).map((row) =>
+        decodeURIComponent(row.getAttribute("data-newfilepath")!)
+      );
+    }
+
+    function moveTwiceBeforeAnyResponse(): void {
+      mockFileHistoryInstance.navigate
+        .mockReturnValueOnce(FIRST_DESTINATION)
+        .mockReturnValueOnce(SECOND_DESTINATION);
+      resolveHistoricalPaths({
+        [FIRST_DESTINATION]: HISTORICAL_PATH,
+        [SECOND_DESTINATION]: RENAMED_PATH
+      });
+      pressArrowDown();
+      pressArrowDown();
+    }
+
+    beforeAll(async () => {
+      liveShowErrorDialog = (await import("../../web/dialogs")).showErrorDialog;
+      liveFileTree = await import("../../web/fileTree");
+      actualFileTree =
+        await vi.importActual<typeof import("../../web/fileTree")>("../../web/fileTree");
+    });
+
+    beforeEach(() => {
+      // The file rows are rendered from the response itself instead of canned HTML.
+      vi.mocked(liveFileTree.generateGitFileTree).mockImplementation(
+        actualFileTree.generateGitFileTree
+      );
+      vi.mocked(liveFileTreeHtml).mockImplementation(actualFileTree.generateGitFileTreeHtml);
+      vi.mocked(liveFileListHtml).mockImplementation(actualFileTree.generateGitFileListHtml);
+      dispatchMessage({
+        command: "loadCommits",
+        commits: HISTORY_COMMITS,
+        head: "h0",
+        moreCommitsAvailable: false,
+        hard: true
+      });
+      vi.clearAllMocks();
+      mockFileHistoryInstance.isActive.mockReturnValue(true);
+    });
+
+    afterEach(() => {
+      vi.mocked(liveFileTree.generateGitFileTree).mockReset();
+      vi.mocked(liveFileTreeHtml).mockReset();
+      vi.mocked(liveFileListHtml).mockReset();
+      mockFileHistoryInstance.navigate.mockReset();
+      mockFileHistoryInstance.getHistoricalPathFor.mockReset();
+      resetFileHistoryMocks();
+    });
+
+    it("renders the destination details and highlights the historical file row (TC-616)", () => {
+      // Case: TC-616
+      // Given: highlighted, the controller resolves ArrowDown to h1 whose historical path is
+      // src/a.txt
+      mockFileHistoryInstance.navigate.mockReturnValue(FIRST_DESTINATION);
+      resolveHistoricalPaths({ [FIRST_DESTINATION]: HISTORICAL_PATH });
+
+      // When: ArrowDown is pressed and the successful response for h1 arrives
+      pressArrowDown();
+      const requests = commitDetailsRequests();
+      respondWithDetails(FIRST_DESTINATION, [HISTORICAL_PATH, UNRELATED_PATH]);
+
+      // Then: h1 was the only request, its details follow its row, and only the row of the
+      // historical path is highlighted
+      expect(requests).toEqual([commitDetailsRequestFor(FIRST_DESTINATION)]);
+      expect(commitRow(FIRST_DESTINATION).nextElementSibling!.id).toBe("commitDetails");
+      expect(document.getElementById("commitDetailsSummary")).not.toBeNull();
+      const fileRow = document.querySelector('.gitFile[data-newfilepath="src%2Fa.txt"]')!;
+      expect(fileRow.classList.contains("fileHistoryCurrent")).toBe(true);
+      expect(highlightedPaths()).toEqual([HISTORICAL_PATH]);
+      expect(notes()).toHaveLength(0);
+    });
+
+    it("matches a renamed file by its historical path, not the requested path (TC-617)", () => {
+      // Case: TC-617
+      // Given: highlighted for src/a.txt, and the controller resolves ArrowDown to h2 where the
+      // file was still named lib/a.txt
+      mockFileHistoryInstance.navigate.mockReturnValue(SECOND_DESTINATION);
+      resolveHistoricalPaths({ [SECOND_DESTINATION]: RENAMED_PATH });
+
+      // When: ArrowDown is pressed and the response for h2 holds both paths
+      pressArrowDown();
+      respondWithDetails(SECOND_DESTINATION, [RENAMED_PATH, HISTORICAL_PATH]);
+
+      // Then: only the row of lib/a.txt is highlighted
+      expect(commitDetailsRequests()).toEqual([commitDetailsRequestFor(SECOND_DESTINATION)]);
+      expect(highlightedPaths()).toEqual([RENAMED_PATH]);
+      const requestedPathRow = document.querySelector('.gitFile[data-newfilepath="src%2Fa.txt"]')!;
+      expect(requestedPathRow.classList.contains("fileHistoryCurrent")).toBe(false);
+      expect(notes()).toHaveLength(0);
+    });
+
+    it("leads the file list with the first parent note for a matching merge (TC-618)", () => {
+      // Case: TC-618
+      // Given: highlighted, and the controller resolves ArrowDown to the matching merge m1
+      mockFileHistoryInstance.navigate.mockReturnValue(MERGE_MATCH);
+      resolveHistoricalPaths({ [MERGE_MATCH]: HISTORICAL_PATH });
+
+      // When: ArrowDown is pressed and the response for m1 does not hold src/a.txt
+      pressArrowDown();
+      respondWithDetails(MERGE_MATCH, [UNRELATED_PATH]);
+
+      // Then: one note with the fixed text is the first child of the file panel, no row is
+      // highlighted
+      expect(commitDetailsRequests()).toEqual([commitDetailsRequestFor(MERGE_MATCH, true)]);
+      const noteList = notes();
+      expect(noteList).toHaveLength(1);
+      expect(noteList[0].textContent).toBe(FILE_HISTORY_NOTE_TEXT);
+      const panel = document.getElementById("commitDetailsFiles");
+      expect(panel).not.toBeNull();
+      expect(noteList[0].parentElement).toBe(panel);
+      expect(panel!.firstElementChild).toBe(noteList[0]);
+      expect(document.querySelectorAll(".gitFile")).toHaveLength(1);
+      expect(currentFileRows()).toHaveLength(0);
+    });
+
+    it("requests each destination when moving twice before any response (TC-619)", () => {
+      // Case: TC-619
+      // Given: highlighted, and the controller resolves two ArrowDown presses to h1 then h2
+      // When: ArrowDown is pressed twice before any response arrives
+      moveTwiceBeforeAnyResponse();
+
+      // Then: two moves, two different requests in order, and h2 is loading under its row
+      expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(2);
+      expect(mockFileHistoryInstance.navigate).toHaveBeenNthCalledWith(1, 1, true);
+      expect(mockFileHistoryInstance.navigate).toHaveBeenNthCalledWith(2, 1, true);
+      expect(commitDetailsRequests()).toEqual([
+        commitDetailsRequestFor(FIRST_DESTINATION),
+        commitDetailsRequestFor(SECOND_DESTINATION)
+      ]);
+      expect(expandedCommit()!.hash).toBe(SECOND_DESTINATION);
+      expect(commitRow(SECOND_DESTINATION).nextElementSibling!.id).toBe("commitDetails");
+      expect(document.querySelectorAll("#commitDetails")).toHaveLength(1);
+      expect(document.getElementById("cdvLoading")).not.toBeNull();
+    });
+
+    it("ignores the late response of the earlier destination (TC-620)", () => {
+      // Case: TC-620
+      // Given: two moves before any response, so the details of h2 are loading
+      moveTwiceBeforeAnyResponse();
+
+      // When: the successful response for h1 arrives first
+      respondWithDetails(FIRST_DESTINATION, [HISTORICAL_PATH]);
+
+      // Then: the details of h2 are still loading and nothing of h1 is rendered
+      expect(expandedCommit()!.hash).toBe(SECOND_DESTINATION);
+      expect(expandedCommit()!.commitDetails).toBeNull();
+      expect(document.getElementById("commitDetailsSummary")).toBeNull();
+      expect(document.querySelectorAll(".gitFile")).toHaveLength(0);
+
+      // When: the successful response for h2 arrives
+      respondWithDetails(SECOND_DESTINATION, [RENAMED_PATH, HISTORICAL_PATH]);
+
+      // Then: the details of h2 are rendered under its row with its historical path highlighted
+      expect(expandedCommit()!.commitDetails!.hash).toBe(SECOND_DESTINATION);
+      expect(commitRow(SECOND_DESTINATION).nextElementSibling!.id).toBe("commitDetails");
+      expect(document.getElementById("commitDetailsSummary")).not.toBeNull();
+      expect(highlightedPaths()).toEqual([RENAMED_PATH]);
+    });
+
+    it("closes the details on a failed response without touching the history (TC-621)", () => {
+      // Case: TC-621
+      // Given: highlighted, ArrowDown moved to h1 and its details are loading
+      mockFileHistoryInstance.navigate.mockReturnValue(FIRST_DESTINATION);
+      pressArrowDown();
+      expect(expandedCommit()!.hash).toBe(FIRST_DESTINATION);
+      const navigateCalls = mockFileHistoryInstance.navigate.mock.calls.length;
+      const rowClickCalls = mockFileHistoryInstance.handleCommitRowClick.mock.calls.length;
+      expect(navigateCalls).toBe(1);
+
+      // When: the details response reports a failure
+      dispatchMessage({ command: "commitDetails", commitDetails: null });
+
+      // Then: the details close with the existing error, the history neither exits nor moves back
+      expect(document.getElementById("commitDetails")).toBeNull();
+      expect(expandedCommit()).toBeNull();
+      expect(commitRow(FIRST_DESTINATION).classList.contains("commitDetailsOpen")).toBe(false);
+      expect(liveShowErrorDialog).toHaveBeenCalledTimes(1);
+      expect(liveShowErrorDialog).toHaveBeenCalledWith(COMMIT_DETAILS_ERROR_TITLE, null, null);
+      expect(mockFileHistoryInstance.exit).toHaveBeenCalledTimes(0);
+      expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(navigateCalls);
+      expect(mockFileHistoryInstance.handleCommitRowClick).toHaveBeenCalledTimes(rowClickCalls);
     });
   });
 });

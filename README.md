@@ -100,6 +100,23 @@ Create and manage Git worktrees without leaving the graph.
 | `Git Keizu: View Git Keizu (git log)` | Open the Git Keizu graph view          |
 | `Git Keizu: Clear Avatar Cache`       | Clear all cached commit author avatars |
 
+### Keyboard navigation
+
+The arrow keys and `ESC` are fixed. The shortcuts that can be changed are listed under Settings.
+
+| Key                                             | Normally                                | File history highlighted        |
+| ----------------------------------------------- | --------------------------------------- | ------------------------------- |
+| `↑` / `↓`                                       | Previous / next row of the commit table | Previous / next matching commit |
+| `CTRL/CMD + ↑` / `CTRL/CMD + ↓`                 | First child / first parent              | Disabled                        |
+| `CTRL/CMD + SHIFT + ↑` / `CTRL/CMD + SHIFT + ↓` | Alternative child / alternative parent  | Disabled                        |
+
+- Normally, the arrow keys work only while commit details are open and two commits are not being compared.
+- While **Highlight File History** is active, `↑` / `↓` move only among the matching commits that are already loaded, and work even when no commit details are open. A move opens the commit details of its destination. The keys stop at the first and last of those commits instead of wrapping around.
+- The **Previous match** and **Next match** buttons on the file history bar stop at the same ends, but do not open commit details.
+- While a file history is loading, the arrow keys do not move between commits.
+- The arrow keys are ignored while the focus is in an editable element, while two commits are being compared, and during IME composition.
+- `ESC` closes one item per press, in this order: context menu, dialog, dropdown, **+N** label list, Find, commit details, file history. The file history ends — or, while it is still loading, is cancelled — with the same restore as its **Exit** button.
+
 ### Settings
 
 All settings are under the `git-keizu.*` namespace.

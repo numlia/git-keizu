@@ -142,3 +142,42 @@ controller は mock のまま、`restoreExpandedCommit` と `applyFileHistoryToF
 - External: excluded(上表のとおり)
 - Boundary: TC-553、TC-561
 - Type: excluded(引数の型は `src/types-test.md` S9とTypeScriptの型検査で担保)
+
+## S66: キーによる履歴移動後の詳細要求と応答描画（ファイル行の強調・第1親の注記・以前の応答・失敗）
+
+> Origin: Feature 060-02 (light-spec-plan)
+> Added: 2026-09-28
+> Status: active
+> Supersedes: -
+> Signature: `handleKeyboardShortcut(e: KeyboardEvent): void`（履歴用 Arrow 分岐）→ private `loadCommitDetails(sourceElem: HTMLElement)` → `public showCommitDetails(commitDetails: GG.GitCommitDetails, fileTree: GitFolder)` → private `applyFileHistoryToFileRows()`
+> Target Path: `web/main.ts:1529-1550`（履歴用 Arrow 分岐の `handleFileHistoryArrowKey()`）、`web/main.ts:1814-1816`（`findCommitRowByHash()`）、`web/main.ts:1666-1690`（`loadCommitDetails()`）、`web/main.ts:1753-1813`（`showCommitDetails()`）、`web/main.ts:1836-1863`（`applyFileHistoryToFileRows()`）
+> Test File: `tests/web/main.test.ts`
+
+キーで履歴を移動した後の詳細要求から応答描画までを、実際のキーイベント・実際の `commitDetails` response の発火・`showCommitDetails()` の描画を通して確かめる結合の観点。controllerは `vi.mock` のままで、`isActive` / `navigate` / `getHistoricalPathFor` の戻り値をmockで制御する。移動先の選定とcurrentの進行は `web/fileHistory-test.md` S10、キーの振り分けとイベント消費は `04-keyboard-selection-02.md` S64の責務で本表には含めない。詳細の描画契約は変えないため、S50とS63はactiveのまま残り、注記の位置と表示切替はS63（TC-556〜TC-558）が引き続き担当する。S51の期待は復活させない。
+
+| Case ID | Input / Precondition                                                                                                                                                                                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                             | Notes                                                                |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| TC-616  | 強調中、`navigate` が `"h1"`、`getHistoricalPathFor("h1")` が `"src/a.txt"` を返す状態でArrowDown。続けて `fileChanges` に `src/a.txt` を含む `h1` の `commitDetails` 成功responseを届ける                                                             | Normal - 移動先の詳細描画とファイル行の強調                                | 詳細要求が `commitHash: "h1"` の1件。response後、`#commitDetails` が `h1` 行の直後にあり、`.gitFile[data-newfilepath="src%2Fa.txt"]` に `fileHistoryCurrent` が付き、`.gitFile.fileHistoryCurrent` がちょうど1件、`.fileHistoryNote` が0件  | D1。画面テスト（実response・実描画）                                 |
+| TC-617  | 強調中、履歴の要求時のpathが `src/a.txt`、リネームにより `getHistoricalPathFor("h2")` が `"lib/a.txt"` を返す。`navigate` が `"h2"` を返す状態でArrowDown。続けて `fileChanges` に `lib/a.txt` と `src/a.txt` の両方を含む `h2` の成功responseを届ける | Normal - リネームは履歴上のpathで照合                                      | `fileHistoryCurrent` が、`data-newfilepath` をdecodeして `lib/a.txt` になる行だけに付く。`src/a.txt` の行には付かず、`.gitFile.fileHistoryCurrent` がちょうど1件、`.fileHistoryNote` が0件                                                  | D1。画面テスト（実response・実描画）。要求時のpathを使わない         |
+| TC-618  | 強調中、`navigate` が一致merge `"m1"`、`getHistoricalPathFor("m1")` が `"src/a.txt"` を返す状態でArrowDown。続けて `fileChanges` に `src/a.txt` を含まない `m1` の成功responseを届ける                                                                 | Normal - 第1親との差分に対象がない一致merge                                | `.fileHistoryNote` が1件で、`textContent` が `"This file's change is not part of the diff against the first parent."`。注記の親が `#commitDetailsFiles` で、`#commitDetailsFiles` の最初の子要素が注記。`.gitFile.fileHistoryCurrent` が0件 | D2。画面テスト（実response・実描画）。注記の位置はS63 TC-556と同じ   |
+| TC-619  | 強調中、responseが届く前にArrowDownを2回（`navigate` が順に `"h1"`、`"h2"` を返す）                                                                                                                                                                    | Normal - 応答前の連続移動                                                  | `navigate` が `(1, true)` で計2回、詳細要求が `commitHash: "h1"`、`"h2"` の順に計2件。`expandedCommit.hash` が `"h2"` で、`#commitDetails` が `h2` 行の直後にあり読み込み中の表示                                                           | D3。画面テスト。currentの進行は `web/fileHistory-test.md` S10 TC-088 |
+| TC-620  | TC-619の後、先に `h1` の成功response、続いて `h2` の成功responseを届ける                                                                                                                                                                               | Validation - 以前のhashへの遅延した成功response                            | `h1` のresponse後も `expandedCommit.hash` が `"h2"`、`expandedCommit.commitDetails` が `null` のままで、`#commitDetailsSummary` が生成されない。`h2` のresponse後に `h2` の詳細が描画され、履歴上のpathの行に `fileHistoryCurrent` が付く   | D3。画面テスト（実response・実描画）。現在の詳細を置き換えない       |
+| TC-621  | 強調中、`navigate` が `"h1"` を返す状態でArrowDown。続けて `commitDetails: null` のresponseを届ける                                                                                                                                                    | External - 詳細取得の失敗                                                  | `#commitDetails` が除去され `expandedCommit` が `null`、`showErrorDialog("Unable to load commit details", null, null)` が1回。`exit` が0回、失敗後の `navigate` / `handleCommitRowClick` の追加呼出が0回                                    | D3。画面テスト（実response）。履歴位置を戻さない                     |
+
+### 失敗源インベントリ（include-or-justify）— Feature 060-02追加分（S66）
+
+| 失敗源                                                 | 対応ケースまたは除外理由                                                                        |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| 移動先ではない行（隣の非一致行）の詳細を要求・描画する | TC-616                                                                                          |
+| 要求時のpathでファイル行を照合する                     | TC-617                                                                                          |
+| 対象がない一致mergeで注記が出ない・一覧先頭以外へ入る  | TC-618                                                                                          |
+| 連続移動で詳細要求が欠ける・重複する                   | TC-619                                                                                          |
+| 以前のhashの成功responseで現在の詳細を置き換える       | TC-620                                                                                          |
+| 詳細取得の失敗で履歴を終了する・位置を戻す             | TC-621                                                                                          |
+| 表示切替後の強調の付け直し・注記の重複                 | excluded(S63 TC-557、TC-558が維持)                                                              |
+| 移動先の選定・端での停止                               | excluded(`web/fileHistory-test.md` S10の責務。mockの戻り値を移動先選定の検証として扱わない)     |
+| 例外・エラー経路                                       | excluded(file treeの生成失敗は `web/messageHandler-test/` の責務で、本変更は応答処理を変えない) |
+
+### 実画面確認（VS Code）— Feature 060-02（S66）
+
+- 2026-09-28、利用者による手動確認で問題なし。条件と項目は [04-keyboard-selection-02.md](04-keyboard-selection-02.md) の「実画面確認（VS Code）— Feature 060-02」に記録した。S66 に対応するのは同記録の項目 3。
