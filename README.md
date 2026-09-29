@@ -13,6 +13,8 @@
 
 **Git Keizu** is a focused Git history graph for VS Code. Explore branches, commits, stashes, tags, and uncommitted changes in one graph. Run common Git actions and manage worktrees without opening a terminal.
 
+![Inspect a commit, compare two commits, and create a worktree from a branch label](./resources/screenshots/hero.gif)
+
 Git Keizu is an actively maintained fork of [Git Graph](https://github.com/mhutchie/vscode-git-graph), intentionally focused on the core graph experience.
 
 > **English & Japanese UI / 英語・日本語UI対応**
@@ -20,6 +22,13 @@ Git Keizu is an actively maintained fork of [Git Graph](https://github.com/mhutc
 > Git Keizu follows VS Code's display language. The interface is in English by default and switches to Japanese automatically when the display language is Japanese — commands, settings, menus, dialogs, error messages, and dates. Other display languages fall back to English.
 >
 > Git Keizuの表示はVS Codeの表示言語に従います。通常は英語で表示され、表示言語を日本語にすると、コマンド、設定項目、メニュー、ダイアログ、エラーメッセージ、日付表示まで自動的に日本語へ切り替わります。追加の設定は不要です。
+
+## Why Git Keizu
+
+- **Worktrees live in the graph** — create a worktree from any branch or commit, then open, reveal, or remove it from its label. Linked and detached-HEAD worktrees stay visible.
+- **Follow one file through history** — Highlight File History traces a file back across renames and merges and highlights its commits without hiding the rest of the graph.
+- **Decide before you delete** — Branch Cleanup lays out the facts for every local branch, and a rejected deletion explains why Git refused, including after squash merges.
+- **Stays out of your way** — Git operations refresh the graph without losing your place, context menus remember your recent actions per repository, and busy commits fold extra labels into a **+N** badge.
 
 ## Getting Started
 
@@ -32,13 +41,20 @@ Open a folder or workspace that contains a Git repository. On first use, the Git
 
 After Git Keizu has been activated and detects a repository, the Status Bar item appears by default and provides a quick way to reopen the graph.
 
+Once the graph is open, try these first:
+
+1. Click a commit to see its files and diffs, then Ctrl/Cmd+click another commit to compare the two.
+2. Right-click a branch label and choose **Create Worktree...**.
+3. In the commit details, click the history icon on a file's row to start **Highlight File History**, then press `↑` / `↓` to step through that file's commits.
+4. Click the **Branch Cleanup** button in the toolbar to review every local branch in one panel.
+
 ## Highlights
 
 ### Understand your repository at a glance
 
 See branches, commits, tags, stash entries, and uncommitted changes together in one graph.
 
-![Graph overview](./resources/screenshots/graph-overview.gif)
+![Graph with branches, tags, a stash, worktrees, and a +N label list](./resources/screenshots/graph-overview.png)
 
 - Filter the graph by branch or author, and search commit messages with regex and case-sensitive modes.
 - Choose date, topological, or author-date ordering. Merge commits and non-ancestor commits can be visually muted.
@@ -56,11 +72,13 @@ Select a commit to inspect its files and diffs, or Ctrl/Cmd+click a second commi
 - Navigate commits with the keyboard, follow parent links, and keep comparison state when switching tabs.
 - **Highlight File History**, started from the history icon on a file's row or from its context menu, follows a single file backwards from a commit — through renames and the merges that touched it — and highlights its commits on the graph without hiding anything else, with previous/next navigation and the file's row highlighted in each commit's details. While it is active, `↑` / `↓` step through the highlighted commits only and open their details, and `ESC` leaves the highlight once any open commit details are closed.
 
+![Highlight File History following a file across a rename](./resources/screenshots/file-history.gif)
+
 ### Run Git actions from the graph
 
 Right-click commits, branches, tags, stash entries, or uncommitted changes to access the actions available for that item.
 
-![Commit actions](./resources/screenshots/commit-actions.png)
+![Commit context menu with a Recent section and a More submenu](./resources/screenshots/commit-actions.png)
 
 - Checkout, cherry-pick, merge, rebase, create branches, manage tags, and apply or pop stashes.
 - Pull and push the current branch, including choosing an upstream when one has not been configured. Fetch automatically prunes stale remote-tracking references.
@@ -68,11 +86,15 @@ Right-click commits, branches, tags, stash entries, or uncommitted changes to ac
 - **Branch Cleanup** collects every local branch into one panel with the facts needed to decide whether it can be deleted — ancestry against a comparison branch, ahead/behind counts, tree differences, upstream state, worktree usage, and last commit date — then lets you show a branch in the graph or open its delete dialog. It gives no safe-or-unsafe verdict and deletes nothing on its own.
 - When a branch deletion is rejected because Git could not confirm the branch is fully merged, the error dialog explains why — including after squash merges and rebases — and what to check before using Force Delete, with the original Git output preserved in a collapsible section.
 
+![Branch Cleanup panel listing local branches](./resources/screenshots/branch-cleanup.png)
+
+![Error dialog explaining why a squash-merged branch could not be deleted](./resources/screenshots/branch-delete-explained.png)
+
 ### Manage worktrees visually
 
 Create and manage Git worktrees without leaving the graph.
 
-![Create worktree from a commit](./resources/screenshots/worktree-create.png)
+![Worktree actions on a branch label, with a detached-HEAD worktree visible below](./resources/screenshots/worktree-menu.png)
 
 - Create a worktree from a branch or any commit, with a suggested path derived from the branch name.
 - Open a worktree in VS Code or a terminal, reveal it in the file manager, copy its path, or remove it — from the label of a branch-based or a detached-HEAD worktree alike.
