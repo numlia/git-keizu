@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2026-09-29
+
+This release changes nothing about how the extension behaves. It republishes the marketplace listing so that it picks up the refreshed README.
+
+### Changed
+
+- **The README shows what Git Keizu does at a glance**: The README now opens with an animated walkthrough — inspecting a commit, comparing two commits, and creating a worktree from a branch label — followed by a short "Why Git Keizu" summary of what sets it apart: worktrees managed from the graph, Highlight File History, Branch Cleanup with explained deletion errors, and a graph that stays out of your way. Getting Started now suggests four things to try once the graph is open, and every screenshot in Highlights has been retaken from the current version, adding an animation of Highlight File History and screenshots of Branch Cleanup and the branch deletion explanation. Marketplace listings render the README bundled inside the extension package, so this release is what makes the refreshed README visible on the Marketplace and Open VSX pages.
+
 ## [1.5.0] - 2026-09-29
 
 This release makes cleaning up worktrees quicker: once you have removed one, **Remove Worktree...** appears in the **Recent** section of the next worktree label's context menu. It also keeps error dialogs open when the graph refreshes, so the branch deletion error after a worktree removal no longer disappears before you can read it.
@@ -662,7 +670,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.5.1...HEAD
+[1.5.1]: https://github.com/numlia/git-keizu/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/numlia/git-keizu/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/numlia/git-keizu/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/numlia/git-keizu/compare/v1.3.1...v1.3.2
