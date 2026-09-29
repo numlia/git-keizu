@@ -1,0 +1,22 @@
+{
+  "workbench.colorTheme": "Dark Modern",
+  "workbench.startupEditor": "none",
+  "workbench.tips.enabled": false,
+  "workbench.enableExperiments": false,
+  "workbench.secondarySideBar.defaultVisibility": "hidden",
+  "workbench.layoutControl.enabled": false,
+  "window.commandCenter": false,
+  "window.titleBarStyle": "custom",
+  "window.restoreWindows": "none",
+  "window.zoomLevel": 0,
+  "window.title": "${rootName} - Visual Studio Code",
+  "chat.disableAIFeatures": true,
+  "security.workspace.trust.enabled": false,
+  "update.mode": "none",
+  "extensions.ignoreRecommendations": true,
+  "extensions.autoCheckUpdates": false,
+  "telemetry.telemetryLevel": "off",
+  "git.openRepositoryInParentFolders": "never",
+  "editor.minimap.enabled": false,
+  "git-keizu.dialog.createWorktree.openTerminal": false
+}

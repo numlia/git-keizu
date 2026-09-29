@@ -23,7 +23,8 @@ git-keizu/
 ├── media/                # Webview CSS stylesheets
 ├── notes/                # Design notes, plans, audit records
 ├── out/                  # Build output (gitignored)
-├── resources/            # Extension icons (SVG, PNG)
+├── resources/            # Extension icons (SVG, PNG), README screenshots
+├── scripts/              # Maintenance scripts (README media capture)
 ├── src/                  # Extension backend (Node.js)
 ├── tests/                # Test code (Vitest)
 ├── web/                  # Webview frontend (Browser)
