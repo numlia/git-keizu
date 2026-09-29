@@ -25,7 +25,7 @@ Git Keizu is an actively maintained fork of [Git Graph](https://github.com/mhutc
 
 ## Why Git Keizu
 
-- **Worktrees live in the graph** — create a worktree from any branch or commit, then open, reveal, or remove it from its label. Linked and detached-HEAD worktrees stay visible.
+- **Worktrees live in the graph** — create a worktree from a local branch or any commit, then open, reveal, or remove it from its label. Linked and detached-HEAD worktrees stay visible.
 - **Follow one file through history** — Highlight File History traces a file back across renames and merges and highlights its commits without hiding the rest of the graph.
 - **Decide before you delete** — Branch Cleanup lays out the facts for every local branch, and a rejected deletion explains why Git refused, including after squash merges.
 - **Stays out of your way** — Git operations refresh the graph without losing your place, context menus remember your recent actions per repository, and busy commits fold extra labels into a **+N** badge.
@@ -44,7 +44,7 @@ After Git Keizu has been activated and detects a repository, the Status Bar item
 Once the graph is open, try these first:
 
 1. Click a commit to see its files and diffs, then Ctrl/Cmd+click another commit to compare the two.
-2. Right-click a branch label and choose **Create Worktree...**.
+2. Right-click a local branch label that has no worktree yet and choose **Create Worktree...**.
 3. In the commit details, click the history icon on a file's row to start **Highlight File History**, then press `↑` / `↓` to step through that file's commits.
 4. Click the **Branch Cleanup** button in the toolbar to review every local branch in one panel.
 
