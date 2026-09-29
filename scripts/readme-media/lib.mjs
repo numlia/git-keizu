@@ -230,15 +230,18 @@ async function showClickRipple(page, point) {
         pointerEvents: "none"
       });
       document.body.appendChild(ripple);
-      ripple
-        .animate(
+      // Not awaited: the ripple fades out while the click and the next steps go ahead.
+      const fadeOut = async () => {
+        await ripple.animate(
           [
             { transform: "scale(0.4)", opacity: 1 },
             { transform: "scale(1.4)", opacity: 0 }
           ],
           { duration, easing: "ease-out" }
-        )
-        .finished.then(() => ripple.remove());
+        ).finished;
+        ripple.remove();
+      };
+      fadeOut();
     },
     { ...point, duration: RIPPLE_MS }
   );
@@ -287,9 +290,14 @@ export async function pressKey(page, key, label) {
         pointerEvents: "none"
       });
       document.body.appendChild(cap);
-      cap
-        .animate([{ opacity: 1 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }], { duration })
-        .finished.then(() => cap.remove());
+      // Not awaited: the keycap fades out while the key press and the next steps go ahead.
+      const fadeOut = async () => {
+        await cap.animate([{ opacity: 1 }, { opacity: 1, offset: 0.7 }, { opacity: 0 }], {
+          duration
+        }).finished;
+        cap.remove();
+      };
+      fadeOut();
     },
     { text: label, duration: KEYCAP_MS }
   );
