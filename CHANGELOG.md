@@ -7,13 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-09-29
+
+This release makes cleaning up worktrees quicker: once you have removed one, **Remove Worktree...** appears in the **Recent** section of the next worktree label's context menu. It also keeps error dialogs open when the graph refreshes, so the branch deletion error after a worktree removal no longer disappears before you can read it.
+
 ### Added
 
-- Remove Worktree is now available in Recent actions for branch and detached worktree labels after confirmation. Selecting it opens the confirmation for the current worktree.
+- **Remove Worktree in Recent actions**: Confirming **Remove Worktree...** on a branch label (under **More...**) or on a detached-HEAD worktree label now records it in the **Recent** section at the top of the context menu, so the next worktree can be removed without opening **More...**. Choosing it from **Recent** opens the usual confirmation for the worktree you right-clicked, with its own path and branch name; the previous target is never reused, and nothing is removed until you confirm. The action is recorded when the confirmation is accepted, before Git runs, so it stays in **Recent** even if Git refuses the removal or only the branch deletion fails. With **Also delete branch** checked, only **Remove Worktree...** is added and **Delete Branch...** is not. Labels that offer no removal, such as the checked-out branch, the main worktree, and branches without a worktree, do not show it. As with other recent actions, the removal is recorded even while `git-keizu.menu.showRecentActions` is off.
 
 ### Fixed
 
-- Error dialogs, such as the branch deletion failure shown after removing a worktree, no longer close by themselves when the graph refreshes.
+- **Error dialogs no longer vanish when the graph refreshes**: After removing a worktree with **Also delete branch** checked, the **Unable to Delete Branch** error (for example for an unmerged branch) appeared only for a moment, because the graph refresh that follows the removal closed every open dialog. Error dialogs now stay open through background refreshes until you dismiss them, press `ESC`, or open another dialog; confirmation and input dialogs and context menus still close when the graph changes. The **Unable to Pull** error, which is also shown while the graph refreshes, stays open in the same way.
 
 ## [1.4.0] - 2026-09-28
 
@@ -658,7 +662,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/numlia/git-keizu/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/numlia/git-keizu/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/numlia/git-keizu/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/numlia/git-keizu/compare/v1.3.0...v1.3.1

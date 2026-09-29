@@ -78,6 +78,7 @@ Create and manage Git worktrees without leaving the graph.
 - Open a worktree in VS Code or a terminal, reveal it in the file manager, copy its path, or remove it — from the label of a branch-based or a detached-HEAD worktree alike.
 - Linked and detached-HEAD worktrees remain visible in the graph, including detached commits outside the loaded history.
 - Removal never forces: a worktree with modified or untracked files is left in place and Git's reason is shown.
+- After you confirm a removal, **Remove Worktree...** appears under **Recent** in the context menu, so the next worktree can be cleaned up from its label in one click; it always asks for confirmation for the worktree you right-clicked.
 
 ### Designed for everyday use
 
