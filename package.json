@@ -376,7 +376,8 @@
   "pnpm": {
     "overrides": {
       "fast-uri": "^3.1.6",
-      "js-yaml": "^4.3.2"
+      "js-yaml": "^4.3.2",
+      "undici": "^8.10.2"
     }
   }
 }
