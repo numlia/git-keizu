@@ -34,6 +34,7 @@ crop_still() {
 render_gif hero
 render_gif file-history
 crop_still graph-overview "${CROP_VIEW}"
+crop_still path-highlight "${CROP_VIEW}"
 crop_still commit-comparison "${CROP_VIEW_WITH_DETAILS}"
 crop_still commit-actions "${CROP_COMMIT_MENU}"
 crop_still worktree-menu "${CROP_WORKTREE_MENU}"

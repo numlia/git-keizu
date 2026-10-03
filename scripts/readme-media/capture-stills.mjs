@@ -19,6 +19,8 @@ const ROW_CLICK_Y = 10;
 /** Right-clicking a label this close to its far end keeps the menu off the label itself. */
 const LABEL_END_INSET = 4;
 const SEEDED_BRANCH = "experiment/cluster-markers";
+/** Empty spot left of the Branches filter, inside the view and without hover styles. */
+const VIEW_BLANK_SPOT = { x: 100, y: 82 };
 
 rmSync(OUT_DIR, { recursive: true, force: true });
 mkdirSync(OUT_DIR, { recursive: true });
@@ -74,6 +76,16 @@ await withGitKeizu(requireRepoPath(process.argv), async ({ page, view }) => {
   await view.locator(".refOverflowCounter").first().click();
   await shot("graph-overview", { parkPointer: false });
   await page.keyboard.press("Escape");
+
+  await headLabel("feature/offline-mode").click({ button: "right" });
+  await menuItem("Highlight path").hover();
+  await page.waitForTimeout(MENU_SETTLE_MS);
+  await menuItem("All ancestors").click();
+  await view.locator("#pathHighlightBar").waitFor({ state: "visible" });
+  // The row under the clicked menu item keeps its hover unless the pointer moves inside the view first.
+  await page.mouse.move(VIEW_BLANK_SPOT.x, VIEW_BLANK_SPOT.y);
+  await shot("path-highlight", { parkPointer: true });
+  await view.locator("#pathHighlightClear").click();
 
   await headLabel("feature/trail-photos").click({ button: "right" });
   await menuItem("More").hover();
