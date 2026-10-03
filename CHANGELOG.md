@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-10-03
+
+This release lets you follow how a commit or branch connects through the graph: **Highlight path** draws the chosen path with thicker lines and outlined commits while the rest of the graph fades, so a merge's parents or a branch's whole history stand out from the lines around them.
+
+### Added
+
+- **Highlight path**: Right-click a commit and choose **Highlight path** to highlight its **Direct parents and children**, its **Ancestors and descendants**, or its **First-parent ancestors**; right-click a local or remote branch label, including one in a **+N** list, to highlight its **All ancestors** or **First-parent ancestors**. The selected lines are drawn thicker, each commit on the path gets an outline in the theme's focus color, and unrelated lines fade, so the path can be followed by line width and outline rather than color in light, dark, and high contrast themes. Commit text, row backgrounds, the HEAD marker, and the stash marker stay as they are. A bar above the graph shows the target name (the subject for a commit), its short hash with the full hash in a tooltip, a **Mode** selector for switching modes, and **Clear path highlight**; its controls can be reached with the keyboard, long names wrap, and the clear button stays visible in a narrow view. Only one target is highlighted at a time, and a branch is pinned to the commit it pointed to when you chose it, marked **Branch at selection**. The highlight is recalculated when the graph refreshes, loads more commits, or changes its filter or order; if the target is no longer loaded, the bar shows **Target is outside loaded history** until it comes back. Only loaded history is followed, so where a path reaches a parent that is not loaded yet, the loaded commit is marked with an unfilled square and the pairs are listed under **Outside loaded history**, without guessing what lies beyond. Highlight File History can be used at the same time: the selected path stays visible over its dimming, and clearing either highlight keeps the other. Highlighting never runs Git or changes the scroll position, filters, search, or open commit details.
+
 ## [1.5.1] - 2026-09-29
 
 This release changes nothing about how the extension behaves. It republishes the marketplace listing so that it picks up the refreshed README.
@@ -670,7 +678,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.5.1...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/numlia/git-keizu/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/numlia/git-keizu/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/numlia/git-keizu/compare/v1.4.0...v1.5.0
 [1.4.0]: https://github.com/numlia/git-keizu/compare/v1.3.2...v1.4.0
