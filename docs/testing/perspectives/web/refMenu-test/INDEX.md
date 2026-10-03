@@ -2,12 +2,12 @@
 
 > Source: `web/refMenu.ts`
 > Storage Mode: sharded
-> Generated: 2026-09-29T00:00:00Z
+> Generated: 2026-10-03T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 3
-> Total Sections: 19
-> Total Cases: 98
+> Total Sections: 20
+> Total Cases: 102
 
 ## Shards
 
@@ -15,7 +15,7 @@
 | ------------------------------------ | --------------------------- | -------- | ----- | ------------ |
 | 01-branch-actions-01.md              | branch-actions              | 10       | 50    | 2026-08-25   |
 | 02-worktree-actions-01.md            | worktree-actions            | 5        | 23    | 2026-09-29   |
-| 03-context-menu-recent-actions-01.md | context-menu-recent-actions | 4        | 25    | 2026-09-29   |
+| 03-context-menu-recent-actions-01.md | context-menu-recent-actions | 5        | 29    | 2026-10-03   |
 
 ## Origin Coverage
 
@@ -34,6 +34,7 @@
 | Feature 053 (detached-worktree-menu) (light-spec-plan)                 | 02-worktree-actions-01.md                                       |
 | Feature 055-03 (light-spec-plan)                                       | 01-branch-actions-01.md                                         |
 | Feature 060-03 (light-spec-plan)                                       | 02-worktree-actions-01.md, 03-context-menu-recent-actions-01.md |
+| Feature 061-01 (light-spec-plan)                                       | 03-context-menu-recent-actions-01.md                            |
 
 ## 移行履歴
 

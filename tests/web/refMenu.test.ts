@@ -33,6 +33,7 @@ vi.mock("../../web/utils", () => {
   };
 });
 
+import type * as GG from "../../src/types";
 import { recordRecentAction } from "../../web/contextMenu";
 import {
   showCheckboxDialog,
@@ -41,6 +42,7 @@ import {
   showRefInputDialog,
   showSelectDialog
 } from "../../web/dialogs";
+import { type BranchPathMode, PathHighlightMode } from "../../web/pathHighlight";
 import {
   buildRefContextMenuItems,
   checkoutBranchAction,
@@ -2519,4 +2521,224 @@ describe("buildRefContextMenuItems worktree menu order after builder extraction 
     expect(inputs[0].type).toBe("checkbox");
     expect(showConfirmationDialog).toHaveBeenCalledTimes(0);
   });
+});
+
+/* ------------------------------------------------------------------ */
+/* S26: Highlight path submenu (two branch modes), tag exclusion, optional callback */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/refMenu-test/03-context-menu-recent-actions-01.md
+describe("Highlight path submenu for branches (S26)", () => {
+  const HIGHLIGHT_TITLE = "Highlight path";
+  const COPY_BRANCH_TITLE = "Copy Branch Name to Clipboard";
+  const BRANCH_MODE_TITLES = ["All ancestors", "First-parent ancestors"];
+  const WORKTREE_INFO = { path: "/tmp/feature-worktree", isMainWorktree: false };
+  // S13 TC-058: the tag menu layout.
+  const TAG_LAYOUT = ["Delete Tag&#8230;", "Push Tag&#8230;", null, "Copy Tag Name to Clipboard"];
+  // S13 TC-059 / TC-060 / TC-063 (with S22 TC-107): layouts without the callback.
+  const REMOTE_LAYOUT = [
+    "Checkout Branch&#8230;",
+    "Merge into current branch&#8230;",
+    null,
+    "More...",
+    null,
+    COPY_BRANCH_TITLE
+  ];
+  const HEAD_LAYOUT = ["Pull", "Push", null, "More...", null, COPY_BRANCH_TITLE];
+  const WORKTREE_LAYOUT = [
+    "Checkout Branch",
+    "Merge into current branch&#8230;",
+    "Rebase current branch on Branch&#8230;",
+    null,
+    "Open in New Window",
+    "Reveal in File Manager",
+    "Open Terminal Here",
+    "Copy Worktree Path",
+    null,
+    "More...",
+    null,
+    COPY_BRANCH_TITLE
+  ];
+  // S14 TC-065 / S25 TC-125: recent action ids per variant.
+  const REMOTE_RECENT_IDS = ["ref.checkoutBranch", "ref.mergeBranch", "ref.deleteRemoteBranch"];
+  const HEAD_RECENT_IDS = ["ref.pull", "ref.push"];
+  const WORKTREE_RECENT_IDS = [
+    "ref.checkoutBranch",
+    "ref.mergeBranch",
+    "ref.openWorktreeInNewWindow",
+    "ref.revealWorktreeInOS",
+    "ref.openTerminal",
+    "ref.deleteBranch",
+    "ref.removeWorktree"
+  ];
+
+  interface BranchVariant {
+    readonly name: string;
+    readonly refName: string;
+    readonly classes: string[];
+    readonly isRemoteCombined: boolean;
+    readonly worktreeInfo: { path: string; isMainWorktree: boolean } | null;
+    readonly layout: (string | null)[];
+    readonly recentIds: string[];
+  }
+
+  const REMOTE: BranchVariant = {
+    name: "remote",
+    refName: "origin/feature",
+    classes: ["remote"],
+    isRemoteCombined: false,
+    worktreeInfo: null,
+    layout: REMOTE_LAYOUT,
+    recentIds: REMOTE_RECENT_IDS
+  };
+  const LOCAL_HEAD: BranchVariant = {
+    name: "local HEAD",
+    refName: "main",
+    classes: ["head"],
+    isRemoteCombined: false,
+    worktreeInfo: null,
+    layout: HEAD_LAYOUT,
+    recentIds: HEAD_RECENT_IDS
+  };
+  const LOCAL_WORKTREE: BranchVariant = {
+    name: "local non-HEAD with worktree",
+    refName: "feature/x",
+    classes: ["head"],
+    isRemoteCombined: false,
+    worktreeInfo: WORKTREE_INFO,
+    layout: WORKTREE_LAYOUT,
+    recentIds: WORKTREE_RECENT_IDS
+  };
+
+  function build(
+    variant: BranchVariant,
+    onHighlight?: (mode: BranchPathMode) => void
+  ): ContextMenuElement[] {
+    return buildRefContextMenuItems(
+      REPO,
+      variant.refName,
+      createMockElement(variant.classes),
+      variant.isRemoteCombined,
+      "main",
+      undefined,
+      variant.worktreeInfo,
+      onHighlight
+    );
+  }
+
+  function titlesOf(menu: ContextMenuElement[]): (string | null)[] {
+    return menu.map((item) => (item === null ? null : item.title));
+  }
+
+  function highlightSubmenus(menu: ContextMenuElement[]): ContextMenuSubmenu[] {
+    return menu.filter(
+      (item): item is ContextMenuSubmenu =>
+        isContextMenuSubmenu(item) && item.title === HIGHLIGHT_TITLE
+    );
+  }
+
+  function recentIdsOf(menu: ContextMenuElement[]): string[] {
+    return flattenMenuItems(menu)
+      .map((item) => item.recentActionId)
+      .filter((id): id is GG.RecentActionId => id !== undefined);
+  }
+
+  /** Common assertions of TC-129 / TC-130 for one head or remote variant. */
+  function expectBranchSubmenu(variant: BranchVariant): void {
+    const onHighlight = vi.fn();
+    const menu = build(variant, onHighlight);
+    const submenus = highlightSubmenus(menu);
+    const titles = titlesOf(menu);
+
+    expect(submenus).toHaveLength(1);
+    expect(submenus[0].submenu.map((item) => (item === null ? null : item.title))).toEqual(
+      BRANCH_MODE_TITLES
+    );
+    for (const item of submenus[0].submenu) {
+      expect(isContextMenuItem(item)).toBe(true);
+      expect((item as ContextMenuItem).recentActionId).toBeUndefined();
+    }
+    expect(titles.indexOf(HIGHLIGHT_TITLE)).toBeLessThan(titles.indexOf(COPY_BRANCH_TITLE));
+    expect(titles[titles.length - 1]).toBe(COPY_BRANCH_TITLE);
+    expect(titles.filter((title) => title !== HIGHLIGHT_TITLE)).toEqual(variant.layout);
+    expect(hasInvalidDividers(menu)).toBe(false);
+
+    for (const item of submenus[0].submenu) {
+      (item as ContextMenuItem).onClick();
+    }
+    expect(onHighlight.mock.calls).toEqual([
+      [PathHighlightMode.AllAncestors],
+      [PathHighlightMode.FirstParent]
+    ]);
+    expect(sendMessage).toHaveBeenCalledTimes(0);
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
+  });
+
+  it.each([LOCAL_HEAD, LOCAL_WORKTREE])(
+    "offers the two branch modes for a $name branch and keeps the existing order (TC-129)",
+    (variant) => {
+      // Case: TC-129
+      // Given / When / Then: see expectBranchSubmenu
+      expectBranchSubmenu(variant);
+    }
+  );
+
+  it.each([false, true])(
+    "offers the two branch modes for a remote branch with isRemoteCombined=%s (TC-130)",
+    (isRemoteCombined) => {
+      // Case: TC-130
+      // Given: the remote variant, plain or as the remote part of a combined label
+      expectBranchSubmenu({ ...REMOTE, isRemoteCombined });
+    }
+  );
+
+  it("adds nothing to the tag menu even when the callback is given (TC-131)", () => {
+    // Case: TC-131
+    // Given: a tag source with the callback
+    const onHighlight = vi.fn();
+
+    // When: the menu is built
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "v1.0.0",
+      createMockElement(["tag"]),
+      false,
+      "main",
+      undefined,
+      null,
+      onHighlight
+    );
+
+    // Then: the S13 TC-058 layout, no highlight item, no callback call
+    expect(titlesOf(menu)).toEqual(TAG_LAYOUT);
+    expect(highlightSubmenus(menu)).toHaveLength(0);
+    expect(onHighlight).toHaveBeenCalledTimes(0);
+  });
+
+  it.each([REMOTE, LOCAL_HEAD, LOCAL_WORKTREE])(
+    "keeps the $name layout and recent action ids when the callback is omitted (TC-132)",
+    (variant) => {
+      // Case: TC-132
+      // When: the menu is built without the callback
+      const menu = build(variant);
+
+      // Then: titles, dividers and recent action ids are the pre-existing ones
+      expect(titlesOf(menu)).toEqual(variant.layout);
+      expect(highlightSubmenus(menu)).toHaveLength(0);
+      expect(recentIdsOf(menu)).toEqual(variant.recentIds);
+    }
+  );
 });

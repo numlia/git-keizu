@@ -16,7 +16,7 @@ import { vscode } from "../../web/utils";
 /* Hoisted mock state                                                 */
 /* ------------------------------------------------------------------ */
 
-const { dropdowns, MENU_ITEMS } = vi.hoisted(() => ({
+const { dropdowns, MENU_ITEMS, graphSetPathHighlight } = vi.hoisted(() => ({
   dropdowns: {} as Record<
     string,
     {
@@ -26,7 +26,9 @@ const { dropdowns, MENU_ITEMS } = vi.hoisted(() => ({
     }
   >,
   // Identity of the builder result forwarded to showContextMenu.
-  MENU_ITEMS: [] as unknown[]
+  MENU_ITEMS: [] as unknown[],
+  // Captures the highlight handed to the mocked Graph by the real PathHighlightController.
+  graphSetPathHighlight: vi.fn()
 }));
 
 /* ------------------------------------------------------------------ */
@@ -67,7 +69,8 @@ vi.mock("../../web/graph", () => ({
       getWidth: vi.fn(() => 100),
       getHeight: vi.fn(() => 500),
       limitMaxWidth: vi.fn(),
-      setFileHistoryHighlight: vi.fn()
+      setFileHistoryHighlight: vi.fn(),
+      setPathHighlight: graphSetPathHighlight
     };
   })
 }));
@@ -679,7 +682,8 @@ describe("ref overflow rendering and the description column width (S60)", () => 
       false,
       "main",
       undefined,
-      { path: "/worktrees/4", isMainWorktree: false }
+      { path: "/worktrees/4", isMainWorktree: false },
+      expect.any(Function)
     );
   });
 
@@ -1072,8 +1076,10 @@ function lastBuilderArgs(): unknown[] {
   return calls[0];
 }
 
+// The path highlight callback (8th argument) is a fresh closure per menu, so only the first 7 compare.
+const BUILDER_ARG_COUNT = 7;
 function withoutSource(args: unknown[]): unknown[] {
-  return args.filter((_arg, index) => index !== 2);
+  return args.slice(0, BUILDER_ARG_COUNT).filter((_arg, index) => index !== 2);
 }
 
 function rightClickInRowAndInList(
@@ -1114,7 +1120,8 @@ describe("ref badge right-click from the row and the list (S57)", () => {
       false,
       "main",
       ["origin"],
-      { path: "/tmp/wtx", isMainWorktree: false }
+      { path: "/tmp/wtx", isMainWorktree: false },
+      expect.any(Function)
     );
     const showArgs = vi.mocked(contextMenu.showContextMenu).mock.calls[0];
     expect(showArgs[1]).toBe(MENU_ITEMS);
@@ -2281,21 +2288,48 @@ const SIBLING_LABELS: SiblingLabel[] = [
     kind: "local branch",
     selector: '.gitRef[data-name="feature/x"]',
     builder: "ref",
-    expectedArgs: (badge) => [TEST_REPO, "feature/x", badge, false, "main", undefined, null]
+    expectedArgs: (badge) => [
+      TEST_REPO,
+      "feature/x",
+      badge,
+      false,
+      "main",
+      undefined,
+      null,
+      expect.any(Function)
+    ]
   },
   {
     id: "TC-516",
     kind: "combined remote",
     selector: '.gitRef[data-name="main"] > .gitRefHeadRemote',
     builder: "ref",
-    expectedArgs: (badge) => [TEST_REPO, "origin/main", badge, true, "main", ["origin"], null]
+    expectedArgs: (badge) => [
+      TEST_REPO,
+      "origin/main",
+      badge,
+      true,
+      "main",
+      ["origin"],
+      null,
+      expect.any(Function)
+    ]
   },
   {
     id: "TC-517",
     kind: "standalone remote",
     selector: '.gitRef[data-name="origin/dev"]',
     builder: "ref",
-    expectedArgs: (badge) => [TEST_REPO, "origin/dev", badge, false, "main", undefined, null]
+    expectedArgs: (badge) => [
+      TEST_REPO,
+      "origin/dev",
+      badge,
+      false,
+      "main",
+      undefined,
+      null,
+      expect.any(Function)
+    ]
   },
   {
     id: "TC-518",
@@ -2316,7 +2350,8 @@ const SIBLING_LABELS: SiblingLabel[] = [
       false,
       "main",
       undefined,
-      { path: SIBLING_WORKTREE_PATH, isMainWorktree: false }
+      { path: SIBLING_WORKTREE_PATH, isMainWorktree: false },
+      expect.any(Function)
     ]
   },
   {
@@ -3101,5 +3136,169 @@ describe("pull error after checkout across the forceRender refresh (S21)", () =>
     // Then: the pull error is still open and no loading view was shown
     expectErrorDialog(PULL_ERROR_TITLE, PULL_ERROR_REASON);
     expect(loadingHeader()).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S68: branch target resolution from the row and the list            */
+/* ------------------------------------------------------------------ */
+
+const PATH_HIGHLIGHT_TITLE = "Highlight path";
+const ALL_ANCESTORS_TITLE = "All ancestors";
+const BRANCH_AT_SELECTION_TEXT = "Branch at selection";
+const PATH_ROW_INDEX = 1;
+const OVERSIZED_FEATURE_BADGE = 900;
+// Standard fixture of the path highlight perspectives: N(1) -> M(2) -> A(3) / B(4); U(5); R(6); X(7).
+const PATH_N = 1;
+const PATH_M = 2;
+const PATH_A = 3;
+const PATH_B = 4;
+const PATH_U = 5;
+const PATH_R = 6;
+const PATH_X = 7;
+const M_ALL_ANCESTORS = new Set([hashOf(PATH_M), hashOf(PATH_A), hashOf(PATH_B), hashOf(PATH_R)]);
+
+function pathCommits(
+  refsOfM: [string, GitRef["type"]][] = [
+    ["feature", "head"],
+    ["hotfix", "head"],
+    ["origin/feature", "remote"]
+  ],
+  refsOfA: [string, GitRef["type"]][] = []
+): GitCommitNode[] {
+  return [
+    commitOf(PATH_N, [], { parentHashes: [hashOf(PATH_M)] }),
+    commitOf(PATH_M, refsOfM, { parentHashes: [hashOf(PATH_A), hashOf(PATH_B)] }),
+    commitOf(PATH_A, refsOfA, { parentHashes: [hashOf(PATH_R)] }),
+    commitOf(PATH_B, [], { parentHashes: [hashOf(PATH_R)] }),
+    commitOf(PATH_U, [], { parentHashes: [hashOf(PATH_R)] }),
+    commitOf(PATH_R, [], { parentHashes: [] }),
+    commitOf(PATH_X, [], { parentHashes: [] })
+  ];
+}
+
+function chooseAllAncestors(target: Element): void {
+  fire(target, "contextmenu");
+  const parent = Array.from(
+    document.querySelectorAll<HTMLElement>("#contextMenu li.contextMenuParent")
+  ).find((item) => item.textContent?.startsWith(PATH_HIGHLIGHT_TITLE));
+  expect(parent, `"${PATH_HIGHLIGHT_TITLE}" submenu`).toBeDefined();
+  const submenu = document.getElementById(`contextSubmenu_${parent!.dataset.submenuIndex}`);
+  expect(submenu).not.toBeNull();
+  const item = Array.from(submenu!.querySelectorAll<HTMLElement>("li")).find(
+    (candidate) => candidate.textContent === ALL_ANCESTORS_TITLE
+  );
+  expect(item, ALL_ANCESTORS_TITLE).toBeDefined();
+  fire(item!, "click");
+}
+
+function pathBarState(): {
+  active: boolean;
+  name: string | null;
+  kind: string | null;
+  hashTitle: string | null;
+} {
+  const bar = document.getElementById("pathHighlightBar");
+  expect(bar).not.toBeNull();
+  return {
+    active: bar!.classList.contains("active"),
+    name: document.getElementById("pathHighlightName")!.textContent,
+    kind: document.getElementById("pathHighlightKind")!.textContent,
+    hashTitle: document.getElementById("pathHighlightHash")!.getAttribute("title")
+  };
+}
+
+function lastPathHighlightHashes(): Set<string> {
+  const calls = graphSetPathHighlight.mock.calls;
+  expect(calls.length).toBeGreaterThan(0);
+  const highlight = calls[calls.length - 1][0] as { hashes: Set<string> } | null;
+  expect(highlight).not.toBeNull();
+  return highlight!.hashes;
+}
+
+// @see docs/testing/perspectives/web/main-test/12-path-highlight-01.md
+describe("branch path targets from the row and the ref list (S68)", () => {
+  beforeEach(async () => {
+    await resetView(null);
+    const actual = await vi.importActual<RefMenuModule>("../../web/refMenu");
+    vi.mocked(refMenu.buildRefContextMenuItems).mockImplementation(actual.buildRefContextMenuItems);
+  });
+
+  afterEach(() => {
+    vi.mocked(refMenu.buildRefContextMenuItems).mockImplementation(() => MENU_ITEMS as never);
+    const clear = document.getElementById("pathHighlightClear");
+    if (clear !== null && pathBarState().active) fire(clear, "click");
+  });
+
+  it.each([
+    ["the row", false],
+    ["the ref list", true]
+  ])("resolves feature at M from %s by ref type and name (TC-639)", (_label, listed) => {
+    // Case: TC-639
+    // Given: the standard fixture, with feature folded into the list when requested
+    if (listed) layout.badgeOuter = { feature: OVERSIZED_FEATURE_BADGE };
+    loadCommits({ commits: pathCommits() });
+    vi.clearAllMocks();
+    const target = listed
+      ? openList(PATH_ROW_INDEX).querySelector('[data-name="feature"]')
+      : inRow("feature", PATH_ROW_INDEX);
+    expect(target).not.toBeNull();
+
+    // When: All ancestors is chosen from the real menu of that label
+    chooseAllAncestors(target!);
+
+    // Then: the bar names feature at M and the graph receives M's ancestors
+    expect(pathBarState()).toEqual({
+      active: true,
+      name: "feature",
+      kind: BRANCH_AT_SELECTION_TEXT,
+      hashTitle: hashOf(PATH_M)
+    });
+    expect(lastPathHighlightHashes()).toEqual(M_ALL_ANCESTORS);
+  });
+
+  it.each([
+    [
+      "the remote part of feature | origin",
+      () => pathCommits(),
+      () => inRow("feature", PATH_ROW_INDEX).querySelector(".gitRefHeadRemote"),
+      "origin/feature"
+    ],
+    [
+      "the head part of feature | origin",
+      () => pathCommits(),
+      () => inRow("feature", PATH_ROW_INDEX),
+      "feature"
+    ],
+    [
+      "hotfix on the same tip",
+      () => pathCommits(),
+      () => inRow("hotfix", PATH_ROW_INDEX),
+      "hotfix"
+    ],
+    [
+      "origin/feature at M while head feature is at A",
+      () => pathCommits([["origin/feature", "remote"]], [["feature", "head"]]),
+      () => inRow("origin/feature", PATH_ROW_INDEX),
+      "origin/feature"
+    ]
+  ])("distinguishes %s (TC-640)", (_label, commits, pick, expectedName) => {
+    // Case: TC-640
+    loadCommits({ commits: commits() });
+    vi.clearAllMocks();
+    const target = pick();
+    expect(target).not.toBeNull();
+
+    // When: All ancestors is chosen from the real menu of that label
+    chooseAllAncestors(target!);
+
+    // Then: the selected name and type map to M, never to another ref on the same or another row
+    expect(pathBarState()).toEqual({
+      active: true,
+      name: expectedName,
+      kind: BRANCH_AT_SELECTION_TEXT,
+      hashTitle: hashOf(PATH_M)
+    });
+    expect(lastPathHighlightHashes()).toEqual(M_ALL_ANCESTORS);
   });
 });

@@ -113,3 +113,45 @@ Test file: `tests/web/refMenu.test.ts`, new describe `Remove Worktree recent act
 
 - RED before implementation (2026-09-29): in the temporary copy of the base commit `2a3cc5f` described in `02-worktree-actions-01.md` (updated tests and `src/types.ts`, `web/refMenu.ts` at the base), `pnpm exec vitest run tests/web/refMenu.test.ts -t 'TC-(121|122|125)'` failed TC-125 with `AssertionError: expected undefined to be 'ref.removeWorktree'` (no ID on the branch removal item). No failure came from dependency resolution, DOM setup or types.
 - GREEN after implementation (2026-09-29): the same command in the checkout gave `Tests 3 passed | 100 skipped (103)`.
+
+## S26: Highlight path サブメニュー（ブランチ2モード）とタグ除外・任意 callback
+
+> Origin: Feature 061-01 (light-spec-plan)
+> Added: 2026-10-03
+> Status: active
+> Supersedes: -
+> Signature: `buildRefContextMenuItems(repo: string, refName: string, sourceElem: HTMLElement, isRemoteCombined: boolean, gitBranchHead: string | null, remotes?: string[], worktreeInfo?: { path: string; isMainWorktree: boolean } | null, onHighlight?: (mode: BranchPathMode) => void): ContextMenuElement[]`
+> Target Path: `web/refMenu.ts:66-77` (`BRANCH_PATH_MODES` / `buildHighlightPathSubmenu`), `web/refMenu.ts:158-473` (`buildRefContextMenuItems`。signature 158-167、tag 判定 170、submenu 挿入 463-465)
+> Test File: `tests/web/refMenu.test.ts`
+
+対応プラン §3.6 のブランチ向けサブメニューの観点。末尾の任意 callback `onHighlight` が渡された head / remote 分岐だけに `Highlight path` の submenu（`All ancestors` → `First-parent ancestors`）を追加し、tag 分岐には追加しない。対象 hash の解決（行内・省略一覧・併記リモート）は `web/main-test/12-path-highlight-01.md` S68 の責務で本表には含めない。S13 / S14 / S15 / S25 は callback 省略時の契約として active のまま残す。fixture は `REPO = "/test/repo"`、`createMockElement([...])` で `head` / `remote` / `tag` の `sourceElem` を作る。
+
+| Case ID | Input / Precondition                                                                                                                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       | Notes                                  |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| TC-129  | `head` の `sourceElem`、`onHighlight = vi.fn()`。local HEAD（`gitBranchHead === refName`、`worktreeInfo = null`）と local non-HEAD（`worktreeInfo = { path, isMainWorktree: false }`）の2通り | Normal - head の2候補                                                      | 2通りとも `title === "Highlight path"` の submenu がちょうど1件で、その `submenu` の `title` が順に `All ancestors` / `First-parent ancestors` の2件、`recentActionId` を持たない。submenu は末尾の `Copy Branch Name to Clipboard` より前にあり、S13 TC-060 / TC-063 の既存項目の相対順序が変わらず、`null` が連続せず先頭・末尾が `null` でない。各 `onClick` で `onHighlight` が `PathHighlightMode.AllAncestors` / `PathHighlightMode.FirstParent` を引数に1回ずつ呼ばれ、`sendMessage` と `recordRecentAction` の call count が0 | コミット用モードを含まない             |
+| TC-130  | `remote` の `sourceElem`、`refName = "origin/feature"`、`onHighlight = vi.fn()`。`isRemoteCombined` が `false` と `true` の2通り                                                              | Normal - remote の2候補                                                    | 2通りとも `Highlight path` の submenu がちょうど1件で `All ancestors` / `First-parent ancestors` の2件、S13 TC-059 の既存項目の相対順序が変わらず、末尾の `Copy Branch Name to Clipboard` より前にある。各 `onClick` で `onHighlight` が対応するモードで1回ずつ呼ばれ、`sendMessage` の call count が0                                                                                                                                                                                                                                | 併記リモートの remote 部分でも同じ候補 |
+| TC-131  | `tag` の `sourceElem`、`onHighlight = vi.fn()`                                                                                                                                                | Validation - タグ除外                                                      | 戻り値が S13 TC-058 と同じ `Delete Tag...`、`Push Tag...`、`null`、`Copy Tag Name to Clipboard` の4要素で、`Highlight path` の項目が0件、`onHighlight` の call count が0                                                                                                                                                                                                                                                                                                                                                              | タグには新操作を追加しない             |
+| TC-132  | `onHighlight` を渡さず、remote / local HEAD / local non-HEAD（worktree あり）の3通りで構築                                                                                                    | Boundary - callback 省略時の既存順序と recent action の不変                | 3通りとも `title` 列と `null` の位置が S13 TC-059 / TC-060 / TC-063 の配列と `toEqual` で一致し、`Highlight path` の項目が0件。`recentActionId` を持つ項目の集合が S14 TC-065 / S25 TC-125 と同じ                                                                                                                                                                                                                                                                                                                                     | 既存利用者・既存単体テストの契約を維持 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-01 追加分（S26）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                   |
+| ----------------------------------------------------- | -------------------------------------------------------------------------- |
+| モード候補の過不足・順序違い・コミット用モードの混入  | TC-129、TC-130                                                             |
+| callback の mode 取り違え・ホスト送信・recent 記録    | TC-129、TC-130                                                             |
+| タグ・detached 向けに項目が増える                     | TC-131（detached worktree のメニューは `web/worktreeMenu-test.md` の責務） |
+| callback 省略時に項目・`recentActionId` が変わる      | TC-132                                                                     |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL） | callback 省略: TC-132。その他: excluded(数値閾値がない)                    |
+| 入力検証×違反パターン                                 | TC-131（分岐の除外）                                                       |
+| 外部依存×失敗モード                                   | excluded(ダイアログ・送信は mock で、失敗経路を追加しない)                 |
+| 例外・エラー経路                                      | excluded(throw 経路なし)                                                   |
+| 型不正・フォーマット不正                              | excluded(`BranchPathMode` の制約は TypeScript の型検査で担保)              |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: TC-131
+- Exception: excluded(上表のとおり)
+- External: excluded(上表のとおり)
+- Boundary: TC-132
+- Type: excluded(上表のとおり)
+- Normal: TC-129、TC-130

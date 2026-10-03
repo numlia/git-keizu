@@ -3,6 +3,7 @@ import { recordRecentAction } from "./contextMenu";
 import { showConfirmationDialog, showFormDialog, showSelectDialog } from "./dialogs";
 import { t } from "./i18n";
 import { buildMergeMenuItem } from "./mergeDialog";
+import { type CommitPathMode, PathHighlightMode } from "./pathHighlight";
 import {
   abbrevCommit,
   ELLIPSIS,
@@ -10,6 +11,22 @@ import {
   sanitizeBranchNameForPath,
   sendMessage
 } from "./utils";
+
+/** Submenu order for a commit target. */
+const COMMIT_PATH_MODES: readonly CommitPathMode[] = [
+  PathHighlightMode.Direct,
+  PathHighlightMode.AncestorsAndDescendants,
+  PathHighlightMode.FirstParent
+];
+
+function buildHighlightPathSubmenu(
+  onHighlight: (mode: CommitPathMode) => void
+): ContextMenuSubmenu {
+  return {
+    title: t("pathHighlight.menu"),
+    submenu: COMMIT_PATH_MODES.map((mode) => ({ title: t(mode), onClick: () => onHighlight(mode) }))
+  };
+}
 
 function buildMergeParentOptions(
   parentHashes: string[],
@@ -31,7 +48,8 @@ export function buildCommitContextMenuItems(
   parentHashes: string[],
   commits: GitCommitNode[],
   commitLookup: { [hash: string]: number },
-  sourceElem: HTMLElement
+  sourceElem: HTMLElement,
+  onHighlight?: (mode: CommitPathMode) => void
 ): ContextMenuElement[] {
   const addTagItem: ContextMenuItem = {
     title: `${t("Add Tag")}${ELLIPSIS}`,
@@ -338,6 +356,7 @@ export function buildCommitContextMenuItems(
       title: t("context.more"),
       submenu: [addTagItem, checkoutItem, revertItem, resetItem]
     },
+    ...(onHighlight === undefined ? [] : [buildHighlightPathSubmenu(onHighlight)]),
     null,
     copyCommitHashItem
   ];

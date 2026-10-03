@@ -34,6 +34,8 @@ import { findCommitElemWithId, FindWidget, getCommitElems } from "./findWidget";
 import { Graph } from "./graph";
 import { t } from "./i18n";
 import { handleMessage, type RefreshMode } from "./messageHandler";
+import type { BranchPathMode, PathHighlightSelection } from "./pathHighlight";
+import { PathHighlightController } from "./pathHighlightController";
 import { buildRefContextMenuItems, checkoutBranchAction, showDeleteBranchDialog } from "./refMenu";
 import { DESCRIPTION_MIN_WIDTH, RefOverflowController } from "./refOverflow";
 import { buildStashContextMenuItems } from "./stashMenu";
@@ -85,6 +87,9 @@ const GRAPH_COL_MIN_WIDTH = 64;
 const DESCRIPTION_COLUMN_INDEX = 1;
 const TABLE_COLUMN_COUNT = 5;
 const COMBINED_REMOTE_SELECTOR = ".gitRefHeadRemote";
+const REF_CLASS_HEAD = "head";
+const REF_CLASS_REMOTE = "remote";
+type BranchRefType = Extract<PathHighlightSelection, { kind: "branch" }>["refType"];
 const COMMIT_ORDERING_MENU_ITEMS: { label: string; value: GG.RepoCommitOrdering }[] = [
   { label: t("commitOrdering.default"), value: "default" },
   { label: t("commitOrdering.date"), value: "date" },
@@ -100,6 +105,13 @@ function getFileViewToggle(mode: FileViewType): { icon: string; title: string } 
   return mode === FILE_VIEW_LIST
     ? { icon: svgIcons.treeView, title: t("toolbar.switchToTreeView") }
     : { icon: svgIcons.listView, title: t("toolbar.switchToListView") };
+}
+
+/** Tags and detached worktree labels have no branch ref type, so they get no path highlight. */
+function resolveRefType(badge: HTMLElement, isRemoteCombined: boolean): BranchRefType | null {
+  if (isRemoteCombined || badge.classList.contains(REF_CLASS_REMOTE)) return REF_CLASS_REMOTE;
+  if (badge.classList.contains(REF_CLASS_HEAD)) return REF_CLASS_HEAD;
+  return null;
 }
 
 const EMPTY_WORKTREE_COLLECTION: GG.WorktreeCollection = { branches: {}, detached: [] };
@@ -168,6 +180,7 @@ class GitKeizuView {
   private displayFixedColumns: HTMLElement[] = [];
   private findWidget: FindWidget;
   private fileHistory: FileHistoryController;
+  private pathHighlight: PathHighlightController;
   private config: Config;
   private moreCommitsAvailable: boolean = false;
   private showRemoteBranches: boolean = true;
@@ -215,6 +228,7 @@ class GitKeizuView {
     this.repoDropdown = new Dropdown("repoSelect", true, t("toolbar.repos"), (value) => {
       this.refOverflow.detachTable();
       this.fileHistory.onRepositoryChanged();
+      this.pathHighlight.onRepositoryChanged();
       this.currentRepo = value;
       this.branchCleanupPanel.selectRepository(value);
       this.maxCommits = this.config.initialLoadCommits;
@@ -323,6 +337,14 @@ class GitKeizuView {
         this.renderGraph();
       }
     });
+    this.pathHighlight = new PathHighlightController({
+      getCommits: () => this.commits,
+      getCurrentRepo: () => this.currentRepo,
+      setGraphHighlight: (highlight) => {
+        this.graph.setPathHighlight(highlight);
+        this.renderGraph();
+      }
+    });
     document.addEventListener("keydown", (e) => this.handleKeyboardShortcut(e));
     this.observeWindowSizeChanges();
     this.observeWebviewStyleChanges();
@@ -393,6 +415,7 @@ class GitKeizuView {
     if (repos[this.currentRepo] === undefined) {
       this.refOverflow.detachTable();
       this.fileHistory.onRepositoryChanged();
+      this.pathHighlight.onRepositoryChanged();
       this.currentRepo =
         lastActiveRepo !== null && repos[lastActiveRepo] !== undefined
           ? lastActiveRepo
@@ -426,6 +449,7 @@ class GitKeizuView {
 
     this.refOverflow.detachTable();
     this.fileHistory.onRepositoryChanged();
+    if (repo !== this.currentRepo) this.pathHighlight.onRepositoryChanged();
     this.currentRepo = repo;
     this.branchCleanupPanel.selectRepository(repo);
     const repoPaths = Object.keys(this.gitRepos);
@@ -587,6 +611,7 @@ class GitKeizuView {
       this.expandedCommit = null;
       this.saveState();
     }
+    this.pathHighlight.onCommitsChanged();
     this.render();
 
     const authorList =
@@ -1008,15 +1033,18 @@ class GitKeizuView {
         );
         return;
       }
+      const repo = this.currentRepo;
+      const subject = commit.message;
       showContextMenu(
         <MouseEvent>e,
         buildCommitContextMenuItems(
-          this.currentRepo,
+          repo,
           hash,
           commit.parentHashes,
           this.commits,
           this.commitLookup,
-          sourceElem
+          sourceElem,
+          (mode) => this.pathHighlight.select({ kind: "commit", repo, hash, name: subject, mode })
         ),
         sourceElem,
         this.getCurrentRepoRecentActions()
@@ -1108,6 +1136,13 @@ class GitKeizuView {
         worktreeInfo = { path: wtEntry.path, isMainWorktree: wtEntry.isMain };
       }
     }
+    const onHighlight = this.buildRefHighlightHandler(
+      resolveRefType(badge, isRemoteCombined),
+      refName
+    );
+    // Labels without a highlight target keep the builder's existing argument list.
+    const highlightArgs: [] | [(mode: BranchPathMode) => void] =
+      onHighlight === undefined ? [] : [onHighlight];
     showContextMenu(
       event,
       buildRefContextMenuItems(
@@ -1117,11 +1152,31 @@ class GitKeizuView {
         isRemoteCombined,
         this.gitBranchHead,
         remotes,
-        worktreeInfo
+        worktreeInfo,
+        ...highlightArgs
       ),
       badge,
       this.getCurrentRepoRecentActions()
     );
+  }
+  // The target is bound at menu time by exact ref type and name, so listed clones and shared tips resolve the same way.
+  private buildRefHighlightHandler(
+    refType: BranchRefType | null,
+    refName: string
+  ): ((mode: BranchPathMode) => void) | undefined {
+    if (refType === null) return undefined;
+    const target = this.commits.find((commit) =>
+      commit.refs.some((ref) => ref.type === refType && ref.name === refName)
+    );
+    if (target === undefined) return undefined;
+    const selection = {
+      kind: "branch",
+      refType,
+      repo: this.currentRepo,
+      hash: target.hash,
+      name: refName
+    } as const;
+    return (mode) => this.pathHighlight.select({ ...selection, mode });
   }
   // A listed clone lives outside its row, so the stash is resolved from the badge's hash attribute.
   private showStashBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void {

@@ -220,3 +220,44 @@ Cherry Pick / Revert の通常コミット判定を `parentHashes.length === 1` 
 数値境界のうち本変更に意味があるのは `parentHashes.length` の `0`（TC-048/TC-049）・`1`（既存 S3/S10 で担保）・`2`（TC-050）であり、maximum / +/-1 のその他の値は同一分岐のため対象外とする。
 
 **失敗系/正常系比（煙感知器）**: 正常系1件（TC-050)、失敗系2件（TC-048、TC-049）、比2.0。
+
+## S12: Highlight path サブメニュー（コミット3モード）と任意 callback
+
+> Origin: Feature 061-01 (light-spec-plan)
+> Added: 2026-10-03
+> Status: active
+> Supersedes: -
+> Signature: `buildCommitContextMenuItems(repo: string, hash: string, parentHashes: string[], commits: GitCommitNode[], commitLookup: { [hash: string]: number }, sourceElem: HTMLElement, onHighlight?: (mode: CommitPathMode) => void): ContextMenuElement[]`
+> Target Path: `web/commitMenu.ts:16-29` (`COMMIT_PATH_MODES` / `buildHighlightPathSubmenu`), `web/commitMenu.ts:45-363` (`buildCommitContextMenuItems`。signature 45-53、submenu 挿入 349-362)
+> Test File: `tests/web/commitMenu.test.ts`
+
+対応プラン §3.6 の通常コミット向けサブメニューの観点。末尾の任意 callback `onHighlight` が渡されたときだけ `Highlight path`（`t("pathHighlight.menu")`）の submenu を追加し、既存項目の相対順序・`recentActionId`・末尾の `Copy Commit Hash to Clipboard` を維持する。対象 repo / hash の解決と selection の生成は `web/main-test/12-path-highlight-01.md` S68 の責務で本表には含めない。S7（TC-035〜TC-038）と S8 は callback 省略時の契約として active のまま残す。
+
+| Case ID | Input / Precondition                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Notes                                                    |
+| ------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| TC-051  | `onHighlight = vi.fn()` を渡して構築。`parentHashes` が1件・2件・0件の3通り | Normal - 3候補と既存項目の相対順序                                         | 3通りとも `title === "Highlight path"` の submenu 項目がちょうど1件あり、その `submenu` の `title` が順に `Direct parents and children` / `Ancestors and descendants` / `First-parent ancestors` の3件で `recentActionId` を持たない。submenu 項目は末尾の `Copy Commit Hash to Clipboard` より前にあり、`Create Branch...` → `Create Worktree Here...` → `Cherry Pick...` → `Merge into current branch...` → `More...` の相対順序が S7 TC-035 / TC-036 と同じ。`null` が連続せず先頭・末尾が `null` でない | 親の数でモード候補を変えない。`All ancestors` を含まない |
+| TC-052  | TC-051 の submenu の各 `onClick` を順に1回ずつ呼ぶ                          | Normal - callback の mode 引数とホスト送信0                                | `onHighlight` が合計3回、引数がそれぞれ `PathHighlightMode.Direct` / `PathHighlightMode.AncestorsAndDescendants` / `PathHighlightMode.FirstParent`（1回ずつ、クリック順）で呼ばれる。`sendMessage`（`acquireVsCodeApi().postMessage`）の call count が0、`showFormDialog` / `showConfirmationDialog` / `recordRecentAction` の call count が0                                                                                                                                                               | parameterized（3モード）。recentAction を記録しない      |
+| TC-053  | `onHighlight` を渡さずに構築（`parentHashes` 1件）                          | Boundary - callback 省略時の互換                                           | 戻り値の `title` 列と `null` の位置が S7 TC-035 / TC-038 の8要素の配列と `toEqual` で一致し、`Highlight path` の項目が0件                                                                                                                                                                                                                                                                                                                                                                                   | 既存利用者・既存単体テストの契約を維持                   |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-01 追加分（S12）
+
+| 失敗源                                                | 対応ケースまたは除外理由                                                                 |
+| ----------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| モード候補の過不足・順序違い・ブランチ用モードの混入  | TC-051                                                                                   |
+| 既存項目の順序・区切り線・末尾 Copy の変化            | TC-051、TC-053                                                                           |
+| callback の mode 取り違え・ホスト送信・recent 記録    | TC-052                                                                                   |
+| callback 省略時に項目が増える                         | TC-053                                                                                   |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL） | callback 省略: TC-053。`parentHashes` 0件・2件: TC-051。その他: excluded(数値閾値がない) |
+| 入力検証×違反パターン                                 | excluded(ビルダーは入力を検証せず、対象の解決は main の責務)                             |
+| 外部依存×失敗モード                                   | excluded(ダイアログ・送信は mock で、失敗経路を追加しない)                               |
+| 例外・エラー経路                                      | excluded(throw 経路なし)                                                                 |
+| 型不正・フォーマット不正                              | excluded(`CommitPathMode` の制約は TypeScript の型検査で担保)                            |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(上表のとおり)
+- Exception: excluded(上表のとおり)
+- External: excluded(上表のとおり)
+- Boundary: TC-053
+- Type: excluded(上表のとおり)
+- Normal: TC-051、TC-052

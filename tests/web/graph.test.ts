@@ -52,6 +52,7 @@ vi.stubGlobal("document", {
 });
 
 import { Graph, NULL_VERTEX_ID, Vertex } from "../../web/graph";
+import type { PathHighlightResult } from "../../web/pathHighlight";
 
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
@@ -1601,5 +1602,456 @@ describe("Graph.setFileHistoryHighlight() circle classes (S19)", () => {
     expect(classOf("h2")).toBe("fileHistoryMatch");
     expect(classOf("h1")).toBe("fileHistoryDim");
     expect(svgElement().getAttribute("class")).toBe("fileHistoryMode");
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S21: setPathHighlight() line emphasis, rings and boundary marks     */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/graph-test.md
+describe("Graph.setPathHighlight() logical connection rendering (S21)", () => {
+  const CLASS_MODE = "pathHighlightMode";
+  const CLASS_SELECTED = "pathHighlightSelected";
+  const CLASS_RING = "pathHighlightRing";
+  const CLASS_BOUNDARY = "pathHighlightBoundary";
+  const RING_RADIUS = "6";
+  const BOUNDARY_SIDE = "12";
+  const HALF_BOUNDARY_SIDE = 6;
+  const CURVE_COMMANDS = /[CQ]/;
+
+  // Straight fixture: a -> b -> c, all in lane 0.
+  const STRAIGHT = [
+    makeCommit("a", ["b"], null),
+    makeCommit("b", ["c"], null),
+    makeCommit("c", [], null)
+  ];
+  // Merge fixture: n's second parent b joins the point registered by the m -> b line.
+  const MERGE = [
+    makeCommit("m", ["a", "b"], null),
+    makeCommit("n", ["c", "b"], null),
+    makeCommit("a", [], null),
+    makeCommit("c", [], null),
+    makeCommit("b", ["r"], null),
+    makeCommit("r", [], null)
+  ];
+  const TWO_UNLOADED_PARENTS = [makeCommit("c1", ["g2", "g1"], null), makeCommit("x", [], null)];
+  const UNLOADED_PARENT = [makeCommit("t", ["gap"], null), makeCommit("r", [], null)];
+  // S20 TC-076: the parent a of c is listed before its child.
+  const REVERSED = [
+    makeCommit("a", ["b"], null),
+    makeCommit("b", [], null),
+    makeCommit("c", ["a"], null)
+  ];
+
+  // Expected `d` strings derive from the grid (x 16 / y 24, offset 8 / 12, rounded d = 19.2).
+  const STRAIGHT_A_TO_B = "M8,12.0L8,36.0";
+  const STRAIGHT_B_TO_C = "M8,36.0L8,60.0";
+  const STRAIGHT_WHOLE = "M8,12.0L8,60.0";
+  const MERGE_M_TO_A = "M8,12.0L8,60.0";
+  const MERGE_M_TO_B = "M8,12.0C8,31.2 24,16.8 24,36.0L24,60.0C24,79.2 8,64.8 8,84.0L8,108.0";
+  const MERGE_M_TO_JOIN = "M8,12.0C8,31.2 24,16.8 24,36.0L24,60.0";
+  // Without a highlight the lane continues vertically past b, so only the curves are compared.
+  const MERGE_M_TO_B_CURVES = "M8,12.0C8,31.2 24,16.8 24,36.0L24,60.0C24,79.2 8,64.8 8,84.0L8,";
+  const MERGE_JOIN_TO_B = "M24,60.0C24,79.2 8,64.8 8,84.0L8,108.0";
+  const MERGE_N_TO_JOIN = "M40,36.0C40,55.2 24,40.8 24,60.0";
+  const MERGE_B_TO_R = "M8,108.0L8,132.0";
+  const MERGE_N_TO_C = "M40,36.0L40,60.0C40,79.2 24,64.8 24,84.0";
+  const MERGE_B_TO_R_AND_N_TO_JOIN = `${MERGE_B_TO_R}${MERGE_N_TO_JOIN}`;
+  // With row 0 or row 2 expanded (expandY 160) the vertical part of m -> b is stretched.
+  const MERGE_M_TO_B_EXPANDED =
+    "M8,12.0C8,31.2 24,16.8 24,36.0L24,220.0C24,239.2 8,224.8 8,244.0L8,268.0";
+  const MERGE_B_TO_R_AFTER_EXPANSION = "M8,268.0L8,292.0";
+  const UNLOADED_PARENT_R_LANE_X = "24";
+
+  function lookupOf(commits: GitCommitNode[]): { [hash: string]: number } {
+    const lookup: { [hash: string]: number } = {};
+    commits.forEach((commit, index) => {
+      lookup[commit.hash] = index;
+    });
+    return lookup;
+  }
+
+  function highlightOf(
+    hashes: string[],
+    edges: [string, string][],
+    boundaries: { childHash: string; parentHash: string }[] = []
+  ): PathHighlightResult {
+    return {
+      targetFound: true,
+      hashes: new Set(hashes),
+      edgeKeys: new Set(edges.map(([child, parent]) => `["${child}","${parent}"]`)),
+      boundaries
+    };
+  }
+
+  function expandedAt(id: number, commits: GitCommitNode[]): ExpandedCommit {
+    return {
+      id,
+      hash: commits[id].hash,
+      srcElem: null,
+      compareWithHash: null,
+      compareWithSrcElem: null,
+      commitDetails: null,
+      fileTree: null,
+      loading: false
+    };
+  }
+
+  interface RenderOptions {
+    style?: Config["graphStyle"];
+    expand?: number;
+    head?: string | null;
+  }
+
+  /** Renders the commits with the highlight and returns the svg; a null highlight is the reference render. */
+  function render(
+    commits: GitCommitNode[],
+    highlight: PathHighlightResult | null,
+    options: RenderOptions = {}
+  ): { graph: Graph; svg: MockElement } {
+    allCreatedElements = [];
+    containerElement = createMockElement("div");
+    const graph = new Graph("testGraph", {
+      ...DEFAULT_CONFIG,
+      graphStyle: options.style ?? DEFAULT_CONFIG.graphStyle
+    });
+    graph.loadCommits(commits, options.head ?? null, lookupOf(commits));
+    graph.setPathHighlight(highlight);
+    graph.render(options.expand === undefined ? null : expandedAt(options.expand, commits));
+    return { graph, svg: containerElement.children[0] };
+  }
+
+  function descendants(elem: MockElement, tagName: string): MockElement[] {
+    const found: MockElement[] = [];
+    const walk = (current: MockElement): void => {
+      if (current.tagName === tagName) found.push(current);
+      current.children.forEach(walk);
+    };
+    walk(elem);
+    return found;
+  }
+
+  function classesOf(elem: MockElement): string[] {
+    return (elem.getAttribute("class") ?? "").split(" ").filter((name) => name !== "");
+  }
+
+  function linePaths(svg: MockElement): MockElement[] {
+    return descendants(svg, "path").filter((path) => classesOf(path).includes("line"));
+  }
+
+  function shadowPaths(svg: MockElement): MockElement[] {
+    return descendants(svg, "path").filter((path) => classesOf(path).includes("shaddow"));
+  }
+
+  function dOf(path: MockElement): string {
+    return path.getAttribute("d") ?? "";
+  }
+
+  function selectedOf(paths: MockElement[]): string[] {
+    return paths.filter((path) => classesOf(path).includes(CLASS_SELECTED)).map(dOf);
+  }
+
+  function unselectedOf(paths: MockElement[]): string[] {
+    return paths.filter((path) => !classesOf(path).includes(CLASS_SELECTED)).map(dOf);
+  }
+
+  function rings(svg: MockElement): MockElement[] {
+    return descendants(svg, "circle").filter((circle) => classesOf(circle).includes(CLASS_RING));
+  }
+
+  function boundaryRects(svg: MockElement): MockElement[] {
+    return descendants(svg, "rect").filter((rect) => classesOf(rect).includes(CLASS_BOUNDARY));
+  }
+
+  function hashCircles(svg: MockElement): MockElement[] {
+    return descendants(svg, "circle").filter((circle) => circle.getAttribute("data-hash") !== null);
+  }
+
+  function circleOf(svg: MockElement, hash: string): MockElement {
+    const circle = hashCircles(svg).find((elem) => elem.getAttribute("data-hash") === hash);
+    expect(circle).toBeDefined();
+    return circle!;
+  }
+
+  function centreOf(elem: MockElement): [string | null, string | null] {
+    return [elem.getAttribute("cx"), elem.getAttribute("cy")];
+  }
+
+  interface Segment {
+    command: string;
+    coords: string;
+    startX: string | null;
+    endX: string;
+  }
+
+  /**
+   * Point sequence of the concatenated paths: drops a move that repeats the current point and
+   * merges consecutive vertical segments, the only simplification the renderer applies.
+   */
+  function pointSequence(paths: MockElement[]): string {
+    const tokens =
+      paths
+        .map(dOf)
+        .join("")
+        .match(/[MLC][^MLC]*/g) ?? [];
+    const segments: Segment[] = [];
+    let current: [string, string] | null = null;
+    for (const token of tokens) {
+      const command = token[0];
+      const coords = token.slice(1).trim();
+      const [endX, endY] = (coords.split(" ").pop() ?? "").split(",");
+      if (command === "M" && current !== null && endX === current[0] && endY === current[1]) {
+        continue;
+      }
+      const previous = segments[segments.length - 1];
+      if (
+        command === "L" &&
+        current !== null &&
+        endX === current[0] &&
+        previous !== undefined &&
+        previous.command === "L" &&
+        previous.startX === endX &&
+        previous.endX === endX
+      ) {
+        previous.coords = `${endX},${endY}`;
+        current = [endX, endY];
+        continue;
+      }
+      segments.push({ command, coords, startX: current === null ? null : current[0], endX });
+      current = [endX, endY];
+    }
+    return segments.map((segment) => `${segment.command}${segment.coords}`).join("");
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("splits a straight lane at the highlight boundary and rejoins it after clearing (TC-078)", () => {
+    // Case: TC-078
+    // Given: b -> c highlighted on the straight fixture
+    const highlight = highlightOf(["b", "c"], [["b", "c"]]);
+
+    // When: rendered
+    const { graph, svg } = render(STRAIGHT, highlight);
+    const lines = linePaths(svg);
+    const shadows = shadowPaths(svg);
+
+    // Then: two line paths, only the b -> c one selected, shadows match, svg in mode
+    expect(lines).toHaveLength(2);
+    expect(selectedOf(lines)).toEqual([STRAIGHT_B_TO_C]);
+    expect(unselectedOf(lines)).toEqual([STRAIGHT_A_TO_B]);
+    expect(shadows.map(dOf)).toEqual(lines.map(dOf));
+    expect(selectedOf(shadows)).toEqual([STRAIGHT_B_TO_C]);
+    expect(classesOf(svg)).toContain(CLASS_MODE);
+
+    // When: the highlight is cleared and rendered again
+    graph.setPathHighlight(null);
+    graph.render(null);
+    const cleared = containerElement.children[0];
+
+    // Then: one path equal to the two joined, no selected class, no mode class
+    expect(linePaths(cleared).map(dOf)).toEqual([STRAIGHT_WHOLE]);
+    expect(pointSequence(linePaths(cleared))).toBe(pointSequence(lines));
+    expect(selectedOf(descendants(cleared, "path"))).toEqual([]);
+    expect(classesOf(cleared)).not.toContain(CLASS_MODE);
+  });
+
+  it("highlights the new part and the shared trailing part of m -> b (TC-079)", () => {
+    // Case: TC-079
+    const { svg } = render(MERGE, highlightOf(["m", "b"], [["m", "b"]]));
+    const reference = render(MERGE, null).svg;
+
+    // Then: the whole m -> b line is one selected path; m -> a, b -> r, n's lines are not
+    expect(selectedOf(linePaths(svg))).toEqual([MERGE_M_TO_B]);
+    expect(unselectedOf(linePaths(svg))).toEqual([
+      MERGE_M_TO_A,
+      MERGE_B_TO_R_AND_N_TO_JOIN,
+      MERGE_N_TO_C
+    ]);
+    expect(
+      linePaths(reference)
+        .map(dOf)
+        .some((d) => d.startsWith(MERGE_M_TO_B_CURVES))
+    ).toBe(true);
+    expect(pointSequence(linePaths(svg))).toBe(pointSequence(linePaths(reference)));
+    expect(shadowPaths(svg).map(dOf)).toEqual(linePaths(svg).map(dOf));
+  });
+
+  it("highlights the n -> b merge line and the shared part from the join point to b (TC-080)", () => {
+    // Case: TC-080
+    const { svg } = render(MERGE, highlightOf(["n", "b"], [["n", "b"]]));
+    const reference = render(MERGE, null).svg;
+
+    // Then: the shared part and the merge line are selected; m -> b before the join is not
+    expect(selectedOf(linePaths(svg))).toEqual([MERGE_JOIN_TO_B, MERGE_N_TO_JOIN]);
+    expect(unselectedOf(linePaths(svg))).toContain(MERGE_M_TO_JOIN);
+    expect(pointSequence(linePaths(svg))).toBe(pointSequence(linePaths(reference)));
+  });
+
+  it("leaves b -> r, n -> c and m -> a unselected for the n -> b selection (TC-081)", () => {
+    // Case: TC-081
+    const { svg } = render(MERGE, highlightOf(["n", "b"], [["n", "b"]]));
+    const selected = selectedOf(linePaths(svg));
+
+    // Then: none of the unrelated same-colour or trailing parts is selected
+    expect(unselectedOf(linePaths(svg))).toEqual([
+      MERGE_M_TO_A,
+      MERGE_M_TO_JOIN,
+      MERGE_B_TO_R,
+      MERGE_N_TO_C
+    ]);
+    expect(selected).not.toContain(MERGE_B_TO_R);
+    expect(selected).not.toContain(MERGE_N_TO_C);
+    expect(selected).not.toContain(MERGE_M_TO_A);
+  });
+
+  it("keeps the angular point sequence and draws no curve (TC-082)", () => {
+    // Case: TC-082
+    const { svg } = render(MERGE, highlightOf(["n", "b"], [["n", "b"]]), { style: "angular" });
+    const reference = render(MERGE, null, { style: "angular" }).svg;
+    const selected = selectedOf(linePaths(svg));
+
+    // Then: same points as the reference, two selected paths without curve commands
+    expect(pointSequence(linePaths(svg))).toBe(pointSequence(linePaths(reference)));
+    expect(selected).toHaveLength(2);
+    for (const d of selected) {
+      expect(d).not.toMatch(CURVE_COMMANDS);
+    }
+  });
+
+  it("keeps the rounded curve of the m -> b path (TC-083)", () => {
+    // Case: TC-083
+    const { svg } = render(MERGE, highlightOf(["m", "b"], [["m", "b"]]), { style: "rounded" });
+    const reference = render(MERGE, null, { style: "rounded" }).svg;
+    const selected = selectedOf(linePaths(svg));
+
+    // Then: the selected path has the curve and is the head of the reference lane path
+    expect(selected).toEqual([MERGE_M_TO_B]);
+    expect(selected[0]).toMatch(CURVE_COMMANDS);
+    const referenceLane = linePaths(reference)
+      .map(dOf)
+      .find((d) => d.startsWith("M8,12.0C"));
+    expect(referenceLane).toBeDefined();
+    expect(referenceLane!.startsWith(MERGE_M_TO_B_CURVES)).toBe(true);
+    expect(pointSequence(linePaths(svg))).toBe(pointSequence(linePaths(reference)));
+  });
+
+  it("keeps ownership across the lockedFirst expansion of m (TC-084)", () => {
+    // Case: TC-084
+    // Given: m (row 0) expanded, so the first m -> b transition (lockedFirst) crosses the expansion
+    const { svg } = render(MERGE, highlightOf(["m", "b"], [["m", "b"]]), { expand: 0 });
+    const reference = render(MERGE, null, { expand: 0 }).svg;
+
+    // Then: transition and extension are both selected and match the reference geometry
+    expect(selectedOf(linePaths(svg))).toEqual([MERGE_M_TO_B_EXPANDED]);
+    expect(selectedOf(shadowPaths(svg))).toEqual([MERGE_M_TO_B_EXPANDED]);
+    expect(pointSequence(linePaths(svg))).toBe(pointSequence(linePaths(reference)));
+  });
+
+  it("keeps ownership across the non-lockedFirst expansion of a (TC-085)", () => {
+    // Case: TC-085
+    // Given: a (row 2) expanded, so the (1,2) -> (0,3) part of m -> b (lockedFirst false) crosses it
+    const { svg } = render(MERGE, highlightOf(["m", "b"], [["m", "b"]]), { expand: 2 });
+    const reference = render(MERGE, null, { expand: 2 }).svg;
+
+    // Then: extension and moved transition are selected; n -> b is not; geometry matches
+    expect(selectedOf(linePaths(svg))).toEqual([MERGE_M_TO_B_EXPANDED]);
+    expect(selectedOf(shadowPaths(svg))).toEqual([MERGE_M_TO_B_EXPANDED]);
+    expect(
+      unselectedOf(linePaths(svg)).some((d) => d.startsWith(MERGE_B_TO_R_AFTER_EXPANSION))
+    ).toBe(true);
+    expect(pointSequence(linePaths(svg))).toBe(pointSequence(linePaths(reference)));
+  });
+
+  it("draws rings beside the HEAD circle and removes them on clear (TC-086)", () => {
+    // Case: TC-086
+    const highlight = highlightOf(["m", "b"], [["m", "b"]]);
+    const reference = render(MERGE, null, { head: "m" }).svg;
+    const { graph, svg } = render(MERGE, highlight, { head: "m" });
+    const mCircle = circleOf(svg, "m");
+
+    // Then: two rings at m and b, the HEAD circle unchanged, no extra data-hash circle
+    expect(rings(svg).map((ring) => [...centreOf(ring), ring.getAttribute("r")])).toEqual([
+      [...centreOf(mCircle), RING_RADIUS],
+      [...centreOf(circleOf(svg, "b")), RING_RADIUS]
+    ]);
+    expect(rings(svg).every((ring) => ring.getAttribute("data-hash") === null)).toBe(true);
+    expect(classesOf(mCircle)).toContain("current");
+    expect(mCircle.getAttribute("fill")).toBe(circleOf(reference, "m").getAttribute("fill"));
+    expect(hashCircles(svg)).toHaveLength(hashCircles(reference).length);
+
+    // When: cleared
+    graph.setPathHighlight(null);
+    graph.render(null);
+    const cleared = containerElement.children[0];
+
+    // Then: no ring, HEAD still current, no mode class
+    expect(rings(cleared)).toHaveLength(0);
+    expect(classesOf(circleOf(cleared, "m"))).toContain("current");
+    expect(classesOf(cleared)).not.toContain(CLASS_MODE);
+  });
+
+  it("draws one square for a child with two unloaded parents (TC-087)", () => {
+    // Case: TC-087
+    const highlight = highlightOf(
+      ["c1"],
+      [],
+      [
+        { childHash: "c1", parentHash: "g2" },
+        { childHash: "c1", parentHash: "g1" }
+      ]
+    );
+    const reference = render(TWO_UNLOADED_PARENTS, null).svg;
+    const { svg } = render(TWO_UNLOADED_PARENTS, highlight);
+    const rects = boundaryRects(svg);
+    const c1 = circleOf(svg, "c1");
+
+    // Then: one 12 x 12 square centred on c1, no circle for g1 / g2, one ring
+    expect(rects).toHaveLength(1);
+    expect(rects[0].getAttribute("width")).toBe(BOUNDARY_SIDE);
+    expect(rects[0].getAttribute("height")).toBe(BOUNDARY_SIDE);
+    expect(Number(rects[0].getAttribute("x")) + HALF_BOUNDARY_SIDE).toBe(
+      Number(c1.getAttribute("cx"))
+    );
+    expect(Number(rects[0].getAttribute("y")) + HALF_BOUNDARY_SIDE).toBe(
+      Number(c1.getAttribute("cy"))
+    );
+    expect(hashCircles(svg).map((circle) => circle.getAttribute("data-hash"))).toEqual(["c1", "x"]);
+    expect(hashCircles(svg)).toHaveLength(hashCircles(reference).length);
+    expect(rings(svg)).toHaveLength(1);
+  });
+
+  it("does not highlight the continuation line to an unloaded parent (TC-088)", () => {
+    // Case: TC-088
+    const { svg } = render(
+      UNLOADED_PARENT,
+      highlightOf(["t"], [], [{ childHash: "t", parentHash: "gap" }])
+    );
+    const lines = linePaths(svg);
+
+    // Then: no selected path, no line reaching r's lane, one ring and one square at t
+    expect(selectedOf(descendants(svg, "path"))).toEqual([]);
+    expect(circleOf(svg, "r").getAttribute("cx")).toBe(UNLOADED_PARENT_R_LANE_X);
+    expect(lines.some((line) => dOf(line).includes(`${UNLOADED_PARENT_R_LANE_X},`))).toBe(false);
+    expect(rings(svg).map(centreOf)).toEqual([centreOf(circleOf(svg, "t"))]);
+    expect(boundaryRects(svg)).toHaveLength(1);
+  });
+
+  it("terminates on reversed input and highlights no line that does not exist (TC-089)", () => {
+    // Case: TC-089
+    const spy = vi.spyOn(Vertex.prototype, "registerParentProcessed");
+
+    // When: c -> a is highlighted although a precedes c
+    const { svg } = render(REVERSED, highlightOf(["c", "a"], [["c", "a"]]));
+
+    // Then: placement finished as in S20 TC-076, no selected path, rings for a and c
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(selectedOf(descendants(svg, "path"))).toEqual([]);
+    expect(rings(svg).map(centreOf)).toEqual([
+      centreOf(circleOf(svg, "a")),
+      centreOf(circleOf(svg, "c"))
+    ]);
   });
 });
