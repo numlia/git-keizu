@@ -12,7 +12,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `computePathHighlight(commits: readonly GitCommitNode[], targetHash: string, mode: PathHighlightMode): PathHighlightResult` / `pathEdgeKey(childHash: string, parentHash: string): string`
-> Target Path: `web/pathHighlight.ts`（`computePathHighlight`・`pathEdgeKey`。実装後に行範囲へ更新）
+> Target Path: `web/pathHighlight.ts:60-98`
 > Test File: `tests/web/pathHighlight.test.ts`
 
 対応プラン §3.7 の受け入れデータ9行を、`hashes`・`edgeKeys`・`boundaries`・`targetFound` の完全一致で検証する純粋計算の観点。標準fixtureは表示順 `N,M,A,B,U,R,X`、関係は `N→[M]`、`M→[A,B]`、`A→[R]`、`B→[R]`、`U→[R]`、`R→[]`、`X→[]`（各行は `stash: null`、`refs: []`、hashは表示用の識別子）。期待する `edgeKeys` は製品の `pathEdgeKey` を呼ばず、`["子","親"]` 形式のリテラル文字列（`JSON.stringify([childHash, parentHash])` と同じ文字列）で書く。`hashes` / `edgeKeys` は `Set` 同士の `toEqual`、`boundaries` は並び替えずに配列の `toEqual` で比較する。モード値はenum `PathHighlightMode` の `Direct` / `AncestorsAndDescendants` / `FirstParent` / `AllAncestors`。DOM・SVG・翻訳・ホスト送信には触れない（描画は `web/graph-test.md` S21、状態バーは `web/pathHighlightController-test.md` S1 の責務）。
@@ -61,7 +61,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `computePathHighlight(commits: readonly GitCommitNode[], targetHash: string, mode: PathHighlightMode): PathHighlightResult`
-> Target Path: `web/pathHighlight.ts`（`computePathHighlight`。実装後に行範囲へ更新）
+> Target Path: `web/pathHighlight.ts:64-214`
 > Test File: `tests/web/pathHighlight.test.ts`
 
 対応プラン §3.4 の探索規則（疑似行の除外、順序非依存、方向別の境界判定、境界一覧の確定順）の観点。比較方法と標準fixtureは S1 と同じ。疑似行は `hash === UNCOMMITTED_CHANGES_HASH`（`src/types.ts`）の作業ツリー行と `stash !== null` の行。複数モードを含むケースは、各入力と期待値が分かる parameterized test（`it.each`）にする。
@@ -109,7 +109,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `computePathHighlight(commits: readonly GitCommitNode[], targetHash: string, mode: PathHighlightMode): PathHighlightResult`
-> Target Path: `web/pathHighlight.ts`（`computePathHighlight`。実装後に行範囲へ更新）
+> Target Path: `web/pathHighlight.ts:64-214`
 > Test File: `tests/web/pathHighlight.test.ts`
 
 対応プラン §3.1 の入力不変と、§3.4 の「再帰せず頂点数と親情報件数に線形」の観点。長い履歴の件数は実装時に fixture の生成件数を本節の Notes に記録し、ミリ秒の閾値は設けない。
