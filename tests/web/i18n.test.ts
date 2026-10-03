@@ -1079,3 +1079,63 @@ describe("hidden ref badge counter label (Feature 059-02)", () => {
     );
   });
 });
+
+// S3: path highlight UI keys resolve in both real dictionaries
+// @see docs/testing/perspectives/web/i18n-test.md
+describe("path highlight l10n keys (S3)", () => {
+  function loadBundle(fileName: string): Record<string, string> {
+    const jsonPath = resolve(process.cwd(), "l10n/web", fileName);
+    return JSON.parse(readFileSync(jsonPath, "utf-8")) as Record<string, string>;
+  }
+
+  // Plan §3.6: every key with its English and Japanese wording.
+  const PATH_HIGHLIGHT_LABELS: [key: string, english: string, japanese: string][] = [
+    ["pathHighlight.menu", "Highlight path", "経路を強調"],
+    ["Direct parents and children", "Direct parents and children", "直接の親・子"],
+    ["Ancestors and descendants", "Ancestors and descendants", "全祖先と全子孫"],
+    ["First-parent ancestors", "First-parent ancestors", "第一親の祖先"],
+    ["All ancestors", "All ancestors", "全祖先"],
+    ["pathHighlight.mode", "Mode", "モード"],
+    ["pathHighlight.loadedOnly", "Loaded history only", "読み込み済みの履歴のみ"],
+    ["pathHighlight.clear", "Clear path highlight", "経路の強調を解除"],
+    ["pathHighlight.branchAtSelection", "Branch at selection", "選択時点のブランチ"],
+    [
+      "pathHighlight.targetOutside",
+      "Target is outside loaded history",
+      "対象は読み込み済み履歴の範囲外です"
+    ],
+    ["pathHighlight.outside", "Outside loaded history", "読み込み済み履歴の範囲外"]
+  ];
+
+  it.each(PATH_HIGHLIGHT_LABELS)(
+    "resolves %s to the English wording from the real bundle (TC-010)",
+    (key, english) => {
+      // Case: TC-010
+      // Given: the English bundle on disk is the active dictionary
+      globalThis.webviewMessages = loadBundle("web.l10n.en.json");
+
+      // When: the key is translated
+      const result = t(key);
+
+      // Then: the plan wording is returned (a key fallback would equal the key for mode values)
+      expect(result).toBe(english);
+      expect(globalThis.webviewMessages[key]).toBeDefined();
+    }
+  );
+
+  it.each(PATH_HIGHLIGHT_LABELS)(
+    "resolves %s to the Japanese wording from the real bundle (TC-011)",
+    (key, _english, japanese) => {
+      // Case: TC-011
+      // Given: the Japanese bundle on disk is the active dictionary
+      globalThis.webviewMessages = loadBundle("web.l10n.ja.json");
+
+      // When: the key is translated
+      const result = t(key);
+
+      // Then: the Japanese wording is returned, not the English key
+      expect(result).toBe(japanese);
+      expect(result).not.toBe(key);
+    }
+  );
+});

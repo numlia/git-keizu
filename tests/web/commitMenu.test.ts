@@ -1,6 +1,8 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import type { GitCommitNode } from "../../src/types";
+
 vi.mock("../../web/dialogs", () => ({
   showCheckboxDialog: vi.fn(),
   showConfirmationDialog: vi.fn(),
@@ -34,6 +36,7 @@ vi.mock("../../web/utils", () => {
 import { buildCommitContextMenuItems } from "../../web/commitMenu";
 import { recordRecentAction } from "../../web/contextMenu";
 import { showConfirmationDialog, showFormDialog, showSelectDialog } from "../../web/dialogs";
+import { PathHighlightMode } from "../../web/pathHighlight";
 import { sanitizeBranchNameForPath, sendMessage } from "../../web/utils";
 
 const REPO = "/test/repo";
@@ -1372,5 +1375,159 @@ describe("root commit cherry-pick/revert branch (S11)", () => {
       recordOrigin: true,
       noCommit: false
     });
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S12: Highlight path submenu (three commit modes) and optional callback */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/commitMenu-test.md
+describe("Highlight path submenu for commits (S12)", () => {
+  const HIGHLIGHT_TITLE = "Highlight path";
+  const COPY_HASH_TITLE = "Copy Commit Hash to Clipboard";
+  const COMMIT_MODE_TITLES = [
+    "Direct parents and children",
+    "Ancestors and descendants",
+    "First-parent ancestors"
+  ];
+  const EXISTING_TOP_LEVEL_ORDER = [
+    "Create Branch&#8230;",
+    "Create Worktree Here&#8230;",
+    "Cherry Pick&#8230;",
+    "Merge into current branch&#8230;",
+    "More..."
+  ];
+  // S7 TC-035 / TC-038: the eight-element layout without the callback.
+  const LAYOUT_WITHOUT_CALLBACK = [
+    "Create Branch&#8230;",
+    "Create Worktree Here&#8230;",
+    "Cherry Pick&#8230;",
+    "Merge into current branch&#8230;",
+    null,
+    "More...",
+    null,
+    COPY_HASH_TITLE
+  ];
+  const MERGE_PARENTS = ["parent1234567890", "parent2234567890"];
+  const MERGE_COMMITS = [
+    { message: "first commit" },
+    { message: "second commit" }
+  ] as unknown as GitCommitNode[];
+  const MERGE_LOOKUP = { parent1234567890: 0, parent2234567890: 1 };
+
+  function titlesOf(items: ContextMenuElement[]): (string | null)[] {
+    return items.map((item) => (item === null ? null : item.title));
+  }
+
+  function highlightSubmenus(items: ContextMenuElement[]): ContextMenuSubmenu[] {
+    return items.filter(
+      (item): item is ContextMenuSubmenu =>
+        isContextMenuSubmenu(item) && item.title === HIGHLIGHT_TITLE
+    );
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      }
+    };
+  });
+
+  it.each([
+    ["one parent", PARENT_HASHES, [] as GitCommitNode[], {}],
+    ["two parents", MERGE_PARENTS, MERGE_COMMITS, MERGE_LOOKUP],
+    ["no parent", [] as string[], [] as GitCommitNode[], {}]
+  ])(
+    "offers the three commit modes before the copy item for a commit with %s (TC-051)",
+    (_label, parentHashes, commits, lookup) => {
+      // Case: TC-051
+      // Given: a menu built with the highlight callback
+      const items = buildCommitContextMenuItems(
+        REPO,
+        HASH,
+        parentHashes,
+        commits,
+        lookup,
+        createMockElement(),
+        vi.fn()
+      );
+
+      // When: the submenu and the surrounding order are inspected
+      const submenus = highlightSubmenus(items);
+      const titles = titlesOf(items);
+
+      // Then: exactly one submenu with the three modes, before the trailing copy item
+      expect(submenus).toHaveLength(1);
+      expect(submenus[0].submenu.map((item) => (item === null ? null : item.title))).toEqual(
+        COMMIT_MODE_TITLES
+      );
+      for (const item of submenus[0].submenu) {
+        expect(isContextMenuItem(item)).toBe(true);
+        expect((item as ContextMenuItem).recentActionId).toBeUndefined();
+      }
+      expect(titles.indexOf(HIGHLIGHT_TITLE)).toBeLessThan(titles.indexOf(COPY_HASH_TITLE));
+      expect(titles[titles.length - 1]).toBe(COPY_HASH_TITLE);
+      expect(titles.filter((title) => EXISTING_TOP_LEVEL_ORDER.includes(title ?? ""))).toEqual(
+        EXISTING_TOP_LEVEL_ORDER
+      );
+      expect(items[0]).not.toBeNull();
+      expect(items[items.length - 1]).not.toBeNull();
+      expect(items.some((item, index) => item === null && items[index + 1] === null)).toBe(false);
+    }
+  );
+
+  it("passes each mode to the callback in click order without sending or recording (TC-052)", () => {
+    // Case: TC-052
+    // Given: a menu built with the highlight callback
+    const onHighlight = vi.fn();
+    const items = buildCommitContextMenuItems(
+      REPO,
+      HASH,
+      PARENT_HASHES,
+      [],
+      {},
+      createMockElement(),
+      onHighlight
+    );
+
+    // When: every mode item is clicked once in order
+    for (const item of highlightSubmenus(items)[0].submenu) {
+      (item as ContextMenuItem).onClick();
+    }
+
+    // Then: the callback receives the enum values in order; nothing is sent, shown or recorded
+    expect(onHighlight.mock.calls).toEqual([
+      [PathHighlightMode.Direct],
+      [PathHighlightMode.AncestorsAndDescendants],
+      [PathHighlightMode.FirstParent]
+    ]);
+    expect(sendMessage).toHaveBeenCalledTimes(0);
+    expect(showFormDialog).toHaveBeenCalledTimes(0);
+    expect(showConfirmationDialog).toHaveBeenCalledTimes(0);
+    expect(recordRecentAction).toHaveBeenCalledTimes(0);
+  });
+
+  it("keeps the eight-element layout when the callback is omitted (TC-053)", () => {
+    // Case: TC-053
+    // Given: a menu built without the callback
+    const items = buildCommitContextMenuItems(
+      REPO,
+      HASH,
+      PARENT_HASHES,
+      [],
+      {},
+      createMockElement()
+    );
+
+    // Then: the S7 layout is unchanged and no highlight item exists
+    expect(titlesOf(items)).toEqual(LAYOUT_WITHOUT_CALLBACK);
+    expect(highlightSubmenus(items)).toHaveLength(0);
   });
 });

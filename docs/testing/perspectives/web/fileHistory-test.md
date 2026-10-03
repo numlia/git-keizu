@@ -316,8 +316,8 @@ S6 は端での一周（TC-032 / TC-033）と一致1件での再スクロール�
 > Status: active
 > Supersedes: -
 > Signature: `navigate(delta: -1 | 1, useExpandedCommit: boolean = false): string | null` / `handleCommitRowClick(hash: string): void` / `exit(): void` / `getCurrentHash(): string | null`（`FileHistoryController`。実装は変更しない）
-> Target Path: `web/fileHistory.ts`（`FileHistoryController`。既存契約の確認で、変更がなければ行範囲は現状のまま）
-> Test File: `tests/web/fileHistory.test.ts` または `tests/web/main.pathHighlight.test.ts`
+> Target Path: `web/fileHistory.ts:130-401`（`FileHistoryController`。実装は変更しない）
+> Test File: `tests/web/main.pathHighlight.test.ts`
 
 経路強調（`web/pathHighlightController.ts`）は独立した状態と `Graph.setPathHighlight` を使い、ファイル履歴の状態・`setGraphHighlight` callback・復元契約には触れない。本節はその前提のもとで、ファイル履歴側の既存契約（S8 の解除・復元、S10 の移動）が併用時にも変わらないことを確認する。経路探索と CSS の優先順位は本表に含めない（`web/pathHighlight-test.md`、`media/main-test.md` S8）。両強調の SVG class の共存は `web/main-test/12-path-highlight-01.md` S68 TC-644 の責務。fixture A は S10 と同じ（`[h0, x1, h1, x2, h2]`、entries `[h0, h1, h2]`、anchor `h0`、current `h0`、position `"1 of 3"`）。既存テストで十分な場合は差分を要求せず、対応する test method を記録する。
 

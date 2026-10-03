@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import {
+  afterAll,
   afterEach,
   beforeAll,
   beforeEach,
@@ -62,8 +63,10 @@ const {
       getAlternativeChildIndex: vi.fn((): number => -1)
     },
     mockGraphHighlight: {
+      loadCommits: vi.fn(),
       render: vi.fn(),
-      setFileHistoryHighlight: vi.fn()
+      setFileHistoryHighlight: vi.fn(),
+      setPathHighlight: vi.fn()
     },
     mockFileHistoryInstance,
     capturedFileHistoryCallbacks,
@@ -150,7 +153,7 @@ vi.mock("../../web/graph", () => ({
   Graph: vi.fn(function (_elemId: string, config: Record<string, unknown>) {
     capturedConfig.ref = config;
     return {
-      loadCommits: vi.fn(),
+      loadCommits: mockGraphHighlight.loadCommits,
       render: mockGraphHighlight.render,
       clear: vi.fn(),
       getVertexColour: vi.fn(() => 0),
@@ -162,7 +165,8 @@ vi.mock("../../web/graph", () => ({
       getWidth: vi.fn(() => 100),
       getHeight: vi.fn(() => 500),
       limitMaxWidth: vi.fn(),
-      setFileHistoryHighlight: mockGraphHighlight.setFileHistoryHighlight
+      setFileHistoryHighlight: mockGraphHighlight.setFileHistoryHighlight,
+      setPathHighlight: mockGraphHighlight.setPathHighlight
     };
   })
 }));
@@ -343,6 +347,7 @@ import {
   generateGitFileListHtml,
   generateGitFileTreeHtml
 } from "../../web/fileTree";
+import { PathHighlightMode } from "../../web/pathHighlight";
 import { buildRefContextMenuItems, checkoutBranchAction } from "../../web/refMenu";
 import { RefOverflowController } from "../../web/refOverflow";
 import { buildStashContextMenuItems } from "../../web/stashMenu";
@@ -10292,5 +10297,596 @@ describe("GitKeizuView worktrees in saved state", () => {
 
     // Then: the worktree difference triggers a second render
     expect(mockGraphHighlight.render).toHaveBeenCalledTimes(2);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S68: path highlight selection across view changes                  */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/main-test/12-path-highlight-01.md
+describe("path highlight selection across view changes (S68)", () => {
+  const OTHER_REPO = "/test/other-repo";
+  const PATH_HEAD = "N";
+  const MERGE_SUBJECT = "Merge branch";
+  const HIGHLIGHT_TITLE = "Highlight path";
+  const DIRECT_TITLE = "Direct parents and children";
+  const FIRST_PARENT_TITLE = "First-parent ancestors";
+  const TARGET_OUTSIDE_TEXT = "Target is outside loaded history";
+  const BRANCH_LABEL_TEXT = "Branch at selection";
+  const BAR_ID = "pathHighlightBar";
+  const CLEAR_ID = "pathHighlightClear";
+  const CLASS_ACTIVE = "active";
+  const SCROLL_TOP = 240;
+  const FIND_TEXT = "search";
+  const PATH_HIGHLIGHT_STATE_KEY = /pathHighlight/i;
+  const REFRESH_COMMANDS = ["loadBranches", "loadCommits"];
+  const DIRECT_HASHES = new Set(["N", "M", "A", "B"]);
+  const ALL_ANCESTOR_HASHES = new Set(["M", "A", "B", "R"]);
+  const MOVED_TIP_HASHES = new Set(["N", "M", "A", "B", "R"]);
+
+  type BranchLabels = ReturnType<typeof getBranchLabels>;
+
+  let liveVscode: typeof vscode;
+
+  function pathNode(
+    hash: string,
+    parentHashes: string[],
+    extra: Partial<GitCommitNode> = {}
+  ): GitCommitNode {
+    return {
+      hash,
+      parentHashes,
+      author: "Alice",
+      email: "alice@test.com",
+      date: 1700000000,
+      message: `m ${hash}`,
+      refs: [],
+      stash: null,
+      ...extra
+    };
+  }
+
+  function pathRef(hash: string, name: string, type: GitRef["type"]): GitRef {
+    return { hash, name, type };
+  }
+
+  /** Standard fixture: feature / hotfix / origin/feature on M unless overridden. */
+  function pathCommits(refsOfM?: GitRef[], refsOfN: GitRef[] = []): GitCommitNode[] {
+    return [
+      pathNode("N", ["M"], { refs: refsOfN }),
+      pathNode("M", ["A", "B"], {
+        message: MERGE_SUBJECT,
+        refs: refsOfM ?? [
+          pathRef("M", "feature", "head"),
+          pathRef("M", "hotfix", "head"),
+          pathRef("M", "origin/feature", "remote")
+        ]
+      }),
+      pathNode("A", ["R"]),
+      pathNode("B", ["R"]),
+      pathNode("U", ["R"]),
+      pathNode("R", []),
+      pathNode("X", [])
+    ];
+  }
+
+  /** Mirrors the real label grouping closely enough for head / combined-remote badges. */
+  function labelsFromRefs(refs: GitRef[]): BranchLabels {
+    const heads = refs
+      .filter((entry) => entry.type === "head")
+      .map((entry) => ({
+        name: entry.name,
+        remotes: refs
+          .filter((other) => other.type === "remote" && other.name === `origin/${entry.name}`)
+          .map(() => "origin")
+      }));
+    const combined = new Set(
+      heads.flatMap((head) => head.remotes.map((remote) => `${remote}/${head.name}`))
+    );
+    return {
+      heads,
+      remotes: refs.filter((entry) => entry.type === "remote" && !combined.has(entry.name)),
+      tags: refs.filter((entry) => entry.type === "tag")
+    };
+  }
+
+  function loadPath(commits: GitCommitNode[], hard = true, head = PATH_HEAD): void {
+    dispatchMessage({ command: "loadCommits", commits, head, moreCommitsAvailable: false, hard });
+  }
+
+  function loadPathRepos(repos: string[]): void {
+    dispatchMessage({
+      command: "loadRepos",
+      repos: Object.fromEntries(repos.map((repo) => [repo, { columnWidths: null }])),
+      lastActiveRepo: TEST_REPO
+    });
+  }
+
+  function commitMenuItems(hash: string): ContextMenuElement[] {
+    document
+      .querySelector(`.commit[data-hash="${hash}"]`)!
+      .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    const calls = vi.mocked(showContextMenu).mock.calls;
+    return calls[calls.length - 1][1];
+  }
+
+  function modeItem(items: ContextMenuElement[], title: string): ContextMenuItem {
+    const submenu = items.find(
+      (item): item is ContextMenuSubmenu =>
+        item !== null && "submenu" in item && item.title === HIGHLIGHT_TITLE
+    );
+    expect(submenu).toBeDefined();
+    const item = submenu!.submenu.find(
+      (child): child is ContextMenuItem =>
+        child !== null && "onClick" in child && child.title === title
+    );
+    expect(item).toBeDefined();
+    return item!;
+  }
+
+  function selectCommit(hash: string, title = DIRECT_TITLE): void {
+    modeItem(commitMenuItems(hash), title).onClick();
+  }
+
+  function badge(name: string): HTMLElement {
+    const elem = document.querySelector<HTMLElement>(`.gitRef.head[data-name="${name}"]`);
+    expect(elem, `badge ${name}`).not.toBeNull();
+    return elem!;
+  }
+
+  /** Right-clicks the badge and invokes the highlight callback captured from the mocked builder. */
+  function selectBranch(elem: HTMLElement, mode: PathHighlightMode): void {
+    elem.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
+    const calls = vi.mocked(buildRefContextMenuItems).mock.calls;
+    const onHighlight = calls[calls.length - 1][7] as
+      | ((mode: PathHighlightMode) => void)
+      | undefined;
+    expect(onHighlight).toBeDefined();
+    onHighlight!(mode);
+  }
+
+  function barElem(): HTMLElement {
+    const elem = document.getElementById(BAR_ID);
+    expect(elem).not.toBeNull();
+    return elem!;
+  }
+
+  function barState(): {
+    active: boolean;
+    name: string | null;
+    kind: string | null;
+    hashTitle: string | null;
+    mode: string;
+    status: string | null;
+  } {
+    return {
+      active: barElem().classList.contains(CLASS_ACTIVE),
+      name: document.getElementById("pathHighlightName")!.textContent,
+      kind: document.getElementById("pathHighlightKind")!.textContent,
+      hashTitle: document.getElementById("pathHighlightHash")!.getAttribute("title"),
+      mode: (document.getElementById("pathHighlightMode") as HTMLSelectElement).value,
+      status: document.getElementById("pathHighlightStatus")!.textContent
+    };
+  }
+
+  function boundaryItems(): string[][] {
+    return Array.from(barElem().querySelectorAll("details li"), (item) =>
+      Array.from(item.querySelectorAll("span"), (span) => span.title)
+    );
+  }
+
+  function clearPath(): void {
+    document.getElementById(CLEAR_ID)!.dispatchEvent(new MouseEvent("click"));
+  }
+
+  function pathCalls(): unknown[] {
+    return mockGraphHighlight.setPathHighlight.mock.calls.map((call) => call[0]);
+  }
+
+  function lastPathCall(): {
+    hashes: Set<string>;
+    edgeKeys: Set<string>;
+    boundaries: unknown[];
+  } | null {
+    const calls = pathCalls();
+    expect(calls.length).toBeGreaterThan(0);
+    return calls[calls.length - 1] as ReturnType<typeof lastPathCall>;
+  }
+
+  function firstRefreshOrder(): number {
+    const calls = vi.mocked(liveVscode.postMessage).mock.calls;
+    const orders = calls
+      .map((call, index) =>
+        REFRESH_COMMANDS.includes((call[0] as { command: string }).command)
+          ? vi.mocked(liveVscode.postMessage).mock.invocationCallOrder[index]
+          : null
+      )
+      .filter((order): order is number => order !== null);
+    expect(orders.length).toBeGreaterThan(0);
+    return Math.min(...orders);
+  }
+
+  beforeAll(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    capturedRepoCallback = null;
+    capturedBranchCallback = null;
+    capturedAuthorCallback = null;
+    setupTestDOM();
+    setupViewState();
+    const utilsMod = await import("../../web/utils");
+    liveVscode = utilsMod.vscode;
+    vi.mocked(liveVscode.getState).mockReturnValueOnce(null);
+    vi.mocked(getBranchLabels).mockImplementation(labelsFromRefs);
+    await import("../../web/main");
+    loadTestCommits();
+    loadPathRepos([TEST_REPO, OTHER_REPO]);
+  });
+
+  afterAll(() => {
+    vi.mocked(getBranchLabels).mockReturnValue({ heads: [], remotes: [], tags: [] });
+  });
+
+  beforeEach(() => {
+    leaveHistoryMode();
+    mockFindWidgetInstance.isVisible.mockReturnValue(false);
+    loadPathRepos([TEST_REPO, OTHER_REPO]);
+    dispatchMessage({ command: "selectRepo", repo: TEST_REPO });
+    // Settle the in-flight load so later requests are posted instead of queued.
+    dispatchMessage({
+      command: "loadBranches",
+      branches: ["feature", "hotfix"],
+      head: "feature",
+      hard: false,
+      isRepo: true
+    });
+    loadPath(pathCommits());
+    if (barElem().classList.contains(CLASS_ACTIVE)) clearPath();
+    vi.clearAllMocks();
+  });
+
+  it.each([
+    ["reordered", (commits: GitCommitNode[]) => [...commits].reverse(), true, 1],
+    ["identical", (commits: GitCommitNode[]) => commits, false, 0]
+  ])(
+    "recomputes once for a %s same-repo response and keeps the bar (TC-631)",
+    (_label, transform, hard, expectedCalls) => {
+      // Case: TC-631
+      // Given: M highlighted in Direct mode
+      selectCommit("M");
+      const before = barState();
+      vi.clearAllMocks();
+
+      // When: the same repo answers with the transformed commits
+      loadPath(transform(pathCommits()), hard);
+
+      // Then: one recompute between graph.loadCommits and graph.render, or none on the early return
+      expect(mockGraphHighlight.setPathHighlight).toHaveBeenCalledTimes(expectedCalls);
+      if (expectedCalls > 0) {
+        expect(lastPathCall()!.hashes).toEqual(DIRECT_HASHES);
+        expect(mockGraphHighlight.loadCommits.mock.invocationCallOrder[0]).toBeLessThan(
+          mockGraphHighlight.setPathHighlight.mock.invocationCallOrder[0]
+        );
+        expect(mockGraphHighlight.setPathHighlight.mock.invocationCallOrder[0]).toBeLessThan(
+          mockGraphHighlight.render.mock.invocationCallOrder[0]
+        );
+      }
+      expect(barState()).toEqual(before);
+    }
+  );
+
+  it("extends the path when the missing first parent is loaded later (TC-632)", () => {
+    // Case: TC-632
+    // Given: T -> gap with gap unloaded, highlighted by first parent
+    loadPath([pathNode("T", ["gap"]), pathNode("R", [])], true, "T");
+    selectCommit("T", FIRST_PARENT_TITLE);
+
+    // Then: only T, one boundary, listed in the bar
+    expect(lastPathCall()).toMatchObject({
+      hashes: new Set(["T"]),
+      boundaries: [{ childHash: "T", parentHash: "gap" }]
+    });
+    expect(boundaryItems()).toEqual([["T", "gap"]]);
+
+    // When: gap -> R arrives in the same repo
+    loadPath([pathNode("T", ["gap"]), pathNode("R", []), pathNode("gap", ["R"])], true, "T");
+
+    // Then: the path reaches R and the boundary list disappears
+    expect(lastPathCall()).toEqual({
+      targetFound: true,
+      hashes: new Set(["T", "gap", "R"]),
+      edgeKeys: new Set(['["T","gap"]', '["gap","R"]']),
+      boundaries: []
+    });
+    expect(barElem().querySelector("details")).toBeNull();
+    expect(barState()).toMatchObject({ hashTitle: "T", mode: FIRST_PARENT_TITLE });
+  });
+
+  it("keeps the selection while M is filtered out and recovers without scrolling (TC-633)", () => {
+    // Case: TC-633
+    // Given: M highlighted and a scrolled container
+    selectCommit("M");
+    const scrollContainer = document.getElementById("scrollContainer")!;
+    Object.defineProperty(scrollContainer, "scrollTop", {
+      value: SCROLL_TOP,
+      writable: true,
+      configurable: true
+    });
+
+    // When: a response without M arrives
+    loadPath(pathCommits().filter((commit) => commit.hash !== "M"));
+
+    // Then: null to the graph, the bar keeps the target and shows the reason
+    expect(pathCalls()[pathCalls().length - 1]).toBeNull();
+    expect(barState()).toMatchObject({
+      active: true,
+      name: MERGE_SUBJECT,
+      hashTitle: "M",
+      mode: DIRECT_TITLE,
+      status: TARGET_OUTSIDE_TEXT
+    });
+    expect(scrollContainer.scrollTop).toBe(SCROLL_TOP);
+
+    // When: M is back
+    loadPath(pathCommits());
+
+    // Then: recomputed, the reason is gone, still not scrolled
+    expect(lastPathCall()!.hashes).toEqual(DIRECT_HASHES);
+    expect(barState()).toMatchObject({ status: "", hashTitle: "M" });
+    expect(scrollContainer.scrollTop).toBe(SCROLL_TOP);
+  });
+
+  it.each([
+    [
+      "moved to N",
+      () => pathCommits([pathRef("M", "hotfix", "head")], [pathRef("N", "feature", "head")])
+    ],
+    ["renamed to feature2", () => pathCommits([pathRef("M", "feature2", "head")])],
+    ["deleted", () => pathCommits([pathRef("M", "hotfix", "head")])]
+  ])("does not follow a branch %s until it is selected again (TC-634)", (_label, updated) => {
+    // Case: TC-634
+    // Given: feature (at M) highlighted by all ancestors
+    selectBranch(badge("feature"), PathHighlightMode.AllAncestors);
+    expect(lastPathCall()!.hashes).toEqual(ALL_ANCESTOR_HASHES);
+
+    // When: the branch moves, is renamed or deleted
+    loadPath(updated());
+
+    // Then: the bar still names feature at M and the graph keeps M's ancestors
+    expect(barState()).toMatchObject({ name: "feature", kind: BRANCH_LABEL_TEXT, hashTitle: "M" });
+    expect(lastPathCall()!.hashes).toEqual(ALL_ANCESTOR_HASHES);
+
+    // When: feature is selected again from N's label
+    loadPath(pathCommits([pathRef("M", "hotfix", "head")], [pathRef("N", "feature", "head")]));
+    selectBranch(badge("feature"), PathHighlightMode.AllAncestors);
+
+    // Then: the new tip is used
+    expect(barState()).toMatchObject({ name: "feature", hashTitle: "N" });
+    expect(lastPathCall()!.hashes).toEqual(MOVED_TIP_HASHES);
+  });
+
+  it("clears before the other repo is requested from the dropdown (TC-635)", () => {
+    // Case: TC-635
+    selectCommit("M");
+    vi.clearAllMocks();
+
+    // When: another repo is chosen in the dropdown
+    capturedRepoCallback!(OTHER_REPO);
+
+    // Then: one null before the refresh request, bar inactive
+    expect(pathCalls()).toEqual([null]);
+    expect(mockGraphHighlight.setPathHighlight.mock.invocationCallOrder[0]).toBeLessThan(
+      firstRefreshOrder()
+    );
+    expect(barElem().classList.contains(CLASS_ACTIVE)).toBe(false);
+  });
+
+  it.each([
+    ["another repo", OTHER_REPO, [null], false],
+    ["the same repo", TEST_REPO, [], true]
+  ])("handles selectRepo for %s (TC-636)", (_label, repo, expectedCalls, expectedActive) => {
+    // Case: TC-636
+    selectCommit("M");
+    const before = barState();
+    vi.clearAllMocks();
+
+    // When: selectRepo arrives
+    dispatchMessage({ command: "selectRepo", repo });
+
+    // Then: cleared only for another repo
+    expect(pathCalls()).toEqual(expectedCalls);
+    expect(barElem().classList.contains(CLASS_ACTIVE)).toBe(expectedActive);
+    if (expectedActive) expect(barState()).toEqual(before);
+  });
+
+  it.each([
+    ["without the current repo", [OTHER_REPO], [null], false],
+    ["with the current repo", [TEST_REPO, OTHER_REPO], [], true]
+  ])("handles a loadRepos response %s (TC-637)", (_label, repos, expectedCalls, expectedActive) => {
+    // Case: TC-637
+    selectCommit("M");
+    const before = barState();
+    vi.clearAllMocks();
+
+    // When: the repo list arrives
+    loadPathRepos(repos);
+
+    // Then: cleared only when the current repo is gone
+    expect(pathCalls()).toEqual(expectedCalls);
+    expect(barElem().classList.contains(CLASS_ACTIVE)).toBe(expectedActive);
+    if (expectedActive) expect(barState()).toEqual(before);
+  });
+
+  it.each([
+    [
+      "M is filtered out",
+      () => loadPath(pathCommits().filter((commit) => commit.hash !== "M")),
+      true,
+      TARGET_OUTSIDE_TEXT
+    ],
+    ["the repo changes", () => capturedRepoCallback!(OTHER_REPO), false, ""]
+  ])(
+    "selects from the captured values after the menu was opened and %s (TC-641)",
+    (_label, change, expectedActive, expectedStatus) => {
+      // Case: TC-641
+      // Given: the menu of M is open
+      const direct = modeItem(commitMenuItems("M"), DIRECT_TITLE);
+      vi.clearAllMocks();
+
+      // When: the view changes and the mode is clicked afterwards
+      change();
+      direct.onClick();
+
+      // Then: the missing target is shown from the captured values; a changed repo is rejected
+      expect(barElem().classList.contains(CLASS_ACTIVE)).toBe(expectedActive);
+      if (expectedActive) {
+        expect(barState()).toMatchObject({
+          name: MERGE_SUBJECT,
+          hashTitle: "M",
+          status: expectedStatus
+        });
+        expect(pathCalls()[pathCalls().length - 1]).toBeNull();
+      } else {
+        expect(pathCalls().every((call) => call === null)).toBe(true);
+      }
+    }
+  );
+
+  it.each([
+    ["starting", () => selectCommit("M")],
+    ["clearing", () => clearPath()]
+  ])(
+    "keeps scroll, filter, search, details and comparison when %s the highlight (TC-642)",
+    (label, act) => {
+      // Case: TC-642
+      // Given: an author filter, a scrolled container, A compared with R and a visible find widget
+      capturedAuthorCallback!(["Alice"]);
+      loadPath(pathCommits());
+      const scrollContainer = document.getElementById("scrollContainer")!;
+      Object.defineProperty(scrollContainer, "scrollTop", {
+        value: SCROLL_TOP,
+        writable: true,
+        configurable: true
+      });
+      expandCommitWithCompare("A", "R");
+      mockFindWidgetInstance.isVisible.mockReturnValue(true);
+      mockFindWidgetInstance.getState.mockReturnValue({
+        text: FIND_TEXT,
+        currentHash: null,
+        visible: true,
+        caseSensitive: false,
+        regex: false
+      });
+      if (label === "clearing") selectCommit("M");
+      vi.clearAllMocks();
+      const scrollTopBefore = scrollContainer.scrollTop;
+      const table = document.querySelector("#commitTable table");
+      const details = document.getElementById("commitDetails");
+      expect(details).not.toBeNull();
+      const compareTarget = document.querySelector(".commit.compareTarget");
+      expect(compareTarget).not.toBeNull();
+
+      // When: the highlight is started or cleared
+      act();
+
+      // Then: only the graph was re-rendered; nothing else moved, re-rendered, saved or requested
+      expect(mockGraphHighlight.render).toHaveBeenCalledTimes(1);
+      expect(scrollContainer.scrollTop).toBe(scrollTopBefore);
+      expect(document.querySelector("#commitTable table")).toBe(table);
+      expect(document.getElementById("commitDetails")).toBe(details);
+      expect(document.querySelector(".commit.compareTarget")).toBe(compareTarget);
+      expect(mockAuthorDropdownInstance.setOptions).toHaveBeenCalledTimes(0);
+      expect(mockFindWidgetInstance.close).toHaveBeenCalledTimes(0);
+      expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(0);
+      expect(mockFindWidgetInstance.refresh).toHaveBeenCalledTimes(0);
+      expect(mockFileHistoryInstance.exit).toHaveBeenCalledTimes(0);
+      expect(liveVscode.setState).toHaveBeenCalledTimes(0);
+      expect(liveVscode.postMessage).toHaveBeenCalledTimes(0);
+      mockFindWidgetInstance.isVisible.mockReturnValue(false);
+      document.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape" }));
+    }
+  );
+
+  it("leaves click, modifier click, dblclick, arrow keys and Escape unchanged (TC-643)", () => {
+    // Case: TC-643
+    interface InteractionRecord {
+      posts: unknown[];
+      checkouts: unknown[];
+      detailsAfterEscape: boolean;
+    }
+    const run = (): InteractionRecord => {
+      vi.clearAllMocks();
+      clickCommit("A");
+      dispatchMessage({ command: "commitDetails", commitDetails: makeCommitDetails("A") });
+      clickCommit("R", { ctrlKey: true });
+      clickCommit("U", { metaKey: true });
+      document.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape" }));
+      clickCommit("A");
+      dispatchMessage({ command: "commitDetails", commitDetails: makeCommitDetails("A") });
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+      badge("feature").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
+      document.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape" }));
+      return {
+        posts: vi.mocked(liveVscode.postMessage).mock.calls.map((call) => call[0]),
+        checkouts: vi
+          .mocked(checkoutBranchAction)
+          .mock.calls.map((call) => [call[0], call[2], call[3]]),
+        detailsAfterEscape: document.getElementById("commitDetails") !== null
+      };
+    };
+
+    // Given: the interactions recorded without a highlight
+    const baseline = run();
+    expect(baseline.posts.map((post) => (post as { command: string }).command)).toEqual([
+      "commitDetails",
+      "compareCommits",
+      "compareCommits",
+      "commitDetails",
+      "commitDetails",
+      "commitDetails"
+    ]);
+    expect(baseline.checkouts).toEqual([[TEST_REPO, "feature", undefined]]);
+    expect(baseline.detailsAfterEscape).toBe(false);
+
+    // When: the same interactions run while M is highlighted
+    selectCommit("M");
+    const highlighted = run();
+
+    // Then: identical requests and results, the highlight is untouched
+    expect(highlighted).toEqual(baseline);
+    expect(barState()).toMatchObject({ active: true, hashTitle: "M" });
+    expect(pathCalls().every((call) => call !== null)).toBe(true);
+  });
+
+  it("starts unselected after the webview is rebuilt and saves no highlight key (TC-638)", async () => {
+    // Case: TC-638
+    // Given: M highlighted, and the last state saved so far
+    selectCommit("M");
+    const stateCalls = vi.mocked(liveVscode.setState).mock.calls;
+    const savedBefore = stateCalls.length;
+    loadPath([...pathCommits()].reverse());
+    expect(stateCalls.length).toBeGreaterThan(savedBefore);
+    const prevState = stateCalls[stateCalls.length - 1][0] as Record<string, unknown>;
+
+    // Then: no highlight key is persisted
+    expect(Object.keys(prevState).filter((key) => PATH_HIGHLIGHT_STATE_KEY.test(key))).toEqual([]);
+
+    // When: a new view is built from that state
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+    const utilsMod = await import("../../web/utils");
+    vi.mocked(utilsMod.vscode.getState).mockReturnValueOnce(
+      prevState as ReturnType<typeof utilsMod.vscode.getState>
+    );
+    mockGraphHighlight.setPathHighlight.mockClear();
+    await import("../../web/main");
+
+    // Then: the bar is inactive and the graph never received a highlight
+    expect(barElem().classList.contains(CLASS_ACTIVE)).toBe(false);
+    expect(pathCalls().every((call) => call === null)).toBe(true);
   });
 });

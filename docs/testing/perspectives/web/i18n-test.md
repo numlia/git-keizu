@@ -62,7 +62,7 @@ counterのtitle/aria-labelに使う `t("refs.showHidden", hiddenCount)` が、�
 > Status: active
 > Supersedes: -
 > Signature: `t(key: string, ...args: (string | number)[]): string`（実装は変更しない）
-> Target Path: `web/i18n.ts`（`t`。実装は変更しない）
+> Target Path: `web/i18n.ts:7-13`（`t`。実装は変更しない）
 > Test File: `tests/web/i18n.test.ts`
 
 対応プラン §3.6 の11キーが、実辞書 `l10n/web/web.l10n.en.json` / `l10n/web/web.l10n.ja.json` を `globalThis.webviewMessages` に設定した状態で、既存の `t` によりキーそのものへ fallback せず期待文言へ解決されることを確認する。モード値（`Direct parents and children` 等）はenumの値がそのままキーになる。各ケースは11キーの parameterized test（`it.each`）で、キーごとに期待文言を照合する。バーの DOM 構造は `web/pathHighlightController-test.md` S1 の責務で本表には含めない。
