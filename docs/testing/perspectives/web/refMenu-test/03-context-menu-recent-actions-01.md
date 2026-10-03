@@ -121,7 +121,7 @@ Test file: `tests/web/refMenu.test.ts`, new describe `Remove Worktree recent act
 > Status: active
 > Supersedes: -
 > Signature: `buildRefContextMenuItems(repo: string, refName: string, sourceElem: HTMLElement, isRemoteCombined: boolean, gitBranchHead: string | null, remotes?: string[], worktreeInfo?: { path: string; isMainWorktree: boolean } | null, onHighlight?: (mode: BranchPathMode) => void): ContextMenuElement[]`
-> Target Path: `web/refMenu.ts`（`buildRefContextMenuItems`。実装後に行範囲へ更新）
+> Target Path: `web/refMenu.ts:66-77` (`BRANCH_PATH_MODES` / `buildHighlightPathSubmenu`), `web/refMenu.ts:158-473` (`buildRefContextMenuItems`。signature 158-167、tag 判定 170、submenu 挿入 463-465)
 > Test File: `tests/web/refMenu.test.ts`
 
 対応プラン §3.6 のブランチ向けサブメニューの観点。末尾の任意 callback `onHighlight` が渡された head / remote 分岐だけに `Highlight path` の submenu（`All ancestors` → `First-parent ancestors`）を追加し、tag 分岐には追加しない。対象 hash の解決（行内・省略一覧・併記リモート）は `web/main-test/12-path-highlight-01.md` S68 の責務で本表には含めない。S13 / S14 / S15 / S25 は callback 省略時の契約として active のまま残す。fixture は `REPO = "/test/repo"`、`createMockElement([...])` で `head` / `remote` / `tag` の `sourceElem` を作る。

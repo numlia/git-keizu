@@ -8,6 +8,7 @@ import {
 } from "./dialogs";
 import { t } from "./i18n";
 import { buildMergeMenuItem } from "./mergeDialog";
+import { type BranchPathMode, PathHighlightMode } from "./pathHighlight";
 import {
   ELLIPSIS,
   escapeHtml,
@@ -59,6 +60,21 @@ export function showPushRemoteDialog(
     },
     null
   );
+}
+
+/** Submenu order for a branch target. */
+const BRANCH_PATH_MODES: readonly BranchPathMode[] = [
+  PathHighlightMode.AllAncestors,
+  PathHighlightMode.FirstParent
+];
+
+function buildHighlightPathSubmenu(
+  onHighlight: (mode: BranchPathMode) => void
+): ContextMenuSubmenu {
+  return {
+    title: t("pathHighlight.menu"),
+    submenu: BRANCH_PATH_MODES.map((mode) => ({ title: t(mode), onClick: () => onHighlight(mode) }))
+  };
 }
 
 function buildMergeBranchMenuItem(repo: string, refName: string): ContextMenuItem {
@@ -146,11 +162,13 @@ export function buildRefContextMenuItems(
   isRemoteCombined: boolean,
   gitBranchHead: string | null,
   remotes?: string[],
-  worktreeInfo?: { path: string; isMainWorktree: boolean } | null
+  worktreeInfo?: { path: string; isMainWorktree: boolean } | null,
+  onHighlight?: (mode: BranchPathMode) => void
 ): ContextMenuElement[] {
   let menu: ContextMenuElement[];
   let copyType: string;
-  if (sourceElem.classList.contains("tag")) {
+  const isTag = sourceElem.classList.contains("tag");
+  if (isTag) {
     menu = [
       {
         title: `${t("Delete Tag")}${ELLIPSIS}`,
@@ -441,6 +459,9 @@ export function buildRefContextMenuItems(
     }
 
     copyType = "Branch Name";
+  }
+  if (onHighlight !== undefined && !isTag) {
+    menu.push(buildHighlightPathSubmenu(onHighlight));
   }
   menu.push(null, {
     title: t("context.copyToClipboard", t(copyType)),

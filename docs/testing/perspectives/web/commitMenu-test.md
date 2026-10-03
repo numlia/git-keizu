@@ -228,7 +228,7 @@ Cherry Pick / Revert の通常コミット判定を `parentHashes.length === 1` 
 > Status: active
 > Supersedes: -
 > Signature: `buildCommitContextMenuItems(repo: string, hash: string, parentHashes: string[], commits: GitCommitNode[], commitLookup: { [hash: string]: number }, sourceElem: HTMLElement, onHighlight?: (mode: CommitPathMode) => void): ContextMenuElement[]`
-> Target Path: `web/commitMenu.ts`（`buildCommitContextMenuItems`。実装後に行範囲へ更新）
+> Target Path: `web/commitMenu.ts:16-29` (`COMMIT_PATH_MODES` / `buildHighlightPathSubmenu`), `web/commitMenu.ts:45-363` (`buildCommitContextMenuItems`。signature 45-53、submenu 挿入 349-362)
 > Test File: `tests/web/commitMenu.test.ts`
 
 対応プラン §3.6 の通常コミット向けサブメニューの観点。末尾の任意 callback `onHighlight` が渡されたときだけ `Highlight path`（`t("pathHighlight.menu")`）の submenu を追加し、既存項目の相対順序・`recentActionId`・末尾の `Copy Commit Hash to Clipboard` を維持する。対象 repo / hash の解決と selection の生成は `web/main-test/12-path-highlight-01.md` S68 の責務で本表には含めない。S7（TC-035〜TC-038）と S8 は callback 省略時の契約として active のまま残す。

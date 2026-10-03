@@ -679,7 +679,8 @@ describe("ref overflow rendering and the description column width (S60)", () => 
       false,
       "main",
       undefined,
-      { path: "/worktrees/4", isMainWorktree: false }
+      { path: "/worktrees/4", isMainWorktree: false },
+      expect.any(Function)
     );
   });
 
@@ -1072,8 +1073,10 @@ function lastBuilderArgs(): unknown[] {
   return calls[0];
 }
 
+// The path highlight callback (8th argument) is a fresh closure per menu, so only the first 7 compare.
+const BUILDER_ARG_COUNT = 7;
 function withoutSource(args: unknown[]): unknown[] {
-  return args.filter((_arg, index) => index !== 2);
+  return args.slice(0, BUILDER_ARG_COUNT).filter((_arg, index) => index !== 2);
 }
 
 function rightClickInRowAndInList(
@@ -1114,7 +1117,8 @@ describe("ref badge right-click from the row and the list (S57)", () => {
       false,
       "main",
       ["origin"],
-      { path: "/tmp/wtx", isMainWorktree: false }
+      { path: "/tmp/wtx", isMainWorktree: false },
+      expect.any(Function)
     );
     const showArgs = vi.mocked(contextMenu.showContextMenu).mock.calls[0];
     expect(showArgs[1]).toBe(MENU_ITEMS);
@@ -2281,21 +2285,48 @@ const SIBLING_LABELS: SiblingLabel[] = [
     kind: "local branch",
     selector: '.gitRef[data-name="feature/x"]',
     builder: "ref",
-    expectedArgs: (badge) => [TEST_REPO, "feature/x", badge, false, "main", undefined, null]
+    expectedArgs: (badge) => [
+      TEST_REPO,
+      "feature/x",
+      badge,
+      false,
+      "main",
+      undefined,
+      null,
+      expect.any(Function)
+    ]
   },
   {
     id: "TC-516",
     kind: "combined remote",
     selector: '.gitRef[data-name="main"] > .gitRefHeadRemote',
     builder: "ref",
-    expectedArgs: (badge) => [TEST_REPO, "origin/main", badge, true, "main", ["origin"], null]
+    expectedArgs: (badge) => [
+      TEST_REPO,
+      "origin/main",
+      badge,
+      true,
+      "main",
+      ["origin"],
+      null,
+      expect.any(Function)
+    ]
   },
   {
     id: "TC-517",
     kind: "standalone remote",
     selector: '.gitRef[data-name="origin/dev"]',
     builder: "ref",
-    expectedArgs: (badge) => [TEST_REPO, "origin/dev", badge, false, "main", undefined, null]
+    expectedArgs: (badge) => [
+      TEST_REPO,
+      "origin/dev",
+      badge,
+      false,
+      "main",
+      undefined,
+      null,
+      expect.any(Function)
+    ]
   },
   {
     id: "TC-518",
@@ -2316,7 +2347,8 @@ const SIBLING_LABELS: SiblingLabel[] = [
       false,
       "main",
       undefined,
-      { path: SIBLING_WORKTREE_PATH, isMainWorktree: false }
+      { path: SIBLING_WORKTREE_PATH, isMainWorktree: false },
+      expect.any(Function)
     ]
   },
   {
