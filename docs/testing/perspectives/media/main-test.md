@@ -408,7 +408,7 @@ S1は層数を10定義に固定していたため、ref一覧層の追加で期�
 > Status: active
 > Supersedes: -
 > Signature: `#commitGraph svg.pathHighlightMode path.line` / `path.shaddow` / `.pathHighlightSelected` / `circle.pathHighlightRing` / `rect.pathHighlightBoundary` / `svg.fileHistoryMode.pathHighlightMode` の併用セレクター / `#pathHighlightBar` とその子要素の宣言
-> Target Path: `media/main.css`（`fileHistoryMode` のグラフ規則の直後、`#fileHistoryBar` の規則の直後。実装後に行範囲へ更新）
+> Target Path: `media/main.css:17-24`（経路強調の CSS custom property）、`media/main.css:77`（外枠を除外した既存 circle 規則）、`media/main.css:263-285`（グラフの経路強調規則）、`media/main.css`（`#fileHistoryBar` の規則の直後。状態バーの実装後に行範囲へ更新）
 > Test File: `tests/web/pathHighlightStyles.test.ts`（TC-095〜TC-098）、実VS Code Webview（TC-099〜TC-100）
 
 対応プラン §3.5 の数値（選択線4px / 影6px / opacity 1、非選択0.35、外枠半径6px・線幅2px、四角形一辺12px・線幅2px）と §3.6 のバーのレイアウトの観点。TC-095〜TC-098は実 `media/main.css` を `readFileSync` で読み、対象の class を持つ要素に一致する規則を specificity と記述順で解決した有効値（または宣言テキスト）を照合する。S3（ファイル履歴単独の `0.45` / match / current）は現行のまま残し、本節は併用時の優先順位だけを加える。外枠の `r` と四角形の `width` / `height` は SVG 属性で `web/graph-test.md` S21 の責務、バーの状態遷移は `web/pathHighlightController-test.md` S1 の責務で本表には含めない。jsdomは寸法・色・コントラスト・フォーカス順を描画しないため、TC-099〜TC-100は実際のVS Code Webviewで手動確認し、自動テスト済み件数に含めない。

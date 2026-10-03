@@ -398,7 +398,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `Graph.setPathHighlight(highlight: PathHighlightResult | null): void` / `Graph.render(expandedCommit: ExpandedCommit | null): void` / `Branch.draw(svg: SVGElement, config: Config, expandAt: number)` / `Line` と `PlacedLine` の `readonly edgeKeys: ReadonlySet<string>`
-> Target Path: `web/graph.ts`（`Graph.setPathHighlight`・`Graph.render`・`Graph.determinePath`・`Branch.draw`・`Vertex.draw`・`UnavailablePoint`。実装後に行範囲へ更新）、`web/global.d.ts`（`Line` / `PlacedLine`）
+> Target Path: `web/graph.ts:49-54`（`UnavailablePoint`）、`web/graph.ts:66-93`（`Branch.addLine` / `Branch.shareEdgeKeys`）、`web/graph.ts:97-248`（`Branch.draw` / `Branch.drawPath`）、`web/graph.ts:298-300`（`Vertex.getNextParentIndex`）、`web/graph.ts:341-355`（`Vertex.registerUnavailablePoint` / `Vertex.getLineIndexAfter`）、`web/graph.ts:369-457`（`Vertex.draw` / `Vertex.drawPathHighlightMarks`）、`web/graph.ts:556-631`（`Graph.setPathHighlight` / `Graph.drawPathHighlightMarks` / `Graph.render`）、`web/graph.ts:782-909`（`Graph.getEdgeKeysToParent` / `Graph.shareEdgeKeysToParent` / `Graph.determinePath`）、`web/global.d.ts:104-121`（`Line` / `PlacedLine`）
 > Test File: `tests/web/graph.test.ts`
 
 対応プラン §3.5 の描画契約の観点。`Graph` は `PathHighlightResult`（`hashes` / `edgeKeys` / `boundaries`）を保持し、`render()` のたびに所有キーが `edgeKeys` に含まれる線分だけを強調する。どの頂点・接続を強調するか（探索モード）は `web/pathHighlight-test.md` が決め、本表は与えられた結果の描画だけを扱う。CSS の値は `media/main-test.md` S8 の責務で本表には含めない。期待する `edgeKeys` は `["子","親"]` 形式のリテラル文字列で書き、`hashes` / `boundaries` も fixture から独立に決める。

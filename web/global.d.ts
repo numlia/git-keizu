@@ -105,6 +105,7 @@ declare global {
     p1: Point;
     p2: Point;
     lockedFirst: boolean; // TRUE => The line is locked to p1, FALSE => The line is locked to p2
+    readonly edgeKeys: ReadonlySet<string>; // Logical child→parent connections (pathEdgeKey) this line belongs to; empty when none is loaded
   }
 
   interface Pixel {
@@ -116,6 +117,7 @@ declare global {
     p2: Pixel;
     isCommitted: boolean;
     lockedFirst: boolean; // TRUE => The line is locked to p1, FALSE => The line is locked to p2
+    readonly edgeKeys: ReadonlySet<string>; // Carried over from the Line this placed line was derived from
   }
 
   type AvatarImageCollection = { [email: string]: string };

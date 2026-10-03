@@ -14,6 +14,15 @@
   --git-keizu-local-z-index-dropdown-menu: 100;
 }
 
+/* -- Path Highlight Dimensions --------------------------------------------- */
+
+:root {
+  --git-keizu-path-highlight-line-width: 4px;
+  --git-keizu-path-highlight-shadow-width: 6px;
+  --git-keizu-path-highlight-dim-opacity: 0.35;
+  --git-keizu-path-highlight-mark-stroke-width: 2px;
+}
+
 /* -- Layout ---------------------------------------------------------------- */
 
 body {
@@ -65,7 +74,7 @@ body.unableToLoad p {
   fill: var(--vscode-editor-background);
   stroke-width: 2;
 }
-#commitGraph circle:not(.current):not(.stashInner) {
+#commitGraph circle:not(.current):not(.stashInner):not(.pathHighlightRing) {
   stroke: var(--vscode-editor-background);
   stroke-width: 1;
   stroke-opacity: 0.75;
@@ -250,6 +259,29 @@ body.unableToLoad p {
 #commitGraph svg.fileHistoryMode circle.fileHistoryCurrent {
   stroke: var(--vscode-focusBorder);
   stroke-width: 2px;
+}
+/* Path highlight graph emphasis. Lines and marks are dimmed or emphasised per element so the
+   two dimming factors never multiply; the combined selectors win over the file history rules
+   when both modes are active. */
+#commitGraph svg.pathHighlightMode path.shaddow,
+#commitGraph svg.pathHighlightMode path.line,
+#commitGraph svg.fileHistoryMode.pathHighlightMode path.shaddow,
+#commitGraph svg.fileHistoryMode.pathHighlightMode path.line {
+  opacity: var(--git-keizu-path-highlight-dim-opacity);
+}
+#commitGraph svg.pathHighlightMode path.shaddow.pathHighlightSelected {
+  stroke-width: var(--git-keizu-path-highlight-shadow-width);
+  opacity: 1;
+}
+#commitGraph svg.pathHighlightMode path.line.pathHighlightSelected {
+  stroke-width: var(--git-keizu-path-highlight-line-width);
+  opacity: 1;
+}
+#commitGraph svg.pathHighlightMode circle.pathHighlightRing,
+#commitGraph svg.pathHighlightMode rect.pathHighlightBoundary {
+  fill: none;
+  stroke: var(--vscode-focusBorder);
+  stroke-width: var(--git-keizu-path-highlight-mark-stroke-width);
 }
 
 /* -- Commit Details View --------------------------------------------------- */
