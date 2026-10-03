@@ -2,12 +2,12 @@
 
 > Source: `web/main.ts`
 > Storage Mode: sharded
-> Generated: 2026-09-29T00:00:00Z
+> Generated: 2026-10-03T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 16
-> Total Sections: 57
-> Total Cases: 506
+> Total Shards: 17
+> Total Sections: 58
+> Total Cases: 521
 
 ## Shards
 
@@ -29,6 +29,7 @@
 | 09-branch-cleanup-01.md     | branch-cleanup     | 1        | 11    | 2026-08-25   |
 | 10-file-history-01.md       | file-history       | 3        | 34    | 2026-09-28   |
 | 11-state-persistence-01.md  | state-persistence  | 1        | 3     | 2026-09-12   |
+| 12-path-highlight-01.md     | path-highlight     | 1        | 15    | 2026-10-03   |
 
 ## Origin Coverage
 
@@ -63,6 +64,7 @@
 | Feature 060 (light-spec-plan)                                        | 01-rendering-03.md, 10-file-history-01.md                                                       |
 | Feature 060-02 (light-spec-plan)                                     | 04-keyboard-selection-02.md, 10-file-history-01.md                                              |
 | Feature 060-03 addendum (light-spec-plan)                            | 08-request-queue-01.md                                                                          |
+| Feature 061-01 (light-spec-plan)                                     | 12-path-highlight-01.md                                                                         |
 | フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                                                         |
 | フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                                                         |
 | フェーズ3 修正 L15 (avatar-raw-email-compare)                        | 05-state-response-02.md                                                                         |

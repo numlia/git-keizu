@@ -308,3 +308,39 @@ S6 は端での一周（TC-032 / TC-033）と一致1件での再スクロール�
 | キーイベントの消費・詳細の要求と描画                    | excluded(`web/main-test/04-keyboard-selection-02.md` S64、`web/main-test/10-file-history-01.md` S66 の責務) |
 | 例外・エラー経路                                        | excluded(移動は throw せず、戻り値 `null` と no-op で扱う)                                                  |
 | 型不正・フォーマット不正                                | excluded(`delta` と戻り値の型は TypeScript の型検査で担保)                                                  |
+
+## S11: 経路強調との併用時の履歴状態・移動・解除の維持
+
+> Origin: Feature 061-01 (light-spec-plan)
+> Added: 2026-10-03
+> Status: active
+> Supersedes: -
+> Signature: `navigate(delta: -1 | 1, useExpandedCommit: boolean = false): string | null` / `handleCommitRowClick(hash: string): void` / `exit(): void` / `getCurrentHash(): string | null`（`FileHistoryController`。実装は変更しない）
+> Target Path: `web/fileHistory.ts`（`FileHistoryController`。既存契約の確認で、変更がなければ行範囲は現状のまま）
+> Test File: `tests/web/fileHistory.test.ts` または `tests/web/main.pathHighlight.test.ts`
+
+経路強調（`web/pathHighlightController.ts`）は独立した状態と `Graph.setPathHighlight` を使い、ファイル履歴の状態・`setGraphHighlight` callback・復元契約には触れない。本節はその前提のもとで、ファイル履歴側の既存契約（S8 の解除・復元、S10 の移動）が併用時にも変わらないことを確認する。経路探索と CSS の優先順位は本表に含めない（`web/pathHighlight-test.md`、`media/main-test.md` S8）。両強調の SVG class の共存は `web/main-test/12-path-highlight-01.md` S68 TC-644 の責務。fixture A は S10 と同じ（`[h0, x1, h1, x2, h2]`、entries `[h0, h1, h2]`、anchor `h0`、current `h0`、position `"1 of 3"`）。既存テストで十分な場合は差分を要求せず、対応する test method を記録する。
+
+| Case ID | Input / Precondition                                                                                                                                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                  | Notes                                        |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| TC-103  | fixture A の active 状態で経路強調を開始（統合テストでは実コントローラーの `select`、単体テストでは `FileHistoryController` の外部で `Graph.setPathHighlight` 相当を呼ぶ）し、先に経路強調だけを解除してから `navigate(1)` | Normal - 経路を先に解除しても履歴状態と移動を維持                          | 解除後も `getCurrentHash()` が `"h0"`、position が `"1 of 3"`、`#fileHistoryBar` が `active`。`navigate(1)` の戻り値が `"h1"` で `scrollToCommit` が1回呼ばれ、ファイル履歴の `setGraphHighlight` が解除によって追加で呼ばれない（call count が解除前と同じ）                    | ファイル履歴の `exit()` は呼ばれない         |
+| TC-104  | fixture A の active 状態で経路強調を開始し、先にファイル履歴を `exit()` で解除する                                                                                                                                         | Normal - 履歴を先に解除したとき既存の復元契約を維持                        | `exit()` が S8 と同じ順序で `setGraphHighlight(null)`・`restoreExpandedCommit`・スクロール復元の callback を呼び、callback の呼出列（名前と引数）が経路強調なしで `exit()` した記録と `toEqual` で一致する。`getCurrentHash()` が `null`、`#fileHistoryBar` の `active` が外れる | 経路強調の有無で履歴側の解除経路を分岐しない |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-01 追加分（S11）
+
+| 失敗源                                                   | 対応ケースまたは除外理由                                                               |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 経路強調の解除で履歴の current / position / bar が崩れる | TC-103                                                                                 |
+| 併用時に履歴の移動が止まる                               | TC-103                                                                                 |
+| 履歴の解除・復元順序が併用時に変わる                     | TC-104                                                                                 |
+| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）    | excluded(本節は併用時の契約維持のみで、端の移動・空の entries は S3 / S5 / S10 の責務) |
+| 入力検証・外部依存・例外・型                             | excluded(`fileHistory.ts` を変更せず、既存分岐は S1〜S10 で担保)                       |
+
+**失敗カテゴリ網羅（diversity floor）**:
+
+- Validation: excluded(上表のとおり)
+- Exception: excluded(上表のとおり)
+- External: excluded(上表のとおり)
+- Boundary: excluded(上表のとおり)
+- Type: excluded(上表のとおり)
+- Normal: TC-103、TC-104
