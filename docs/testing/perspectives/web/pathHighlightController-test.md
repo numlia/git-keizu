@@ -12,7 +12,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `constructor(callbacks: PathHighlightCallbacks)` / `select(selection: PathHighlightSelection): void` / `onCommitsChanged(): void` / `onRepositoryChanged(): void` / `clear(): void`（`PathHighlightCallbacks` は `getCommits(): readonly GitCommitNode[]` / `getCurrentRepo(): string | undefined` / `setGraphHighlight(highlight: PathHighlightResult | null): void`）
-> Target Path: `web/pathHighlightController.ts`（`PathHighlightController`。実装後に行範囲へ更新）
+> Target Path: `web/pathHighlightController.ts:104-262`（`PathHighlightController`）
 > Test File: `tests/web/pathHighlightController.test.ts`
 
 対応プラン §3.4 のコントローラー契約と §3.6 の状態バーの観点。fixture は `#controls` と `#fileHistoryBar` を持つ jsdom に、`getCommits` が `web/pathHighlight-test.md` S1 の標準fixture（`N,M,A,B,U,R,X`。`M` の message は `"Merge branch"`、`M` の `refs` に head `feature`）を返し、`getCurrentRepo` が `"/repo"` を返し、`setGraphHighlight` が `vi.fn()` の callbacks を渡す。翻訳は `globalThis.webviewMessages` に実辞書（`l10n/web/web.l10n.en.json`）を設定し、期待文言は §3.6 の英語を使う。`PathHighlightResult` の期待値は `web/pathHighlight-test.md` S1 の集合で、`setGraphHighlight` の引数を `toEqual` で照合する。mainのイベント配線（メニュー・更新入口・repo切替の呼出）は `web/main-test/12-path-highlight-01.md` S68 の責務で本表には含めない。全ケースで `acquireVsCodeApi()` の `postMessage` / `setState` / `getState` の call count が0である。

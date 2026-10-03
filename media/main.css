@@ -661,6 +661,42 @@ body.unableToLoad p {
   opacity: 0.4;
   pointer-events: none;
 }
+/* Path highlight bar (inserted after #controls, before #fileHistoryBar) */
+#pathHighlightBar {
+  display: none;
+}
+#pathHighlightBar.active {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  border-bottom: 1px solid rgba(128, 128, 128, 0.5);
+  flex-shrink: 0;
+}
+#pathHighlightName {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+#pathHighlightKind,
+#pathHighlightHash,
+#pathHighlightScope {
+  white-space: nowrap;
+}
+#pathHighlightClear {
+  flex-shrink: 0;
+  font-family: inherit;
+  color: inherit;
+}
+#pathHighlightBoundaries {
+  min-width: 0;
+}
+#pathHighlightBoundaries > ul {
+  margin: 4px 0 0;
+  padding-left: 8px;
+  list-style: none;
+}
 #repoControl,
 #branchControl,
 #showRemoteBranchesControl {
