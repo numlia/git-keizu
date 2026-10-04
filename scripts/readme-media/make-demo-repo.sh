@@ -10,13 +10,33 @@ readonly TZ_OFFSET="+0900"
 epoch=1790380800 # 2026-09-26 09:00 +09:00
 
 mkdir "${BASE_DIR}"
-git init -q -b main "${BASE_DIR}/trailmap"
+mkdir "${BASE_DIR}/template"
+cat > "${BASE_DIR}/template/config" <<'CONFIG'
+[user]
+    name = Mika Sato
+    email = mika@example.com
+[commit]
+    gpgsign = false
+[tag]
+    gpgsign = false
+[remote "origin"]
+    url = https://example.com/trailmap.git
+    fetch = +refs/heads/*:refs/remotes/origin/*
+[branch "main"]
+    remote = origin
+    merge = refs/heads/main
+[branch "release/1.2"]
+    remote = origin
+    merge = refs/heads/release/1.2
+[branch "feature/offline-mode"]
+    remote = origin
+    merge = refs/heads/feature/offline-mode
+[branch "feature/dark-theme"]
+    remote = origin
+    merge = refs/heads/feature/dark-theme
+CONFIG
+git init -q -b main --template="${BASE_DIR}/template" "${BASE_DIR}/trailmap"
 cd "${BASE_DIR}/trailmap"
-git config user.name "Mika Sato"
-git config user.email "mika@example.com"
-git config commit.gpgsign false
-git config tag.gpgsign false
-git remote add origin https://example.com/trailmap.git
 
 as() {
   export GIT_AUTHOR_NAME="$1" GIT_AUTHOR_EMAIL="$2" GIT_COMMITTER_NAME="$1" GIT_COMMITTER_EMAIL="$2"
@@ -48,8 +68,6 @@ m() {
 # track <branch>: records the branch's current commit as its remote-tracking branch.
 track() {
   git update-ref "refs/remotes/origin/$1" "$1"
-  git config "branch.$1.remote" origin
-  git config "branch.$1.merge" "refs/heads/$1"
 }
 
 mika
