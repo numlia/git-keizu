@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-10-03T11:43:53+09:00
-> Total sources: 54
-> Total physical files: 97
-> Total sections: 588
-> Total cases: 3602
+> Auto-generated: 2026-10-04T08:55:43+09:00
+> Total sources: 55
+> Total physical files: 98
+> Total sections: 589
+> Total cases: 3605
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -17,6 +17,7 @@
 | `media/findwidget.css` | single-file | `media/findwidget-test.md` | 1 | 1 | 3 | 2026-08-24 |
 | `media/main.css` | single-file | `media/main-test.md` | 1 | 7 | 81 | 2026-10-03 |
 | `package.json` | single-file | `package.json-test.md` | 1 | 3 | 43 | 2026-08-04 |
+| `scripts/readme-media/make-demo-repo.sh` | single-file | `scripts/readme-media/make-demo-repo-test.md` | 1 | 1 | 3 | 2026-10-04 |
 | `src/avatarManager.ts` | single-file | `src/avatarManager-test.md` | 1 | 25 | 101 | 2026-07-19 |
 | `src/branchCleanup.ts` | single-file | `src/branchCleanup-test.md` | 1 | 5 | 43 | 2026-08-25 |
 | `src/config.ts` | single-file | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md` | 1 | 14 | 79 | 2026-05-02 |
@@ -144,6 +145,7 @@
 | Feature 060-03 (light-spec-plan) | `web/contextMenu-test.md`, `web/refMenu-test/INDEX.md`, `web/worktreeMenu-test.md` |
 | Feature 060-03 addendum (light-spec-plan) | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
 | Feature 061-01 (light-spec-plan) | `media/main-test.md`, `web/commitMenu-test.md`, `web/fileHistory-test.md`, `web/graph-test.md`, `web/i18n-test.md`, `web/main-test/INDEX.md`, `web/pathHighlight-test.md`, `web/pathHighlightController-test.md`, `web/refMenu-test/INDEX.md` |
+| K2 demo-repository-config (light-spec-plan) | `scripts/readme-media/make-demo-repo-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
 | test-plan | `web/stashMenu-test.md` |

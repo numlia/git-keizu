@@ -53,11 +53,21 @@ VS Code 拡張機能 git-keizu を VS Marketplace と OpenVSX に公開します
 
 ### Step 2: main を最新化
 
+リモートに接続する `git fetch` / `git pull` は、1 コマンドずつ単独の Bash 呼び出しで実行する。`cd` や他のコマンドと同じ呼び出しにまとめない。sandbox の `excludedCommands` は呼び出し全体が一致したときだけ sandbox 外で実行するため、まとめると SSH の接続が sandbox に遮られて失敗する。
+
 ```bash
-cd ~/work/ai/git-keizu
 git fetch origin
+```
+
+```bash
 git switch main
+```
+
+```bash
 git pull --ff-only origin main
+```
+
+```bash
 git status
 ```
 
@@ -85,8 +95,13 @@ npx --yes pnpm@10.34.5 run test:ci
 
 ### Step 5: タグが既存でないか確認
 
+`git ls-remote` もリモートに接続するため、Step 2 と同じく単独の Bash 呼び出しで実行する。
+
 ```bash
 git tag -l <タグ形式バージョン>
+```
+
+```bash
 git ls-remote --tags origin <タグ形式バージョン>
 ```
 

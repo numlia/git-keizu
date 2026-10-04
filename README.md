@@ -81,7 +81,7 @@ Select a commit to inspect its files and diffs, or Ctrl/Cmd+click a second commi
 
 Right-click commits, branches, tags, stash entries, or uncommitted changes to access the actions available for that item.
 
-![Commit context menu with a Recent section and a More submenu](./resources/screenshots/commit-actions.png)
+![Commit context menu with a Recent section, a More submenu, and a Highlight path submenu](./resources/screenshots/commit-actions.png)
 
 - Checkout, cherry-pick, merge, rebase, create branches, manage tags, and apply or pop stashes.
 - Pull and push the current branch, including choosing an upstream when one has not been configured. Fetch automatically prunes stale remote-tracking references.
