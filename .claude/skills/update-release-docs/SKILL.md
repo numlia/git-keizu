@@ -163,8 +163,13 @@ git commit -m "chore: bump version to {バージョン}"
 
 ### Step 9: Push と Draft PR 作成
 
+`git push` と `gh pr create` は別々の Bash 呼び出しで実行する。sandbox の `excludedCommands` は呼び出し全体が一致したときだけ sandbox 外で実行するため、同じ呼び出しにまとめると SSH の push が sandbox に遮られて失敗する。
+
 ```bash
 git push -u origin docs/release-v{バージョン}
+```
+
+```bash
 gh pr create --draft --assignee @me --base main --title "docs: prepare release v{バージョン}" --body "..."
 ```
 
