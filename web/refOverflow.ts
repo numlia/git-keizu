@@ -119,7 +119,11 @@ const FONT_LOADING_DONE_EVENT = "loadingdone";
 
 export interface RefOverflowOptions {
   readonly onMinimumWidth: (minimum: number | null) => void;
-  readonly onRefContextMenu: (event: MouseEvent, badge: HTMLElement) => void;
+  readonly onRefContextMenu: (
+    event: ContextMenuTrigger,
+    ref: HTMLElement,
+    focusOptions?: ContextMenuFocusOptions
+  ) => void;
 }
 
 interface RefOverflowRow {
@@ -578,8 +582,14 @@ export class RefOverflowController {
     const clones = getHiddenRefs(cell).map(cloneRef);
     if (clones.length === 0) return false;
     this.hidePopupContextMenu();
+    // A menu opened from the list leaves by Tab from the counter after the list closed itself.
+    const counter = this.popupCounter;
+    const focusOptions: ContextMenuFocusOptions | undefined =
+      counter === null ? undefined : { tabOrigin: counter, onTabExit: () => this.closePopup() };
     for (const clone of clones) {
-      clone.addEventListener("contextmenu", (event) => this.options.onRefContextMenu(event, clone));
+      clone.addEventListener("contextmenu", (event) =>
+        this.options.onRefContextMenu(event, clone, focusOptions)
+      );
     }
     popup.replaceChildren(...clones);
     return true;

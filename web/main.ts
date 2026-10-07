@@ -33,6 +33,7 @@ import {
 import { findCommitElemWithId, FindWidget, getCommitElems } from "./findWidget";
 import { Graph } from "./graph";
 import { t } from "./i18n";
+import { isKeyboardActionBlocked } from "./keyboardNavigation";
 import { handleMessage, type RefreshMode } from "./messageHandler";
 import type { BranchPathMode, PathHighlightSelection } from "./pathHighlight";
 import { PathHighlightController } from "./pathHighlightController";
@@ -132,6 +133,20 @@ function isEditableEventTarget(target: EventTarget | null): boolean {
   if (EDITABLE_TAG_NAMES.includes(target.tagName)) return true;
   const contentEditable = target.getAttribute("contenteditable");
   return target.isContentEditable || (contentEditable !== null && contentEditable !== "false");
+}
+
+const KEY_CONTEXT_MENU = "ContextMenu";
+const KEY_F10 = "F10";
+
+// ContextMenu / Shift+F10 open the target's own menu; inputs keep the browser's edit menu and
+// repeat / keyup / IME presses never launch. A consumed launch stops at the innermost target.
+function consumeContextMenuLaunch(e: Event): e is KeyboardEvent {
+  if (!(e instanceof KeyboardEvent) || e.defaultPrevented) return false;
+  if (e.key !== KEY_CONTEXT_MENU && !(e.key === KEY_F10 && e.shiftKey)) return false;
+  if (isEditableEventTarget(e.target) || isKeyboardActionBlocked(e)) return false;
+  e.preventDefault();
+  e.stopPropagation();
+  return true;
 }
 
 function getHorizontalSum(style: CSSStyleDeclaration, left: string, right: string): number {
@@ -303,7 +318,8 @@ class GitKeizuView {
     });
     this.refOverflow = new RefOverflowController({
       onMinimumWidth: (minimum) => this.applyDescriptionMinimumWidth(minimum),
-      onRefContextMenu: (event, badge) => this.showRefBadgeContextMenu(event, badge)
+      onRefContextMenu: (event, badge, focusOptions) =>
+        this.showRefBadgeContextMenu(event, badge, focusOptions)
     });
     this.findWidget = new FindWidget({
       getCommits: () => this.commits,
@@ -1020,35 +1036,14 @@ class GitKeizuView {
 
     addListenerToClass("commit", "contextmenu", (e: Event) => {
       e.stopPropagation();
-      let sourceElem = <HTMLElement>(<Element>e.target).closest(".commit")!;
-      let hash = sourceElem.dataset.hash!;
-      let commit = this.commits[this.commitLookup[hash]];
-      if (commit.stash !== null) {
-        let selector = commit.stash.selector;
-        showContextMenu(
-          <MouseEvent>e,
-          buildStashContextMenuItems(this.currentRepo, hash, selector, sourceElem),
-          sourceElem,
-          this.getCurrentRepoRecentActions()
-        );
-        return;
-      }
-      const repo = this.currentRepo;
-      const subject = commit.message;
-      showContextMenu(
+      this.showCommitRowContextMenu(
         <MouseEvent>e,
-        buildCommitContextMenuItems(
-          repo,
-          hash,
-          commit.parentHashes,
-          this.commits,
-          this.commitLookup,
-          sourceElem,
-          (mode) => this.pathHighlight.select({ kind: "commit", repo, hash, name: subject, mode })
-        ),
-        sourceElem,
-        this.getCurrentRepoRecentActions()
+        <HTMLElement>(<Element>e.target).closest(".commit")!
       );
+    });
+    addListenerToClass("commit", "keydown", (e: Event) => {
+      if (!consumeContextMenuLaunch(e)) return;
+      this.showCommitRowContextMenu(e, <HTMLElement>e.currentTarget);
     });
     addListenerToClass("commit", "click", (e: Event) => {
       const mouseEvent = <MouseEvent>e;
@@ -1072,16 +1067,21 @@ class GitKeizuView {
     });
     addListenerToClass("unsavedChanges", "contextmenu", (e: Event) => {
       e.stopPropagation();
-      let sourceElem = <HTMLElement>(<Element>e.target).closest(".unsavedChanges")!;
-      showContextMenu(
+      this.showUncommittedContextMenu(
         <MouseEvent>e,
-        buildUncommittedContextMenuItems(this.currentRepo, sourceElem),
-        sourceElem,
-        this.getCurrentRepoRecentActions()
+        <HTMLElement>(<Element>e.target).closest(".unsavedChanges")!
       );
+    });
+    addListenerToClass("unsavedChanges", "keydown", (e: Event) => {
+      if (!consumeContextMenuLaunch(e)) return;
+      this.showUncommittedContextMenu(e, <HTMLElement>e.currentTarget);
     });
     addListenerToClass("gitRef", "contextmenu", (e: Event) => {
       this.showRefBadgeContextMenu(<MouseEvent>e, <HTMLElement>e.currentTarget);
+    });
+    addListenerToClass("gitRef", "keydown", (e: Event) => {
+      if (!consumeContextMenuLaunch(e)) return;
+      this.showRefBadgeContextMenu(e, <HTMLElement>e.currentTarget);
     });
     addListenerToClass("gitRef", "click", (e: Event) => e.stopPropagation());
     addListenerToClass("gitRef", "dblclick", (e: Event) => {
@@ -1104,10 +1104,65 @@ class GitKeizuView {
 
     this.scrollContainerElem.scrollTop = savedScrollTop;
   }
-  private showRefBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void {
+  // Pointer and keyboard launches share these builders, so a row's menu is the same either way.
+  private showCommitRowContextMenu(event: ContextMenuTrigger, sourceElem: HTMLElement): void {
+    let hash = sourceElem.dataset.hash!;
+    let commit = this.commits[this.commitLookup[hash]];
+    if (commit.stash !== null) {
+      let selector = commit.stash.selector;
+      showContextMenu(
+        event,
+        buildStashContextMenuItems(this.currentRepo, hash, selector, sourceElem),
+        sourceElem,
+        this.getCurrentRepoRecentActions()
+      );
+      return;
+    }
+    const repo = this.currentRepo;
+    const subject = commit.message;
+    showContextMenu(
+      event,
+      buildCommitContextMenuItems(
+        repo,
+        hash,
+        commit.parentHashes,
+        this.commits,
+        this.commitLookup,
+        sourceElem,
+        (mode) => this.pathHighlight.select({ kind: "commit", repo, hash, name: subject, mode })
+      ),
+      sourceElem,
+      this.getCurrentRepoRecentActions()
+    );
+  }
+  private showUncommittedContextMenu(event: ContextMenuTrigger, sourceElem: HTMLElement): void {
+    showContextMenu(
+      event,
+      buildUncommittedContextMenuItems(this.currentRepo, sourceElem),
+      sourceElem,
+      this.getCurrentRepoRecentActions()
+    );
+  }
+  private showFileRowContextMenu(event: ContextMenuTrigger): void {
+    const sourceElem = event.target instanceof Element ? resolveFileRow(event.target) : null;
+    if (sourceElem === null) return;
+    const items = buildFileContextMenuItems(
+      sourceElem,
+      this.expandedCommit,
+      this.currentRepo,
+      this.buildFileHistoryMenuContext()
+    );
+    if (items.length === 0) return;
+    showContextMenu(event, items, sourceElem, this.getCurrentRepoRecentActions());
+  }
+  private showRefBadgeContextMenu(
+    event: ContextMenuTrigger,
+    badge: HTMLElement,
+    focusOptions?: ContextMenuFocusOptions
+  ): void {
     event.stopPropagation();
     if (badge.classList.contains(STASH_BADGE_CLASS)) {
-      this.showStashBadgeContextMenu(event, badge);
+      this.showStashBadgeContextMenu(event, badge, focusOptions);
       return;
     }
     if (badge.classList.contains(DETACHED_WORKTREE_CLASS)) {
@@ -1117,7 +1172,8 @@ class GitKeizuView {
         event,
         buildDetachedWorktreeContextMenuItems(this.currentRepo, worktreePath),
         badge,
-        this.getCurrentRepoRecentActions()
+        this.getCurrentRepoRecentActions(),
+        focusOptions
       );
       return;
     }
@@ -1156,7 +1212,8 @@ class GitKeizuView {
         ...highlightArgs
       ),
       badge,
-      this.getCurrentRepoRecentActions()
+      this.getCurrentRepoRecentActions(),
+      focusOptions
     );
   }
   // The target is bound at menu time by exact ref type and name, so listed clones and shared tips resolve the same way.
@@ -1179,7 +1236,11 @@ class GitKeizuView {
     return (mode) => this.pathHighlight.select({ ...selection, mode });
   }
   // A listed clone lives outside its row, so the stash is resolved from the badge's hash attribute.
-  private showStashBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void {
+  private showStashBadgeContextMenu(
+    event: ContextMenuTrigger,
+    badge: HTMLElement,
+    focusOptions?: ContextMenuFocusOptions
+  ): void {
     const hash = badge.getAttribute(STASH_HASH_ATTRIBUTE);
     if (hash === null || hash === "") return;
     const index = this.commitLookup[hash];
@@ -1195,7 +1256,8 @@ class GitKeizuView {
       event,
       buildStashContextMenuItems(this.currentRepo, hash, commit.stash.selector, originalRow),
       badge,
-      this.getCurrentRepoRecentActions()
+      this.getCurrentRepoRecentActions(),
+      focusOptions
     );
   }
   private renderUncommitedChanges() {
@@ -1324,26 +1386,33 @@ class GitKeizuView {
     colHeadersElem.addEventListener("contextmenu", (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      const repoOrdering: GG.RepoCommitOrdering =
-        this.gitRepos[this.currentRepo]?.commitOrdering ?? "default";
-      const items: ContextMenuElement[] = COMMIT_ORDERING_MENU_ITEMS.map(({ label, value }) => ({
-        title: value === repoOrdering ? `\u2713 ${label}` : label,
-        onClick: () => {
-          const updatedRepo: GG.GitRepoState = {
-            ...this.gitRepos[this.currentRepo],
-            commitOrdering: value
-          };
-          this.gitRepos[this.currentRepo] = updatedRepo;
-          sendMessage({
-            command: "saveRepoState",
-            repo: this.currentRepo,
-            state: updatedRepo
-          });
-          this.requestLoadCommits(true, () => {});
-        }
-      }));
-      showContextMenu(e, items, colHeadersElem, this.getCurrentRepoRecentActions());
+      this.showCommitOrderingContextMenu(e, colHeadersElem);
     });
+    colHeadersElem.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (!consumeContextMenuLaunch(e)) return;
+      this.showCommitOrderingContextMenu(e, colHeadersElem);
+    });
+  }
+  private showCommitOrderingContextMenu(event: ContextMenuTrigger, colHeadersElem: HTMLElement) {
+    const repoOrdering: GG.RepoCommitOrdering =
+      this.gitRepos[this.currentRepo]?.commitOrdering ?? "default";
+    const items: ContextMenuElement[] = COMMIT_ORDERING_MENU_ITEMS.map(({ label, value }) => ({
+      title: value === repoOrdering ? `\u2713 ${label}` : label,
+      onClick: () => {
+        const updatedRepo: GG.GitRepoState = {
+          ...this.gitRepos[this.currentRepo],
+          commitOrdering: value
+        };
+        this.gitRepos[this.currentRepo] = updatedRepo;
+        sendMessage({
+          command: "saveRepoState",
+          repo: this.currentRepo,
+          state: updatedRepo
+        });
+        this.requestLoadCommits(true, () => {});
+      }
+    }));
+    showContextMenu(event, items, colHeadersElem, this.getCurrentRepoRecentActions());
   }
 
   /* Description Column Minimum Width */
@@ -2096,16 +2165,11 @@ class GitKeizuView {
     addListenerToClass("gitFile", "contextmenu", (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
-      const sourceElem = resolveFileRow(<Element>(<MouseEvent>e).target);
-      if (sourceElem === null) return;
-      const items = buildFileContextMenuItems(
-        sourceElem,
-        this.expandedCommit,
-        this.currentRepo,
-        this.buildFileHistoryMenuContext()
-      );
-      if (items.length === 0) return;
-      showContextMenu(<MouseEvent>e, items, sourceElem, this.getCurrentRepoRecentActions());
+      this.showFileRowContextMenu(<MouseEvent>e);
+    });
+    addListenerToClass("gitFile", "keydown", (e: Event) => {
+      if (!consumeContextMenuLaunch(e)) return;
+      this.showFileRowContextMenu(e);
     });
     addListenerToClass("gitFile", "click", (e) => {
       let sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;

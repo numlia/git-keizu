@@ -43,6 +43,15 @@ declare global {
 
   type ContextMenuElement = ContextMenuItem | ContextMenuSubmenu | ContextMenuLabel | null;
 
+  // UI-only menu trigger: a pointer event or the ContextMenu / Shift+F10 keydown; not a host request.
+  type ContextMenuTrigger = MouseEvent | KeyboardEvent;
+
+  // Menus opened from a transient list: Tab leaves from `tabOrigin` after `onTabExit` closed the list.
+  interface ContextMenuFocusOptions {
+    readonly tabOrigin: HTMLElement;
+    readonly onTabExit: () => void;
+  }
+
   interface DialogTextInput {
     type: "text";
     name: string;
