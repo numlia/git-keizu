@@ -2525,7 +2525,7 @@ describe("merge dialog opened from a keyboard menu returns focus to the row (S81
 });
 
 /* ------------------------------------------------------------------ */
-/* S76: details, file and folder controls as standard buttons         */
+/* S76 / S82: details, file and folder controls as standard buttons   */
 /* ------------------------------------------------------------------ */
 
 const BINARY_FILE_CHANGE: GitFileChange = { ...FILE_CHANGE, additions: null, deletions: null };
@@ -2630,8 +2630,8 @@ describe("details, file and folder controls as standard buttons (S76)", () => {
     expect(postedCommands()).toEqual(["saveRepoState", "saveRepoState"]);
   });
 
-  it("requests the diff from the diff button only, not from the row wrapper (TC-731)", () => {
-    // Case: TC-731 (K39 / A8.1-6)
+  it("requests the same diff from the diff button and from the row wrapper (TC-754)", () => {
+    // Case: TC-731 → TC-754 (K39 / A8.1-6): S82 restores the whole row as the mouse hit area
     openDetails("M");
     clearPosts();
     const fileRow = detailsControl<HTMLElement>("li.gitFile");
@@ -2641,7 +2641,37 @@ describe("details, file and folder controls as standard buttons (S76)", () => {
     expect(press(diffButton, "Enter").defaultPrevented).toBe(false);
     expect(posts()).toEqual([]);
 
+    const expectedDiff = {
+      command: "viewDiff",
+      repo: REPO,
+      commitHash: "M",
+      oldFilePath: FILE_PATH,
+      newFilePath: FILE_PATH,
+      type: "M"
+    };
     fire(diffButton, "click");
+    expect(posts()).toEqual([expectedDiff]);
+
+    clearPosts();
+    fire(fileRow, "click");
+    expect(posts()).toEqual([expectedDiff]);
+    expect(detailsOwner()).toBe("M");
+
+    // The row click keeps bubbling, so the document-level dismissal closes an open menu as before.
+    clearPosts();
+    fire(fileRow, "contextmenu");
+    expect(menuIsActive()).toBe(true);
+    fire(fileRow, "click");
+    expect(menuIsActive()).toBe(false);
+    expect(posts()).toEqual([expectedDiff]);
+    expect(detailsOwner()).toBe("M");
+  });
+
+  it("requests the diff from the rename marker and the counters inside the row (TC-755)", () => {
+    // Case: TC-755 (K39): a target inside the row that is not a button acts like the row itself
+    openDetails("M");
+    clearPosts();
+    fire(detailsControl<HTMLElement>("li.gitFile > span.gitFileAddDel"), "click");
     expect(posts()).toEqual([
       {
         command: "viewDiff",
@@ -2653,28 +2683,70 @@ describe("details, file and folder controls as standard buttons (S76)", () => {
       }
     ]);
 
-    fire(fileRow, "click");
-    expect(posts()).toHaveLength(1);
-    expect(detailsOwner()).toBe("M");
-  });
-
-  it("orders the comparison hashes for the diff button like the mouse path (TC-731)", () => {
-    // Case: TC-731 (K39), comparison variant: getCommitOrder puts the older commit first
-    startCompare("N", "M");
+    const oldPath = "src/old.txt";
+    respondDetails("M", [], [{ ...FILE_CHANGE, type: "R", oldFilePath: oldPath }]);
     clearPosts();
-    fire(detailsControl<HTMLButtonElement>("li.gitFile > button.gitFileDiff"), "click");
-
+    fire(detailsControl<HTMLElement>("li.gitFile > span.gitFileRename"), "click");
     expect(posts()).toEqual([
       {
         command: "viewDiff",
         repo: REPO,
         commitHash: "M",
-        oldFilePath: FILE_PATH,
+        oldFilePath: oldPath,
         newFilePath: FILE_PATH,
-        type: "M",
-        compareWithHash: "N"
+        type: "R"
       }
     ]);
+    expect(detailsOwner()).toBe("M");
+  });
+
+  it("keeps each button's own request without a second diff from the row (TC-756)", () => {
+    // Case: TC-756 (K39 / A8.1-6): the button targets are excluded from the row listener
+    openDetails("M");
+    clearPosts();
+    fire(detailsControl<HTMLButtonElement>("li.gitFile > button.gitFileDiff"), "click");
+    expect(postedCommands()).toEqual(["viewDiff"]);
+
+    clearPosts();
+    fire(detailsControl<HTMLButtonElement>("button.gitFileAction.openFile"), "click");
+    fire(detailsControl<HTMLButtonElement>("button.gitFileAction.highlightFileHistory"), "click");
+    expect(postedCommands()).toEqual(["openFile", "fileHistory"]);
+    expect(posts("viewDiff")).toEqual([]);
+    expect(detailsOwner()).toBe("M");
+  });
+
+  it("ignores a row click on a binary file (TC-757)", () => {
+    // Case: TC-757 (K38 / R4.3): without gitDiffPossible the row stays inert
+    fire(row("M"), "click");
+    respondDetails("M", [], [BINARY_FILE_CHANGE]);
+    clearPosts();
+    const fileRow = detailsControl<HTMLElement>("li.gitFile");
+    expect(fileRow.classList.contains("gitDiffPossible")).toBe(false);
+
+    fire(fileRow, "click");
+    expect(posts()).toEqual([]);
+    expect(detailsOwner()).toBe("M");
+  });
+
+  it("orders the comparison hashes for the row like the diff button (TC-758)", () => {
+    // Case: TC-731 → TC-758 (K39), comparison variant: getCommitOrder puts the older commit first
+    startCompare("N", "M");
+    clearPosts();
+    const expectedDiff = {
+      command: "viewDiff",
+      repo: REPO,
+      commitHash: "M",
+      oldFilePath: FILE_PATH,
+      newFilePath: FILE_PATH,
+      type: "M",
+      compareWithHash: "N"
+    };
+    fire(detailsControl<HTMLButtonElement>("li.gitFile > button.gitFileDiff"), "click");
+    expect(posts()).toEqual([expectedDiff]);
+
+    clearPosts();
+    fire(detailsControl<HTMLElement>("li.gitFile"), "click");
+    expect(posts()).toEqual([expectedDiff]);
   });
 
   it("runs the open and history buttons without reaching the row or the list (TC-732)", () => {

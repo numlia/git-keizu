@@ -208,6 +208,7 @@ const COMMIT_DETAILS_CLOSE_ID = "commitDetailsClose";
 const COMMIT_DETAILS_FILES_ID = "commitDetailsFiles";
 const FILE_VIEW_TOGGLE_ID = "fileViewToggle";
 const FILE_ROW_SELECTOR = ".gitFile";
+const BUTTON_SELECTOR = "button";
 const FILE_DIFF_BUTTON_CLASS = "gitFileDiff";
 const FILE_OPEN_BUTTON_CLASS = "openFile";
 const FILE_HISTORY_BUTTON_CLASS = "highlightFileHistory";
@@ -2713,6 +2714,8 @@ class GitKeizuView {
   }
   // Every control is a native button: Enter / Space run the same click handler as the mouse,
   // and the child buttons stop propagation so neither the row wrapper nor the commit row acts.
+  // The row wrapper keeps the whole row as the mouse hit area for the diff; its click bubbles on
+  // so the document-level dismissal still closes an open menu.
   private bindFileViewListeners() {
     this.markFileViewTargets();
     addListenerToClass(FOLDER_BUTTON_CLASS, "click", (e) => {
@@ -2735,6 +2738,10 @@ class GitKeizuView {
         this.currentRepo,
         this.buildFileHistoryMenuContext()
       );
+    });
+    addListenerToClass("gitFile", "click", (e) => {
+      if (e.target instanceof Element && e.target.closest(BUTTON_SELECTOR) !== null) return;
+      this.sendViewDiffAction(<HTMLElement>e.currentTarget);
     });
     addListenerToClass("gitFile", "contextmenu", (e: Event) => {
       e.preventDefault();

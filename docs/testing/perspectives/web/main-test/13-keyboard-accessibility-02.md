@@ -6,7 +6,7 @@
 > Test Framework: Vitest
 > Responsibility: keyboard-accessibility
 
-`13-keyboard-accessibility-01.md` の続き（同じ共通 fixture・用語・計画 ID 対応表を参照）。本 shard は Tab 順と一覧内の往復、再描画・応答後の復元とメニュー維持、メニュー起動経路、詳細・ファイル操作の既存アクション接続、行の名前・状態説明・通知、blur した Webview へフォーカスを取り戻さない契約、キー起動メニューの keyup 由来 `contextmenu` と merge ダイアログの起点復元を持つ。
+`13-keyboard-accessibility-01.md` の続き（同じ共通 fixture・用語・計画 ID 対応表を参照）。本 shard は Tab 順と一覧内の往復、再描画・応答後の復元とメニュー維持、メニュー起動経路、詳細・ファイル操作の既存アクション接続、行の名前・状態説明・通知、blur した Webview へフォーカスを取り戻さない契約、キー起動メニューの keyup 由来 `contextmenu` と merge ダイアログの起点復元、ファイル行全体をマウスの差分起動領域として戻す契約を持つ。
 
 ## S73: Tab 順序・一覧内の往復・停止点の構成
 
@@ -143,7 +143,8 @@
 
 > Origin: Feature 061-05 (light-spec-plan)
 > Added: 2026-10-07
-> Status: active
+> Status: superseded
+> Superseded By: S82
 > Supersedes: -
 > Signature: `renderCommitDetailsView()` / `showCommitDetails()` の親 hash button・`#commitDetailsClose`・`#fileViewToggle` / `bindFileViewListeners()` のファイル差分 button・`.openFile` button・`.highlightFileHistory` button・folder button の `click` と `keydown` / `handleFileViewToggle()` / `alterGitFileTree` の接続
 > Target Path: `web/main.ts:2367-2399, 2499-2504, 2640-2848`（`renderCommitDetailsView()`、`bindDetailsClose`、`bindParentHashListeners` / `handleFileViewToggle` / `bindFileViewListeners` / `markFileViewTargets` / `toggleFolder` / `sendViewDiffAction` / `handleFileRowActivationKey`）
@@ -177,6 +178,7 @@
 - テスト: `tests/web/main.keyboard.test.ts` describe `details, file and folder controls as standard buttons (S76)`。TC-728〜TC-734 を同番号の `it` で（TC-731 は通常 / 比較の 2 変種、TC-734 は binary の差分 button と有効 button なし行の 2 変種）
 - jsdom の代替（Task 8 handoff）: 各 button の Enter keydown は native click に委ねるため `defaultPrevented === false` を確認し、実行は `click` で代替する（実機の Enter → click 1 回は `13-keyboard-accessibility-01.md` 冒頭の手動一覧）。TC-730 の「要求 0 件」は Git / 詳細要求 0 件の意味で、表示形式の保存 `saveRepoState` 1 件は `01-rendering-03.md` S62 TC-548 の契約として許容。TC-733 の「閉じている間は子 button が `getTabStops()` に含まれない」は `ul.gitFolderContents[hidden]` 祖先による除外（`isTabStop` の `[hidden]` 判定）で確認
 - 実行結果（2026-10-07）: 13 件 pass
+- 本節は S82 に置き換えた（TC-731 の「`li` の click では要求 0 件」だけが契約変更。他の Case は S82 へ引き継ぎ、test method の対応は S82 の「利用者フォローアップ テスト対応」を参照）
 
 ## S77: 行の名前・状態説明・状態通知
 
@@ -354,3 +356,41 @@ A8.2-4「フォーカスが別の部品・VS Code側へ移った後に、更新�
 - RED: 旧実装（a0e8503）で 3 件とも fail（TC-751: `#contextMenu` が非 `active`、TC-752 / TC-753: `activeElement` が `body`）→ GREEN。S75 TC-724 / TC-727 は変更なしで pass
 - Windows 実機の VK_APPS keyup → `contextmenu` 合成は `13-keyboard-accessibility-01.md` 冒頭の手動一覧に追加（未実施）
 - 実行結果（2026-10-07）: 3 件 pass
+
+## S82: ファイル行全体をマウスの差分起動領域として戻す（`li` の click で差分）
+
+> Origin: Feature 061-05 (light-spec-plan) user follow-up
+> Added: 2026-10-07
+> Status: active
+> Supersedes: S76
+> Signature: `bindFileViewListeners()` の `li.gitFile` `click`（`e.target` が `button` 内なら無視し、それ以外は `sendViewDiffAction(e.currentTarget)`。伝播は止めない）/ S76 と同じ差分 button・`.openFile` / `.highlightFileHistory` button・folder button・親 hash button・`#commitDetailsClose`・`#fileViewToggle` の接続
+> Target Path: `web/main.ts:211, 2717-2757, 2818-2842`（`BUTTON_SELECTOR`、`bindFileViewListeners` の `gitFile` click、`sendViewDiffAction`）
+> Test File: `tests/web/main.keyboard.test.ts`
+
+S76 TC-731 は「`li` は非操作ラッパーで、`li` 自体の click では要求 0 件」としたが、利用者の判断で Task 8 以前のマウスの当たり判定（`li` の余白・`R` マーカー・`(+n|-m)` カウンターを含む行全体の click で差分を開く）を戻す。キーボード操作（差分 button の Enter / Space、有効 button なし行の Enter / Space メニュー）、button 構造（`web/fileTree-test.md` S6）、子 button の伝播停止（TC-732）はそのまま。`li` の click リスナーは 83385b6 の旧実装と同じく伝播を止めない（詳細 `tr` はコミット行の兄弟であり行の切替は起きず、document の `hideContextMenuListener` が開いているメニューを従来どおり閉じる）。本節は TC-731 だけを TC-754 / TC-758 へ置き換え、S76 の TC-728〜TC-730・TC-732〜TC-734 は期待結果を変えずに引き継ぐ（テストは同じ Case ID のまま describe `details, file and folder controls as standard buttons (S76)` に残る）。
+
+| Case ID | Input / Precondition                                                                                                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                        | Notes                                                             |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| TC-754  | `M` の詳細でファイル行の差分 button を `click`、続けて `li` 自体（`e.target === li`）を `click`。さらに `li` を `contextmenu` でメニューを開いてから `li` を `click` | Normal - 行の余白から差分                                                  | 差分 button と `li` の click で `viewDiff` 要求が各 1 件、payload（`repo` / `commitHash` / `oldFilePath` / `newFilePath` / `type`）が同一。`#commitDetails` は `M` 行の直後のまま、他の要求 0 件。メニューを開いた後の `li` click ではメニューが閉じて `viewDiff` 1 件 | S76 TC-731 の置き換え（K39 / A8.1-6）。`// Case: TC-731 → TC-754` |
+| TC-755  | `li.gitFile > span.gitFileAddDel` を `click`。`type: "R"`（`oldFilePath: "src/old.txt"`）の行で `li.gitFile > span.gitFileRename` を `click`                         | Normal - button 以外の子要素                                               | それぞれ `viewDiff` 要求 1 件。rename 行では `oldFilePath` が旧 path、`type: "R"`                                                                                                                                                                                      | K39。`e.target` が `li` 内で `button` 外なら行として扱う          |
+| TC-756  | 差分 button、`.openFile` button、`.highlightFileHistory` button を `click`                                                                                           | Validation - button は自身の要求だけ                                       | 差分 button で `viewDiff` 1 件だけ（行リスナーによる 2 件目なし）。`.openFile` / `.highlightFileHistory` で `openFile` / `fileHistory` が各 1 件、`viewDiff` 0 件                                                                                                      | K39 / A8.1-6。TC-732 の伝播停止契約は不変                         |
+| TC-757  | `additions: null` / `deletions: null`（binary、`gitDiffPossible` なし）の行で `li` を `click`                                                                        | Validation - 差分不可の行は不活性                                          | 要求 0 件、`#commitDetails` は `M` 行の直後のまま                                                                                                                                                                                                                      | K38 / R4.3。`sendViewDiffAction` の `gitDiffPossible` ガード      |
+| TC-758  | 比較表示（`N` を開き `M` を Ctrl + click）でファイル行の差分 button を `click`、続けて `li` を `click`                                                               | Normal - 比較表示の時系列                                                  | 両方の `viewDiff` が `commitHash: "M"` / `compareWithHash: "N"`（`getCommitOrder` で古い側が先）で payload が同一                                                                                                                                                      | S76 TC-731 比較変種の置き換え（K39）。`// Case: TC-731 → TC-758`  |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 利用者フォローアップ（S82）
+
+| 失敗源                                                   | 対応ケースまたは除外理由                                                 |
+| -------------------------------------------------------- | ------------------------------------------------------------------------ |
+| `li` の余白・子 span の click で差分が開かない           | TC-754、TC-755                                                           |
+| button の click が行リスナーで二重に差分を開く           | TC-756                                                                   |
+| binary 行の click で差分が開く                           | TC-757                                                                   |
+| 比較表示で `li` 経路の時系列が button 経路と違う         | TC-758                                                                   |
+| 行の click でコミット行が切り替わる / メニューが閉じない | TC-754（`#commitDetails` の位置とメニューの閉鎖）                        |
+| キーボード経路・button 構造                              | 引き継いだ S76 TC-728〜TC-730・TC-732〜TC-734、`web/fileTree-test.md` S6 |
+
+### 利用者フォローアップ テスト対応（Feature 061-05）— S82
+
+- テスト: `tests/web/main.keyboard.test.ts` describe `details, file and folder controls as standard buttons (S76)`。TC-754 `requests the same diff from the diff button and from the row wrapper (TC-754)`（旧 TC-731 の書き換え）、TC-755 `requests the diff from the rename marker and the counters inside the row (TC-755)`、TC-756 `keeps each button's own request without a second diff from the row (TC-756)`、TC-757 `ignores a row click on a binary file (TC-757)`、TC-758 `orders the comparison hashes for the row like the diff button (TC-758)`（旧 TC-731 比較変種の書き換え）
+- RED: 旧実装（b5d40df、`li` の click リスナーなし）で TC-754 / TC-755 / TC-758 が fail（`li` の click で `viewDiff` 0 件）→ GREEN。TC-756 / TC-757 は旧実装でも pass（不変の保証）。S76 の引き継ぎ Case は変更なしで pass
+- 引き継ぎ: TC-728 / TC-729 / TC-730 / TC-732 / TC-733 / TC-734 / TC-686 / TC-719 / TC-710 の各 `it` は S76 の「Task 12 テスト対応」のまま
+- 実行結果（2026-10-07）: 16 件 pass（describe 全体）
