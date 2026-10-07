@@ -2039,10 +2039,11 @@ class GitKeizuView {
 
   // Focus dropped by a replacement returns by key, else to the row target; while no row exists
   // (loading view, repository change) it parks on the named list container instead of body.
+  // A webview that lost focus to VS Code is never pulled back (A8.2-4).
   private finishListFocusUpdate(update: FocusUpdate | null): void {
     if (update === null || finishFocusUpdate(update)) return;
     const active = document.activeElement;
-    if (active === null || active === document.body) {
+    if ((active === null || active === document.body) && document.hasFocus()) {
       this.tableElem.focus({ preventScroll: true });
     }
   }

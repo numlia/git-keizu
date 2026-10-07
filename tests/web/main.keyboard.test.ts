@@ -2027,6 +2027,90 @@ describe("focus restore after re-render and the kept menu context (S74)", () => 
 });
 
 /* ------------------------------------------------------------------ */
+/* S80: no focus pulled back into a blurred webview                   */
+/* ------------------------------------------------------------------ */
+
+/** Simulates the webview losing focus to VS Code: the window blur plus `document.hasFocus()`. */
+function blurWebview(): void {
+  vi.spyOn(document, "hasFocus").mockReturnValue(false);
+  window.dispatchEvent(new Event("blur"));
+}
+
+function refocusWebview(): void {
+  vi.spyOn(document, "hasFocus").mockReturnValue(true);
+  window.dispatchEvent(new Event("focus"));
+}
+
+// @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-02.md
+describe("no focus pulled back into a blurred webview (S80)", () => {
+  afterEach(() => {
+    window.dispatchEvent(new Event("focus"));
+  });
+
+  it("leaves focus on body when a response replaces the rows after the webview blurred (TC-747)", () => {
+    // Case: TC-747 (A8.2-4)
+    const oldRow = focusRow("M");
+    blurWebview();
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+
+    loadCommits(standardCommits(), { hard: true });
+
+    expect(oldRow.isConnected).toBe(false);
+    expect(document.activeElement).toBe(document.body);
+    expect(focusSpy).not.toHaveBeenCalled();
+    expect(rowsWithTabStop()).toEqual(["M"]);
+    expect(posts()).toEqual([]);
+  });
+
+  it("restores the row again once the webview has focus back (TC-748)", () => {
+    // Case: TC-748 (K22 / A8.1-7 counterpart of TC-747)
+    const oldRow = focusRow("M");
+    blurWebview();
+    refocusWebview();
+
+    loadCommits(standardCommits(), { hard: true });
+
+    expect(oldRow.isConnected).toBe(false);
+    expect(document.activeElement).toBe(row("M"));
+    expect(posts()).toEqual([]);
+  });
+
+  it("parks on the list container across a repository change while the webview has focus (TC-749)", () => {
+    // Case: TC-749 (R4.7 loading-view parking kept for the repository change)
+    focusRow("M");
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+
+    dispatch({ command: "selectRepo", repo: OTHER_REPO });
+
+    expect(document.getElementById("loadingHeader")).not.toBeNull();
+    expect(document.activeElement).toBe(table());
+
+    respondToRefresh(standardCommits(), "R");
+
+    expect(document.activeElement).toBe(row("R"));
+    expect(rowsWithTabStop()).toEqual(["R"]);
+  });
+
+  it("does not park on the list container after the webview blurred (TC-750)", () => {
+    // Case: TC-750 (A8.2-4): the repository change refusal must not pull focus back either
+    focusRow("M");
+    blurWebview();
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+
+    dispatch({ command: "selectRepo", repo: OTHER_REPO });
+
+    expect(document.getElementById("loadingHeader")).not.toBeNull();
+    expect(document.activeElement).toBe(document.body);
+
+    respondToRefresh(standardCommits(), "R");
+
+    expect(document.activeElement).toBe(document.body);
+    expect(focusSpy).not.toHaveBeenCalled();
+    expect(rowsWithTabStop()).toEqual(["R"]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
 /* S75: ref label Enter / Space                                       */
 /* ------------------------------------------------------------------ */
 
@@ -2190,6 +2274,8 @@ describe("ref label Enter / Space open the menu while dblclick keeps the checkou
       expect(document.activeElement).toBe(contextMenuElem().querySelector("li.contextMenuItem"));
       fire(document, "click");
 
+      // A right-click presses the button before its contextmenu; the press ends the key launch.
+      launch.mouseTarget.dispatchEvent(new Event("pointerdown", { bubbles: true }));
       fire(launch.mouseTarget, "contextmenu");
       expect(menuIsActive(), launch.name).toBe(true);
       expect(menuTitles(), launch.name).toEqual(keyboardTitles);
@@ -2272,6 +2358,29 @@ describe("ref label Enter / Space open the menu while dblclick keeps the checkou
     clearPosts();
     fire(menuItem(COPY_HASH_TITLE), "click");
     expect(posts("copyToClipboard")).toEqual([expect.objectContaining({ data: "R" })]);
+
+    // The other platform order: keydown → keyup → contextmenu of the same press (VK_APPS).
+    const launchTarget = focusRow("M");
+    press(launchTarget, "ContextMenu");
+    expect(menuIsActive()).toBe(true);
+    const focusedItem = document.activeElement;
+    expect(focusedItem).toBe(contextMenuElem().querySelector("li.contextMenuItem"));
+    const afterKeyup = Array.from(contextMenuElem().children);
+
+    const late = fire(launchTarget, "contextmenu");
+
+    expect(late.defaultPrevented).toBe(true);
+    expect(menuIsActive()).toBe(true);
+    expect(Array.from(contextMenuElem().children)).toEqual(afterKeyup);
+    expect(document.activeElement).toBe(focusedItem);
+
+    const laterIndependent = fire(row("R"), "contextmenu");
+
+    expect(laterIndependent.defaultPrevented).toBe(false);
+    expect(contextMenuElem().children[0]).not.toBe(afterKeyup[0]);
+    clearPosts();
+    fire(menuItem(COPY_HASH_TITLE), "click");
+    expect(posts("copyToClipboard")).toEqual([expect.objectContaining({ data: "R" })]);
   });
 
   it("runs the same action and recent record from Enter as from a click (TC-727)", () => {
@@ -2286,6 +2395,7 @@ describe("ref label Enter / Space open the menu while dblclick keeps the checkou
     const keyboardPosts = posts();
     expect(postedCommands()).toEqual(["saveRepoState", "openFile"]);
     expect(menuIsActive()).toBe(false);
+    expect(document.activeElement).toBe(diffButton);
 
     fire(details()!.querySelector("li.gitFile")!, "contextmenu");
     clearPosts();
@@ -2299,6 +2409,7 @@ describe("ref label Enter / Space open the menu while dblclick keeps the checkou
     press(document.activeElement!, "Enter");
     const keyboardCopy = posts();
     expect(keyboardCopy).toEqual([{ command: "copyToClipboard", type: "Commit Hash", data: "M" }]);
+    expect(document.activeElement).toBe(row("M"));
     fire(row("M"), "contextmenu");
     clearPosts();
     fire(menuItem(COPY_HASH_TITLE), "click");

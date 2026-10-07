@@ -29,7 +29,6 @@ const KEY_HOME = "Home";
 const KEY_END = "End";
 
 const EVENT_KEYDOWN = "keydown";
-const EVENT_KEYUP = "keyup";
 const EVENT_POINTERDOWN = "pointerdown";
 const EVENT_MOUSEDOWN = "mousedown";
 const EVENT_CONTEXTMENU = "contextmenu";
@@ -69,18 +68,15 @@ interface MenuSession {
 let activeSession: MenuSession | null = null;
 
 // The browser may follow the ContextMenu / Shift+F10 keydown that opened a menu with its own
-// `contextmenu` event on the same target; only that one event is swallowed.
+// `contextmenu` event on the same target; only that one event is swallowed. Some platforms
+// dispatch it after the launching key's keyup, so only a new key press or pointer press counts
+// as an independent input.
 interface KeyboardLaunch {
   readonly target: HTMLElement;
   readonly dispose: () => void;
 }
 let pendingKeyboardLaunch: KeyboardLaunch | null = null;
-const KEYBOARD_LAUNCH_INDEPENDENT_EVENTS = [
-  EVENT_KEYDOWN,
-  EVENT_KEYUP,
-  EVENT_POINTERDOWN,
-  EVENT_MOUSEDOWN
-];
+const KEYBOARD_LAUNCH_INDEPENDENT_EVENTS = [EVENT_KEYDOWN, EVENT_POINTERDOWN, EVENT_MOUSEDOWN];
 
 const titleProbe = document.createElement("span");
 
@@ -348,10 +344,14 @@ function resolveItem(session: MenuSession, menuItemEl: HTMLElement): ContextMenu
 }
 
 // hide → onClick keeps the existing order; a menu closed for any reason runs nothing afterwards.
+// Hiding removes the focused `li`, so an action that hands focus to no other UI (dialog, editor)
+// returns it to the origin (R4.7); one that did is left alone.
 function activateItem(session: MenuSession, item: ContextMenuElement): void {
   if (activeSession !== session || !isContextMenuItem(item)) return;
   hideContextMenu(REASON_ACTION);
   item.onClick();
+  const active = document.activeElement;
+  if (active === null || active === document.body) focusOrigin(session.origin, session.source);
 }
 
 function addSubmenuElements(session: MenuSession): void {
