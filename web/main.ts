@@ -13,6 +13,7 @@ import { Dropdown } from "./dropdown";
 import {
   CLASS_FILE_HISTORY_CURRENT,
   CLASS_FILE_HISTORY_NOTE,
+  FILE_HISTORY_BAR_ID,
   FileHistoryController
 } from "./fileHistory";
 import {
@@ -30,13 +31,26 @@ import {
   generateGitFileTree,
   generateGitFileTreeHtml
 } from "./fileTree";
-import { findCommitElemWithId, FindWidget, getCommitElems } from "./findWidget";
+import { FindWidget } from "./findWidget";
 import { Graph } from "./graph";
 import { t } from "./i18n";
-import { isKeyboardActionBlocked } from "./keyboardNavigation";
+import {
+  beginFocusUpdate,
+  captureFocusOrigin,
+  configureFocusContext,
+  finishFocusUpdate,
+  type FocusKey,
+  type FocusUpdate,
+  installKeyboardGuards,
+  isKeyboardActionBlocked,
+  markFocusTarget,
+  moveFocusPast,
+  reconcileRowTarget,
+  type RowTarget
+} from "./keyboardNavigation";
 import { handleMessage, type RefreshMode } from "./messageHandler";
 import type { BranchPathMode, PathHighlightSelection } from "./pathHighlight";
-import { PathHighlightController } from "./pathHighlightController";
+import { PATH_HIGHLIGHT_BAR_ID, PathHighlightController } from "./pathHighlightController";
 import { buildRefContextMenuItems, checkoutBranchAction, showDeleteBranchDialog } from "./refMenu";
 import { DESCRIPTION_MIN_WIDTH, RefOverflowController } from "./refOverflow";
 import { buildStashContextMenuItems } from "./stashMenu";
@@ -128,15 +142,85 @@ type PendingCommitLoad = {
 
 const EDITABLE_TAG_NAMES = ["INPUT", "TEXTAREA", "SELECT"];
 
+const CONTENT_EDITABLE_ATTRIBUTE = "contenteditable";
+const CONTENT_EDITABLE_SELECTOR = `[${CONTENT_EDITABLE_ATTRIBUTE}]`;
+
 function isEditableEventTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
-  if (EDITABLE_TAG_NAMES.includes(target.tagName)) return true;
-  const contentEditable = target.getAttribute("contenteditable");
-  return target.isContentEditable || (contentEditable !== null && contentEditable !== "false");
+  if (EDITABLE_TAG_NAMES.includes(target.tagName) || target.isContentEditable) return true;
+  // jsdom and detached hosts do not propagate isContentEditable to descendants.
+  const host = target.closest(CONTENT_EDITABLE_SELECTOR);
+  return host !== null && host.getAttribute(CONTENT_EDITABLE_ATTRIBUTE) !== "false";
 }
 
 const KEY_CONTEXT_MENU = "ContextMenu";
 const KEY_F10 = "F10";
+const KEY_ARROW_UP = "ArrowUp";
+const KEY_ARROW_DOWN = "ArrowDown";
+const KEY_ENTER = "Enter";
+const KEY_ESCAPE = "Escape";
+const KEY_TAB = "Tab";
+const TAB_INDEX_STOP = 0;
+const TAB_INDEX_PROGRAMMATIC = -1;
+const COMMIT_DETAILS_ID = "commitDetails";
+const LOAD_MORE_BUTTON_ID = "loadMoreCommitsBtn";
+const TABLE_HEADERS_ID = "tableColHeaders";
+const BRANCH_CLEANUP_PANEL_ID = "branchCleanupPanel";
+const FIND_WIDGET_ACTIVE_SELECTOR = ".findWidget.active";
+const CLASS_ACTIVE = "active";
+const ROW_SELECTOR = "tr[data-hash]";
+const ROW_LABEL_SELECTOR = ".gitRef, .refOverflowCounter";
+const ROW_LABEL_STOP_SELECTOR = ".gitRef:not(.refOverflowHidden), .refOverflowCounter";
+const TAB_STOP_SELECTOR = "button, input, select, textarea, summary, a[href], [tabindex]";
+const TAB_STOP_EXCLUDED_SELECTOR =
+  '[hidden], [disabled], [aria-hidden="true"], .refOverflowHidden, .refOverflowMeasure';
+const DISPLAY_NONE = "none";
+const VISIBILITY_HIDDEN = "hidden";
+// Toolbar order of plan R4.3: repo, branch, author, remote, cleanup, find, fetch, current, refresh.
+const TOOLBAR_STOP_SELECTORS: readonly string[] = [
+  "#repoSelect > .dropdownCurrentValue",
+  "#branchSelect > .dropdownCurrentValue",
+  "#authorSelect > .dropdownCurrentValue",
+  "#showRemoteBranchesCheckbox",
+  "#branchCleanupBtn",
+  "#searchBtn",
+  "#fetchBtn",
+  "#currentBtn",
+  "#refreshBtn"
+];
+
+function consumeKey(e: KeyboardEvent): void {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function isDisplayed(element: HTMLElement): boolean {
+  if (getComputedStyle(element).visibility === VISIBILITY_HIDDEN) return false;
+  for (let node: HTMLElement | null = element; node !== null; node = node.parentElement) {
+    if (getComputedStyle(node).display === DISPLAY_NONE) return false;
+  }
+  return true;
+}
+
+// A normal tab stop: connected, tabbable, enabled and not inside a hidden or measuring subtree.
+function isTabStop(element: HTMLElement): boolean {
+  return (
+    element.isConnected &&
+    element.tabIndex >= TAB_INDEX_STOP &&
+    element.closest(TAB_STOP_EXCLUDED_SELECTOR) === null &&
+    isDisplayed(element)
+  );
+}
+
+function collectTabStops(container: Element | null): HTMLElement[] {
+  if (container === null) return [];
+  return Array.from(container.querySelectorAll<HTMLElement>(TAB_STOP_SELECTOR)).filter(isTabStop);
+}
+
+// The highlight bars and the find widget are shown by their "active" class, not by `hidden`.
+function activeContainer(element: Element | null): Element | null {
+  return element !== null && element.classList.contains(CLASS_ACTIVE) ? element : null;
+}
 
 // ContextMenu / Shift+F10 open the target's own menu; inputs keep the browser's edit menu and
 // repeat / keyup / IME presses never launch. A consumed launch stops at the innermost target.
@@ -225,6 +309,10 @@ class GitKeizuView {
   private stashNavigationIndex: number = -1;
   private stashNavigationTimer: ReturnType<typeof setTimeout> | null = null;
   private isLoadingMoreCommits: boolean = false;
+  // The row the next key acts on: separate from the details, compare, HEAD and history states.
+  private rowTarget: RowTarget | null = null;
+  private readonly keydownListener = (e: KeyboardEvent) => this.handleKeyboardShortcut(e);
+  private readonly disposeFocusContext: () => void;
 
   constructor(
     repos: GG.GitRepoSet,
@@ -240,7 +328,15 @@ class GitKeizuView {
     this.tableElem = document.getElementById("commitTable")!;
     this.footerElem = document.getElementById("footer")!;
     this.scrollContainerElem = document.getElementById("scrollContainer")!;
+    this.disposeFocusContext = configureFocusContext({
+      getRepo: () => this.currentRepo ?? null,
+      getActiveRow: () => this.getRowTargetElem(),
+      getTabStops: () => this.getTabStops()
+    });
+    this.tableElem.tabIndex = TAB_INDEX_PROGRAMMATIC;
+    this.tableElem.addEventListener("focusin", (e) => this.syncRowTargetFromFocus(e.target));
     this.repoDropdown = new Dropdown("repoSelect", true, t("toolbar.repos"), (value) => {
+      this.leaveRepository();
       this.refOverflow.detachTable();
       this.fileHistory.onRepositoryChanged();
       this.pathHighlight.onRepositoryChanged();
@@ -361,7 +457,7 @@ class GitKeizuView {
         this.renderGraph();
       }
     });
-    document.addEventListener("keydown", (e) => this.handleKeyboardShortcut(e));
+    document.addEventListener("keydown", this.keydownListener);
     this.observeWindowSizeChanges();
     this.observeWebviewStyleChanges();
     this.observeWebviewScroll();
@@ -429,6 +525,7 @@ class GitKeizuView {
     let repoPaths = Object.keys(repos),
       changedRepo = false;
     if (repos[this.currentRepo] === undefined) {
+      this.leaveRepository();
       this.refOverflow.detachTable();
       this.fileHistory.onRepositoryChanged();
       this.pathHighlight.onRepositoryChanged();
@@ -465,7 +562,10 @@ class GitKeizuView {
 
     this.refOverflow.detachTable();
     this.fileHistory.onRepositoryChanged();
-    if (repo !== this.currentRepo) this.pathHighlight.onRepositoryChanged();
+    if (repo !== this.currentRepo) {
+      this.pathHighlight.onRepositoryChanged();
+      this.leaveRepository();
+    }
     this.currentRepo = repo;
     this.branchCleanupPanel.selectRepository(repo);
     const repoPaths = Object.keys(this.gitRepos);
@@ -616,6 +716,12 @@ class GitKeizuView {
       }
     }
 
+    this.rowTarget = reconcileRowTarget(
+      this.rowTarget,
+      this.currentRepo,
+      this.commits.map((commit) => commit.hash),
+      this.commitHead
+    );
     this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup);
 
     const expandedCommitVisible =
@@ -890,6 +996,7 @@ class GitKeizuView {
     this.graph.render(this.expandedCommit);
   }
   private renderTable() {
+    const focusUpdate = this.beginListFocusUpdate();
     // Close first: the ref listeners below are bound by class name across the whole document.
     this.refOverflow.closePopup();
     const savedScrollTop = this.scrollContainerElem.scrollTop;
@@ -969,15 +1076,19 @@ class GitKeizuView {
     }
     this.tableElem.innerHTML = `<table>${html}</table>`;
     this.footerElem.innerHTML = this.moreCommitsAvailable
-      ? `<div id="loadMoreCommitsBtn" class="roundedBtn">${t("table.loadMoreCommits")}</div>`
+      ? `<div id="${LOAD_MORE_BUTTON_ID}" class="roundedBtn">${t("table.loadMoreCommits")}</div>`
       : "";
+    this.applyRowTargets();
     this.makeTableResizable();
     this.setupColumnHeaderContextMenu();
 
     if (this.moreCommitsAvailable) {
-      document.getElementById("loadMoreCommitsBtn")!.addEventListener("click", () => {
+      const loadMoreElem = document.getElementById(LOAD_MORE_BUTTON_ID)!;
+      markFocusTarget(loadMoreElem, { kind: "control", id: LOAD_MORE_BUTTON_ID });
+      loadMoreElem.addEventListener("click", () => {
+        const loadMoreFocusUpdate = beginFocusUpdate(this.footerElem);
         (<HTMLElement>(
-          document.getElementById("loadMoreCommitsBtn")!.parentNode!
+          document.getElementById(LOAD_MORE_BUTTON_ID)!.parentNode!
         )).innerHTML = `<h2 id="loadingHeader">${svgIcons.loading}${t("loading.label")}</h2>`;
         this.maxCommits = normalizeCommitLoadCount(
           this.maxCommits + this.config.loadMoreCommits,
@@ -986,6 +1097,7 @@ class GitKeizuView {
         this.hideCommitDetails();
         this.saveState();
         this.requestLoadCommits(true, () => {});
+        this.finishListFocusUpdate(loadMoreFocusUpdate);
       });
     }
 
@@ -1049,6 +1161,7 @@ class GitKeizuView {
       const mouseEvent = <MouseEvent>e;
       let sourceElem = <HTMLElement>(<Element>e.target).closest(".commit")!;
       const clickedHash = sourceElem.dataset.hash!;
+      this.setRowTarget(clickedHash);
       this.fileHistory.handleCommitRowClick(clickedHash);
       this.handleCommitRowActivation(
         clickedHash,
@@ -1059,6 +1172,7 @@ class GitKeizuView {
     addListenerToClass("unsavedChanges", "click", (e: Event) => {
       const mouseEvent = <MouseEvent>e;
       let sourceElem = <HTMLElement>(<Element>e.target).closest(".unsavedChanges")!;
+      this.setRowTarget(sourceElem.dataset.hash!);
       this.handleCommitRowActivation(
         sourceElem.dataset.hash!,
         sourceElem,
@@ -1102,6 +1216,7 @@ class GitKeizuView {
     const tableElem = this.tableElem.querySelector("table");
     if (tableElem !== null) this.refOverflow.attachTable(tableElem);
 
+    this.finishListFocusUpdate(focusUpdate);
     this.scrollContainerElem.scrollTop = savedScrollTop;
   }
   // Pointer and keyboard launches share these builders, so a row's menu is the same either way.
@@ -1262,17 +1377,22 @@ class GitKeizuView {
   }
   private renderUncommitedChanges() {
     let date = getCommitDate(this.commits[0].date);
-    document.getElementsByClassName("unsavedChanges")[0].innerHTML =
-      `<td></td><td><b>${escapeHtml(this.commits[0].message)}</b></td><td title="${date.title}">${date.value}</td><td title="* <>">*</td><td title="*">*</td>`;
+    const rowElem = <HTMLElement>document.getElementsByClassName("unsavedChanges")[0];
+    const focusUpdate = beginFocusUpdate(rowElem);
+    rowElem.innerHTML = `<td></td><td><b>${escapeHtml(this.commits[0].message)}</b></td><td title="${date.title}">${date.value}</td><td title="* <>">*</td><td title="*">*</td>`;
+    finishFocusUpdate(focusUpdate);
   }
+  // A same-repository loading view keeps the menu (its action context is captured at open time);
+  // repository changes close it explicitly in leaveRepository().
   private renderShowLoading() {
+    const focusUpdate = this.beginListFocusUpdate();
     this.refOverflow.detachTable();
     if (isDialogActive()) hideDialog();
-    if (isContextMenuActive()) hideContextMenu();
     this.graph.clear();
     this.tableElem.innerHTML = `<h2 id="loadingHeader">${svgIcons.loading}${t("loading.label")}</h2>`;
     this.footerElem.innerHTML = "";
     this.findWidget.setInputEnabled(false);
+    this.finishListFocusUpdate(focusUpdate);
   }
   private makeTableResizable() {
     const colHeadersElem = document.getElementById("tableColHeaders");
@@ -1573,61 +1693,149 @@ class GitKeizuView {
     } else {
       currentBtn.classList.add("disabled");
     }
+    currentBtn.toggleAttribute("disabled", !isHeadVisible);
   }
 
   /* Keyboard Shortcuts */
+  // Local UIs (menu, dialog, dropdowns) stop their keys before they reach here; a consumed or
+  // composition-bound key is never handled twice (R4.6).
   private handleKeyboardShortcut(e: KeyboardEvent) {
-    if (e.isComposing) return;
-
-    if (this.handleFileHistoryArrowKey(e)) return;
-
-    // Arrow key navigation (REQ-2.1, REQ-2.2, REQ-2.3, REQ-2.4, REQ-2.5)
-    if (
-      this.expandedCommit !== null &&
-      (e.key === "ArrowUp" || e.key === "ArrowDown") &&
-      this.expandedCommit.compareWithHash === null
-    ) {
-      // Guard only this branch (not the whole handler) so global shortcuts
-      // such as Ctrl/Cmd+F keep working while typing in editable elements.
-      if (isEditableEventTarget(e.target)) return;
-
-      const curIndex = this.commitLookup[this.expandedCommit.hash];
-      if (typeof curIndex === "number") {
-        let newIndex = -1;
-
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {
-          // Ctrl/Cmd+Shift: alternative branch navigation
-          newIndex =
-            e.key === "ArrowUp"
-              ? this.graph.getAlternativeChildIndex(curIndex)
-              : this.graph.getAlternativeParentIndex(curIndex);
-        } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
-          // Ctrl/Cmd: branch tracking navigation
-          newIndex =
-            e.key === "ArrowUp"
-              ? this.graph.getFirstChildIndex(curIndex)
-              : this.graph.getFirstParentIndex(curIndex);
-        } else if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-          // No modifier: table order navigation
-          if (e.key === "ArrowUp" && curIndex > 0) {
-            newIndex = curIndex - 1;
-          } else if (e.key === "ArrowDown" && curIndex < this.commits.length - 1) {
-            newIndex = curIndex + 1;
-          }
-        }
-        // Other modifier combinations: fall through to existing shortcuts
-
-        if (newIndex > -1) {
-          e.preventDefault();
-          e.stopPropagation();
-          const elem = findCommitElemWithId(getCommitElems(), newIndex);
-          if (elem !== null) this.loadCommitDetails(elem);
-          return;
-        }
-      }
+    if (e.defaultPrevented || isKeyboardActionBlocked(e)) return;
+    if (e.key === KEY_TAB) {
+      this.handleListTab(e);
+      return;
     }
+    const focused = this.resolveFocusedRow(e.target);
+    if (focused !== null && this.handleRowKey(e, focused.row, focused.onRow)) return;
+    this.handleConfiguredShortcut(e, focused !== null || this.isListScopeTarget(e.target));
+  }
 
-    if (!(e.ctrlKey || e.metaKey)) return;
+  // The list keys apply only to a row or to one of its ref labels; inputs, buttons, file actions
+  // and the details view keep their own keys (R4.2).
+  private resolveFocusedRow(
+    target: EventTarget | null
+  ): { row: HTMLElement; onRow: boolean } | null {
+    if (!(target instanceof HTMLElement) || !this.tableElem.contains(target)) return null;
+    if (isEditableEventTarget(target)) return null;
+    const row = target.closest<HTMLElement>(ROW_SELECTOR);
+    if (row === null) return null;
+    if (target === row) return { row, onRow: true };
+    const label = target.closest<HTMLElement>(ROW_LABEL_SELECTOR);
+    return label !== null && row.contains(label) ? { row, onRow: false } : null;
+  }
+
+  private isListScopeTarget(target: EventTarget | null): boolean {
+    return target === document.body || target === document || target === this.tableElem;
+  }
+
+  // Returns true when the key belonged to the list, whether or not it moved anything.
+  private handleRowKey(e: KeyboardEvent, row: HTMLElement, onRow: boolean): boolean {
+    if (e.altKey) return false;
+    const hash = row.dataset.hash;
+    const index = hash === undefined ? undefined : this.commitLookup[hash];
+    if (hash === undefined || typeof index !== "number") return false;
+    const ctrlOrCmd = e.ctrlKey || e.metaKey;
+    if (e.key === KEY_ENTER) {
+      // Ref labels and the overflow counter own their Enter; Shift / Alt + Enter are unassigned.
+      if (!onRow || e.shiftKey) return false;
+      consumeKey(e);
+      if (ctrlOrCmd) {
+        this.handleCommitRowActivation(hash, row, true);
+      } else {
+        this.openRowDetails(row, hash);
+      }
+      return true;
+    }
+    if (e.key !== KEY_ARROW_UP && e.key !== KEY_ARROW_DOWN) return false;
+    const delta: -1 | 1 = e.key === KEY_ARROW_UP ? -1 : 1;
+    if (this.isComparing()) {
+      if (ctrlOrCmd || e.shiftKey) return false;
+      return this.moveRowTarget(index + delta, e, false);
+    }
+    if (this.fileHistory.isActive() || this.fileHistory.isPending()) {
+      return this.handleFileHistoryArrowKey(e, delta, ctrlOrCmd);
+    }
+    if (!ctrlOrCmd) {
+      if (e.shiftKey) return false;
+      return this.moveRowTarget(index + delta, e, this.expandedCommit !== null);
+    }
+    const graphIndex = e.shiftKey
+      ? delta < 0
+        ? this.graph.getAlternativeChildIndex(index)
+        : this.graph.getAlternativeParentIndex(index)
+      : delta < 0
+        ? this.graph.getFirstChildIndex(index)
+        : this.graph.getFirstParentIndex(index);
+    return this.moveRowTarget(graphIndex, e, this.expandedCommit !== null);
+  }
+
+  // The history edge, a pending request and Ctrl/Cmd arrows are consumed without moving, so the
+  // key never falls through to the table order or the graph (A8.2-1).
+  private handleFileHistoryArrowKey(e: KeyboardEvent, delta: -1 | 1, ctrlOrCmd: boolean): boolean {
+    if (!ctrlOrCmd && e.shiftKey) return false;
+    consumeKey(e);
+    if (ctrlOrCmd || this.fileHistory.isPending()) return true;
+    const hash = this.fileHistory.navigate(delta, true);
+    if (hash === null) return true;
+    const destination = this.findRowByHash(hash);
+    if (destination === null) return true;
+    this.setRowTarget(hash);
+    destination.focus({ preventScroll: true });
+    this.loadCommitDetails(destination);
+    return true;
+  }
+
+  // Table-order and graph moves share this: the row gets real focus and the details follow only
+  // while a single details view is open. An out-of-range destination is left unconsumed, so the
+  // list never wraps and never fetches unloaded commits.
+  private moveRowTarget(index: number, e: KeyboardEvent, followDetails: boolean): boolean {
+    const commit = this.commits[index];
+    const row = commit === undefined ? null : this.findRowByHash(commit.hash);
+    if (commit === undefined || row === null) return false;
+    consumeKey(e);
+    this.setRowTarget(commit.hash);
+    row.focus({ preventScroll: true });
+    if (followDetails && !this.hasSingleDetailsFor(commit.hash)) {
+      this.loadCommitDetails(row);
+    } else {
+      this.scrollRowIntoView(row);
+    }
+    return true;
+  }
+
+  // Enter opens; unlike the click path it never closes the same single details (R4.2).
+  private openRowDetails(row: HTMLElement, hash: string): void {
+    if (this.hasSingleDetailsFor(hash)) return;
+    this.loadCommitDetails(row);
+  }
+
+  private isComparing(): boolean {
+    return this.expandedCommit !== null && this.expandedCommit.compareWithHash !== null;
+  }
+
+  private hasSingleDetailsFor(hash: string): boolean {
+    return (
+      this.expandedCommit !== null &&
+      this.expandedCommit.compareWithHash === null &&
+      this.expandedCommit.hash === hash
+    );
+  }
+
+  // Manual moves scroll by the smallest amount that shows the row below the sticky header.
+  private scrollRowIntoView(row: HTMLElement): void {
+    const container = this.scrollContainerElem;
+    const headerHeight = (document.getElementById(TABLE_HEADERS_ID)?.clientHeight ?? 0) + 1;
+    const rowTop = row.offsetTop;
+    const rowBottom = rowTop + row.offsetHeight;
+    if (rowTop < container.scrollTop + headerHeight + SCROLL_PADDING_TOP) {
+      container.scrollTop = Math.max(0, rowTop - headerHeight - SCROLL_PADDING_TOP);
+    } else if (rowBottom > container.scrollTop + container.clientHeight) {
+      container.scrollTop = rowBottom - container.clientHeight;
+    }
+  }
+
+  private handleConfiguredShortcut(e: KeyboardEvent, inListScope: boolean): void {
+    if (!(e.ctrlKey || e.metaKey) || !inListScope || isDialogActive()) return;
 
     const key = e.key.toLowerCase();
     const { keybindings } = this.config;
@@ -1649,28 +1857,134 @@ class GitKeizuView {
     }
   }
 
-  // Returns true when the file history mode consumed the arrow key.
-  private handleFileHistoryArrowKey(e: KeyboardEvent): boolean {
-    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return false;
-    if (!this.fileHistory.isActive() && !this.fileHistory.isPending()) return false;
-    if (this.expandedCommit !== null && this.expandedCommit.compareWithHash !== null) return false;
-    if (isEditableEventTarget(e.target)) return false;
+  /* Row Target and Tab Stops */
+  private leaveRepository(): void {
+    if (isContextMenuActive()) hideContextMenu("repository");
+    this.rowTarget = null;
+  }
 
-    const hasNoModifier = !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey;
-    const hasCtrlOrCmdWithoutAlt = (e.ctrlKey || e.metaKey) && !e.altKey;
-    if (!hasNoModifier && !hasCtrlOrCmdWithoutAlt) return false;
+  private beginListFocusUpdate(): FocusUpdate | null {
+    return beginFocusUpdate(this.tableElem) ?? beginFocusUpdate(this.footerElem);
+  }
 
-    // Consumed even when nothing moves, so the view does not scroll at an end and the key
-    // never reaches the table order or graph navigation.
-    e.preventDefault();
-    e.stopPropagation();
-    if (!hasNoModifier || this.fileHistory.isPending()) return true;
+  // Focus dropped by a replacement returns by key, else to the row target; while no row exists
+  // (loading view, repository change) it parks on the named list container instead of body.
+  private finishListFocusUpdate(update: FocusUpdate | null): void {
+    if (update === null || finishFocusUpdate(update)) return;
+    const active = document.activeElement;
+    if (active === null || active === document.body) {
+      this.tableElem.focus({ preventScroll: true });
+    }
+  }
 
-    const hash = this.fileHistory.navigate(e.key === "ArrowUp" ? -1 : 1, true);
-    if (hash === null) return true;
-    const sourceElem = this.findCommitRowByHash(hash);
-    if (sourceElem !== null) this.loadCommitDetails(sourceElem);
-    return true;
+  // Rows are re-marked on every render; only the target row and its labels are tab stops and
+  // the empty list exposes the container itself (R4.1).
+  private applyRowTargets(): void {
+    const rows = this.tableElem.querySelectorAll<HTMLElement>(ROW_SELECTOR);
+    const targetHash = this.rowTarget === null ? null : this.rowTarget.hash;
+    rows.forEach((row) => {
+      const hash = row.dataset.hash;
+      if (hash === undefined) return;
+      markFocusTarget(row, this.rowKey(hash));
+      this.setRowTabIndex(row, hash === targetHash ? TAB_INDEX_STOP : TAB_INDEX_PROGRAMMATIC);
+    });
+    this.tableElem.tabIndex = rows.length === 0 ? TAB_INDEX_STOP : TAB_INDEX_PROGRAMMATIC;
+  }
+
+  private rowKey(hash: string): FocusKey {
+    return { kind: "row", repo: this.currentRepo, hash };
+  }
+
+  private setRowTabIndex(row: HTMLElement, tabIndex: number): void {
+    row.tabIndex = tabIndex;
+    row.querySelectorAll<HTMLElement>(ROW_LABEL_SELECTOR).forEach((label) => {
+      label.tabIndex = tabIndex;
+    });
+  }
+
+  private setRowTarget(hash: string): void {
+    const index = this.commitLookup[hash];
+    if (typeof index !== "number") return;
+    const previous = this.rowTarget;
+    if (previous !== null && previous.hash === hash) return;
+    this.rowTarget = { repo: this.currentRepo, hash, index };
+    const previousRow = previous === null ? null : this.findRowByHash(previous.hash);
+    if (previousRow !== null) this.setRowTabIndex(previousRow, TAB_INDEX_PROGRAMMATIC);
+    const row = this.findRowByHash(hash);
+    if (row !== null) this.setRowTabIndex(row, TAB_INDEX_STOP);
+  }
+
+  // Real focus on a row or one of its labels only syncs the target; it never requests anything.
+  private syncRowTargetFromFocus(target: EventTarget | null): void {
+    const row = target instanceof Element ? target.closest<HTMLElement>(ROW_SELECTOR) : null;
+    const hash = row === null ? undefined : row.dataset.hash;
+    if (hash !== undefined) this.setRowTarget(hash);
+  }
+
+  private findRowByHash(hash: string): HTMLElement | null {
+    const index = this.commitLookup[hash];
+    if (typeof index !== "number") return null;
+    const row = this.tableElem.querySelector<HTMLElement>(`${ROW_SELECTOR}[data-id="${index}"]`);
+    return row !== null && row.dataset.hash === hash ? row : null;
+  }
+
+  private getRowTargetElem(): HTMLElement | null {
+    return this.rowTarget === null || this.rowTarget.repo !== this.currentRepo
+      ? null
+      : this.findRowByHash(this.rowTarget.hash);
+  }
+
+  private getRowLabelStops(row: HTMLElement): HTMLElement[] {
+    return Array.from(row.querySelectorAll<HTMLElement>(ROW_LABEL_STOP_SELECTOR)).filter(isTabStop);
+  }
+
+  // Logical order of plan R4.3: toolbar, path bar, history bar, cleanup panel, column headers,
+  // the target row, its labels left to right, the open details, load more, find widget.
+  private getTabStops(): readonly HTMLElement[] {
+    const toolbar = TOOLBAR_STOP_SELECTORS.map((selector) =>
+      document.querySelector<HTMLElement>(selector)
+    ).filter((element): element is HTMLElement => element !== null && isTabStop(element));
+    const row = this.getRowTargetElem();
+    const listEntry =
+      row !== null ? [row, ...this.getRowLabelStops(row)] : [this.tableElem].filter(isTabStop);
+    return [
+      ...toolbar,
+      ...collectTabStops(activeContainer(document.getElementById(PATH_HIGHLIGHT_BAR_ID))),
+      ...collectTabStops(activeContainer(document.getElementById(FILE_HISTORY_BAR_ID))),
+      ...collectTabStops(document.getElementById(BRANCH_CLEANUP_PANEL_ID)),
+      ...collectTabStops(document.getElementById(TABLE_HEADERS_ID)),
+      ...listEntry,
+      ...collectTabStops(document.getElementById(COMMIT_DETAILS_ID)),
+      ...[document.getElementById(LOAD_MORE_BUTTON_ID)].filter(
+        (element): element is HTMLElement => element !== null && isTabStop(element)
+      ),
+      ...collectTabStops(document.querySelector(FIND_WIDGET_ACTIVE_SELECTOR))
+    ];
+  }
+
+  // Only the boundary between the target row's labels and a details view inserted at another
+  // row needs explicit moves; everything else follows the native Tab order (plan §3.6).
+  private handleListTab(e: KeyboardEvent): void {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const target = e.target;
+    if (!(target instanceof HTMLElement) || !this.tableElem.contains(target)) return;
+    const row = this.getRowTargetElem();
+    const details = document.getElementById(COMMIT_DETAILS_ID);
+    if (row === null || details === null) return;
+    const rowStops = [row, ...this.getRowLabelStops(row)];
+    const detailStops = collectTabStops(details);
+    if (detailStops.length === 0) return;
+    const anchor = target.closest<HTMLElement>(ROW_LABEL_SELECTOR) ?? target;
+    const atBoundary = e.shiftKey
+      ? anchor === detailStops[0]
+      : anchor === rowStops[rowStops.length - 1];
+    if (!atBoundary) return;
+    if (moveFocusPast(captureFocusOrigin(anchor), e.shiftKey ? -1 : 1)) consumeKey(e);
+  }
+
+  public dispose(): void {
+    document.removeEventListener("keydown", this.keydownListener);
+    this.disposeFocusContext();
   }
 
   /* Stash Navigation */
@@ -1712,25 +2026,26 @@ class GitKeizuView {
   }
 
   /* Escape Chain */
+  // One layer per Escape keydown; dropdowns cancel (close() would apply the selection).
   public handleEscape() {
     if (isContextMenuActive()) {
-      hideContextMenu();
+      hideContextMenu("keyboard");
       return;
     }
     if (isDialogActive()) {
-      hideDialog();
+      hideDialog("keyboard");
       return;
     }
     if (this.repoDropdown.isOpen()) {
-      this.repoDropdown.close();
+      this.repoDropdown.cancelAndClose("keyboard");
       return;
     }
     if (this.branchDropdown.isOpen()) {
-      this.branchDropdown.close();
+      this.branchDropdown.cancelAndClose("keyboard");
       return;
     }
     if (this.authorDropdown.isOpen()) {
-      this.authorDropdown.close();
+      this.authorDropdown.cancelAndClose("keyboard");
       return;
     }
     if (this.refOverflow.closePopup()) return;
@@ -1788,6 +2103,9 @@ class GitKeizuView {
   }
 
   private loadCommitDetails(sourceElem: HTMLElement) {
+    const previousDetails = document.getElementById(COMMIT_DETAILS_ID);
+    const focusWasInDetails =
+      previousDetails !== null && previousDetails.contains(document.activeElement);
     this.hideCommitDetails();
     const hash = sourceElem.dataset.hash!;
     const commit = this.commits[this.commitLookup[hash]];
@@ -1804,6 +2122,8 @@ class GitKeizuView {
     sourceElem.classList.add("commitDetailsOpen");
     this.saveState();
     this.renderCommitDetailsView();
+    // A switch started from inside the old details (parent link) lands on the new origin row.
+    if (focusWasInDetails) sourceElem.focus({ preventScroll: true });
     sendMessage({
       command: "commitDetails",
       repo: this.currentRepo!,
@@ -1815,12 +2135,15 @@ class GitKeizuView {
   private renderCommitDetailsView() {
     if (this.expandedCommit === null || this.expandedCommit.srcElem === null) return;
 
-    let elem = document.getElementById("commitDetails");
+    let elem = document.getElementById(COMMIT_DETAILS_ID);
+    const focusUpdate = elem === null ? null : beginFocusUpdate(elem);
     if (elem === null) {
       elem = document.createElement("tr");
-      elem.id = "commitDetails";
+      elem.id = COMMIT_DETAILS_ID;
       insertAfter(elem, this.expandedCommit.srcElem);
     }
+    // Focus lost inside the details resolves to the origin row (plan §3.4 restore order).
+    markFocusTarget(elem, this.rowKey(this.expandedCommit.hash));
 
     const cdvHeight = this.calculateCdvHeight();
     elem.style.height = `${cdvHeight}px`;
@@ -1842,6 +2165,7 @@ class GitKeizuView {
 
     this.renderGraph();
     this.scrollToExpandedCommit(elem);
+    finishFocusUpdate(focusUpdate);
   }
   private getCommitOrder(hash1: string, hash2: string): { from: string; to: string } {
     // Backend expects UNCOMMITTED_CHANGES_HASH in fromHash to trigger working tree diff
@@ -1865,13 +2189,15 @@ class GitKeizuView {
   public hideCommitDetails() {
     if (this.expandedCommit !== null) {
       this.clearCompareTarget();
-      let elem = document.getElementById("commitDetails");
+      let elem = document.getElementById(COMMIT_DETAILS_ID);
+      const focusUpdate = elem === null ? null : beginFocusUpdate(elem);
       if (typeof elem === "object" && elem !== null) elem.remove();
       if (typeof this.expandedCommit.srcElem === "object" && this.expandedCommit.srcElem !== null)
         this.expandedCommit.srcElem.classList.remove("commitDetailsOpen");
       this.expandedCommit = null;
       this.saveState();
       this.renderGraph();
+      finishFocusUpdate(focusUpdate);
     }
   }
   public showCommitDetails(commitDetails: GG.GitCommitDetails, fileTree: GitFolder) {
@@ -1909,15 +2235,17 @@ class GitKeizuView {
       `<div id="commitDetailsClose">${svgIcons.close}</div>` +
       "</td>";
 
-    let elem = document.getElementById("commitDetails");
+    let elem = document.getElementById(COMMIT_DETAILS_ID);
+    const focusUpdate = elem === null ? null : beginFocusUpdate(elem);
     if (elem !== null) {
       elem.innerHTML = html;
     } else {
       elem = document.createElement("tr");
-      elem.id = "commitDetails";
+      elem.id = COMMIT_DETAILS_ID;
       elem.innerHTML = html;
       insertAfter(elem, this.expandedCommit.srcElem);
     }
+    markFocusTarget(elem, this.rowKey(this.expandedCommit.hash));
 
     const cdvHeight = this.calculateCdvHeight();
     elem.style.height = `${cdvHeight}px`;
@@ -1934,6 +2262,7 @@ class GitKeizuView {
     this.bindFileViewListeners();
     this.applyFileHistoryToFileRows();
     this.bindParentHashListeners();
+    finishFocusUpdate(focusUpdate);
   }
   private findCommitRowByHash(hash: string): HTMLElement | null {
     return document.querySelector<HTMLElement>(`.commit[data-hash="${hash}"]`);
@@ -2225,6 +2554,8 @@ class GitKeizuView {
 }
 
 /* Initialization */
+// Guards are installed before any other listener so composition and repeat state is tracked first.
+const disposeKeyboardGuards = installKeyboardGuards(document);
 let gitKeizu = new GitKeizuView(
   viewState.repos,
   viewState.lastActiveRepo,
@@ -2250,12 +2581,21 @@ const prevCleanup = _win[LISTENER_CLEANUP_KEY];
 if (typeof prevCleanup === "function") (prevCleanup as () => void)();
 const messageHandler = (event: MessageEvent) => handleMessage(event.data, gitKeizu);
 window.addEventListener("message", messageHandler);
-_win[LISTENER_CLEANUP_KEY] = () => window.removeEventListener("message", messageHandler);
+// Escape closes one layer per keydown in the bubble phase; a key a local UI already consumed, a
+// repeat or a composition-bound press never reaches the chain (R4.6).
+const escapeHandler = (e: KeyboardEvent) => {
+  if (e.key !== KEY_ESCAPE || e.defaultPrevented || isKeyboardActionBlocked(e)) return;
+  gitKeizu.handleEscape();
+};
+document.addEventListener("keydown", escapeHandler);
+_win[LISTENER_CLEANUP_KEY] = () => {
+  window.removeEventListener("message", messageHandler);
+  document.removeEventListener("keydown", escapeHandler);
+  gitKeizu.dispose();
+  disposeKeyboardGuards();
+};
 
 /* Global Listeners */
-document.addEventListener("keyup", (e) => {
-  if (e.key === "Escape") gitKeizu.handleEscape();
-});
 document.addEventListener("click", hideContextMenuListener);
 document.addEventListener("contextmenu", hideContextMenuListener);
 document.addEventListener("mouseleave", hideContextMenuListener);

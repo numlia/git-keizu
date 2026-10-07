@@ -23,6 +23,7 @@ const { dropdowns, MENU_ITEMS, graphSetPathHighlight } = vi.hoisted(() => ({
       callback: ((value: never) => void) | undefined;
       open: boolean;
       close: ReturnType<typeof vi.fn>;
+      cancelAndClose: ReturnType<typeof vi.fn>;
     }
   >,
   // Identity of the builder result forwarded to showContextMenu.
@@ -38,6 +39,7 @@ const { dropdowns, MENU_ITEMS, graphSetPathHighlight } = vi.hoisted(() => ({
 vi.mock("../../web/fileHistory", () => ({
   CLASS_FILE_HISTORY_CURRENT: "fileHistoryCurrent",
   CLASS_FILE_HISTORY_NOTE: "fileHistoryNote",
+  FILE_HISTORY_BAR_ID: "fileHistoryBar",
   FileHistoryController: vi.fn(function () {
     return {
       request: vi.fn(),
@@ -77,13 +79,14 @@ vi.mock("../../web/graph", () => ({
 
 vi.mock("../../web/dropdown", () => ({
   Dropdown: vi.fn(function (id: string, _showInfo: boolean, _label: string, callback?: never) {
-    const entry = { callback, open: false, close: vi.fn() };
+    const entry = { callback, open: false, close: vi.fn(), cancelAndClose: vi.fn() };
     dropdowns[id] = entry;
     return {
       setOptions: vi.fn(),
       refresh: vi.fn(),
       isOpen: vi.fn(() => entry.open),
-      close: entry.close
+      close: entry.close,
+      cancelAndClose: entry.cancelAndClose
     };
   })
 }));
@@ -461,8 +464,11 @@ function openList(rowIndex = 0): HTMLElement {
   return list[0];
 }
 
+/** main.ts closes one layer per Escape keydown (13-keyboard-accessibility-01.md S72). */
 function pressEscape(): void {
-  document.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", bubbles: true }));
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+  );
 }
 
 function pressShortcut(key: string): void {
@@ -1420,9 +1426,9 @@ describe("handleEscape with the ref list (S58)", () => {
   });
 
   it.each(["repoSelect", "branchSelect", "authorSelect"])(
-    "closes the open %s dropdown before the list (TC-460)",
+    "cancels the open %s dropdown before the list (TC-460)",
     (id) => {
-      // Case: TC-460
+      // Case: TC-460 (the dropdown stage cancels instead of applying: S72 TC-692)
       // Given: the list and one open dropdown
       openList(0);
       dropdowns[id].open = true;
@@ -1430,8 +1436,9 @@ describe("handleEscape with the ref list (S58)", () => {
       // When: Escape is pressed
       pressEscape();
 
-      // Then: only that dropdown closes
-      expect(dropdowns[id].close).toHaveBeenCalledTimes(1);
+      // Then: only that dropdown is cancelled
+      expect(dropdowns[id].cancelAndClose).toHaveBeenCalledTimes(1);
+      expect(dropdowns[id].close).not.toHaveBeenCalled();
       expect(popups()).toHaveLength(1);
     }
   );
@@ -1472,7 +1479,10 @@ describe("handleEscape with the ref list (S58)", () => {
     // Then: no hide / close call and no list
     expect(contextMenu.hideContextMenu).not.toHaveBeenCalled();
     expect(dialogs.hideDialog).not.toHaveBeenCalled();
-    for (const entry of Object.values(dropdowns)) expect(entry.close).not.toHaveBeenCalled();
+    for (const entry of Object.values(dropdowns)) {
+      expect(entry.close).not.toHaveBeenCalled();
+      expect(entry.cancelAndClose).not.toHaveBeenCalled();
+    }
     expect(findWidgetClose).not.toHaveBeenCalled();
     expect(popups()).toHaveLength(0);
   });

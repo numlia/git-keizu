@@ -26,7 +26,13 @@ const { dropdowns } = vi.hoisted(() => ({
 vi.mock("../../web/dropdown", () => ({
   Dropdown: vi.fn(function (id: string, _showInfo: boolean, _label: string, callback?: never) {
     dropdowns[id] = { callback };
-    return { setOptions: vi.fn(), refresh: vi.fn(), isOpen: vi.fn(() => false), close: vi.fn() };
+    return {
+      setOptions: vi.fn(),
+      refresh: vi.fn(),
+      isOpen: vi.fn(() => false),
+      close: vi.fn(),
+      cancelAndClose: vi.fn()
+    };
   })
 }));
 
@@ -193,13 +199,19 @@ function fire(target: Element, type: string): void {
   target.dispatchEvent(new MouseEvent(type, { bubbles: true, cancelable: true }));
 }
 
+/** The list keys apply from the focused row target (13-keyboard-accessibility-01.md S71). */
 function pressKey(key: string): void {
-  document.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true }));
+  const target = document.querySelector<HTMLElement>('#commitTable tr[tabindex="0"]');
+  expect(target, "row target").not.toBeNull();
+  target!.focus();
+  target!.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
 }
 
-/** main.ts handles Escape on keyup. */
+/** main.ts closes one layer per Escape keydown (13-keyboard-accessibility-01.md S72). */
 function pressEscape(): void {
-  document.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", bubbles: true }));
+  document.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+  );
 }
 
 function row(hash: string): HTMLElement {
