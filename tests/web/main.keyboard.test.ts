@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import type { GitCommitNode, GitFileChange, GitRef } from "../../src/types";
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
+import { getCommitDate } from "../../web/dates";
 import { captureFocusOrigin, moveFocusPast } from "../../web/keyboardNavigation";
 import { vscode } from "../../web/utils";
 
@@ -1794,7 +1795,7 @@ describe("details, file and folder controls as standard buttons (S76)", () => {
     const closeButton = detailsControl<HTMLButtonElement>("#commitDetailsClose");
     expect(closeButton.tagName).toBe("BUTTON");
     expect(closeButton.getAttribute("type")).toBe("button");
-    expect(closeButton.getAttribute("aria-label")).not.toBe("");
+    expect(closeButton.getAttribute("aria-label")).toBe("Close commit details");
     closeButton.focus();
     expect(press(closeButton, "Enter").defaultPrevented).toBe(false);
     expect(details()).not.toBeNull();
@@ -2176,7 +2177,7 @@ describe("toolbar state, load more button, status notice and ordering button (S6
     expect(button.tagName).toBe("BUTTON");
     expect(button.getAttribute("type")).toBe("button");
     expect(button.getAttribute("aria-haspopup")).toBe("menu");
-    expect(button.getAttribute("aria-label")).not.toBe("");
+    expect(button.getAttribute("aria-label")).toBe("Commit ordering");
     expect(button.closest("#tableColHeaders")).not.toBeNull();
     clearPosts();
 
@@ -2223,5 +2224,85 @@ describe("toolbar state, load more button, status notice and ordering button (S6
     pressEscape(document.activeElement!);
     expect(findWidgetIsVisible()).toBe(false);
     expect(document.activeElement).toBe(searchBtn);
+  });
+});
+
+describe("row names, state descriptions and decorative icons (S77)", () => {
+  // @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-02.md
+  const HTML_SUBJECT = "<b>x</b>";
+
+  function stateText(hash: string): string {
+    const id = row(hash).getAttribute("aria-describedby");
+    expect(id, `aria-describedby of ${hash}`).not.toBeNull();
+    const description = document.getElementById(id!);
+    expect(description, `description ${id}`).not.toBeNull();
+    return description!.textContent ?? "";
+  }
+
+  it("names a row by short hash, subject, author and date without interpreting HTML (TC-735)", () => {
+    // Case: TC-735 (K45 / R4.8)
+    loadCommits([node("N", ["M"]), node("M", ["R"], { message: HTML_SUBJECT }), node("R", [])]);
+    const name = row("M").getAttribute("aria-label")!;
+    const date = getCommitDate(1700000000).value;
+    expect(name).toBe(`M, ${HTML_SUBJECT}, a, ${date}`);
+    expect(row("M").querySelector(".commitMessage")!.textContent).toBe(HTML_SUBJECT);
+    expect(row("N").getAttribute("aria-label")).toBe(`N, m N, a, ${date}`);
+  });
+
+  it("describes the target, details, compare base, compare target and HEAD together (TC-736)", () => {
+    // Case: TC-736 (K45 / R4.8 "show several states at once")
+    loadCommits(standardCommits());
+    expect(stateText("M")).toBe("Navigation target, HEAD");
+    expect(stateText("N")).toBe("");
+
+    startCompare("N", "R");
+    focusRow("M");
+    expect(stateText("M")).toBe("Navigation target, HEAD");
+    expect(stateText("N")).toBe("Details open, Comparison base");
+    expect(stateText("R")).toBe("Comparison target");
+
+    const ids = Array.from(table().querySelectorAll("tr[data-hash]")).map((elem) =>
+      elem.getAttribute("aria-describedby")
+    );
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids) expect(document.getElementById(id!), id!).not.toBeNull();
+
+    fire(document.getElementById("commitDetailsClose")!, "click");
+    expect(stateText("N")).toBe("");
+    expect(stateText("R")).toBe("");
+    expect(stateText("M")).toBe("Navigation target, HEAD");
+  });
+
+  it("states the working tree and stash kinds in the row name (TC-737)", () => {
+    // Case: TC-737 (R4.8)
+    loadCommits(stashCommits());
+    expect(row(STASH_HASH).getAttribute("aria-label")).toContain("Stash");
+    expect(row("M").getAttribute("aria-label")).not.toContain("Stash");
+
+    loadCommits(uncommittedCommits());
+    const name = row(UNCOMMITTED_CHANGES_HASH).getAttribute("aria-label")!;
+    expect(name).toContain("Working tree");
+    expect(name).toContain("Uncommitted Changes (2)");
+  });
+
+  it("keeps the native table structure without grid roles or aria-selected (TC-738)", () => {
+    // Case: TC-738 (R4.8)
+    loadCommits(standardCommits());
+    startCompare("N", "R");
+    expect(document.querySelectorAll('[role="grid"], [role="row"]')).toHaveLength(0);
+    expect(table().querySelectorAll("tr[aria-selected]")).toHaveLength(0);
+    expect(table().querySelector("table")).not.toBeNull();
+    for (const hash of ["N", "M", "R"]) expect(row(hash).tagName).toBe("TR");
+  });
+
+  it("names the list and hides the decorative ref icons from the accessibility tree (TC-740 / TC-742)", () => {
+    // Case: TC-740 (Task 9 / Task 11) and TC-742 (R4.8) ref icon variant; the measuring area is
+    // asserted by refOverflow S6 and the screen reader pass stays manual
+    loadCommits(standardCommits());
+    expect(table().getAttribute("aria-label")).toBe("Commit history");
+    const icons = labelsOf("M").map((label) => label.querySelector(".codicon"));
+    expect(icons.length).toBeGreaterThan(0);
+    for (const icon of icons) expect(icon!.getAttribute("aria-hidden")).toBe("true");
+    expect(labelsOf("M").map((label) => label.textContent)).toEqual(["feature", "hotfix"]);
   });
 });

@@ -125,7 +125,26 @@ type FileViewType = typeof FILE_VIEW_LIST | typeof FILE_VIEW_TREE;
 const DEFAULT_FILE_VIEW_TYPE: FileViewType = FILE_VIEW_TREE;
 
 function buildDetailsCloseHtml(): string {
-  return `<button type="button" id="${COMMIT_DETAILS_CLOSE_ID}" ${ATTRIBUTE_ARIA_LABEL}="${t("find.close")}">${svgIcons.close}</button>`;
+  return `<button type="button" id="${COMMIT_DETAILS_CLOSE_ID}" ${ATTRIBUTE_ARIA_LABEL}="${escapeHtml(t("a11y.closeDetails"))}">${svgIcons.close}</button>`;
+}
+
+// A row is named by its short hash, subject, author and date; the working tree and stashes state
+// their kind (R4.8). The subject stays plain text: the caller escapes the result once as an
+// attribute value.
+function buildRowName(commit: GG.GitCommitNode, dateValue: string): string {
+  if (commit.hash === UNCOMMITTED_CHANGES_HASH) {
+    return [t(ROW_KIND_WORKING_TREE_KEY), commit.message, dateValue].join(ROW_NAME_SEPARATOR);
+  }
+  const kind = commit.stash !== null ? [t(ROW_KIND_STASH_KEY)] : [];
+  return [abbrevCommit(commit.hash), commit.message, commit.author, dateValue, ...kind].join(
+    ROW_NAME_SEPARATOR
+  );
+}
+
+// The visually hidden description a row's aria-describedby points at; its text lists the row's
+// simultaneous states and is refreshed in place without a re-render.
+function buildRowStateHtml(index: number): string {
+  return `<span id="${ROW_STATE_ID_PREFIX}${index}" class="${ROW_STATE_CLASS} ${CLASS_VISUALLY_HIDDEN}"></span>`;
 }
 
 function getFileViewToggle(mode: FileViewType): { icon: string; title: string } {
@@ -216,6 +235,29 @@ const COMMIT_ORDERING_BUTTON_GLYPH = "\u25BE";
 const STATUS_NOTICE_ID = "statusNotice";
 const STATUS_KEY_COMMITS_LOADED = "a11y.commitsLoaded";
 const STATUS_KEY_NO_COMMITS = "a11y.noCommits";
+const COMMIT_HISTORY_NAME_KEY = "a11y.commitHistory";
+const COMMIT_ORDERING_NAME_KEY = "a11y.commitOrdering";
+const ROW_KIND_WORKING_TREE_KEY = "a11y.workingTree";
+const ROW_KIND_STASH_KEY = "a11y.stash";
+const ROW_NAME_SEPARATOR = ", ";
+const ATTRIBUTE_ARIA_DESCRIBEDBY = "aria-describedby";
+const CLASS_VISUALLY_HIDDEN = "visuallyHidden";
+// The row that holds the navigation target carries this class for its row-head marker (R4.8).
+const ROW_TARGET_CLASS = "keyboardTarget";
+const ROW_STATE_CLASS = "commitRowState";
+const ROW_STATE_SELECTOR = `.${ROW_STATE_CLASS}`;
+// Row indices are unique per render, so the description ids are unique among coexisting rows.
+const ROW_STATE_ID_PREFIX = "commitRowState";
+const CLASS_DETAILS_OPEN = "commitDetailsOpen";
+const CLASS_COMPARE_TARGET = "compareTarget";
+// Order of the state description: target, details, compare base, compare target, HEAD (§3.6).
+const ROW_STATE_KEYS = {
+  target: "a11y.operationTarget",
+  detailsOpen: "a11y.detailsOpen",
+  compareBase: "a11y.compareBase",
+  compareTarget: "a11y.compareTarget",
+  head: "a11y.head"
+} as const;
 const BRANCH_CLEANUP_PANEL_ID = "branchCleanupPanel";
 const FIND_WIDGET_ACTIVE_SELECTOR = ".findWidget.active";
 const CLASS_ACTIVE = "active";
@@ -379,6 +421,7 @@ class GitKeizuView {
     this.maxCommits = config.initialLoadCommits;
     this.graph = new Graph("commitGraph", this.config);
     this.tableElem = document.getElementById("commitTable")!;
+    this.tableElem.setAttribute(ATTRIBUTE_ARIA_LABEL, t(COMMIT_HISTORY_NAME_KEY));
     this.footerElem = document.getElementById("footer")!;
     this.scrollContainerElem = document.getElementById("scrollContainer")!;
     this.disposeFocusContext = configureFocusContext({
@@ -1104,7 +1147,10 @@ class GitKeizuView {
         refHtml = `<span class="gitRef head${refActive ? " active" : ""}${wtClass}" data-name="${refName}"${remotesAttr}${wtAttr}${wtTitle}>${REF_BUTTON_OPEN_TAG}${branchIcon}<span class="gitRefName">${refName}</span></button>`;
         for (let k = 0; k < branchLabels.heads[j].remotes.length; k++) {
           let remoteName = escapeHtml(branchLabels.heads[j].remotes[k]);
-          refHtml += `<button type="button" class="${REF_BUTTON_CLASS} ${COMBINED_REMOTE_CLASS}" data-remote="${remoteName}" data-name="${escapeHtml(`${branchLabels.heads[j].remotes[k]}/${branchLabels.heads[j].name}`)}">${remoteName}</button>`;
+          const combinedName = escapeHtml(
+            `${branchLabels.heads[j].remotes[k]}/${branchLabels.heads[j].name}`
+          );
+          refHtml += `<button type="button" class="${REF_BUTTON_CLASS} ${COMBINED_REMOTE_CLASS}" data-remote="${remoteName}" data-name="${combinedName}" ${ATTRIBUTE_ARIA_LABEL}="${combinedName}">${remoteName}</button>`;
         }
         refHtml += "</span>";
         refs = refActive ? refHtml + refs : refs + refHtml;
@@ -1137,7 +1183,7 @@ class GitKeizuView {
         this.commits[i].stash,
         muted[i]
       );
-      html += `<tr ${rowClass} data-id="${i}" data-color="${this.graph.getVertexColour(i)}"><td></td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}<span class="commitMessage">${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</span></td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${
+      html += `<tr ${rowClass} data-id="${i}" data-color="${this.graph.getVertexColour(i)}" ${ATTRIBUTE_ARIA_LABEL}="${escapeHtml(buildRowName(this.commits[i], date.value))}" ${ATTRIBUTE_ARIA_DESCRIBEDBY}="${ROW_STATE_ID_PREFIX}${i}"><td>${buildRowStateHtml(i)}</td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}<span class="commitMessage">${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</span></td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${
         this.config.fetchAvatars
           ? `<span class="avatar" data-email="${escapeHtml(this.commits[i].email)}">${
               typeof this.avatars[this.commits[i].email] === "string"
@@ -1218,6 +1264,7 @@ class GitKeizuView {
         }
       }
     }
+    this.refreshRowStates();
 
     addListenerToClass("commit", "contextmenu", (e: Event) => {
       e.stopPropagation();
@@ -1466,7 +1513,10 @@ class GitKeizuView {
     let date = getCommitDate(this.commits[0].date);
     const rowElem = <HTMLElement>document.getElementsByClassName("unsavedChanges")[0];
     const focusUpdate = beginFocusUpdate(rowElem);
-    rowElem.innerHTML = `<td></td><td><b>${escapeHtml(this.commits[0].message)}</b></td><td title="${date.title}">${date.value}</td><td title="* <>">*</td><td title="*">*</td>`;
+    const index = parseInt(rowElem.dataset.id ?? "0", 10);
+    rowElem.setAttribute(ATTRIBUTE_ARIA_LABEL, buildRowName(this.commits[0], date.value));
+    rowElem.innerHTML = `<td>${buildRowStateHtml(index)}</td><td><b>${escapeHtml(this.commits[0].message)}</b></td><td title="${date.title}">${date.value}</td><td title="* <>">*</td><td title="*">*</td>`;
+    this.refreshRowStates();
     finishFocusUpdate(focusUpdate);
   }
   // A same-repository loading view keeps the menu (its action context is captured at open time);
@@ -1625,8 +1675,8 @@ class GitKeizuView {
   private buildCommitOrderingButtonHtml(): string {
     const ordering = this.getRepoCommitOrdering();
     const current = COMMIT_ORDERING_MENU_ITEMS.find((item) => item.value === ordering);
-    const name = escapeHtml(current === undefined ? "" : current.label);
-    return `<button type="button" id="${COMMIT_ORDERING_BUTTON_ID}" class="${COMMIT_ORDERING_BUTTON_CLASS}" aria-haspopup="menu" title="${name}" aria-label="${name}">${COMMIT_ORDERING_BUTTON_GLYPH}</button>`;
+    const title = escapeHtml(current === undefined ? "" : current.label);
+    return `<button type="button" id="${COMMIT_ORDERING_BUTTON_ID}" class="${COMMIT_ORDERING_BUTTON_CLASS}" aria-haspopup="menu" title="${title}" ${ATTRIBUTE_ARIA_LABEL}="${escapeHtml(t(COMMIT_ORDERING_NAME_KEY))}">${COMMIT_ORDERING_BUTTON_GLYPH}</button>`;
   }
   private showCommitOrderingContextMenu(event: ContextMenuTrigger, sourceElem: HTMLElement) {
     const repoOrdering = this.getRepoCommitOrdering();
@@ -2049,8 +2099,34 @@ class GitKeizuView {
 
   private setRowTabIndex(row: HTMLElement, tabIndex: number): void {
     row.tabIndex = tabIndex;
+    row.classList.toggle(ROW_TARGET_CLASS, tabIndex === TAB_INDEX_STOP);
     row.querySelectorAll<HTMLElement>(ROW_LABEL_STOP_SELECTOR).forEach((label) => {
       label.tabIndex = tabIndex;
+    });
+  }
+
+  // Each row's description lists the states it holds at the same time (R4.8); the text is
+  // rewritten in place, so the graph and the rows are never re-rendered for it.
+  private refreshRowStates(): void {
+    const compareBaseHash =
+      this.expandedCommit !== null && this.expandedCommit.compareWithHash !== null
+        ? this.expandedCommit.hash
+        : null;
+    this.tableElem.querySelectorAll<HTMLElement>(ROW_SELECTOR).forEach((row) => {
+      const stateElem = row.querySelector<HTMLElement>(ROW_STATE_SELECTOR);
+      if (stateElem === null) return;
+      const hash = row.dataset.hash;
+      const states: readonly (readonly [boolean, string])[] = [
+        [row.classList.contains(ROW_TARGET_CLASS), ROW_STATE_KEYS.target],
+        [row.classList.contains(CLASS_DETAILS_OPEN), ROW_STATE_KEYS.detailsOpen],
+        [hash === compareBaseHash, ROW_STATE_KEYS.compareBase],
+        [row.classList.contains(CLASS_COMPARE_TARGET), ROW_STATE_KEYS.compareTarget],
+        [hash === this.commitHead, ROW_STATE_KEYS.head]
+      ];
+      stateElem.textContent = states
+        .filter(([active]) => active)
+        .map(([, key]) => t(key))
+        .join(ROW_NAME_SEPARATOR);
     });
   }
 
@@ -2064,6 +2140,7 @@ class GitKeizuView {
     if (previousRow !== null) this.setRowTabIndex(previousRow, TAB_INDEX_PROGRAMMATIC);
     const row = this.findRowByHash(hash);
     if (row !== null) this.setRowTabIndex(row, TAB_INDEX_STOP);
+    this.refreshRowStates();
   }
 
   // Real focus on a row or one of its labels only syncs the target; it never requests anything.
@@ -2229,6 +2306,7 @@ class GitKeizuView {
         this.expandedCommit.compareWithHash = null;
         this.expandedCommit.compareWithSrcElem = null;
         this.saveState();
+        this.refreshRowStates();
         if (this.expandedCommit.commitDetails !== null && this.expandedCommit.fileTree !== null) {
           this.showCommitDetails(this.expandedCommit.commitDetails, this.expandedCommit.fileTree);
         }
@@ -2239,6 +2317,7 @@ class GitKeizuView {
         this.expandedCommit.compareWithSrcElem = sourceElem;
         sourceElem.classList.add("compareTarget");
         this.saveState();
+        this.refreshRowStates();
         const order = this.getCommitOrder(this.expandedCommit.hash, clickedHash);
         sendMessage({
           command: "compareCommits",
@@ -2273,6 +2352,7 @@ class GitKeizuView {
     };
     sourceElem.classList.add("commitDetailsOpen");
     this.saveState();
+    this.refreshRowStates();
     this.renderCommitDetailsView();
     // A switch started from inside the old details (parent link) lands on the new origin row.
     if (focusWasInDetails) sourceElem.focus({ preventScroll: true });
@@ -2346,6 +2426,7 @@ class GitKeizuView {
         this.expandedCommit.srcElem.classList.remove("commitDetailsOpen");
       this.expandedCommit = null;
       this.saveState();
+      this.refreshRowStates();
       this.renderGraph();
       finishFocusUpdate(focusUpdate);
     }
@@ -2364,6 +2445,7 @@ class GitKeizuView {
     this.expandedCommit.loading = false;
     this.expandedCommit.srcElem.classList.add("commitDetailsOpen");
     this.saveState();
+    this.refreshRowStates();
 
     const summaryHtml = isCompareMode
       ? this.buildCompareSummaryHtml(this.expandedCommit.compareWithHash!)

@@ -44,8 +44,8 @@ const ATTR_ARIA_LIVE = "aria-live";
 const ROLE_STATUS = "status";
 const LIVE_POLITE = "polite";
 const ATTR_TRUE = "true";
-/** Joins an action label and the file path into the button's accessible name. */
-const ACTION_NAME_SEPARATOR = ": ";
+/** Dictionary key that joins an action label and the file path into one accessible name. */
+const ACTION_FOR_KEY = "a11y.actionFor";
 const REASON_KEYBOARD: FocusCloseReason = "keyboard";
 const COMMIT_ROW_SELECTOR = ".commit[data-hash]";
 const FILE_ROW_CURRENT_SELECTOR = `.gitFile.${CLASS_FILE_HISTORY_CURRENT}`;
@@ -92,9 +92,9 @@ interface FileHistoryState {
 
 /* === DOM Helpers === */
 
-/** Interim accessible name until the shared `a11y.actionFor` text exists. */
+/** A bar without a file (inactive) names its controls by the action alone. */
 function actionName(action: string, filePath: string | null): string {
-  return filePath === null ? action : `${action}${ACTION_NAME_SEPARATOR}${filePath}`;
+  return filePath === null ? action : t(ACTION_FOR_KEY, action, filePath);
 }
 
 function createButton(id: string, title: string | null, content: string): HTMLButtonElement {

@@ -25,8 +25,8 @@ const CLASS_ACTION_BTN = "roundedBtn branchCleanupActionBtn";
 const CLASS_DELETE_BTN = "roundedBtn branchCleanupActionBtn branchCleanupDeleteBtn";
 const ACTION_BUTTON_SELECTOR = "button.branchCleanupActionBtn";
 const ATTR_ARIA_LABEL = "aria-label";
-/** Joins an action label and the branch name into the button's accessible name. */
-const ACTION_NAME_SEPARATOR = ": ";
+/** Dictionary key that joins an action label and the branch name into one accessible name. */
+const ACTION_FOR_KEY = "a11y.actionFor";
 const ACTION_SHOW: CleanupAction = "show";
 const ACTION_DELETE: CleanupAction = "delete";
 const FIRST_REQUEST_ID = 1;
@@ -58,11 +58,6 @@ type PanelView =
   | { kind: "loaded"; compareBranch: string | null; rows: readonly GG.BranchCleanupRow[] };
 
 type CleanupAction = Extract<FocusKey, { kind: "cleanup" }>["action"];
-
-/** Interim accessible name until the shared `a11y.actionFor` text exists. */
-function actionName(action: string, branchName: string): string {
-  return `${action}${ACTION_NAME_SEPARATOR}${branchName}`;
-}
 
 /* === Panel === */
 
@@ -511,7 +506,7 @@ function buildActionButton(
   btn.type = "button";
   btn.className = className;
   btn.textContent = label;
-  btn.setAttribute(ATTR_ARIA_LABEL, actionName(label, branchName));
+  btn.setAttribute(ATTR_ARIA_LABEL, t(ACTION_FOR_KEY, label, branchName));
   btn.dataset.branch = branchName;
   btn.dataset.action = action;
   markFocusTarget(btn, { kind: "cleanup", repo, branch: branchName, action });

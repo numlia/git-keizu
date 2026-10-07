@@ -7,14 +7,10 @@ const BINARY_FILE_TITLE = ` title="${t("file.binaryTitle")}"`;
 const FILE_DIFF_BUTTON_CLASS = "gitFileDiff";
 /** Id prefix of a folder's contents list, referenced by the folder button's `aria-controls`. */
 const FOLDER_CONTENTS_ID_PREFIX = "gitFolderContents_";
-/** Joins an action title and the file path into the button's accessible name. */
-const ACTION_NAME_SEPARATOR = ": ";
+/** Dictionary key that joins an action title and its target into one accessible name. */
+const ACTION_FOR_KEY = "a11y.actionFor";
 /** A row whose only reachable control is the wrapper itself becomes a tab stop for its menu. */
 const MENU_STOP_TAB_INDEX = ' tabindex="0"';
-
-function actionName(title: string, escapedPath: string): string {
-  return `${title}${ACTION_NAME_SEPARATOR}${escapedPath}`;
-}
 
 export function generateGitFileTree(gitFiles: GitFileChange[]) {
   let contents: GitFolderContents = {},
@@ -84,10 +80,10 @@ function buildFileItemHtml(
   const fileHistoryTitle = t("context.highlightFileHistory");
   const openFileActionHtml =
     gitFile.type !== "D"
-      ? `<button type="button" class="gitFileAction openFile" title="${openFileTitle}" aria-label="${actionName(openFileTitle, escapedNewPath)}">${svgIcons.goToFile}</button>`
+      ? `<button type="button" class="gitFileAction openFile" title="${openFileTitle}" aria-label="${t(ACTION_FOR_KEY, openFileTitle, escapedNewPath)}">${svgIcons.goToFile}</button>`
       : "";
   const fileHistoryActionHtml = showFileHistoryAction
-    ? `<button type="button" class="gitFileAction highlightFileHistory" title="${fileHistoryTitle}" aria-label="${actionName(fileHistoryTitle, escapedNewPath)}">${svgIcons.history}</button>`
+    ? `<button type="button" class="gitFileAction highlightFileHistory" title="${fileHistoryTitle}" aria-label="${t(ACTION_FOR_KEY, fileHistoryTitle, escapedNewPath)}">${svgIcons.history}</button>`
     : "";
   const actionsHtml = `${openFileActionHtml}${fileHistoryActionHtml}`;
   const fileActionsHtml =

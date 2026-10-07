@@ -4,10 +4,10 @@
  */
 
 /*
- * Ref label icons -- the codicon inside .gitRef badges.
+ * Ref label icons -- the codicon inside the button of a .gitRef badge.
  * transform/text-stroke values are visually tuned; do not change.
  */
-.gitRef > .codicon {
+.gitRef > .gitRefButton > .codicon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -19,12 +19,12 @@
   margin-right: 5px;
   vertical-align: top;
 }
-.gitRef > .codicon::before {
+.gitRef > .gitRefButton > .codicon::before {
   display: block;
   transform: scale(0.9);
   -webkit-text-stroke: 0.3px currentColor;
 }
-.gitRef.stash > .codicon {
+.gitRef.stash > .gitRefButton > .codicon {
   background-color: var(--git-keizu-color);
 }
 
@@ -55,7 +55,8 @@
 #refreshBtn.refreshing .codicon {
   animation: codicon-spin 1.5s linear infinite;
 }
-#currentBtn.disabled:hover .codicon {
+#currentBtn.disabled:hover .codicon,
+#currentBtn:disabled:hover .codicon {
   opacity: 0.8;
 }
 
@@ -147,6 +148,7 @@
 #findClose:hover .codicon {
   opacity: 1;
 }
-#findOpenCdv.active .codicon {
+#findOpenCdv.active .codicon,
+#findOpenCdv[aria-pressed="true"] .codicon {
   opacity: 1;
 }

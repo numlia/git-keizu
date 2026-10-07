@@ -146,6 +146,22 @@ body.unableToLoad p {
 #commitTable tr.commit.commitDetailsOpen:hover td {
   background-color: rgba(128, 128, 128, 0.35);
 }
+/* Keyboard focus: one continuous 2px theme frame around the row box, drawn inside its cells */
+#commitTable tr[tabindex]:focus-visible,
+#commitTable:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -2px;
+}
+/* Navigation target: a row-head marker that coexists with the background-based states */
+#commitTable tr.keyboardTarget td:first-child::before {
+  content: "\25B8";
+  display: inline-block;
+  width: 0;
+  overflow: visible;
+  margin-left: -3px;
+  font-size: 10px;
+  opacity: 0.9;
+}
 /* Table layout modes */
 #commitTable.fixedLayout table {
   table-layout: fixed;
@@ -182,6 +198,22 @@ body.unableToLoad p {
 }
 .resizeCol.right {
   right: 0px;
+}
+/* Commit ordering menu button inside the description header */
+.tableColHeaderMenuBtn {
+  appearance: none;
+  background: none;
+  border: 0;
+  margin: 0 0 0 4px;
+  padding: 0 4px;
+  font: inherit;
+  color: inherit;
+  line-height: inherit;
+  vertical-align: top;
+  cursor: pointer;
+}
+.tableColHeaderMenuBtn:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
 }
 /* Stash rows */
 #commitTable tr.commit.stash td {
@@ -397,6 +429,12 @@ body.unableToLoad p {
   top: 4px;
   width: 24px;
   height: 24px;
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
   cursor: pointer;
 }
 /* File view toggle */
@@ -410,12 +448,46 @@ body.unableToLoad p {
   display: flex;
   align-items: center;
   justify-content: center;
+  appearance: none;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
   cursor: pointer;
   padding: 2px 4px;
+}
+#commitDetailsClose:focus-visible,
+#commitDetails #fileViewToggle:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
 }
 /* Git file / folder entries */
 .gitFolderContents.hidden {
   display: none;
+}
+/* File and folder controls are native buttons that inherit the row's type colour */
+.gitFileDiff,
+.gitFileAction,
+.gitFolder {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gitFileDiff:disabled {
+  cursor: default;
+}
+.gitFileDiff:focus-visible,
+.gitFileAction:focus-visible,
+.gitFolder:focus-visible,
+li.gitFile[tabindex]:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
 }
 .gitFolder {
   cursor: pointer;
@@ -457,7 +529,8 @@ body.unableToLoad p {
   margin-left: 8px;
   transition: opacity 0.15s;
 }
-.gitFile:hover .gitFileActions {
+.gitFile:hover .gitFileActions,
+.gitFile:focus-within .gitFileActions {
   opacity: 1;
 }
 .gitFileAction {
@@ -494,12 +567,21 @@ body.unableToLoad p {
 }
 /* Parent hash links */
 .parentHash {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  font: inherit;
   color: var(--vscode-textLink-foreground);
   cursor: pointer;
   text-decoration: underline;
 }
 .parentHash:hover {
   color: var(--vscode-textLink-activeForeground);
+}
+.parentHash:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
 }
 
 /* -- Ref Labels (branch / tag / stash badges) ------------------------------ */
@@ -525,6 +607,26 @@ body.unableToLoad p {
 }
 .gitRef.head {
   padding-right: 0;
+}
+/* Each operable part of a badge is a native button; the measured wrapper keeps the badge box */
+.gitRefButton {
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  height: 18px;
+  line-height: 18px;
+  font: inherit;
+  color: inherit;
+  vertical-align: top;
+  cursor: default;
+}
+/* The wrapper clips its overflow, so the ring is drawn inside the button */
+.gitRefButton:focus-visible,
+.refOverflowCounter:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -2px;
 }
 .gitRefName {
   padding-right: 5px;
@@ -635,6 +737,10 @@ body.unableToLoad p {
 #controls input:focus {
   outline: none;
 }
+#controls input:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
 #controls label {
   cursor: pointer;
 }
@@ -657,9 +763,14 @@ body.unableToLoad p {
   overflow-wrap: anywhere;
 }
 #fileHistoryBar.loading #fileHistoryPrev,
-#fileHistoryBar.loading #fileHistoryNext {
+#fileHistoryBar.loading #fileHistoryNext,
+#fileHistoryBar button:disabled {
   opacity: 0.4;
   pointer-events: none;
+}
+/* The bar's controls were unpadded boxes; the native button padding is removed to match */
+#fileHistoryBar .roundedBtn {
+  padding: 0;
 }
 /* Path highlight bar (inserted after #controls, before #fileHistoryBar) */
 #pathHighlightBar {
@@ -697,6 +808,11 @@ body.unableToLoad p {
   padding-left: 8px;
   list-style: none;
 }
+#pathHighlightClear:focus-visible,
+#pathHighlightMode:focus-visible,
+#pathHighlightBoundaries summary:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+}
 #repoControl,
 #branchControl,
 #showRemoteBranchesControl {
@@ -725,8 +841,22 @@ body.unableToLoad p {
   width: 20px;
   height: 20px;
   margin-top: -10px;
+  appearance: none;
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  color: inherit;
   cursor: pointer;
   user-select: none;
+}
+#branchCleanupBtn:focus-visible,
+#searchBtn:focus-visible,
+#fetchBtn:focus-visible,
+#currentBtn:focus-visible,
+#refreshBtn:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
 }
 #branchCleanupBtn {
   right: 106px;
@@ -746,7 +876,8 @@ body.unableToLoad p {
 #refreshBtn.refreshing {
   cursor: default;
 }
-#currentBtn.disabled {
+#currentBtn.disabled,
+#currentBtn:disabled {
   opacity: 0.4;
   cursor: default;
 }
@@ -761,6 +892,7 @@ body.unableToLoad p {
   width: 180px;
   height: 28px;
   margin: 10px auto;
+  padding: 0;
   border-radius: 14px;
   line-height: 28px;
 }
@@ -834,11 +966,11 @@ body.unableToLoad p {
   margin: 1px 2px;
   border-radius: 9px;
 }
-.branchCleanupActionBtn.disabled {
+.branchCleanupActionBtn:disabled {
   opacity: 0.4;
   cursor: default;
 }
-.branchCleanupActionBtn.disabled:hover {
+.branchCleanupActionBtn:disabled:hover {
   background-color: rgba(128, 128, 128, 0.1);
 }
 
@@ -868,6 +1000,11 @@ body.unableToLoad p {
 #contextMenu li.contextMenuItem:hover {
   background-color: var(--vscode-menu-selectionBackground);
   color: var(--vscode-menu-selectionForeground);
+}
+#contextMenu li[role="menuitem"]:focus-visible,
+ul.contextMenuSubmenu li[role="menuitem"]:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -2px;
 }
 #contextMenu li.contextMenuLabel,
 ul.contextMenuSubmenu li.contextMenuLabel {
@@ -1018,6 +1155,11 @@ ul.contextMenuSubmenu li.contextMenuDivider {
   border: 1px solid rgba(128, 128, 128, 0.3);
   outline-style: none;
 }
+#dialog > table.dialogForm input[type="text"]:focus-visible,
+#dialog > table.dialogForm select:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
 /* Dialog buttons and messages */
 #dialog .roundedBtn {
   display: inline-block;
@@ -1065,7 +1207,8 @@ ul.contextMenuSubmenu li.contextMenuDivider {
   border-radius: 4px;
 }
 #dialog.noInput #dialogAction,
-#dialog.inputInvalid #dialogAction {
+#dialog.inputInvalid #dialogAction,
+#dialog .roundedBtn:disabled {
   background-color: rgba(128, 128, 128, 0.2);
   opacity: 0.5;
 }
@@ -1101,12 +1244,33 @@ ul.contextMenuSubmenu li.contextMenuDivider {
   display: block;
   background-color: rgba(128, 128, 128, 0.1);
   border: 1px solid rgba(128, 128, 128, 0.5);
+  font-family: inherit;
   font-size: 13px;
+  color: inherit;
   text-align: center;
   cursor: pointer;
 }
 .roundedBtn:hover {
   background-color: rgba(128, 128, 128, 0.2);
+}
+.roundedBtn:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+}
+
+/* -- Accessibility helpers ------------------------------------------------- */
+
+/* Read by assistive technology but takes no visible space (not display: none) */
+.visuallyHidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* -- Custom Checkboxes ----------------------------------------------------- */
@@ -1127,14 +1291,20 @@ input[type="checkbox"] {
   vertical-align: middle;
   margin-top: -2px;
 }
-label:hover > .customCheckbox {
+label:hover > .customCheckbox,
+.dropdownOption:hover .customCheckbox {
   background-color: rgba(128, 128, 128, 0.2);
+}
+label > input[type="checkbox"]:focus-visible ~ .customCheckbox {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: 1px;
 }
 .customCheckbox:after {
   content: "";
   display: none;
 }
-label > input[type="checkbox"]:checked ~ .customCheckbox:after {
+label > input[type="checkbox"]:checked ~ .customCheckbox:after,
+.dropdownOption[aria-selected="true"] .customCheckbox:after {
   position: relative;
   display: block;
   left: 5px;
