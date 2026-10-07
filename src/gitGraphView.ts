@@ -799,18 +799,19 @@ export class GitKeizuView {
 				<span id="branchControl"><span class="unselectable">${hostT("Branches:")} </span><div id="branchSelect" class="dropdown"></div></span>
 				<span id="authorControl"><span class="unselectable">${hostT("Authors:")} </span><div id="authorSelect" class="dropdown"></div></span>
 				<label id="showRemoteBranchesControl"><input type="checkbox" id="showRemoteBranchesCheckbox" value="1" checked><span class="customCheckbox"></span>${hostT("Show Remote Branches")}</label>
-				<div id="branchCleanupBtn" title="${hostT("Branch Cleanup")}"></div>
-				<div id="searchBtn" title="${hostT("Search")}"></div>
-				<div id="fetchBtn" title="${hostT("Fetch --prune")}"></div>
-				<div id="currentBtn" title="${hostT("Current")}"></div>
-				<div id="refreshBtn" title="${hostT("Refresh")}"></div>
+				${toolbarButton("branchCleanupBtn", hostT("Branch Cleanup"))}
+				${toolbarButton("searchBtn", hostT("Search"))}
+				${toolbarButton("fetchBtn", hostT("Fetch --prune"))}
+				${toolbarButton("currentBtn", hostT("Current"))}
+				${toolbarButton("refreshBtn", hostT("Refresh"))}
 			</div>
 			<div id="branchCleanupPanel" hidden></div>
+			<div id="statusNotice" class="visuallyHidden" role="status" aria-live="polite" aria-label="${hostT("Git Keizu status")}"></div>
 			<div id="scrollContainer">
 				<div id="scrollShadow"></div>
 				<div id="content">
 					<div id="commitGraph"></div>
-					<div id="commitTable"></div>
+					<div id="commitTable" aria-label="${hostT("Commit history")}"></div>
 				</div>
 				<div id="footer"></div>
 			</div>
@@ -1079,6 +1080,11 @@ function buildRemoteSelectionResponse(
 
 function completedPush(repo: string, operationId: string, status: GitCommandStatus): ResponsePush {
   return { command: "push", repo, operationId, phase: "completed", status };
+}
+
+// The toolbar icon buttons have no text, so the host title doubles as the accessible name.
+function toolbarButton(id: string, name: string): string {
+  return `<button type="button" id="${id}" title="${name}" aria-label="${name}"></button>`;
 }
 
 function getNonce() {

@@ -163,6 +163,10 @@ vi.mock("../../src/utils", () => ({
   getPathFromUri: vi.fn((uri: { fsPath: string }) => uri.fsPath)
 }));
 
+import { readFileSync } from "node:fs";
+import { resolve as resolvePath } from "node:path";
+
+import { JSDOM } from "jsdom";
 import * as vscode from "vscode";
 
 import type { AvatarManager } from "../../src/avatarManager";
@@ -4908,7 +4912,8 @@ describe("GitKeizuView branch cleanup routing and mount (S33)", () => {
     const html = getWebviewHtml();
 
     // When: the button markup is located
-    const button = '<div id="branchCleanupBtn" title="Branch Cleanup"></div>';
+    const button =
+      '<button type="button" id="branchCleanupBtn" title="Branch Cleanup" aria-label="Branch Cleanup"></button>';
     const buttonIndex = html.indexOf(button);
     const controlsIndex = html.indexOf('<div id="controls">');
     const controlsEndIndex = html.indexOf("</div>", buttonIndex);
@@ -5565,5 +5570,185 @@ describe("GitKeizuView removeWorktree detached removal and input validation (S41
       command: "removeWorktree",
       status: LOCKED_WORKTREE_MESSAGE
     });
+  });
+});
+
+// @see docs/testing/perspectives/src/gitGraphView-test/08-keyboard-accessibility-01.md
+describe("GitKeizuView host HTML toolbar buttons, list name and status notice (S42)", () => {
+  const TOOLBAR_BUTTONS: readonly (readonly [string, string])[] = [
+    ["branchCleanupBtn", "Branch Cleanup"],
+    ["searchBtn", "Search"],
+    ["fetchBtn", "Fetch --prune"],
+    ["currentBtn", "Current"],
+    ["refreshBtn", "Refresh"]
+  ];
+  const EXISTING_IDS = [
+    "repoSelect",
+    "branchSelect",
+    "authorSelect",
+    "showRemoteBranchesCheckbox",
+    "branchCleanupBtn",
+    "searchBtn",
+    "fetchBtn",
+    "currentBtn",
+    "refreshBtn",
+    "branchCleanupPanel",
+    "scrollContainer",
+    "scrollShadow",
+    "content",
+    "commitGraph",
+    "commitTable",
+    "footer",
+    "dialogBacking",
+    "dialog"
+  ];
+  // The git-keizu.* configuration entries at the start of this feature (no new setting keys).
+  const CONFIGURATION_ENTRY_COUNT = 32;
+  const VIEW_STATE_KEYS = [
+    "commitOrdering",
+    "dateFormat",
+    "dialogDefaults",
+    "fetchAvatars",
+    "graphColours",
+    "graphStyle",
+    "initialLoadCommits",
+    "keybindings",
+    "lastActiveRepo",
+    "loadMoreCommits",
+    "loadMoreCommitsAutomatically",
+    "mute",
+    "repos",
+    "showCurrentBranchByDefault",
+    "showRecentActions"
+  ];
+  let body: HTMLElement;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    GitKeizuView.currentPanel = undefined;
+    mocks.getRepos.mockReturnValue({ [TEST_REPO]: "Test Repo" });
+    GitKeizuView.createOrShow(
+      "/test/extension",
+      {} as unknown as DataSource,
+      {
+        getLastActiveRepo: vi.fn(() => null),
+        isAvatarStorageAvailable: vi.fn(() => false),
+        waitForAvatarStorage: vi.fn().mockResolvedValue(undefined),
+        setLastActiveRepo: vi.fn()
+      } as unknown as ExtensionState,
+      { registerView: vi.fn(), deregisterView: vi.fn() } as unknown as AvatarManager,
+      {
+        getRepos: mocks.getRepos,
+        registerViewCallback: vi.fn(),
+        deregisterViewCallback: vi.fn(),
+        setRepoState: vi.fn(),
+        checkReposExist: vi.fn()
+      } as unknown as RepoManager
+    );
+    // The HTML is assigned after the avatar storage await settles.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const panelMock = vi.mocked(vscode.window.createWebviewPanel).mock.results[0].value as {
+      webview: { html: string };
+    };
+    body = new JSDOM(panelMock.webview.html).window.document.body;
+  });
+
+  afterEach(() => {
+    GitKeizuView.currentPanel?.dispose();
+    GitKeizuView.currentPanel = undefined;
+  });
+
+  it("renders the five toolbar actions as named standard buttons (TC-410)", () => {
+    // Case: TC-410 (K44 / A8.1-6)
+    for (const [id, name] of TOOLBAR_BUTTONS) {
+      const button = body.querySelector(`#${id}`)!;
+      expect(button, id).not.toBeNull();
+      expect(button.tagName).toBe("BUTTON");
+      expect(button.getAttribute("type")).toBe("button");
+      expect(button.getAttribute("aria-label")).toBe(name);
+      expect(button.getAttribute("title")).toBe(name);
+    }
+  });
+
+  it("keeps the dropdown labels next to their mounts (TC-411)", () => {
+    // Case: TC-411 (K44): the trigger name itself comes from the webview dictionary (toolbar.*)
+    for (const [control, label] of [
+      ["repoControl", "Repo:"],
+      ["branchControl", "Branches:"],
+      ["authorControl", "Authors:"]
+    ]) {
+      const wrapper = body.querySelector(`#${control}`)!;
+      expect(wrapper.querySelector("span.unselectable")!.textContent!.trim()).toBe(label);
+      expect(wrapper.querySelector("div.dropdown")).not.toBeNull();
+    }
+  });
+
+  it("keeps the remote checkbox label structure and order (TC-412)", () => {
+    // Case: TC-412 (K44)
+    const label = body.querySelector("label#showRemoteBranchesControl")!;
+    expect(label).not.toBeNull();
+    const [input, mark] = Array.from(label.children);
+    expect(input.tagName).toBe("INPUT");
+    expect(input.id).toBe("showRemoteBranchesCheckbox");
+    expect(input.getAttribute("type")).toBe("checkbox");
+    expect(input.getAttribute("value")).toBe("1");
+    expect(input.hasAttribute("checked")).toBe(true);
+    expect(mark.className).toBe("customCheckbox");
+    expect(label.lastChild!.textContent!.trim()).toBe("Show Remote Branches");
+  });
+
+  it("orders the toolbar children per R4.3 without any tabindex (TC-413)", () => {
+    // Case: TC-413 (K44 / R4.3)
+    const controls = body.querySelector("#controls")!;
+    expect(Array.from(controls.children).map((child) => child.id)).toEqual([
+      "repoControl",
+      "branchControl",
+      "authorControl",
+      "showRemoteBranchesControl",
+      "branchCleanupBtn",
+      "searchBtn",
+      "fetchBtn",
+      "currentBtn",
+      "refreshBtn"
+    ]);
+    expect(controls.querySelectorAll("[tabindex]")).toHaveLength(0);
+  });
+
+  it("names the commit list (TC-414)", () => {
+    // Case: TC-414 (K44 / K45)
+    expect(body.querySelector("#commitTable")!.getAttribute("aria-label")).toBe("Commit history");
+  });
+
+  it("places one polite status element outside the graph and the list (TC-415)", () => {
+    // Case: TC-415 (K44 / R4.8)
+    const notices = body.querySelectorAll('[role="status"]');
+    expect(notices).toHaveLength(1);
+    const notice = notices[0];
+    expect(notice.getAttribute("aria-live")).toBe("polite");
+    expect(notice.getAttribute("aria-label")).toBe("Git Keizu status");
+    expect(notice.id).toBe("statusNotice");
+    expect(notice.closest("#commitGraph, #commitTable")).toBeNull();
+    expect(body.querySelector("#commitGraph")!.hasAttribute("aria-live")).toBe(false);
+    expect(body.querySelector("#commitTable")!.hasAttribute("aria-live")).toBe(false);
+  });
+
+  it("keeps every existing id and never duplicates one (TC-416)", () => {
+    // Case: TC-416
+    const ids = Array.from(body.querySelectorAll("[id]")).map((element) => element.id);
+    for (const id of EXISTING_IDS) expect(ids, id).toContain(id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("adds no viewState key and no configuration entry (TC-417)", () => {
+    // Case: TC-417 (R6)
+    const script = Array.from(body.querySelectorAll("script")).find((element) =>
+      element.textContent!.includes("var viewState = ")
+    )!;
+    const json = script.textContent!.replace(/^\s*var viewState = /, "").replace(/;\s*$/, "");
+    expect(Object.keys(JSON.parse(json)).sort()).toEqual(VIEW_STATE_KEYS);
+    const manifest = JSON.parse(readFileSync(resolvePath(process.cwd(), "package.json"), "utf-8"));
+    const settings = Object.keys(manifest.contributes.configuration.properties);
+    expect(settings.every((key) => key.startsWith("git-keizu."))).toBe(true);
+    expect(settings).toHaveLength(CONFIGURATION_ENTRY_COUNT);
   });
 });

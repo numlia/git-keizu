@@ -6,6 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import type { GitCommitNode, GitFileChange, GitRef } from "../../src/types";
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
+import { captureFocusOrigin, moveFocusPast } from "../../web/keyboardNavigation";
 import { vscode } from "../../web/utils";
 
 /*
@@ -449,6 +450,7 @@ beforeAll(async () => {
     '<button id="refreshBtn" type="button"></button>',
     "</div>",
     '<div id="branchCleanupPanel" hidden></div>',
+    '<div id="statusNotice" role="status" aria-live="polite"></div>',
     '<div id="scrollContainer"><div id="scrollShadow"></div>',
     '<div id="content"><div id="commitGraph"></div><div id="commitTable"></div></div>',
     '<div id="footer"></div></div>',
@@ -714,6 +716,7 @@ describe("row target initialisation, maintenance and repository switch (S69)", (
 
     findInput.blur();
     fire(document.getElementById("findClose")!, "click");
+    (document.activeElement as HTMLElement).blur();
     expect(document.activeElement).toBe(document.body);
     focusSpy.mockClear();
     loadCommits(standardCommits());
@@ -2065,5 +2068,160 @@ describe("details, file and folder controls as standard buttons (S76)", () => {
     expect(newButton).not.toBe(oldButton);
     expect(document.activeElement).toBe(newButton);
     expect(posts()).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* Task 9: toolbar state, load more, status notice, ordering button   */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-01.md
+// @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-02.md
+describe("toolbar state, load more button, status notice and ordering button (S69 / S72 / S73 / S77)", () => {
+  function nextStopAfter(element: HTMLElement): Element | null {
+    expect(moveFocusPast(captureFocusOrigin(element), 1)).toBe(true);
+    return document.activeElement;
+  }
+
+  function statusNotice(): HTMLElement {
+    return document.getElementById("statusNotice")!;
+  }
+
+  function orderingButton(): HTMLButtonElement {
+    return document.getElementById("commitOrderingBtn") as HTMLButtonElement;
+  }
+
+  it("drops the disabled current button from the tab stops (TC-655)", () => {
+    // Case: TC-655 (K47 / A8.3-1) tab-stop variant
+    const fetchBtn = document.getElementById("fetchBtn")!;
+    loadCommits(standardCommits(), { head: null });
+    expect(document.getElementById("currentBtn")!.hasAttribute("disabled")).toBe(true);
+    expect(nextStopAfter(fetchBtn)).toBe(document.getElementById("refreshBtn"));
+
+    loadCommits(standardCommits(), { head: "M" });
+    expect(document.getElementById("currentBtn")!.hasAttribute("disabled")).toBe(false);
+    expect(nextStopAfter(fetchBtn)).toBe(document.getElementById("currentBtn"));
+  });
+
+  it("places the load more button and the find controls after the list (TC-708)", () => {
+    // Case: TC-708 (R4.3)
+    loadCommits(standardCommits(), { moreCommitsAvailable: true });
+    const loadMore = document.getElementById("loadMoreCommitsBtn")!;
+    expect(loadMore.tagName).toBe("BUTTON");
+    expect(loadMore.getAttribute("type")).toBe("button");
+    expect(loadMore.textContent).not.toBe("");
+    focusRow("M");
+    press(row("M"), "f", { ctrlKey: true });
+    expect(findWidgetIsVisible()).toBe(true);
+
+    const labels = labelsOf("M");
+    expect(nextStopAfter(labels[labels.length - 1])).toBe(loadMore);
+    expect(nextStopAfter(loadMore)).toBe(document.getElementById("findInput"));
+    expect(nextStopAfter(document.getElementById("findInput")!)).toBe(
+      document.getElementById("findCaseSensitive")
+    );
+  });
+
+  it("sends one request from the load more button and keeps focus in the list (TC-709)", () => {
+    // Case: TC-709 (K21 / A8.3-5) load more variant
+    loadCommits(standardCommits(), { moreCommitsAvailable: true });
+    const loadMore = document.getElementById("loadMoreCommitsBtn")!;
+    loadMore.focus();
+    clearPosts();
+
+    fire(loadMore, "click");
+    expect(posts("loadCommits")).toHaveLength(1);
+    expect(document.getElementById("loadMoreCommitsBtn")).toBeNull();
+    expect(document.activeElement).toBe(row("M"));
+
+    loadCommits(standardCommits(), { moreCommitsAvailable: false });
+    expect(document.activeElement).toBe(row("M"));
+    expect(posts("loadCommits")).toHaveLength(1);
+  });
+
+  it("writes the loaded count and the empty result to the polite status notice (TC-739)", () => {
+    // Case: TC-739 (K45) loaded / empty variants with the dictionary keys Task 11 provides
+    const messages = globalThis.webviewMessages;
+    globalThis.webviewMessages = {
+      ...messages,
+      "a11y.commitsLoaded": "{0} commits loaded",
+      "a11y.noCommits": "No commits to display"
+    };
+    try {
+      loadCommits(standardCommits());
+      expect(statusNotice().textContent).toBe("3 commits loaded");
+      loadCommits([], { head: null });
+      expect(statusNotice().textContent).toBe("No commits to display");
+    } finally {
+      globalThis.webviewMessages = messages;
+    }
+    expect(statusNotice().getAttribute("role")).toBe("status");
+    expect(statusNotice().getAttribute("aria-live")).toBe("polite");
+    expect(table().hasAttribute("aria-live")).toBe(false);
+    expect(document.getElementById("commitGraph")!.hasAttribute("aria-live")).toBe(false);
+    expect(table().contains(statusNotice())).toBe(false);
+  });
+
+  it("uses the standard disabled state on the current button (TC-741)", () => {
+    // Case: TC-741 (K47)
+    const currentBtn = document.getElementById("currentBtn")!;
+    loadCommits(standardCommits(), { head: null });
+    expect(currentBtn.hasAttribute("disabled")).toBe(true);
+    expect(currentBtn.hasAttribute("aria-disabled")).toBe(false);
+  });
+
+  it("opens the ordering menu from the header button with Enter, Space and click (TC-706)", () => {
+    // Case: TC-706 (R4.3 / R4.4)
+    const button = orderingButton();
+    expect(button.tagName).toBe("BUTTON");
+    expect(button.getAttribute("type")).toBe("button");
+    expect(button.getAttribute("aria-haspopup")).toBe("menu");
+    expect(button.getAttribute("aria-label")).not.toBe("");
+    expect(button.closest("#tableColHeaders")).not.toBeNull();
+    clearPosts();
+
+    button.focus();
+    const enter = press(button, "Enter");
+    expect(enter.defaultPrevented).toBe(true);
+    expect(menuIsActive()).toBe(true);
+    expect(document.activeElement).toBe(contextMenuElem().querySelector("li.contextMenuItem"));
+    for (const title of ["\u2713 Default", "Date", "Author Date", "Topological"]) menuItem(title);
+    expect(posts()).toEqual([]);
+
+    pressEscape(document.activeElement!);
+    expect(menuIsActive()).toBe(false);
+    expect(document.activeElement).toBe(orderingButton());
+
+    const space = press(orderingButton(), " ");
+    expect(space.defaultPrevented).toBe(true);
+    expect(menuIsActive()).toBe(true);
+    expect(document.activeElement).toBe(contextMenuElem().querySelector("li.contextMenuItem"));
+    pressEscape(document.activeElement!);
+
+    press(orderingButton(), "Enter", { repeat: true });
+    expect(menuIsActive()).toBe(false);
+
+    fire(orderingButton(), "click", { clientX: 40, clientY: 20 });
+    expect(menuIsActive()).toBe(true);
+    expect(posts()).toEqual([]);
+  });
+
+  it("returns focus to the find launcher when Escape closes the find widget (TC-689)", () => {
+    // Case: TC-689 (R4.6 / R4.7) find stage restore variant
+    focusRow("M");
+    press(row("M"), "f", { ctrlKey: true });
+    expect(document.activeElement).toBe(document.getElementById("findInput"));
+    pressEscape(document.activeElement!);
+    expect(findWidgetIsVisible()).toBe(false);
+    expect(document.activeElement).toBe(row("M"));
+
+    const searchBtn = document.getElementById("searchBtn")!;
+    searchBtn.focus();
+    fire(searchBtn, "click");
+    expect(findWidgetIsVisible()).toBe(true);
+    expect(document.activeElement).toBe(document.getElementById("findInput"));
+    pressEscape(document.activeElement!);
+    expect(findWidgetIsVisible()).toBe(false);
+    expect(document.activeElement).toBe(searchBtn);
   });
 });

@@ -210,6 +210,12 @@ const FILE_ACTION_BUTTONS: readonly (readonly [string, FileActionKind])[] = [
 ];
 const LOAD_MORE_BUTTON_ID = "loadMoreCommitsBtn";
 const TABLE_HEADERS_ID = "tableColHeaders";
+const COMMIT_ORDERING_BUTTON_ID = "commitOrderingBtn";
+const COMMIT_ORDERING_BUTTON_CLASS = "tableColHeaderMenuBtn";
+const COMMIT_ORDERING_BUTTON_GLYPH = "\u25BE";
+const STATUS_NOTICE_ID = "statusNotice";
+const STATUS_KEY_COMMITS_LOADED = "a11y.commitsLoaded";
+const STATUS_KEY_NO_COMMITS = "a11y.noCommits";
 const BRANCH_CLEANUP_PANEL_ID = "branchCleanupPanel";
 const FIND_WIDGET_ACTIVE_SELECTOR = ".findWidget.active";
 const CLASS_ACTIVE = "active";
@@ -459,6 +465,16 @@ class GitKeizuView {
     searchBtnElem.addEventListener("click", () => {
       this.openFindWidget();
     });
+    // Fixed toolbar controls restore by id after the UI they launched closes from the keyboard.
+    for (const control of [
+      branchCleanupBtnElem,
+      searchBtnElem,
+      fetchBtnElem,
+      currentBtnElem,
+      refreshBtnElem
+    ]) {
+      if (control !== null) markFocusTarget(control, { kind: "control", id: control.id });
+    }
     this.refOverflow = new RefOverflowController({
       onMinimumWidth: (minimum) => this.applyDescriptionMinimumWidth(minimum),
       onRefContextMenu: (event, badge, focusOptions) =>
@@ -786,6 +802,11 @@ class GitKeizuView {
     }
     this.pathHighlight.onCommitsChanged();
     this.render();
+    this.announceStatus(
+      this.commits.length === 0
+        ? t(STATUS_KEY_NO_COMMITS)
+        : t(STATUS_KEY_COMMITS_LOADED, this.commits.length)
+    );
 
     const authorList =
       authors !== undefined ? authors : [...new Set(this.commits.map((c) => c.author))].sort();
@@ -1052,7 +1073,7 @@ class GitKeizuView {
     // The ticket above already captured focus inside the list, so the list restores nothing.
     this.refOverflow.closePopup("replace");
     const savedScrollTop = this.scrollContainerElem.scrollTop;
-    let html = `<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader">${t("table.graph")}</th><th class="tableColHeader">${t("table.description")}</th><th class="tableColHeader">${t("table.date")}</th><th class="tableColHeader">${t("table.author")}</th><th class="tableColHeader">${t("table.commit")}</th></tr>`,
+    let html = `<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader">${t("table.graph")}</th><th class="tableColHeader">${t("table.description")}${this.buildCommitOrderingButtonHtml()}</th><th class="tableColHeader">${t("table.date")}</th><th class="tableColHeader">${t("table.author")}</th><th class="tableColHeader">${t("table.commit")}</th></tr>`,
       i,
       currentHash =
         this.commits.length > 0 && this.commits[0].hash === UNCOMMITTED_CHANGES_HASH
@@ -1128,7 +1149,7 @@ class GitKeizuView {
     }
     this.tableElem.innerHTML = `<table>${html}</table>`;
     this.footerElem.innerHTML = this.moreCommitsAvailable
-      ? `<div id="${LOAD_MORE_BUTTON_ID}" class="roundedBtn">${t("table.loadMoreCommits")}</div>`
+      ? `<button type="button" id="${LOAD_MORE_BUTTON_ID}" class="roundedBtn">${t("table.loadMoreCommits")}</button>`
       : "";
     this.applyRowTargets();
     this.makeTableResizable();
@@ -1578,10 +1599,37 @@ class GitKeizuView {
       if (!consumeContextMenuLaunch(e)) return;
       this.showCommitOrderingContextMenu(e, colHeadersElem);
     });
+    this.bindCommitOrderingButton();
   }
-  private showCommitOrderingContextMenu(event: ContextMenuTrigger, colHeadersElem: HTMLElement) {
-    const repoOrdering: GG.RepoCommitOrdering =
-      this.gitRepos[this.currentRepo]?.commitOrdering ?? "default";
+  // Bound after makeTableResizable(), whose innerHTML append re-creates the header children.
+  // Enter / Space are handled on keydown so the menu is placed by the button and focuses its first
+  // item; the consumed keydown suppresses the native click that would otherwise open it twice.
+  private bindCommitOrderingButton() {
+    const button = document.getElementById(COMMIT_ORDERING_BUTTON_ID);
+    if (button === null) return;
+    markFocusTarget(button, { kind: "control", id: COMMIT_ORDERING_BUTTON_ID });
+    button.addEventListener("click", (e: MouseEvent) => {
+      e.stopPropagation();
+      this.showCommitOrderingContextMenu(e, button);
+    });
+    button.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.defaultPrevented || (e.key !== KEY_ENTER && e.key !== KEY_SPACE)) return;
+      if (isKeyboardActionBlocked(e)) return;
+      consumeKey(e);
+      this.showCommitOrderingContextMenu(e, button);
+    });
+  }
+  private getRepoCommitOrdering(): GG.RepoCommitOrdering {
+    return this.gitRepos[this.currentRepo]?.commitOrdering ?? "default";
+  }
+  private buildCommitOrderingButtonHtml(): string {
+    const ordering = this.getRepoCommitOrdering();
+    const current = COMMIT_ORDERING_MENU_ITEMS.find((item) => item.value === ordering);
+    const name = escapeHtml(current === undefined ? "" : current.label);
+    return `<button type="button" id="${COMMIT_ORDERING_BUTTON_ID}" class="${COMMIT_ORDERING_BUTTON_CLASS}" aria-haspopup="menu" title="${name}" aria-label="${name}">${COMMIT_ORDERING_BUTTON_GLYPH}</button>`;
+  }
+  private showCommitOrderingContextMenu(event: ContextMenuTrigger, sourceElem: HTMLElement) {
+    const repoOrdering = this.getRepoCommitOrdering();
     const items: ContextMenuElement[] = COMMIT_ORDERING_MENU_ITEMS.map(({ label, value }) => ({
       title: value === repoOrdering ? `\u2713 ${label}` : label,
       onClick: () => {
@@ -1598,7 +1646,7 @@ class GitKeizuView {
         this.requestLoadCommits(true, () => {});
       }
     }));
-    showContextMenu(event, items, colHeadersElem, this.getCurrentRepoRecentActions());
+    showContextMenu(event, items, sourceElem, this.getCurrentRepoRecentActions());
   }
 
   /* Description Column Minimum Width */
@@ -1747,6 +1795,12 @@ class GitKeizuView {
         elem.classList.remove("flash");
       }, FLASH_ANIMATION_DURATION_MS);
     }
+  }
+
+  // Polite notices live outside the graph, so a re-render never re-reads the whole list (R4.8).
+  private announceStatus(text: string) {
+    const notice = document.getElementById(STATUS_NOTICE_ID);
+    if (notice !== null) notice.textContent = text;
   }
 
   private updateCurrentBtnState() {
@@ -2148,7 +2202,7 @@ class GitKeizuView {
     }
     if (this.refOverflow.closePopup("keyboard")) return;
     if (this.findWidget.isVisible()) {
-      this.findWidget.close();
+      this.findWidget.close("keyboard");
       return;
     }
     if (this.expandedCommit !== null) {
