@@ -6904,7 +6904,8 @@ describe("worktree label rendering (S55)", () => {
     expect(showContextMenuArgs[1]).toBe(
       vi.mocked(buildDetachedWorktreeContextMenuItems).mock.results[0].value
     );
-    expect(showContextMenuArgs[2]).toBe(label);
+    // The menu is anchored to the label's operable button (061-05 Task 7), not to the wrapper.
+    expect(showContextMenuArgs[2]).toBe(label.querySelector("button.gitRefButton"));
     expect(showContextMenuArgs[3]).toEqual(["ref.openTerminal"]);
 
     dispatchMessage({
@@ -7121,11 +7122,13 @@ describe("worktree label rendering (S55)", () => {
       .querySelector(".detachedWorktree .codicon")!
       .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
 
-    // Then: the menu is built for the label path and anchored to the label element
+    // Then: the menu is built for the label path and anchored to the label's button
     expect(buildDetachedWorktreeContextMenuItems).toHaveBeenCalledTimes(1);
     expect(buildDetachedWorktreeContextMenuItems).toHaveBeenCalledWith(TEST_REPO, "/tmp/wt8");
     expect(showContextMenu).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(showContextMenu).mock.calls[0][2]).toBe(label);
+    expect(vi.mocked(showContextMenu).mock.calls[0][2]).toBe(
+      label.querySelector("button.gitRefButton")
+    );
   });
 
   it("restores a path containing markup verbatim from the label attribute (TC-424)", () => {

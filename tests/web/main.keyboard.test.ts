@@ -218,8 +218,9 @@ function focusRow(hash: string): HTMLElement {
   return elem;
 }
 
+/** The operable ref buttons of a row (each `.gitRef` wrapper holds one per head / remote). */
 function labelsOf(hash: string): HTMLElement[] {
-  return Array.from(row(hash).querySelectorAll<HTMLElement>(".gitRef"));
+  return Array.from(row(hash).querySelectorAll<HTMLElement>(".gitRef button.gitRefButton"));
 }
 
 function posts(command?: string): Record<string, unknown>[] {
@@ -1550,6 +1551,21 @@ describe("focus restore after re-render and the kept menu context (S74)", () => 
     expect(posts()).toEqual([]);
   });
 
+  it("restores the focused ref label of the same repository after a forced re-render (TC-710)", () => {
+    // Case: TC-710 (K22 / A8.1-7), ref-label variant: the label key resolves to the new button
+    const [oldLabel] = labelsOf("M");
+    oldLabel.focus();
+    expect(document.activeElement).toBe(oldLabel);
+    loadCommits(standardCommits(), { hard: true });
+
+    const [newLabel] = labelsOf("M");
+    expect(oldLabel.isConnected).toBe(false);
+    expect(newLabel).not.toBe(oldLabel);
+    expect(document.activeElement).toBe(newLabel);
+    expect(newLabel.closest<HTMLElement>(".gitRef")!.dataset.name).toBe("feature");
+    expect(posts()).toEqual([]);
+  });
+
   it("restores only the latest ticket across two consecutive responses (TC-711)", () => {
     // Case: TC-711 (K22 / A8.3-3)
     focusRow("M");
@@ -1655,6 +1671,58 @@ describe("focus restore after re-render and the kept menu context (S74)", () => 
     respondDetails("N", [], []);
 
     expect(document.activeElement).toBe(row("N"));
+    expect(posts()).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S75: ref label Enter / Space                                       */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-02.md
+describe("ref label Enter / Space open the menu while dblclick keeps the checkout (S75)", () => {
+  it("opens the label's menu on Enter and Space without checking out or opening details (TC-726)", () => {
+    // Case: TC-726 (R4.3)
+    const [featureLabel, hotfixLabel] = labelsOf("M");
+    expect(featureLabel.tagName).toBe("BUTTON");
+    expect(featureLabel.getAttribute("type")).toBe("button");
+
+    featureLabel.focus();
+    const enter = press(featureLabel, "Enter");
+    expect(enter.defaultPrevented).toBe(true);
+    expect(menuIsActive()).toBe(true);
+    expect(posts()).toEqual([]);
+    expect(details()).toBeNull();
+    fire(document, "click");
+    expect(menuIsActive()).toBe(false);
+
+    featureLabel.focus();
+    const space = press(featureLabel, " ");
+    expect(space.defaultPrevented).toBe(true);
+    expect(menuIsActive()).toBe(true);
+    expect(posts()).toEqual([]);
+    expect(details()).toBeNull();
+    fire(document, "click");
+
+    fire(hotfixLabel, "dblclick");
+    expect(posts("checkoutBranch")).toEqual([
+      { command: "checkoutBranch", repo: REPO, branchName: "hotfix", remoteBranch: null }
+    ]);
+    expect(details()).toBeNull();
+  });
+
+  it("ignores repeated and released Enter on a label (TC-726)", () => {
+    // Case: TC-726 (R4.6 guard on the label's own Enter)
+    const [label] = labelsOf("M");
+    label.focus();
+    const repeat = press(label, "Enter", { repeat: true, keyup: false });
+    // The shared guard suppresses the native click of a repeated action key on a button.
+    expect(repeat.defaultPrevented).toBe(true);
+    expect(menuIsActive()).toBe(false);
+    label.dispatchEvent(
+      new KeyboardEvent("keyup", { key: "Enter", bubbles: true, cancelable: true })
+    );
+    expect(menuIsActive()).toBe(false);
     expect(posts()).toEqual([]);
   });
 });

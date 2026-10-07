@@ -101,9 +101,17 @@ const GRAPH_AUTO_LAYOUT_MAX_RATIO = 0.4;
 const GRAPH_COL_MIN_WIDTH = 64;
 const DESCRIPTION_COLUMN_INDEX = 1;
 const TABLE_COLUMN_COUNT = 5;
-const COMBINED_REMOTE_SELECTOR = ".gitRefHeadRemote";
+const REF_BADGE_CLASS = "gitRef";
+const REF_BADGE_SELECTOR = `.${REF_BADGE_CLASS}`;
+// Each operable part of a badge is a native button inside the measured `.gitRef` wrapper.
+const REF_BUTTON_CLASS = "gitRefButton";
+const REF_BUTTON_SELECTOR = `.${REF_BUTTON_CLASS}`;
+const REF_BUTTON_OPEN_TAG = `<button type="button" class="${REF_BUTTON_CLASS}">`;
+const COMBINED_REMOTE_CLASS = "gitRefHeadRemote";
+const COMBINED_REMOTE_SELECTOR = `.${COMBINED_REMOTE_CLASS}`;
 const REF_CLASS_HEAD = "head";
 const REF_CLASS_REMOTE = "remote";
+const REF_CLASS_TAG = "tag";
 type BranchRefType = Extract<PathHighlightSelection, { kind: "branch" }>["refType"];
 const COMMIT_ORDERING_MENU_ITEMS: { label: string; value: GG.RepoCommitOrdering }[] = [
   { label: t("commitOrdering.default"), value: "default" },
@@ -127,6 +135,15 @@ function resolveRefType(badge: HTMLElement, isRemoteCombined: boolean): BranchRe
   if (isRemoteCombined || badge.classList.contains(REF_CLASS_REMOTE)) return REF_CLASS_REMOTE;
   if (badge.classList.contains(REF_CLASS_HEAD)) return REF_CLASS_HEAD;
   return null;
+}
+
+// The part under the pointer or holding focus (also through a search mark) is the menu source;
+// a badge-level hit falls back to its first part, so the wrapper itself never takes focus.
+function resolveRefSource(event: ContextMenuTrigger, badge: HTMLElement): HTMLElement {
+  const part =
+    event.target instanceof Element ? event.target.closest<HTMLElement>(REF_BUTTON_SELECTOR) : null;
+  if (part !== null && badge.contains(part)) return part;
+  return badge.querySelector<HTMLElement>(REF_BUTTON_SELECTOR) ?? badge;
 }
 
 const EMPTY_WORKTREE_COLLECTION: GG.WorktreeCollection = { branches: {}, detached: [] };
@@ -158,6 +175,7 @@ const KEY_F10 = "F10";
 const KEY_ARROW_UP = "ArrowUp";
 const KEY_ARROW_DOWN = "ArrowDown";
 const KEY_ENTER = "Enter";
+const KEY_SPACE = " ";
 const KEY_ESCAPE = "Escape";
 const KEY_TAB = "Tab";
 const TAB_INDEX_STOP = 0;
@@ -169,8 +187,10 @@ const BRANCH_CLEANUP_PANEL_ID = "branchCleanupPanel";
 const FIND_WIDGET_ACTIVE_SELECTOR = ".findWidget.active";
 const CLASS_ACTIVE = "active";
 const ROW_SELECTOR = "tr[data-hash]";
-const ROW_LABEL_SELECTOR = ".gitRef, .refOverflowCounter";
-const ROW_LABEL_STOP_SELECTOR = ".gitRef:not(.refOverflowHidden), .refOverflowCounter";
+const ROW_COUNTER_SELECTOR = ".refOverflowCounter";
+const ROW_LABEL_SELECTOR = `${REF_BADGE_SELECTOR} ${REF_BUTTON_SELECTOR}, ${ROW_COUNTER_SELECTOR}`;
+// Labels folded away by the layout keep tabindex -1 until the layout shows them again.
+const ROW_LABEL_STOP_SELECTOR = `${REF_BADGE_SELECTOR}:not(.refOverflowHidden) ${REF_BUTTON_SELECTOR}, ${ROW_COUNTER_SELECTOR}`;
 const TAB_STOP_SELECTOR = "button, input, select, textarea, summary, a[href], [tabindex]";
 const TAB_STOP_EXCLUDED_SELECTOR =
   '[hidden], [disabled], [aria-hidden="true"], .refOverflowHidden, .refOverflowMeasure';
@@ -415,7 +435,11 @@ class GitKeizuView {
     this.refOverflow = new RefOverflowController({
       onMinimumWidth: (minimum) => this.applyDescriptionMinimumWidth(minimum),
       onRefContextMenu: (event, badge, focusOptions) =>
-        this.showRefBadgeContextMenu(event, badge, focusOptions)
+        this.showRefBadgeContextMenu(event, badge, focusOptions),
+      onRefCloned: (original, clone) => {
+        const key = this.resolveRefKey(original);
+        if (key !== null) markFocusTarget(clone, key);
+      }
     });
     this.findWidget = new FindWidget({
       getCommits: () => this.commits,
@@ -998,7 +1022,8 @@ class GitKeizuView {
   private renderTable() {
     const focusUpdate = this.beginListFocusUpdate();
     // Close first: the ref listeners below are bound by class name across the whole document.
-    this.refOverflow.closePopup();
+    // The ticket above already captured focus inside the list, so the list restores nothing.
+    this.refOverflow.closePopup("replace");
     const savedScrollTop = this.scrollContainerElem.scrollTop;
     let html = `<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader">${t("table.graph")}</th><th class="tableColHeader">${t("table.description")}</th><th class="tableColHeader">${t("table.date")}</th><th class="tableColHeader">${t("table.author")}</th><th class="tableColHeader">${t("table.commit")}</th></tr>`,
       i,
@@ -1028,21 +1053,21 @@ class GitKeizuView {
         const wtAttr = isLinkedWorktree ? ` data-worktree-path="${escapeHtml(wtEntry.path)}"` : "";
         const wtTitle = isLinkedWorktree ? ` title="Worktree: ${escapeHtml(wtEntry.path)}"` : "";
         const branchIcon = isLinkedWorktree ? svgIcons.worktree : svgIcons.branch;
-        refHtml = `<span class="gitRef head${refActive ? " active" : ""}${wtClass}" data-name="${refName}"${remotesAttr}${wtAttr}${wtTitle}>${branchIcon}<span class="gitRefName">${refName}</span>`;
+        refHtml = `<span class="gitRef head${refActive ? " active" : ""}${wtClass}" data-name="${refName}"${remotesAttr}${wtAttr}${wtTitle}>${REF_BUTTON_OPEN_TAG}${branchIcon}<span class="gitRefName">${refName}</span></button>`;
         for (let k = 0; k < branchLabels.heads[j].remotes.length; k++) {
           let remoteName = escapeHtml(branchLabels.heads[j].remotes[k]);
-          refHtml += `<span class="gitRefHeadRemote" data-remote="${remoteName}" data-name="${escapeHtml(`${branchLabels.heads[j].remotes[k]}/${branchLabels.heads[j].name}`)}">${remoteName}</span>`;
+          refHtml += `<button type="button" class="${REF_BUTTON_CLASS} ${COMBINED_REMOTE_CLASS}" data-remote="${remoteName}" data-name="${escapeHtml(`${branchLabels.heads[j].remotes[k]}/${branchLabels.heads[j].name}`)}">${remoteName}</button>`;
         }
         refHtml += "</span>";
         refs = refActive ? refHtml + refs : refs + refHtml;
       }
       for (j = 0; j < branchLabels.remotes.length; j++) {
         refName = escapeHtml(branchLabels.remotes[j].name);
-        refs += `<span class="gitRef remote" data-name="${refName}">${svgIcons.branch}${refName}</span>`;
+        refs += `<span class="gitRef remote" data-name="${refName}">${REF_BUTTON_OPEN_TAG}${svgIcons.branch}${refName}</button></span>`;
       }
       for (j = 0; j < branchLabels.tags.length; j++) {
         refName = escapeHtml(branchLabels.tags[j].name);
-        refs += `<span class="gitRef tag" data-name="${refName}">${svgIcons.tag}${refName}</span>`;
+        refs += `<span class="gitRef tag" data-name="${refName}">${REF_BUTTON_OPEN_TAG}${svgIcons.tag}${refName}</button></span>`;
       }
       const commitHash: string = this.commits[i].hash;
       const detachedWorktrees = this.worktrees.detached
@@ -1051,13 +1076,13 @@ class GitKeizuView {
       for (const detachedWorktree of detachedWorktrees) {
         const worktreePath = escapeHtml(detachedWorktree.path);
         const worktreeName = escapeHtml(getWorktreeLabelName(detachedWorktree.path));
-        refs += `<span class="gitRef worktree ${DETACHED_WORKTREE_CLASS}" data-worktree-path="${worktreePath}" title="Worktree: ${worktreePath}">${svgIcons.worktree}${worktreeName}</span>`;
+        refs += `<span class="gitRef worktree ${DETACHED_WORKTREE_CLASS}" data-worktree-path="${worktreePath}" title="Worktree: ${worktreePath}">${REF_BUTTON_OPEN_TAG}${svgIcons.worktree}${worktreeName}</button></span>`;
       }
       if (this.commits[i].stash !== null) {
         let selectorDisplay = escapeHtml(
           buildStashSelectorDisplay(this.commits[i].stash!.selector)
         );
-        refs = `<span class="gitRef stash" ${STASH_HASH_ATTRIBUTE}="${escapeHtml(commitHash)}">${svgIcons.stash}${selectorDisplay}</span>${refs}`;
+        refs = `<span class="gitRef stash" ${STASH_HASH_ATTRIBUTE}="${escapeHtml(commitHash)}">${REF_BUTTON_OPEN_TAG}${svgIcons.stash}${selectorDisplay}</button></span>${refs}`;
       }
       let rowClass = buildCommitRowAttributes(
         this.commits[i].hash,
@@ -1193,8 +1218,18 @@ class GitKeizuView {
     addListenerToClass("gitRef", "contextmenu", (e: Event) => {
       this.showRefBadgeContextMenu(<MouseEvent>e, <HTMLElement>e.currentTarget);
     });
+    // Enter / Space open the part's menu like ContextMenu / Shift+F10; checkout stays on dblclick.
     addListenerToClass("gitRef", "keydown", (e: Event) => {
-      if (!consumeContextMenuLaunch(e)) return;
+      if (consumeContextMenuLaunch(e)) {
+        this.showRefBadgeContextMenu(e, <HTMLElement>e.currentTarget);
+        return;
+      }
+      if (!(e instanceof KeyboardEvent) || e.defaultPrevented) return;
+      if (e.key !== KEY_ENTER && e.key !== KEY_SPACE) return;
+      if (isKeyboardActionBlocked(e)) return;
+      const part = e.target instanceof Element ? e.target.closest(REF_BUTTON_SELECTOR) : null;
+      if (part === null) return;
+      consumeKey(e);
       this.showRefBadgeContextMenu(e, <HTMLElement>e.currentTarget);
     });
     addListenerToClass("gitRef", "click", (e: Event) => e.stopPropagation());
@@ -1203,11 +1238,11 @@ class GitKeizuView {
       if (isDialogActive()) hideDialog();
       if (isContextMenuActive()) hideContextMenu();
       let target = <HTMLElement>e.target;
-      let sourceElem = <HTMLElement>target.closest(".gitRef")!;
+      let sourceElem = <HTMLElement>target.closest(REF_BADGE_SELECTOR)!;
       if (sourceElem.classList.contains(DETACHED_WORKTREE_CLASS)) return;
-      let isRemoteCombined = target.classList.contains("gitRefHeadRemote");
-      if (isRemoteCombined) {
-        checkoutBranchAction(this.currentRepo, sourceElem, target.dataset.name!, true);
+      const remoteElem = target.closest<HTMLElement>(COMBINED_REMOTE_SELECTOR);
+      if (remoteElem !== null && sourceElem.contains(remoteElem)) {
+        checkoutBranchAction(this.currentRepo, sourceElem, remoteElem.dataset.name!, true);
       } else {
         checkoutBranchAction(this.currentRepo, sourceElem, sourceElem.dataset.name!);
       }
@@ -1276,8 +1311,11 @@ class GitKeizuView {
     focusOptions?: ContextMenuFocusOptions
   ): void {
     event.stopPropagation();
+    // The builders keep the badge (its dataset and dialog / checkout marks); the menu itself is
+    // anchored to and restores focus to the operable part that launched it.
+    const source = resolveRefSource(event, badge);
     if (badge.classList.contains(STASH_BADGE_CLASS)) {
-      this.showStashBadgeContextMenu(event, badge, focusOptions);
+      this.showStashBadgeContextMenu(event, badge, source, focusOptions);
       return;
     }
     if (badge.classList.contains(DETACHED_WORKTREE_CLASS)) {
@@ -1286,19 +1324,14 @@ class GitKeizuView {
       showContextMenu(
         event,
         buildDetachedWorktreeContextMenuItems(this.currentRepo, worktreePath),
-        badge,
+        source,
         this.getCurrentRepoRecentActions(),
         focusOptions
       );
       return;
     }
-    // A search highlight can wrap the remote label, so the remote is resolved from the nearest ancestor.
-    const remoteElem =
-      event.target instanceof Element
-        ? event.target.closest<HTMLElement>(COMBINED_REMOTE_SELECTOR)
-        : null;
-    const isRemoteCombined = remoteElem !== null && badge.contains(remoteElem);
-    const refName = isRemoteCombined ? remoteElem.dataset.name! : badge.dataset.name!;
+    const isRemoteCombined = source.classList.contains(COMBINED_REMOTE_CLASS);
+    const refName = isRemoteCombined ? source.dataset.name! : badge.dataset.name!;
     const remotes = badge.dataset.remotes ? badge.dataset.remotes.split(",") : undefined;
     let worktreeInfo: { path: string; isMainWorktree: boolean } | null = null;
     if (badge.classList.contains("head") && !isRemoteCombined) {
@@ -1326,7 +1359,7 @@ class GitKeizuView {
         worktreeInfo,
         ...highlightArgs
       ),
-      badge,
+      source,
       this.getCurrentRepoRecentActions(),
       focusOptions
     );
@@ -1354,6 +1387,7 @@ class GitKeizuView {
   private showStashBadgeContextMenu(
     event: ContextMenuTrigger,
     badge: HTMLElement,
+    source: HTMLElement,
     focusOptions?: ContextMenuFocusOptions
   ): void {
     const hash = badge.getAttribute(STASH_HASH_ATTRIBUTE);
@@ -1370,7 +1404,7 @@ class GitKeizuView {
     showContextMenu(
       event,
       buildStashContextMenuItems(this.currentRepo, hash, commit.stash.selector, originalRow),
-      badge,
+      source,
       this.getCurrentRepoRecentActions(),
       focusOptions
     );
@@ -1886,6 +1920,10 @@ class GitKeizuView {
       const hash = row.dataset.hash;
       if (hash === undefined) return;
       markFocusTarget(row, this.rowKey(hash));
+      row.querySelectorAll<HTMLElement>(REF_BUTTON_SELECTOR).forEach((part) => {
+        const key = this.resolveRefKey(part);
+        if (key !== null) markFocusTarget(part, key);
+      });
       this.setRowTabIndex(row, hash === targetHash ? TAB_INDEX_STOP : TAB_INDEX_PROGRAMMATIC);
     });
     this.tableElem.tabIndex = rows.length === 0 ? TAB_INDEX_STOP : TAB_INDEX_PROGRAMMATIC;
@@ -1895,9 +1933,37 @@ class GitKeizuView {
     return { kind: "row", repo: this.currentRepo, hash };
   }
 
+  // A part is identified by its row and by the full name of what it operates on: the head or
+  // remote name, the tag, the stash hash or the worktree path (plan §3.4).
+  private resolveRefKey(part: HTMLElement): FocusKey | null {
+    const badge = part.closest<HTMLElement>(REF_BADGE_SELECTOR);
+    const hash = part.closest<HTMLElement>(ROW_SELECTOR)?.dataset.hash;
+    if (badge === null || hash === undefined) return null;
+    const base = { kind: "ref", repo: this.currentRepo, hash } as const;
+    if (badge.classList.contains(STASH_BADGE_CLASS)) {
+      const stashHash = badge.getAttribute(STASH_HASH_ATTRIBUTE);
+      return stashHash === null || stashHash === ""
+        ? null
+        : { ...base, refType: "stash", name: stashHash };
+    }
+    if (badge.classList.contains(DETACHED_WORKTREE_CLASS)) {
+      const path = badge.dataset.worktreePath;
+      return path === undefined ? null : { ...base, refType: "worktree", name: path };
+    }
+    if (part.classList.contains(COMBINED_REMOTE_CLASS)) {
+      const name = part.dataset.name;
+      return name === undefined ? null : { ...base, refType: REF_CLASS_REMOTE, name };
+    }
+    const name = badge.dataset.name;
+    if (name === undefined) return null;
+    if (badge.classList.contains(REF_CLASS_TAG)) return { ...base, refType: REF_CLASS_TAG, name };
+    const refType = badge.classList.contains(REF_CLASS_REMOTE) ? REF_CLASS_REMOTE : REF_CLASS_HEAD;
+    return { ...base, refType, name };
+  }
+
   private setRowTabIndex(row: HTMLElement, tabIndex: number): void {
     row.tabIndex = tabIndex;
-    row.querySelectorAll<HTMLElement>(ROW_LABEL_SELECTOR).forEach((label) => {
+    row.querySelectorAll<HTMLElement>(ROW_LABEL_STOP_SELECTOR).forEach((label) => {
       label.tabIndex = tabIndex;
     });
   }
@@ -2048,7 +2114,7 @@ class GitKeizuView {
       this.authorDropdown.cancelAndClose("keyboard");
       return;
     }
-    if (this.refOverflow.closePopup()) return;
+    if (this.refOverflow.closePopup("keyboard")) return;
     if (this.findWidget.isVisible()) {
       this.findWidget.close();
       return;

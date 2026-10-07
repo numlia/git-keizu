@@ -14,9 +14,17 @@ vi.mock("../../web/contextMenu", () => ({
 
 import { hideContextMenu } from "../../web/contextMenu";
 import {
+  beginFocusUpdate,
+  configureFocusContext,
+  finishFocusUpdate,
+  type FocusKey,
+  markFocusTarget
+} from "../../web/keyboardNavigation";
+import {
   calculateMinimumDescriptionWidth,
   type RefMinimumWidthInput,
   RefOverflowController,
+  type RefOverflowOptions,
   selectVisibleRefCount
 } from "../../web/refOverflow";
 import { escapeHtml, svgIcons, vscode } from "../../web/utils";
@@ -64,6 +72,8 @@ interface LayoutFixture {
   zero: boolean;
   counterRect: { left: number; top: number; bottom: number };
   popupSize: { width: number; height: number };
+  // Observes each measuring clone while it is attached (the measuring area is removed afterwards).
+  onMeasureRef: ((clone: HTMLElement) => void) | null;
 }
 
 let fixture: LayoutFixture;
@@ -100,6 +110,7 @@ function fixtureWidth(elem: HTMLElement): number {
   if (elem.classList.contains("gitRefHeadRemote")) return COMBINED_REMOTE_WIDTH;
   if (elem.classList.contains("gitRef")) {
     if (!inMeasure) return ORIGINAL_REF_WIDTH;
+    fixture.onMeasureRef?.(elem);
     const outer = fixture.badgeOuter[badgeKey(elem)];
     if (outer === undefined) throw new Error(`no fixture width for ${badgeKey(elem)}`);
     return outer - BADGE_MARGIN;
@@ -188,6 +199,9 @@ function restoreProperties(): void {
 
 /* --- Markup builders (mirroring web/main.ts renderTable) ----------- */
 
+// Every operable part of a badge is a native button inside the measured `.gitRef` wrapper.
+const BUTTON_OPEN = '<button type="button" class="gitRefButton">';
+
 function headRef(
   name: string,
   options: { active?: boolean; worktreePath?: string; remotes?: string[] } = {}
@@ -206,26 +220,27 @@ function headRef(
   const remoteHtml = remotes
     .map(
       (remote) =>
-        `<span class="gitRefHeadRemote" data-remote="${remote}" data-name="${remote}/${escaped}">${remote}</span>`
+        `<button type="button" class="gitRefButton gitRefHeadRemote" data-remote="${remote}" data-name="${remote}/${escaped}">${remote}</button>`
     )
     .join("");
-  return `<span class="${classes}" data-name="${escaped}"${remotesAttr}${worktreeAttr}>${icon}<span class="gitRefName">${escaped}</span>${remoteHtml}</span>`;
+  return `<span class="${classes}" data-name="${escaped}"${remotesAttr}${worktreeAttr}>${BUTTON_OPEN}${icon}<span class="gitRefName">${escaped}</span></button>${remoteHtml}</span>`;
 }
 
 function remoteRef(name: string): string {
-  return `<span class="gitRef remote" data-name="${escapeHtml(name)}">${svgIcons.branch}${escapeHtml(name)}</span>`;
+  return `<span class="gitRef remote" data-name="${escapeHtml(name)}">${BUTTON_OPEN}${svgIcons.branch}${escapeHtml(name)}</button></span>`;
 }
 
 function tagRef(name: string): string {
-  return `<span class="gitRef tag" data-name="${escapeHtml(name)}">${svgIcons.tag}${escapeHtml(name)}</span>`;
+  return `<span class="gitRef tag" data-name="${escapeHtml(name)}">${BUTTON_OPEN}${svgIcons.tag}${escapeHtml(name)}</button></span>`;
 }
 
-function stashRef(display: string): string {
-  return `<span class="gitRef stash">${svgIcons.stash}${escapeHtml(display)}</span>`;
+function stashRef(display: string, hash?: string): string {
+  const hashAttr = hash === undefined ? "" : ` data-stash-hash="${escapeHtml(hash)}"`;
+  return `<span class="gitRef stash"${hashAttr}>${BUTTON_OPEN}${svgIcons.stash}${escapeHtml(display)}</button></span>`;
 }
 
 function detachedRef(path: string, label: string): string {
-  return `<span class="gitRef worktree detachedWorktree" data-worktree-path="${escapeHtml(path)}" title="Worktree: ${escapeHtml(path)}">${svgIcons.worktree}${escapeHtml(label)}</span>`;
+  return `<span class="gitRef worktree detachedWorktree" data-worktree-path="${escapeHtml(path)}" title="Worktree: ${escapeHtml(path)}">${BUTTON_OPEN}${svgIcons.worktree}${escapeHtml(label)}</button></span>`;
 }
 
 function ac01Refs(): string {
@@ -240,6 +255,9 @@ interface RowSpec {
   readonly head?: boolean;
   readonly color?: number;
   readonly message?: string;
+  // Rows of the keyboard cases (S6) carry main's hash and tabindex; the others stay plain.
+  readonly hash?: string;
+  readonly tabIndex?: number;
 }
 
 function buildTable(rows: readonly RowSpec[]): HTMLTableElement {
@@ -247,12 +265,13 @@ function buildTable(rows: readonly RowSpec[]): HTMLTableElement {
   const header =
     '<tr id="tableColHeaders"><th>Graph</th><th>Description</th><th>Date</th><th>Author</th><th>Commit</th></tr>';
   const body = rows
-    .map(
-      (row, index) =>
-        `<tr class="commit" data-id="${index}" data-color="${row.color ?? 0}"><td></td><td>${
-          row.head === true ? '<span class="commitHeadDot"></span>' : ""
-        }${row.refs}<span class="commitMessage">${row.message ?? "message"}</span></td><td>date</td><td>author</td><td>hash</td></tr>`
-    )
+    .map((row, index) => {
+      const hashAttr = row.hash === undefined ? "" : ` data-hash="${row.hash}"`;
+      const tabIndexAttr = row.tabIndex === undefined ? "" : ` tabindex="${row.tabIndex}"`;
+      return `<tr class="commit" data-id="${index}" data-color="${row.color ?? 0}"${hashAttr}${tabIndexAttr}><td></td><td>${
+        row.head === true ? '<span class="commitHeadDot"></span>' : ""
+      }${row.refs}<span class="commitMessage">${row.message ?? "message"}</span></td><td>date</td><td>author</td><td>hash</td></tr>`;
+    })
     .join("");
   container.innerHTML = `<table>${header}${body}</table>`;
   document.body.appendChild(container);
@@ -263,14 +282,14 @@ function buildTable(rows: readonly RowSpec[]): HTMLTableElement {
 
 const controllers: RefOverflowController[] = [];
 
-function createController(): {
+function createController(extra: Partial<RefOverflowOptions> = {}): {
   controller: RefOverflowController;
   onMinimumWidth: ReturnType<typeof vi.fn>;
   onRefContextMenu: ReturnType<typeof vi.fn>;
 } {
   const onMinimumWidth = vi.fn();
   const onRefContextMenu = vi.fn();
-  const controller = new RefOverflowController({ onMinimumWidth, onRefContextMenu });
+  const controller = new RefOverflowController({ onMinimumWidth, onRefContextMenu, ...extra });
   controllers.push(controller);
   return { controller, onMinimumWidth, onRefContextMenu };
 }
@@ -339,7 +358,8 @@ beforeEach(() => {
     counterOuter: () => AC01_COUNTER,
     zero: false,
     counterRect: { left: 100, top: 200, bottom: 220 },
-    popupSize: { width: 200, height: 150 }
+    popupSize: { width: 200, height: 150 },
+    onMeasureRef: null
   };
   measuredCounterTexts.length = 0;
   measureRoots = [];
@@ -1429,12 +1449,12 @@ describe("RefOverflowController hidden-badge list", () => {
     // When: the list is opened
     const popup = openCounter(table);
 
-    // Then: neither the class nor any id is copied
+    // Then: neither the class nor any id is copied; the list carries only its own fixed id
     expect(popup.querySelector('[data-name="wt-3"]')!.classList.contains("contextMenuActive")).toBe(
       false
     );
     expect(popup.querySelectorAll("[id]")).toHaveLength(0);
-    expect(popup.id).toBe("");
+    expect(popup.id).toBe("refOverflowPopup");
   });
 
   it("keeps the search marks of the hidden refs (TC-065)", () => {
@@ -1937,8 +1957,8 @@ describe("RefOverflowController.syncSearchHighlights", () => {
     expect(popups()).toHaveLength(0);
   });
 
-  it("re-clones an open list after hiding its menu (TC-092)", () => {
-    // Case: TC-092 (AC-09)
+  it("re-clones an open list without closing its menu (TC-092 superseded by S6 TC-102)", () => {
+    // Case: TC-102 (K36 / A8.3-3); replaces S5 TC-092, which expected one hideContextMenu call
     // Given: an open list with wt-3 marked and a menu opened from its clone
     const { controller, table } = setupTable([{ refs: ac01Refs(), head: true }]);
     const cell = descriptionCell(table);
@@ -1947,19 +1967,15 @@ describe("RefOverflowController.syncSearchHighlights", () => {
     const popup = openCounter(table);
     const oldClone = popup.querySelector<HTMLElement>('[data-name="wt-3"]')!;
     oldClone.classList.add("contextMenuActive");
-    let cloneAttachedWhenHidden: boolean | null = null;
-    vi.mocked(hideContextMenu).mockImplementation(() => {
-      cloneAttachedWhenHidden = oldClone.isConnected;
-    });
 
     // When: the mark moves from wt-3 to wt-5 and highlights are synchronised
     unmarkAll(cell);
     markName(cell, "wt-5");
     controller.syncSearchHighlights();
 
-    // Then: the menu was hidden before the old clones were replaced; the same list shows new marks
-    expect(hideContextMenu).toHaveBeenCalledTimes(1);
-    expect(cloneAttachedWhenHidden).toBe(true);
+    // Then: the menu stays open; the same list shows the new marks only
+    expect(hideContextMenu).not.toHaveBeenCalled();
+    expect(oldClone.isConnected).toBe(false);
     expect(popups()).toEqual([popup]);
     expect(popup.querySelectorAll('[data-name="wt-3"] .findMatch')).toHaveLength(0);
     expect(popup.querySelectorAll('[data-name="wt-5"] .findMatch')).toHaveLength(1);
@@ -2049,5 +2065,589 @@ describe("RefOverflowController.syncSearchHighlights", () => {
     const counter = counters(cell)[0];
     expect(counter.textContent).toBe("+3");
     expect(counter.classList.contains("refOverflowMatch")).toBe(false);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S6: keyboard reach, list movement, exits, restore and search sync  */
+/* ------------------------------------------------------------------ */
+
+const S6_REPO = "/s6/repo";
+const S6_HASH = "s6-hash";
+const S6_OTHER_HASH = "s6-other";
+const S6_STASH_HASH = "s6-stash-hash";
+const S6_WORKTREE_PATH = "/tmp/wt8";
+// Only the first badge fits next to the counter (B = 420: 360 + 30.7); the rest is folded.
+const S6_FIRST_BADGE = 360;
+const S6_NARROW_BADGE = 50;
+const S6_TAB_STOP = 0;
+const S6_PROGRAMMATIC = -1;
+const CLASS_MENU_ACTIVE = "contextMenuActive";
+const REF_BUTTON_SELECTOR = ".gitRef button";
+
+// A row whose first badge is the only one that fits, so a combined head, a stash, a detached
+// worktree and a tag are folded into the list (Task 7 implementation item 1 fixture).
+function s6Refs(): string {
+  return [
+    headRef("long"),
+    headRef("feature", { remotes: ["origin"] }),
+    stashRef("@{0}", S6_STASH_HASH),
+    detachedRef(S6_WORKTREE_PATH, "wt8"),
+    tagRef("v1.0")
+  ].join("");
+}
+
+const S6_WIDTHS: Readonly<Record<string, number>> = {
+  long: S6_FIRST_BADGE,
+  feature: S6_NARROW_BADGE,
+  "@{0}": S6_NARROW_BADGE,
+  [S6_WORKTREE_PATH]: S6_NARROW_BADGE,
+  "v1.0": S6_NARROW_BADGE
+};
+
+// Mirrors main's key derivation: the row's hash plus the part's type and full name.
+function s6Key(part: HTMLElement): FocusKey {
+  const badge = part.closest<HTMLElement>(".gitRef")!;
+  const hash = part.closest<HTMLElement>("tr[data-hash]")!.dataset.hash!;
+  const base = { kind: "ref", repo: S6_REPO, hash } as const;
+  if (badge.classList.contains("stash")) {
+    return { ...base, refType: "stash", name: badge.getAttribute("data-stash-hash")! };
+  }
+  if (badge.classList.contains("detachedWorktree")) {
+    return { ...base, refType: "worktree", name: badge.dataset.worktreePath! };
+  }
+  if (part.classList.contains("gitRefHeadRemote")) {
+    return { ...base, refType: "remote", name: part.dataset.name! };
+  }
+  if (badge.classList.contains("tag"))
+    return { ...base, refType: "tag", name: badge.dataset.name! };
+  const refType = badge.classList.contains("remote") ? "remote" : "head";
+  return { ...base, refType, name: badge.dataset.name! };
+}
+
+function markTable(table: HTMLTableElement): void {
+  table.querySelectorAll<HTMLElement>("tr[data-hash]").forEach((row) => {
+    markFocusTarget(row, { kind: "row", repo: S6_REPO, hash: row.dataset.hash! });
+    row.querySelectorAll<HTMLElement>(REF_BUTTON_SELECTOR).forEach((part) => {
+      markFocusTarget(part, s6Key(part));
+    });
+  });
+}
+
+interface KeyboardFixture {
+  controller: RefOverflowController;
+  table: HTMLTableElement;
+  onRefContextMenu: ReturnType<typeof vi.fn>;
+  before: HTMLButtonElement;
+  after: HTMLButtonElement;
+}
+
+let disposeContext: (() => void) | null = null;
+let s6TabStops: () => HTMLElement[] = () => [];
+let s6ActiveRow: () => HTMLElement | null = () => null;
+
+// The row target lives in main; here the context returns the given row and tab stops.
+function setupKeyboardTable(rows: readonly RowSpec[]): KeyboardFixture {
+  const before = document.createElement("button");
+  before.id = "refreshBtn";
+  before.textContent = "before";
+  document.body.appendChild(before);
+  const created = createController({
+    onRefCloned: (original, clone) => markFocusTarget(clone, s6Key(original))
+  });
+  const table = buildTable(rows);
+  markTable(table);
+  const after = document.createElement("button");
+  after.id = "afterList";
+  after.textContent = "after";
+  document.body.appendChild(after);
+  s6ActiveRow = () => table.querySelector<HTMLElement>('tr[tabindex="0"]');
+  s6TabStops = () => {
+    const counter = counters(descriptionCell(table))[0] ?? null;
+    return [before, counter, after].filter((stop): stop is HTMLElement => stop !== null);
+  };
+  disposeContext?.();
+  disposeContext = configureFocusContext({
+    getRepo: () => S6_REPO,
+    getActiveRow: () => s6ActiveRow(),
+    getTabStops: () => s6TabStops()
+  });
+  created.controller.attachTable(table);
+  flushFrames();
+  return { ...created, table, before, after };
+}
+
+function foldedRow(hash = S6_HASH, tabIndex = S6_TAB_STOP): RowSpec {
+  return { refs: s6Refs(), head: true, hash, tabIndex };
+}
+
+function press(target: EventTarget, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+  const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init });
+  target.dispatchEvent(event);
+  return event;
+}
+
+function release(target: EventTarget, key: string): void {
+  target.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true, cancelable: true }));
+}
+
+function listButtons(popup: HTMLElement): HTMLElement[] {
+  return Array.from(popup.querySelectorAll<HTMLElement>(REF_BUTTON_SELECTOR));
+}
+
+function clonePart(popup: HTMLElement, selector: string): HTMLElement {
+  const part = popup.querySelector<HTMLElement>(selector);
+  if (part === null) throw new Error(`no listed part for ${selector}`);
+  return part;
+}
+
+function focusedCloneOf(table: HTMLTableElement, selector: string): HTMLElement {
+  const popup = openCounter(table);
+  const part = clonePart(popup, selector);
+  part.focus();
+  expect(document.activeElement).toBe(part);
+  return part;
+}
+
+// @see docs/testing/perspectives/web/refOverflow-test.md
+describe("RefOverflowController keyboard reach, movement, exits and restore (S6)", () => {
+  beforeEach(() => {
+    fixture.badgeOuter = { ...S6_WIDTHS };
+  });
+
+  afterEach(() => {
+    disposeContext?.();
+    disposeContext = null;
+  });
+
+  it("launches the remote part of a listed combined badge by its full name (TC-099)", () => {
+    // Case: TC-099 (K35 / A8.1-5)
+    // Given: the folded row with feature | origin hidden, its listed remote part focused
+    const { table, onRefContextMenu } = setupKeyboardTable([foldedRow()]);
+    const remotePart = focusedCloneOf(table, '[data-name="feature"] .gitRefHeadRemote');
+    const counter = counters(descriptionCell(table))[0];
+
+    // When: Enter is pressed on the remote part
+    const event = press(remotePart, "Enter");
+
+    // Then: one launch carrying the clone badge, the remote part as target and the list's exit options
+    expect(onRefContextMenu).toHaveBeenCalledTimes(1);
+    const [trigger, badge, focusOptions] = onRefContextMenu.mock.calls[0] as [
+      KeyboardEvent,
+      HTMLElement,
+      ContextMenuFocusOptions
+    ];
+    expect(trigger).toBe(event);
+    expect(badge).toBe(remotePart.closest(".gitRef"));
+    expect(badge.dataset.name).toBe("feature");
+    const resolvedRemote = (trigger.target as Element).closest<HTMLElement>(".gitRefHeadRemote");
+    expect(resolvedRemote?.dataset.name).toBe("origin/feature");
+    expect(focusOptions.tabOrigin).toBe(counter);
+    expect(typeof focusOptions.onTabExit).toBe("function");
+    expect(event.defaultPrevented).toBe(true);
+    expect(vscode.postMessage).not.toHaveBeenCalled();
+  });
+
+  it("launches a listed stash clone by its hash on Space (TC-100)", () => {
+    // Case: TC-100 (K35 / A8.1-5)
+    // Given: the listed stash clone focused
+    const { table, onRefContextMenu } = setupKeyboardTable([foldedRow()]);
+    const stashPart = focusedCloneOf(table, ".gitRef.stash button");
+
+    // When: Space is pressed
+    press(stashPart, " ");
+
+    // Then: one launch whose badge carries the original stash hash
+    expect(onRefContextMenu).toHaveBeenCalledTimes(1);
+    const badge = onRefContextMenu.mock.calls[0][1] as HTMLElement;
+    expect(badge.getAttribute("data-stash-hash")).toBe(S6_STASH_HASH);
+    expect(badge).not.toBe(descriptionCell(table).querySelector(".gitRef.stash"));
+  });
+
+  it("launches a listed detached worktree clone by its path (TC-101)", () => {
+    // Case: TC-101 (K35 / A8.1-5)
+    // Given: the listed detached worktree clone focused
+    const { table, onRefContextMenu } = setupKeyboardTable([foldedRow()]);
+    const worktreePart = focusedCloneOf(table, ".gitRef.detachedWorktree button");
+
+    // When: Enter is pressed
+    press(worktreePart, "Enter");
+
+    // Then: one launch whose badge keeps the path and the detached class
+    expect(onRefContextMenu).toHaveBeenCalledTimes(1);
+    const badge = onRefContextMenu.mock.calls[0][1] as HTMLElement;
+    expect(badge.dataset.worktreePath).toBe(S6_WORKTREE_PATH);
+    expect(badge.classList.contains("detachedWorktree")).toBe(true);
+  });
+
+  it("keeps focus and the open menu through a search re-clone (TC-102)", () => {
+    // Case: TC-102 (K36 / A8.3-3); replaces S5 TC-092
+    // Given: a focused clone from which a menu was opened, and a search mark on another ref
+    const { controller, table, onRefContextMenu } = setupKeyboardTable([foldedRow()]);
+    const cell = descriptionCell(table);
+    onRefContextMenu.mockImplementation((_event: KeyboardEvent, badge: HTMLElement) => {
+      badge.classList.add(CLASS_MENU_ACTIVE);
+    });
+    const oldPart = focusedCloneOf(table, '[data-name="v1.0"] button');
+    press(oldPart, "Enter");
+    expect(oldPart.closest(".gitRef")!.classList.contains(CLASS_MENU_ACTIVE)).toBe(true);
+    const popup = popups()[0];
+
+    // When: the original feature label gains a search mark and highlights are synchronised
+    markName(cell, "feature");
+    controller.syncSearchHighlights();
+
+    // Then: the new clone with the same key holds focus, the menu was not hidden, marks match
+    const newPart = clonePart(popup, '[data-name="v1.0"] button');
+    expect(newPart).not.toBe(oldPart);
+    expect(oldPart.isConnected).toBe(false);
+    expect(document.activeElement).toBe(newPart);
+    expect(hideContextMenu).not.toHaveBeenCalled();
+    expect(popup.querySelectorAll('[data-name="feature"] .findMatch')).toHaveLength(1);
+    expect(counters(cell)[0].classList.contains("refOverflowMatch")).toBe(true);
+
+    // When: the list closes while that menu is still marked on the old clone
+    controller.closePopup();
+
+    // Then: the list-origin menu is hidden exactly once
+    expect(hideContextMenu).toHaveBeenCalledTimes(1);
+  });
+
+  it.each([
+    { variant: "counter kept", allFit: false, moveAway: false },
+    { variant: "counter removed", allFit: true, moveAway: false },
+    { variant: "focus already outside", allFit: false, moveAway: true }
+  ])("restores after a width-change close: $variant (TC-103)", (entry) => {
+    // Case: TC-103 (K36 / A8.3-1)
+    // Given: a focused clone, then a real description width change
+    const { table, before } = setupKeyboardTable([foldedRow()]);
+    focusedCloneOf(table, '[data-name="v1.0"] button');
+    const row = table.querySelector<HTMLElement>(`tr[data-hash="${S6_HASH}"]`)!;
+    const counter = counters(descriptionCell(table))[0];
+    if (entry.moveAway) {
+      before.focus();
+      expect(document.activeElement).toBe(before);
+    }
+    fixture.headerWidth = 1234;
+    if (entry.allFit) fixture.cellWidth = cellWidthFor(5000);
+
+    // When: the header resize is reported and the layout runs
+    latestObserver().notify();
+    expect(popups()).toHaveLength(0);
+    flushFrames();
+
+    // Then: focus is on the counter, on the row once the counter is gone, or untouched
+    if (entry.moveAway) {
+      expect(document.activeElement).toBe(before);
+    } else if (entry.allFit) {
+      expect(counter.isConnected).toBe(false);
+      expect(document.activeElement).toBe(row);
+    } else {
+      expect(document.activeElement).toBe(counter);
+    }
+  });
+
+  it("keeps hidden originals and measuring clones out of the tab order (TC-104)", () => {
+    // Case: TC-104 (K36 / A8.1-5)
+    // Given: the folded row of a target row; measuring clones are observed while attached
+    const measured: { ariaHidden: string | null; tabIndexes: string[] }[] = [];
+    fixture.onMeasureRef = (clone) => {
+      measured.push({
+        ariaHidden: clone.closest(".refOverflowMeasure")!.getAttribute("aria-hidden"),
+        tabIndexes: Array.from(clone.querySelectorAll("button")).map(
+          (part) => part.getAttribute("tabindex") ?? ""
+        )
+      });
+    };
+    const { table } = setupKeyboardTable([foldedRow()]);
+    const cell = descriptionCell(table);
+
+    // Then: hidden originals' parts are programmatic only, visible ones are tab stops
+    const hidden = directRefs(cell).filter((ref) => ref.classList.contains("refOverflowHidden"));
+    expect(hidden.length).toBeGreaterThan(0);
+    for (const ref of hidden) {
+      for (const part of ref.querySelectorAll("button")) {
+        expect(part.getAttribute("tabindex")).toBe(String(S6_PROGRAMMATIC));
+      }
+    }
+    expect(
+      Array.from(cell.querySelectorAll<HTMLElement>(`.gitRef:not(.refOverflowHidden) button`)).map(
+        (part) => part.tabIndex
+      )
+    ).toEqual([S6_TAB_STOP]);
+    expect(measured.length).toBeGreaterThan(0);
+    for (const entry of measured) {
+      expect(entry.ariaHidden).toBe("true");
+      for (const tabIndex of entry.tabIndexes) expect(tabIndex).toBe(String(S6_PROGRAMMATIC));
+    }
+
+    // When: the column widens so every ref fits again
+    fixture.cellWidth = cellWidthFor(5000);
+    fixture.headerWidth = 5000;
+    latestObserver().notify();
+    flushFrames();
+
+    // Then: the re-shown parts follow the target row's tabindex and each key is focusable once
+    expect(counters(cell)).toHaveLength(0);
+    const parts = Array.from(cell.querySelectorAll<HTMLElement>(REF_BUTTON_SELECTOR));
+    expect(parts.length).toBe(6);
+    for (const part of parts) expect(part.tabIndex).toBe(S6_TAB_STOP);
+    expect(document.querySelectorAll('[data-focus-target][tabindex="0"]')).toHaveLength(6);
+  });
+
+  it("moves between listed labels with the arrows and stops at the ends (TC-105)", () => {
+    // Case: TC-105 (K37 / A8.3-4)
+    // Given: the open list with its first label focused
+    const { table } = setupKeyboardTable([foldedRow()]);
+    const popup = openCounter(table);
+    const parts = listButtons(popup);
+    expect(parts.length).toBe(5);
+    parts[0].focus();
+
+    // When / Then: ArrowUp at the start stays, ArrowDown walks down, ArrowDown at the end stays
+    expect(press(parts[0], "ArrowUp").defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(parts[0]);
+    expect(press(parts[0], "ArrowDown").defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(parts[1]);
+    expect(press(parts[1], "ArrowUp").defaultPrevented).toBe(true);
+    expect(document.activeElement).toBe(parts[0]);
+    parts[4].focus();
+    press(parts[4], "ArrowDown");
+    expect(document.activeElement).toBe(parts[4]);
+    expect(popups()).toEqual([popup]);
+  });
+
+  it("jumps to the first and last listed label with Home and End (TC-106)", () => {
+    // Case: TC-106 (K37)
+    // Given: the open list with a middle label focused
+    const { table } = setupKeyboardTable([foldedRow()]);
+    const popup = openCounter(table);
+    const parts = listButtons(popup);
+    parts[2].focus();
+
+    // When / Then: End reaches the last label, Home the first
+    press(parts[2], "End");
+    expect(document.activeElement).toBe(parts[parts.length - 1]);
+    press(parts[parts.length - 1], "Home");
+    expect(document.activeElement).toBe(parts[0]);
+  });
+
+  it.each(["Enter", " "])(
+    "opens the list from the counter with %j and focuses its first label (TC-107)",
+    (key) => {
+      // Case: TC-107 (K37 / A8.1-5)
+      // Given: the counter focused and a row click listener
+      const { table } = setupKeyboardTable([foldedRow()]);
+      const row = table.querySelector<HTMLElement>(`tr[data-hash="${S6_HASH}"]`)!;
+      const rowClick = vi.fn();
+      row.addEventListener("click", rowClick);
+      const counter = counters(descriptionCell(table))[0];
+      counter.focus();
+
+      // When: the key is pressed and released
+      const event = press(counter, key);
+      release(document.activeElement ?? counter, key);
+
+      // Then: one list, its first label focused, the counter expanded, no second toggle, no row click
+      expect(event.defaultPrevented).toBe(true);
+      expect(popups()).toHaveLength(1);
+      expect(document.activeElement).toBe(listButtons(popups()[0])[0]);
+      expect(counter.getAttribute("aria-expanded")).toBe("true");
+      expect(counter.getAttribute("aria-controls")).toBe(popups()[0].id);
+      expect(rowClick).not.toHaveBeenCalled();
+    }
+  );
+
+  it("closes the list on Escape and returns to the counter (TC-108)", () => {
+    // Case: TC-108 (K37 / A8.3-4)
+    // Given: a focused listed label
+    const { table } = setupKeyboardTable([foldedRow()]);
+    const part = focusedCloneOf(table, '[data-name="v1.0"] button');
+    const counter = counters(descriptionCell(table))[0];
+    const documentEscape = vi.fn();
+    document.addEventListener("keydown", documentEscape);
+
+    // When: Escape is pressed and released
+    const event = press(part, "Escape");
+    release(document.activeElement ?? part, "Escape");
+
+    // Then: the list is gone, the counter has focus and is collapsed, the keydown did not bubble
+    expect(popups()).toHaveLength(0);
+    expect(document.activeElement).toBe(counter);
+    expect(counter.getAttribute("aria-expanded")).toBe("false");
+    expect(counter.hasAttribute("aria-controls")).toBe(false);
+    expect(event.defaultPrevented).toBe(true);
+    expect(documentEscape).not.toHaveBeenCalled();
+    document.removeEventListener("keydown", documentEscape);
+  });
+
+  it.each([
+    { direction: "Tab", shiftKey: false, pick: (f: KeyboardFixture) => f.after },
+    { direction: "Shift+Tab", shiftKey: true, pick: (f: KeyboardFixture) => f.before }
+  ])("closes the list on $direction and continues past the counter (TC-109)", (entry) => {
+    // Case: TC-109 (K37 / A8.3-4)
+    // Given: a focused listed label and tab stops around the counter
+    const created = setupKeyboardTable([foldedRow()]);
+    const part = focusedCloneOf(created.table, '[data-name="v1.0"] button');
+    const counter = counters(descriptionCell(created.table))[0];
+
+    // When: Tab or Shift+Tab is pressed
+    const event = press(part, "Tab", { shiftKey: entry.shiftKey });
+
+    // Then: the list is gone and focus sits on the counter's neighbour, not on the counter
+    expect(popups()).toHaveLength(0);
+    expect(document.activeElement).toBe(entry.pick(created));
+    expect(document.activeElement).not.toBe(counter);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it.each([
+    { reason: "tab" as const, outside: false },
+    { reason: "replace" as const, outside: false },
+    { reason: undefined, outside: false },
+    { reason: "tab" as const, outside: true },
+    { reason: "replace" as const, outside: true },
+    { reason: undefined, outside: true }
+  ])(
+    "does not restore focus for closePopup($reason) with focus outside: $outside (TC-110)",
+    (entry) => {
+      // Case: TC-110 (§3.5 / Task 7 item 5)
+      // Given: a menu opened from a focused clone by Enter, focus optionally moved to the toolbar
+      const { controller, table, onRefContextMenu, before } = setupKeyboardTable([foldedRow()]);
+      onRefContextMenu.mockImplementation((_event: KeyboardEvent, badge: HTMLElement) => {
+        badge.classList.add(CLASS_MENU_ACTIVE);
+      });
+      const part = focusedCloneOf(table, '[data-name="v1.0"] button');
+      press(part, "Enter");
+      const counter = counters(descriptionCell(table))[0];
+      if (entry.outside) before.focus();
+      const activeBefore = document.activeElement;
+
+      // When: the list is closed with the reason
+      const closed = controller.closePopup(entry.reason);
+
+      // Then: list and menu are gone, focus was not moved to the counter, a second close is false
+      expect(closed).toBe(true);
+      expect(popups()).toHaveLength(0);
+      expect(hideContextMenu).toHaveBeenCalledTimes(1);
+      expect(document.activeElement).not.toBe(counter);
+      if (entry.outside) expect(document.activeElement).toBe(activeBefore);
+      expect(controller.closePopup(entry.reason)).toBe(false);
+    }
+  );
+
+  it("resolves a duplicated ref name to the row that owns the list (TC-111)", () => {
+    // Case: TC-111 (A8.3-1)
+    // Given: two rows hiding a ref named topic, the second row's list open on its topic clone
+    // Neither badge fits with the counter, so both rows fold long and topic.
+    fixture.badgeOuter = { long: 400, topic: S6_NARROW_BADGE };
+    const refs = headRef("long") + headRef("topic");
+    const { controller, table } = setupKeyboardTable([
+      { refs, head: true, hash: S6_OTHER_HASH, tabIndex: S6_PROGRAMMATIC },
+      { refs, head: true, hash: S6_HASH, tabIndex: S6_TAB_STOP }
+    ]);
+    const popup = openCounter(table, 1);
+    const part = clonePart(popup, '[data-name="topic"] button');
+    part.focus();
+
+    // When: the list is re-cloned by a search sync
+    controller.syncSearchHighlights();
+
+    // Then: focus is on the second row's new topic clone, not on any element of the first row
+    const active = document.activeElement as HTMLElement;
+    expect(active).not.toBe(part);
+    expect(active.closest(".refOverflowPopup")).toBe(popup);
+    expect(active.dataset.name ?? active.closest<HTMLElement>(".gitRef")!.dataset.name).toBe(
+      "topic"
+    );
+    expect(table.rows[1].contains(active)).toBe(false);
+  });
+
+  it("names and links the list, its clones and the counter (TC-112)", () => {
+    // Case: TC-112 (R4.3 / R4.8)
+    // Given: the folded row
+    const { table } = setupKeyboardTable([foldedRow()]);
+    const cell = descriptionCell(table);
+    const counter = counters(cell)[0];
+    expect(counter.getAttribute("aria-haspopup")).toBe("true");
+    expect(counter.getAttribute("aria-expanded")).toBe("false");
+
+    // When: the list is opened
+    const popup = openCounter(table);
+
+    // Then: the list is a labelled group the counter controls; clones repeat the originals' names
+    expect(popup.getAttribute("role")).toBe("group");
+    expect(popup.id).not.toBe("");
+    expect(popup.getAttribute("aria-label")).toBe(counter.getAttribute("aria-label"));
+    expect(counter.getAttribute("aria-controls")).toBe(popup.id);
+    expect(popup.hasAttribute("data-ref-overflow-ignore")).toBe(true);
+    const hiddenParts = Array.from(
+      cell.querySelectorAll<HTMLElement>(".gitRef.refOverflowHidden button")
+    );
+    const cloneParts = listButtons(popup);
+    expect(cloneParts.map((part) => part.textContent)).toEqual(
+      hiddenParts.map((part) => part.textContent)
+    );
+    for (const part of cloneParts) {
+      expect(part.tagName).toBe("BUTTON");
+      expect(part.getAttribute("type")).toBe("button");
+      expect(part.textContent).not.toBe("");
+    }
+    for (const icon of popup.querySelectorAll(".codicon")) expect(icon.textContent).toBe("");
+  });
+
+  it("closes with replace on a table swap and leaves the final restore to the owner's ticket (TC-113)", () => {
+    // Case: TC-113 (Task 7 item 5)
+    // Given: a focused clone whose menu is open, and the owner's ticket taken before the swap
+    const { controller, table } = setupKeyboardTable([foldedRow()]);
+    const container = table.parentElement!;
+    const part = focusedCloneOf(table, '[data-name="v1.0"] button');
+    part.classList.add(CLASS_MENU_ACTIVE);
+    const update = beginFocusUpdate(container);
+    expect(update).not.toBeNull();
+
+    // When: the table is replaced by a new one and the controller attaches it
+    table.remove();
+    const replacement = buildTable([foldedRow()]);
+    container.appendChild(replacement);
+    markTable(replacement);
+    controller.attachTable(replacement);
+
+    // Then: the list closed its menu once and performed no intermediate restore (focus fell to
+    // body); the owner's ticket then resolves the key on the new table, before the layout runs
+    expect(popups()).toHaveLength(0);
+    expect(part.isConnected).toBe(false);
+    expect(hideContextMenu).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(document.body);
+    expect(finishFocusUpdate(update)).toBe(true);
+    const restored = document.activeElement as HTMLElement;
+    expect(replacement.contains(restored)).toBe(true);
+    expect(restored.closest<HTMLElement>(".gitRef")!.dataset.name).toBe("v1.0");
+
+    // When: the new table is laid out and folds that label away again
+    flushFrames();
+
+    // Then: focus continues at the counter that now stands for it
+    expect(document.activeElement).toBe(counters(descriptionCell(replacement))[0]);
+  });
+
+  it("runs nothing from a kept clone after the repository switched (TC-114)", () => {
+    // Case: TC-114 (A8.3-5)
+    // Given: a clone kept from the list of the previous table
+    const { controller, table, onRefContextMenu } = setupKeyboardTable([foldedRow()]);
+    const part = focusedCloneOf(table, '[data-name="v1.0"] button');
+
+    // When: the table is detached and another one attached, then the kept clone gets Enter
+    controller.detachTable();
+    const other = buildTable([foldedRow(S6_OTHER_HASH)]);
+    markTable(other);
+    controller.attachTable(other);
+    flushFrames();
+    press(part, "Enter");
+    part.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+
+    // Then: no launch and no list
+    expect(onRefContextMenu).not.toHaveBeenCalled();
+    expect(popups()).toHaveLength(0);
   });
 });

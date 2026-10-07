@@ -456,6 +456,16 @@ function fire(target: Element | Document, type: string, init: MouseEventInit = {
   return event;
 }
 
+// The menu source is the badge's operable button (061-05 Task 7): the part the event hit, else
+// the badge's first part; row-level sources stay the row itself.
+function menuSourceOf(target: Element): Element {
+  const badge = target.closest(".gitRef");
+  if (badge === null) return target;
+  return (
+    target.closest("button.gitRefButton") ?? badge.querySelector("button.gitRefButton") ?? badge
+  );
+}
+
 function openList(rowIndex = 0): HTMLElement {
   const counter = descriptionCell(rowIndex).querySelector(":scope > button.refOverflowCounter")!;
   fire(counter, "click");
@@ -1131,7 +1141,7 @@ describe("ref badge right-click from the row and the list (S57)", () => {
     );
     const showArgs = vi.mocked(contextMenu.showContextMenu).mock.calls[0];
     expect(showArgs[1]).toBe(MENU_ITEMS);
-    expect(showArgs[2]).toBe(badge);
+    expect(showArgs[2]).toBe(menuSourceOf(badge));
   });
 
   it("selects the remote of a combined badge (TC-446)", () => {
@@ -1179,10 +1189,12 @@ describe("ref badge right-click from the row and the list (S57)", () => {
       (list) => list.querySelector('[data-name="feature/x"]')!
     );
 
-    // Then: every argument but the source element matches, and the clone is the menu source
+    // Then: every argument but the source element matches, and the clone's button is the menu source
     expect(withoutSource(result.list)).toEqual(withoutSource(result.row));
     expect(result.list[2]).toBe(result.clone);
-    expect(vi.mocked(contextMenu.showContextMenu).mock.calls[0][2]).toBe(result.clone);
+    expect(vi.mocked(contextMenu.showContextMenu).mock.calls[0][2]).toBe(
+      menuSourceOf(result.clone)
+    );
   });
 
   it("selects the remote of a listed combined badge (TC-450)", () => {
@@ -1244,7 +1256,7 @@ describe("ref badge right-click from the row and the list (S57)", () => {
     expect(rowBuilderArgs[3]).toBe(row);
     expect(contextMenu.showContextMenu).toHaveBeenCalledTimes(1);
     const rowShowArgs = vi.mocked(contextMenu.showContextMenu).mock.calls[0];
-    expect(rowShowArgs[2]).toBe(rowBadge);
+    expect(rowShowArgs[2]).toBe(menuSourceOf(rowBadge));
     expect(rowShowArgs[3]).toEqual(RECENT_ACTIONS);
     expect(refMenu.buildRefContextMenuItems).not.toHaveBeenCalled();
     expect(worktreeMenu.buildDetachedWorktreeContextMenuItems).not.toHaveBeenCalled();
@@ -1267,7 +1279,7 @@ describe("ref badge right-click from the row and the list (S57)", () => {
     expect(listBuilderArgs[3]).toBe(row);
     expect(contextMenu.showContextMenu).toHaveBeenCalledTimes(1);
     const listShowArgs = vi.mocked(contextMenu.showContextMenu).mock.calls[0];
-    expect(listShowArgs[2]).toBe(clone);
+    expect(listShowArgs[2]).toBe(menuSourceOf(clone));
     expect(listShowArgs[3]).toEqual(RECENT_ACTIONS);
     expect(refMenu.buildRefContextMenuItems).not.toHaveBeenCalled();
     expect(worktreeMenu.buildDetachedWorktreeContextMenuItems).not.toHaveBeenCalled();
@@ -1326,6 +1338,45 @@ describe("listed badge operations through the real context menu (S57)", () => {
     const payload = postedMessages("removeWorktree")[0];
     return { dialogHtml, payload: { payload, listOpenWithMenu, listOpenAfterItem } };
   }
+
+  // @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-02.md
+  it("passes the list's focus options on a keyboard launch from a clone (TC-725)", () => {
+    // Case: TC-725 (K37); S75 owner case placed here because this file wires the real menu spy
+    // Given: the in-row menu of feature/x as the reference, then its listed clone focused
+    const titlesOf = (items: unknown): (string | null)[] =>
+      (items as ContextMenuElement[]).map((item) => (item === null ? null : item.title));
+    fire(inRow("feature/x"), "contextmenu");
+    const rowTitles = titlesOf(vi.mocked(contextMenu.showContextMenu).mock.calls[0][1]);
+    contextMenu.hideContextMenu();
+    vi.clearAllMocks();
+    const list = openList(0);
+    const counter = descriptionCell(0).querySelector("button.refOverflowCounter");
+    const part = list.querySelector<HTMLElement>('[data-name="feature/x"] button.gitRefButton')!;
+    part.focus();
+
+    // When: Shift+F10 is pressed on the clone
+    const event = new KeyboardEvent("keydown", {
+      key: "F10",
+      shiftKey: true,
+      bubbles: true,
+      cancelable: true
+    });
+    part.dispatchEvent(event);
+
+    // Then: the same menu opens from the clone with the counter as Tab origin; onTabExit closes the list
+    expect(contextMenu.showContextMenu).toHaveBeenCalledTimes(1);
+    const [trigger, items, source, , focusOptions] = vi.mocked(contextMenu.showContextMenu).mock
+      .calls[0] as [unknown, unknown, unknown, unknown, ContextMenuFocusOptions];
+    expect(trigger).toBe(event);
+    expect(source).toBe(part);
+    expect(titlesOf(items)).toEqual(rowTitles);
+    expect(focusOptions.tabOrigin).toBe(counter);
+    expect(contextMenu.isContextMenuActive()).toBe(true);
+    expect(popups()).toEqual([list]);
+    focusOptions.onTabExit();
+    expect(popups()).toHaveLength(0);
+    contextMenu.hideContextMenu();
+  });
 
   it("runs More › Remove Worktree from the list exactly like from the row (TC-455)", () => {
     // Case: TC-455 (AC-03)
@@ -1496,7 +1547,7 @@ function openListWithMenu(): { list: HTMLElement; clone: HTMLElement } {
   const list = openList(0);
   const clone = list.children[0] as HTMLElement;
   fire(clone, "contextmenu");
-  expect(clone.classList.contains("contextMenuActive")).toBe(true);
+  expect(menuSourceOf(clone).classList.contains("contextMenuActive")).toBe(true);
   vi.clearAllMocks();
   return { list, clone };
 }
@@ -1854,14 +1905,15 @@ function stashLabelAt(stash: StashFixture, placement: Placement): HTMLElement {
   return placement === "row" ? rowStashLabel(stash) : listedStashClone(stash);
 }
 
-// Replaces the label's text node with a search mark, as the real FindWidget does for a match.
+// Replaces the text node of the label's button with a search mark, as the real FindWidget does.
 function wrapTextInFindMatch(label: HTMLElement): HTMLElement {
-  const text = Array.from(label.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
+  const part = requireElement(label.querySelector("button.gitRefButton"), "stash label button");
+  const text = Array.from(part.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
   if (text === undefined) throw new Error("stash label has no text node");
   const mark = document.createElement("span");
   mark.className = FIND_MATCH_CLASS;
   mark.textContent = text.textContent;
-  label.replaceChild(mark, text);
+  part.replaceChild(mark, text);
   return mark;
 }
 
@@ -1900,7 +1952,7 @@ function expectStashMenuFrom(stash: StashFixture, source: HTMLElement): void {
   expect(contextMenu.showContextMenu).toHaveBeenCalledTimes(1);
   const showArgs = vi.mocked(contextMenu.showContextMenu).mock.calls[0];
   expect(showArgs[1]).toBe(builder.results[0].value);
-  expect(showArgs[2]).toBe(source);
+  expect(showArgs[2]).toBe(menuSourceOf(source));
   expect(showArgs[3]).toEqual(RECENT_ACTIONS);
   expect(refMenu.buildRefContextMenuItems).not.toHaveBeenCalled();
   expect(worktreeMenu.buildDetachedWorktreeContextMenuItems).not.toHaveBeenCalled();
@@ -2445,7 +2497,7 @@ describe("stash label routing (S61)", () => {
       expect(other).not.toHaveBeenCalled();
       expect(stashMenu.buildStashContextMenuItems).not.toHaveBeenCalled();
       expect(contextMenu.showContextMenu).toHaveBeenCalledTimes(1);
-      expect(vi.mocked(contextMenu.showContextMenu).mock.calls[0][2]).toBe(badge);
+      expect(vi.mocked(contextMenu.showContextMenu).mock.calls[0][2]).toBe(menuSourceOf(target));
     }
   );
 
@@ -2646,7 +2698,7 @@ describe("stash label lifecycle and clicks (S61)", () => {
     const clone = listedStashClone(STASH_A);
     const list = popups()[0];
     fire(clone, "contextmenu");
-    expect(clone.classList.contains(CONTEXT_MENU_ACTIVE_CLASS)).toBe(true);
+    expect(menuSourceOf(clone).classList.contains(CONTEXT_MENU_ACTIVE_CLASS)).toBe(true);
     openMore();
     expect(popups()).toEqual([list]);
     vi.mocked(vscode.postMessage).mockClear();
@@ -2662,15 +2714,16 @@ describe("stash label lifecycle and clicks (S61)", () => {
     expect(vscode.postMessage).not.toHaveBeenCalled();
   });
 
-  it("closes the list menu when a find update regenerates the clones (TC-531)", async () => {
-    // Case: TC-531
+  it("keeps the list menu when a find update regenerates the clones (TC-531)", async () => {
+    // Case: TC-531; its "menu closes on re-clone" expectation is superseded by 061-05 R4.7 and
+    // web/refOverflow-test.md S6 TC-102: a clone-only DOM update keeps the open menu
     // Given: the real find widget open, the list and a menu opened from stash A's clone
     loadStashCommits(true);
     pressShortcut("f");
     const clone = listedStashClone(STASH_A);
     const list = popups()[0];
     fire(clone, "contextmenu");
-    expect(clone.classList.contains(CONTEXT_MENU_ACTIVE_CLASS)).toBe(true);
+    expect(menuSourceOf(clone).classList.contains(CONTEXT_MENU_ACTIVE_CLASS)).toBe(true);
     vi.clearAllMocks();
 
     // When: a search term is typed and the debounce elapses
@@ -2681,9 +2734,10 @@ describe("stash label lifecycle and clicks (S61)", () => {
       setTimeout(resolveSearch, findWidgetModule.SEARCH_DEBOUNCE_MS + 50)
     );
 
-    // Then: the old clone and the menu are gone, the list holds a new clone, nothing was requested
+    // Then: the old clone is gone, the menu stays open, the list holds a new clone, no request
     expect(clone.isConnected).toBe(false);
-    expect(contextMenu.isContextMenuActive()).toBe(false);
+    expect(contextMenu.isContextMenuActive()).toBe(true);
+    expect(contextMenu.hideContextMenu).not.toHaveBeenCalled();
     expect(popups()).toEqual([list]);
     const regenerated = requireElement(
       list.querySelector<HTMLElement>(STASH_LABEL_SELECTOR),
