@@ -55,7 +55,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
-> Status: active
+> Status: superseded
+> Superseded By: S72（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
 
 **シグネチャ**: `handleEscape(): void`

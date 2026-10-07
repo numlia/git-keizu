@@ -445,3 +445,39 @@ S1は層数を10定義に固定していたため、ref一覧層の追加で期�
 - Boundary: TC-100（手動）
 - Type: excluded(上表のとおり)
 - Normal: TC-095、TC-096、TC-098、TC-099（手動）
+
+## S9: フォーカス枠・操作対象の印・行状態の併記・focus-within と明暗 / ハイコントラストの実画面
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: -
+> Signature: `:focus-visible` の `outline: 2px solid var(--vscode-focusBorder)` を行の各 cell・参照 / ファイル / toolbar / バー / 整理 / 詳細 / メニュー項目 / 候補の操作要素へ適用する宣言 / 操作対象行の行頭矢印（`tr.commit.keyboardTarget td:first-child::before` 相当）/ 視覚非表示の説明 class（`.visuallyHidden` 相当）/ `.gitFile:focus-within .gitFileActions` / 既存 `commitDetailsOpen` / `compareTarget` / `current`（HEAD）/ `findMatch` class の維持
+> Target Path: `media/main.css`（フォーカス枠・操作対象・ファイル操作・行状態の宣言群。設計時のため実装後に行範囲へ更新）
+> Test File: `tests/web/keyboardStyles.test.ts`（TC-101〜TC-106）、実 VS Code Webview（TC-107〜TC-109）
+
+対応プラン §3.1・R4.8・Task 11 の観点。CSS は文字列として読み込み、対象セレクターの宣言を抽出して検証する。固定色による focus 表現を追加せず、`--vscode-focusBorder` だけを使う。2px はユーザー指定値で実測由来ではない。実画面の確認は手動 Case として VS Code 版・OS・テーマ名を記録し、自動テストの pass に含めない。
+
+| Case ID | Input / Precondition                                                                                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                          | Notes                                                             |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------- |
+| TC-101  | `media/main.css` から `:focus-visible` を含むルールの `outline` 宣言を抽出                                                                                    | Normal - 2px の focusBorder 枠                                             | 行（`tr.commit:focus-visible td` 相当）、参照 / counter / ファイル / folder / 詳細 / toolbar / バー / 整理 / メニュー項目の各操作セレクターに `outline: 2px solid var(--vscode-focusBorder)` があり、`outline-offset` を含めて行の cell 間で枠が連続する宣言になっている | K45 / R4.8                                                        |
+| TC-102  | `media/main.css` 全体の `outline` / `box-shadow` / `border` の色値を走査                                                                                      | Validation - 固定色の focus 表現を追加しない                               | focus 関連宣言の色が `var(--vscode-focusBorder)` だけで、`#`/`rgb(` の固定色が focus 系セレクターに 0 件                                                                                                                                                                 | Task 11 実装内容 2                                                |
+| TC-103  | 操作対象行のセレクター（`tr.commit.keyboardTarget` 相当）の宣言                                                                                               | Normal - 行頭の矢印と視覚非表示の説明                                      | 行頭 cell の `::before` に矢印の `content` があり、説明用 class が `position: absolute` / `width: 1px` / `height: 1px` / `overflow: hidden` / `clip` 系の視覚非表示宣言を持つ（`display: none` / `visibility: hidden` ではない）                                         | K45 / R4.8「色だけで区別せず」。読み上げには残す                  |
+| TC-104  | `.commitDetailsOpen` / `.compareTarget` / `.current` / `.findMatch` / `.fileHistoryCurrent` のセレクターの存在と宣言                                          | Validation - 既存状態 class を消さない                                     | 5 class のルールが S3 / S6 / S7 の既存宣言のまま存在し、操作対象の宣言と併用できる（同じ要素に複数状態が同時に見える宣言。背景と枠 / 矢印が別のプロパティ）                                                                                                              | R4.8「複数状態を同時に示す」                                      |
+| TC-105  | `.gitFile:hover .gitFileActions` と `.gitFile:focus-within .gitFileActions` の宣言                                                                            | Normal - hover と focus-within の同値                                      | 両セレクターが同じ表示宣言（`visibility` / `opacity` / `display`）を持つ                                                                                                                                                                                                 | K45 / R4.3「hoverでだけ見えるファイル操作はfocus-withinでも表示」 |
+| TC-106  | `[hidden]`、`:disabled`、`.refOverflowMeasure`、`.refOverflowHidden` の宣言                                                                                   | Validation - 非表示 / 無効 / 測定複製の停止点排除を表示で支える            | `[hidden]` が `display: none`、`:disabled` の操作に無効表示（`opacity` または色）があり、`.refOverflowMeasure` が視覚上レイアウト外（S5 の宣言維持）で `pointer-events: none`                                                                                            | Task 11 実装内容 2                                                |
+| TC-107  | 実 VS Code Webview（Light / Dark / High Contrast の 3 テーマ）で、`M` を操作対象、`N` の詳細、`N/R` 比較、HEAD = `M`、検索一致ありの状態を作り Tab で行へ入る | Normal - 明暗 / HC で状態が同時に判別できる（手動）                        | 3 テーマで、focus 枠（2px）、操作対象の矢印、詳細 / 比較 / HEAD / 検索の印が同じ画面で同時に判別でき、枠が行の全 cell で連続する。記録: VS Code 版、OS、テーマ名、スクリーンショット。全環境で同一の見た目は合格条件にしない                                             | K45 / A8.3-6。手動                                                |
+| TC-108  | 実 Webview で幅を 400px 程度に狭め、長い参照名（60 文字以上）の行で Tab / `+N` counter / 一覧を開く                                                           | Boundary - 狭幅・長い参照名（手動）                                        | 枠が要素の外へはみ出さず、省略一覧内でも各複製の枠が見え、counter の枠が消えない。記録: 幅、参照名の長さ                                                                                                                                                                 | K45 / A8.3-6。手動                                                |
+| TC-109  | 実 Webview でマウスなしに toolbar → 一覧 → 参照 → 詳細 → ファイル → 検索 → 整理 → 両バーを往復                                                                | Normal - 全操作の focus 表示（手動）                                       | 各操作要素で focus 枠が見え、hover でだけ見えていたファイル操作が focus-within でも見える。記録: 到達できなかった操作があれば列挙                                                                                                                                        | K45 / A8.1-6 / A8.3-6。手動                                       |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S9）
+
+| 失敗源                                                      | 対応ケースまたは除外理由                   |
+| ----------------------------------------------------------- | ------------------------------------------ |
+| 枠の欠落・不連続・固定色                                    | TC-101、TC-102                             |
+| 操作対象の印・説明の欠落、display none で読み上げから消える | TC-103                                     |
+| 既存状態 class の消失・併用不可                             | TC-104                                     |
+| hover だけの表示                                            | TC-105                                     |
+| 非表示 / 無効 / 測定複製の表示                              | TC-106                                     |
+| テーマ・狭幅・実 Tab の見え方                               | TC-107〜TC-109（手動。jsdom で代替しない） |
+| 外部依存・例外                                              | excluded(静的 CSS 契約)                    |

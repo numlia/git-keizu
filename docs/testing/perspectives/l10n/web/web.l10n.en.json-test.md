@@ -380,3 +380,33 @@ counterのtitle/aria-labelに使う新キーが en bundle に追加され、値�
 ### Feature 059-02 テスト対応（S10）
 
 - テストファイル: `tests/web/i18n.test.ts` の describe `hidden ref badge counter label (Feature 059-02)`。TC-026〜TC-028 は各 `it`（名前に `en l10n TC-0NN` を付記）
+
+## S11: キーボード操作・読み上げ用 a11y キー 12 件の英語辞書
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: -
+> Signature: 追加キー `a11y.commitHistory` / `a11y.operationTarget` / `a11y.detailsOpen` / `a11y.compareBase` / `a11y.compareTarget` / `a11y.head` / `a11y.workingTree` / `a11y.stash` / `a11y.actionFor` / `a11y.commitsLoaded` / `a11y.noCommits` / `a11y.commitOrdering`
+> Target Path: `l10n/web/web.l10n.en.json`
+> Test File: `tests/web/i18n.test.ts`
+
+対応プラン Task 11 実装内容 4 の表の英語値。名前・状態通知のキーと翻訳、placeholder 引数の一致を検証する additive section。DOM への接続は `web/main-test/13-keyboard-accessibility-02.md` S77、`t()` の差込みは `web/i18n-test.md` の責務。
+
+| Case ID | Input / Precondition                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                    | Notes                                                 |
+| ------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| TC-101  | en bundle から 12 キーを読み込む                               | Normal - キー集合の存在                                                    | 12 キーがすべて存在し、値が非空の文字列                                                                                                                                                                                            | K45                                                   |
+| TC-102  | 12 キーの値を Task 11 の表と比較                               | Normal - 固定値の一致                                                      | `Commit history` / `Navigation target` / `Details open` / `Comparison base` / `Comparison target` / `HEAD` / `Working tree` / `Stash` / `{0}: {1}` / `{0} commits loaded` / `No commits to display` / `Commit ordering` と完全一致 | K45                                                   |
+| TC-103  | `a11y.actionFor` と `a11y.commitsLoaded` の placeholder を抽出 | Validation - 引数の一致                                                    | `a11y.actionFor` の placeholder 集合が `{0}` と `{1}`、`a11y.commitsLoaded` が `{0}`、他 10 キーに placeholder が無い                                                                                                              | K45。引数不一致で名前が欠ける失敗源                   |
+| TC-104  | en / ja 両 bundle の `a11y.` 接頭辞のキー集合を比較            | Validation - locale parity                                                 | 差集合が双方向とも空                                                                                                                                                                                                               | ja 側は `web.l10n.ja.json-test.md` S12 TC-104 と対    |
+| TC-105  | `web/` 配下のソースで `t("a11y.…")` の参照を走査               | Validation - 未使用キーなし                                                | 12 キーすべてが `web/*.ts` から参照され、参照されるのに bundle に無い `a11y.` キーが 0 件                                                                                                                                          | Task 11 完了条件「新たな未使用キー…を追加していない」 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S11）
+
+| 失敗源                 | 対応ケースまたは除外理由                            |
+| ---------------------- | --------------------------------------------------- |
+| キー欠落・空値・誤値   | TC-101、TC-102                                      |
+| placeholder の不一致   | TC-103                                              |
+| 片 locale だけの追加   | TC-104                                              |
+| 未使用キー・未定義キー | TC-105                                              |
+| 外部依存・例外・型     | excluded(静的 JSON で外部依存・throw・型分岐が無い) |

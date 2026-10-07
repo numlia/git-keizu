@@ -314,3 +314,38 @@ S1 の lifecycle 契約を引き継ぎ、比較先変更の描画契約だけを
 - Normal: TC-044〜TC-047、TC-049、TC-050、TC-052
 
 **失敗系/正常系比（煙感知器）**: 正常系7件（TC-044〜TC-047、TC-049、TC-050、TC-052）、失敗系3件（TC-048、TC-051、TC-053）。S1 の構造を引き継ぎつつ、比較先変更のちらつき（旧表破棄）と stale 削除実行を失敗源として TC-052 に、failed の stale 表保持を TC-053 に割り当てた。
+
+## S7: 整理操作の標準 button・再要求中の無効化・再描画時のフォーカス復元
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: -
+> Signature: `BranchCleanupPanel.handleResponse(response)` の行 `button`（`buildShowButton` / `buildDeleteButton` を `button type="button"` に）/ `requestInFlight` 中の `disabled` / render 前後の `beginFocusUpdate(panel)` → `finishFocusUpdate(update)` と `cleanup` 種別の FocusKey / 比較先 Dropdown（共通契約）
+> Target Path: `web/branchCleanupPanel.ts`（`buildShowButton` / `buildDeleteButton` / render 前後の focus 処理。設計時のため実装後に行範囲へ更新）
+> Test File: `tests/web/branchCleanupPanel.test.ts`
+
+対応プラン R4.3・R4.7・Task 10 の観点。S4（eligibility と callback）の判定は維持され、現行の「再要求中は `div` に `disabled` class を付けリスナーを付けない」（`buildDeleteButton`）を標準 `disabled` へ揃える。fixture は S1〜S6 と同じ `#branchCleanupPanel` / `#branchCleanupBtn` の jsdom に、`actions` を `vi.fn()` で与え、`FocusContext` を登録する。
+
+| Case ID | Input / Precondition                                                                                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                      | Notes                                                              |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| TC-054  | eligible 行を含む応答を受理した後の行操作要素                                                                                                                | Normal - 名前付き標準 button                                               | 「グラフで表示」と「削除」が `button` 要素で `type="button"`、`aria-label` が `t("a11y.actionFor", t("cleanup.action.show"), branchName)` / 同 delete と一致。branch 名 `a;b` も文字列として含まれる | K41 / A8.1-6                                                       |
+| TC-055  | 削除 button に実フォーカスした状態で `refresh(repo)`（再要求で `requestInFlight`）→ 再描画 → button を `click` / `Enter`                                     | Validation - 再要求中は disabled で実行しない                              | 再描画後の削除 button が標準 `disabled` 属性を持ち、`showDeleteDialog` 0 回、`activeElement` が同じ branch の削除 button（意味上のキーで復元）                                                       | K41 / A8.3-5                                                       |
+| TC-056  | 削除 button に実フォーカスした状態で、その行が消えた応答を受理                                                                                               | Normal - 行消失は比較先 button へ                                          | `activeElement` が比較先 Dropdown の起動 button（接続・有効）、`showDeleteDialog` 0 回                                                                                                               | K41 / A8.3-5。「整理の消失操作は比較先button→`#branchCleanupBtn`」 |
+| TC-057  | TC-056 で比較先 button も無い応答（error / empty 表示）                                                                                                      | Boundary - 比較先も無ければ toolbar の整理 button へ                       | `activeElement` が `#branchCleanupBtn`                                                                                                                                                               | K41 / A8.3-5                                                       |
+| TC-058  | 比較先 Dropdown を開き候補に実フォーカスした状態で、再描画のため Dropdown の DOM を一時 detach して再配置する                                                | Validation - 内部の detach による focusout は Tab 退出ではない             | Dropdown が閉じず（`dropdownOpen` 維持または再配置後に同じ状態）、変更 callback 0 回、`activeElement` が再配置後の候補                                                                               | Task 10 実装内容 2                                                 |
+| TC-059  | 削除 button に実フォーカスした状態で `selectRepository(<別 repo>)` の応答、別途 stale な `requestId` の応答、別途応答前に `#refreshBtn` へ実フォーカスを移す | Validation - repo 変更・旧応答・外側移動では復元しない                     | 3 通りとも `activeElement` が panel 内へ戻らない（別 repo: HEAD 行等へ奪わず `body` または元の位置、外側移動: `#refreshBtn`）                                                                        | A8.3-5                                                             |
+| TC-060  | 「グラフで表示」button に実フォーカスして `Enter`、応答で同じ行が残る再描画                                                                                  | Normal - 同操作が残れば同じ button へ                                      | `showBranch` が `(branchName)` で 1 回、再描画後の `activeElement` が同じ branch の表示 button                                                                                                       | K41                                                                |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S7）
+
+| 失敗源                            | 対応ケースまたは除外理由                                              |
+| --------------------------------- | --------------------------------------------------------------------- |
+| 操作が button でない・名前なし    | TC-054                                                                |
+| 再要求中に実行できる              | TC-055                                                                |
+| 消失時の復元先の誤り              | TC-056、TC-057                                                        |
+| detach の focusout を退出扱い     | TC-058                                                                |
+| repo 変更・旧応答・外側移動で奪う | TC-059                                                                |
+| 同操作の復元                      | TC-060                                                                |
+| eligibility・dialog payload       | excluded(S4 と `web/refMenu-test/01-branch-actions-01.md` S21 の責務) |
+| 外部依存・例外                    | excluded(callback は spy で外部依存と throw 経路を持たない)           |

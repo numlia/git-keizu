@@ -401,3 +401,33 @@ counterのtitle/aria-labelに使う新キーが ja bundle に追加され、値�
 ### Feature 059-02 テスト対応（S11）
 
 - テストファイル: `tests/web/i18n.test.ts` の describe `hidden ref badge counter label (Feature 059-02)`。TC-028〜TC-030 は各 `it`（名前に `ja l10n TC-0NN` を付記）
+
+## S12: キーボード操作・読み上げ用 a11y キー 12 件の日本語辞書
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: -
+> Signature: 追加キー `a11y.commitHistory` / `a11y.operationTarget` / `a11y.detailsOpen` / `a11y.compareBase` / `a11y.compareTarget` / `a11y.head` / `a11y.workingTree` / `a11y.stash` / `a11y.actionFor` / `a11y.commitsLoaded` / `a11y.noCommits` / `a11y.commitOrdering`
+> Target Path: `l10n/web/web.l10n.ja.json`
+> Test File: `tests/web/i18n.test.ts`
+
+対応プラン Task 11 実装内容 4 の表の日本語値。raw key fallback が無いことを含めて検証する additive section。
+
+| Case ID | Input / Precondition                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                 | Notes                                              |
+| ------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| TC-101  | ja bundle から 12 キーを読み込む                                                                    | Normal - キー集合の存在                                                    | 12 キーがすべて存在し、値が非空で、値がキー文字列そのものと一致しない（raw key fallback 不在）                                                                                                                                  | K45                                                |
+| TC-102  | 12 キーの値を Task 11 の表と比較                                                                    | Normal - 固定値の一致                                                      | `コミット履歴` / `操作対象` / `詳細表示中` / `比較の起点` / `比較対象` / `HEAD` / `作業ツリー` / `スタッシュ` / `{0}: {1}` / `{0}件のコミットを読み込みました` / `表示するコミットはありません` / `コミットの並び順` と完全一致 | K45。`HEAD` と `{0}: {1}` は英日同値               |
+| TC-103  | `a11y.actionFor` と `a11y.commitsLoaded` の placeholder を抽出                                      | Validation - 引数の一致                                                    | en と同じ placeholder 集合（`{0}` `{1}` / `{0}`）、他 10 キーに placeholder が無い                                                                                                                                              | K45                                                |
+| TC-104  | en / ja 両 bundle の `a11y.` 接頭辞のキー集合を比較                                                 | Validation - locale parity                                                 | 差集合が双方向とも空                                                                                                                                                                                                            | en 側は `web.l10n.en.json-test.md` S11 TC-104 と対 |
+| TC-105  | 実画面（ja locale の VS Code）で `M` の行とファイル操作 button の名前をアクセシビリティツリーで確認 | Normal - 実画面と辞書の整合（手動）                                        | 行の説明が `操作対象` / `詳細表示中` / `HEAD`、ファイル操作の名前が `<操作名>: <path>` の形で辞書と一致。記録: VS Code 版、OS、locale                                                                                           | K45 / A8.3-6。手動。「実画面と辞書整合を別Case化」 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S12）
+
+| 失敗源                                 | 対応ケースまたは除外理由                            |
+| -------------------------------------- | --------------------------------------------------- |
+| キー欠落・空値・raw key fallback・誤値 | TC-101、TC-102                                      |
+| placeholder の不一致                   | TC-103                                              |
+| 片 locale だけの追加                   | TC-104                                              |
+| 実画面との不整合                       | TC-105（手動）                                      |
+| 外部依存・例外・型                     | excluded(静的 JSON で外部依存・throw・型分岐が無い) |
