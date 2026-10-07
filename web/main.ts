@@ -1920,15 +1920,15 @@ class GitKeizuView {
     if (e.key !== KEY_ARROW_UP && e.key !== KEY_ARROW_DOWN) return false;
     const delta: -1 | 1 = e.key === KEY_ARROW_UP ? -1 : 1;
     if (this.isComparing()) {
-      if (ctrlOrCmd || e.shiftKey) return false;
+      if (ctrlOrCmd) return false;
       return this.moveRowTarget(index + delta, e, false);
     }
     if (this.fileHistory.isActive() || this.fileHistory.isPending()) {
       return this.handleFileHistoryArrowKey(e, delta, ctrlOrCmd);
     }
     if (!ctrlOrCmd) {
-      if (e.shiftKey) return false;
-      return this.moveRowTarget(index + delta, e, this.expandedCommit !== null);
+      // Shift moves only the target, so the open details stay while a compare target is chosen.
+      return this.moveRowTarget(index + delta, e, !e.shiftKey && this.expandedCommit !== null);
     }
     const graphIndex = e.shiftKey
       ? delta < 0
@@ -2303,14 +2303,13 @@ class GitKeizuView {
     if (isModifierClick && this.expandedCommit !== null) {
       // Compare mode: Ctrl/Cmd+click while a commit is expanded
       if (this.expandedCommit.compareWithHash === clickedHash) {
-        // Same compare target clicked again → cancel comparison
-        this.clearCompareTarget();
-        this.expandedCommit.compareWithHash = null;
-        this.expandedCommit.compareWithSrcElem = null;
-        this.saveState();
-        this.refreshRowStates();
-        if (this.expandedCommit.commitDetails !== null && this.expandedCommit.fileTree !== null) {
-          this.showCommitDetails(this.expandedCommit.commitDetails, this.expandedCommit.fileTree);
+        // Same compare target clicked again → cancel comparison. The compare result replaced the
+        // stored details, so the origin's own details and files are requested again.
+        const originElem = this.expandedCommit.srcElem;
+        if (originElem === null) {
+          this.hideCommitDetails();
+        } else {
+          this.loadCommitDetails(originElem);
         }
       } else if (clickedHash !== this.expandedCommit.hash) {
         // Different commit → enter/change compare target

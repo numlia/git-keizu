@@ -993,7 +993,10 @@ describe("row keys per state (S70)", () => {
     expect(compareTargetRows()).toEqual([]);
     expect(detailsOwner()).toBe("N");
     expect(details()!.textContent).not.toContain("Displaying all changes");
-    expect(posts()).toEqual([]);
+    // S83: the origin's own details are fetched again instead of redrawing the compare data
+    expect(posts()).toEqual([
+      expect.objectContaining({ command: "commitDetails", commitHash: "N" })
+    ]);
   });
 
   it("keeps the state on a modified Enter at the details origin row (TC-669)", () => {
@@ -3189,5 +3192,198 @@ describe("row names, state descriptions and decorative icons (S77)", () => {
     expect(icons.length).toBeGreaterThan(0);
     for (const icon of icons) expect(icon!.getAttribute("aria-hidden")).toBe("true");
     expect(labelsOf("M").map((label) => label.textContent)).toEqual(["feature", "hotfix"]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S83: cancelling a comparison fetches the origin's details again    */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-02.md
+describe("cancelling a comparison restores the origin's own details (S83)", () => {
+  const ORIGIN_BODY = "N body";
+  const ORIGIN_AUTHOR = "Origin Author";
+  const ORIGIN_FILE = "n.txt";
+  const COMPARE_FILE = "compare.txt";
+  const COMPARE_SUMMARY = "Displaying all changes";
+
+  function change(path: string): GitFileChange {
+    return { ...FILE_CHANGE, oldFilePath: path, newFilePath: path };
+  }
+
+  function respondOriginDetails(): void {
+    dispatch({
+      command: "commitDetails",
+      commitDetails: {
+        hash: "N",
+        parents: ["M"],
+        author: ORIGIN_AUTHOR,
+        email: "origin@example.com",
+        date: 0,
+        committer: "",
+        committerEmail: "",
+        body: ORIGIN_BODY,
+        fileChanges: [change(ORIGIN_FILE)]
+      }
+    });
+  }
+
+  function respondCompare(): void {
+    dispatch({
+      command: "compareCommits",
+      fileChanges: [change(COMPARE_FILE)],
+      fromHash: "M",
+      toHash: "N"
+    });
+  }
+
+  function startOriginCompare(): void {
+    fire(row("N"), "click");
+    respondOriginDetails();
+    fire(row("M"), "click", { ctrlKey: true });
+    respondCompare();
+    expect(compareTargetRows()).toEqual(["M"]);
+    expect(details()!.textContent).toContain(COMPARE_FILE);
+  }
+
+  function expectOriginDetailsShown(): void {
+    const text = details()!.textContent!;
+    expect(text).toContain(ORIGIN_BODY);
+    expect(text).toContain(ORIGIN_AUTHOR);
+    expect(text).toContain(ORIGIN_FILE);
+    expect(text).not.toContain(COMPARE_FILE);
+    expect(text).not.toContain(COMPARE_SUMMARY);
+  }
+
+  it("requests and shows the origin's details after a modified Enter cancel (TC-759)", () => {
+    // Case: TC-759 (user follow-up: the cancel used to redraw the synthetic compare data)
+    startOriginCompare();
+    clearPosts();
+    focusRow("M");
+    press(row("M"), "Enter", { ctrlKey: true });
+
+    expect(compareTargetRows()).toEqual([]);
+    expect(posts()).toEqual([
+      expect.objectContaining({ command: "commitDetails", commitHash: "N" })
+    ]);
+    expect(detailsOwner()).toBe("N");
+    expect(document.activeElement).toBe(row("M"));
+
+    respondOriginDetails();
+    expectOriginDetailsShown();
+  });
+
+  it("sends the same request from a Ctrl+click cancel (TC-760)", () => {
+    // Case: TC-760 (R4.2: the modified Enter and the modified click share the compare branch)
+    startOriginCompare();
+    clearPosts();
+    focusRow("M");
+    press(row("M"), "Enter", { ctrlKey: true });
+    const keyboardPosts = posts();
+
+    closeEverything();
+    startOriginCompare();
+    clearPosts();
+    fire(row("M"), "click", { ctrlKey: true });
+    expect(posts()).toEqual(keyboardPosts);
+    expect(details()!.textContent).not.toContain(COMPARE_FILE);
+
+    respondOriginDetails();
+    expectOriginDetailsShown();
+  });
+
+  it("ignores a compare result that arrives after the cancel (TC-761)", () => {
+    // Case: TC-761 (Boundary: showCompareResult drops results once compareWithHash is null)
+    fire(row("N"), "click");
+    respondOriginDetails();
+    fire(row("M"), "click", { ctrlKey: true });
+    focusRow("M");
+    press(row("M"), "Enter", { ctrlKey: true });
+
+    respondCompare();
+    expect(details()!.textContent).not.toContain(COMPARE_FILE);
+    expect(details()!.querySelector("#cdvLoading")).not.toBeNull();
+
+    respondOriginDetails();
+    expectOriginDetailsShown();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S84: Shift + arrows move only the target                           */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-02.md
+describe("Shift + arrows move only the target (S84)", () => {
+  it("keeps the open details while Shift + arrows move the target (TC-762)", () => {
+    // Case: TC-762 (D4: pre-fix the Shift arrows were left unconsumed)
+    openDetails("N");
+    clearPosts();
+    focusRow("N");
+
+    const down = press(row("N"), "ArrowDown", { shiftKey: true });
+    expect(document.activeElement).toBe(row("M"));
+    expect(rowsWithTabStop()).toEqual(["M"]);
+    expect(detailsOwner()).toBe("N");
+    expect(posts()).toEqual([]);
+    expect(down.defaultPrevented).toBe(true);
+
+    press(row("M"), "ArrowUp", { shiftKey: true });
+    expect(document.activeElement).toBe(row("N"));
+    expect(detailsOwner()).toBe("N");
+    expect(posts()).toEqual([]);
+  });
+
+  it("starts a comparison from the keyboard alone (TC-763)", () => {
+    // Case: TC-763 (§8.1-2: the compare start was unreachable without the mouse)
+    openDetails("N");
+    clearPosts();
+    focusRow("N");
+    press(row("N"), "ArrowDown", { shiftKey: true });
+    expect(document.activeElement).toBe(row("M"));
+    press(document.activeElement!, "Enter", { ctrlKey: true });
+
+    expect(compareTargetRows()).toEqual(["M"]);
+    expect(detailsOpenRows()).toEqual(["N"]);
+    expect(posts()).toEqual([
+      expect.objectContaining({ command: "compareCommits", fromHash: "M", toHash: "N" })
+    ]);
+  });
+
+  it("moves only the target without details like the plain arrow (TC-764)", () => {
+    // Case: TC-764 (D4)
+    focusRow("M");
+    const event = press(row("M"), "ArrowDown", { shiftKey: true });
+
+    expect(document.activeElement).toBe(row("R"));
+    expect(posts()).toEqual([]);
+    expect(details()).toBeNull();
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("moves only the target during a comparison (TC-765)", () => {
+    // Case: TC-765 (D4; the Ctrl / Cmd variants stay unhandled by TC-664)
+    startCompare("N", "M");
+    clearPosts();
+    focusRow("M");
+    const event = press(row("M"), "ArrowDown", { shiftKey: true });
+
+    expect(document.activeElement).toBe(row("R"));
+    expect(detailsOpenRows()).toEqual(["N"]);
+    expect(compareTargetRows()).toEqual(["M"]);
+    expect(posts()).toEqual([]);
+    expect(event.defaultPrevented).toBe(true);
+  });
+
+  it("stops at the first row without consuming Shift + ArrowUp (TC-766)", () => {
+    // Case: TC-766 (§4.2 edge)
+    openDetails("N");
+    clearPosts();
+    focusRow("N");
+    const event = press(row("N"), "ArrowUp", { shiftKey: true });
+
+    expect(document.activeElement).toBe(row("N"));
+    expect(posts()).toEqual([]);
+    expect(event.defaultPrevented).toBe(false);
   });
 });

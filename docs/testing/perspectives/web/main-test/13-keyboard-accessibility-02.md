@@ -394,3 +394,75 @@ S76 TC-731 は「`li` は非操作ラッパーで、`li` 自体の click では�
 - RED: 旧実装（b5d40df、`li` の click リスナーなし）で TC-754 / TC-755 / TC-758 が fail（`li` の click で `viewDiff` 0 件）→ GREEN。TC-756 / TC-757 は旧実装でも pass（不変の保証）。S76 の引き継ぎ Case は変更なしで pass
 - 引き継ぎ: TC-728 / TC-729 / TC-730 / TC-732 / TC-733 / TC-734 / TC-686 / TC-719 / TC-710 の各 `it` は S76 の「Task 12 テスト対応」のまま
 - 実行結果（2026-10-07）: 16 件 pass（describe 全体）
+
+## S83: 比較の解除で起点の単一詳細を取り直す
+
+> Origin: Feature 061-05 (light-spec-plan) user follow-up
+> Added: 2026-10-08
+> Status: active
+> Supersedes: -
+> Signature: `handleCommitRowActivation(clickedHash, sourceElem, isModifierClick)` の「同じ比較対象」分岐 → `loadCommitDetails(this.expandedCommit.srcElem)`（`srcElem === null` なら `hideCommitDetails()`）/ `showCompareResult(fileChanges, fromHash, toHash)` の `compareWithHash === null` ガード
+> Target Path: `web/main.ts:2298-2335, 2337-2366, 2856-2884`（`handleCommitRowActivation`、`loadCommitDetails`、`showCompareResult`）
+> Test File: `tests/web/main.keyboard.test.ts`
+
+比較結果の受信は `expandedCommit.commitDetails` / `fileTree` を比較用の合成データ（作者・日付・親・本文が空、ファイルは比較差分）で上書きする。旧実装は解除時にその合成データで単一詳細を描き直していたため、要約が空になりファイル一覧が比較のまま残っていた（main 由来の既存不具合、利用者の実画面確認で発見）。解除は起点の詳細を取り直す。キーボードの Ctrl + `Enter` とマウスの Ctrl + click は同じ分岐を通る。S70 TC-668 の「`postMessage` の増分が 0」は本節の要求 1 件へ更新し、`06-file-actions-01.md` TC-390 は解除後に起点の詳細応答を受理してから glyph を操作する（期待結果は不変）。
+
+| Case ID | Input / Precondition                                                                                                                                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                          | Notes                                                    |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| TC-759  | `N` の詳細（本文 `N body`、ファイル `src/n.txt`）を開き、比較 `N/M`（比較のファイル `src/compare.txt`）を受理。`M` に実フォーカスで Ctrl + `Enter`、続けて `N` の詳細応答を受理 | Normal - 解除で起点の詳細へ戻る（主回帰）                                  | 解除直後: `compareTarget` 0 件、`commitHash: "N"` の詳細要求 1 件・比較要求 0 件、`#commitDetails` が `N` 行の直後、`activeElement` が `M`。応答後: 要約に `N body` と作者、ファイル一覧に `src/n.txt` があり `src/compare.txt` がない、比較の要約文なし | 旧実装: 要求 0 件、`src/compare.txt` が残る（RED）       |
+| TC-760  | TC-759 と同じ比較 `N/M` で、`M` を Ctrl + click                                                                                                                                 | Normal - マウスの解除も同じ                                                | 要求列が TC-759 のキーボード解除と一致（`commitDetails` / `N` の 1 件）。応答後の表示も TC-759 と同じ                                                                                                                                                    | R4.2「修飾クリックと同じ比較操作」                       |
+| TC-761  | 比較 `N/M` の結果を受理する前に `M` で Ctrl + `Enter` で解除し、遅れて `compareCommits` 応答、続けて `N` の詳細応答                                                             | Boundary - 解除後に届いた比較結果                                          | 比較応答では表示が変わらず（読み込み表示のまま、`src/compare.txt` なし）、詳細応答で `src/n.txt` が描かれる                                                                                                                                              | `showCompareResult` の `compareWithHash === null` ガード |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 利用者フォローアップ（S83）
+
+| 失敗源                                               | 対応ケースまたは除外理由                                                                                        |
+| ---------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| 解除後に合成データ（空の要約・比較のファイル）が残る | TC-759                                                                                                          |
+| キーボードとマウスの解除で要求が食い違う             | TC-760                                                                                                          |
+| 解除後に届いた古い比較結果が表示を上書きする         | TC-761                                                                                                          |
+| 起点の行が無い（`srcElem === null`）                 | 除外: 描画済みの行からしか比較を操作できず、復元時の `srcElem` は再描画で必ず設定される。防御として詳細を閉じる |
+| 詳細の取得失敗                                       | 既存の `commitDetails` 応答処理（エラーダイアログ）の責務。`web/messageHandler-test` で確認済み                 |
+
+### 利用者フォローアップ テスト対応（Feature 061-05）— S83
+
+- テスト: `tests/web/main.keyboard.test.ts` describe `cancelling a comparison restores the origin's own details (S83)`。TC-759 `requests and shows the origin's details after a modified Enter cancel (TC-759)`、TC-760 `sends the same request from a Ctrl+click cancel (TC-760)`、TC-761 `ignores a compare result that arrives after the cancel (TC-761)`。S70 TC-668 と `tests/web/main.test.ts` TC-390 の期待・前提を更新
+- RED: 旧実装（d27270a）で TC-759 / TC-760 / TC-761 と更新後の TC-668 が fail（解除で要求 0 件、比較のファイルが残る）→ GREEN
+- 実行結果（2026-10-08）: `tests/web/main.keyboard.test.ts` / `tests/web/main.test.ts` 全件 pass
+
+## S84: Shift + ↑↓ は詳細を動かさず操作対象だけを移す
+
+> Origin: Feature 061-05 (light-spec-plan) user follow-up
+> Added: 2026-10-08
+> Status: active
+> Supersedes: -
+> Signature: `handleRowKey(e, row, onRow)` の比較中分岐（Ctrl / Cmd 付きだけ非処理）と通常一覧分岐（`moveRowTarget(index + delta, e, !e.shiftKey && this.expandedCommit !== null)`）。ファイル履歴分岐 `handleFileHistoryArrowKey` は変更しない
+> Target Path: `web/main.ts:1903-1941, 1962-1975`（`handleRowKey`、`moveRowTarget`）
+> Test File: `tests/web/main.keyboard.test.ts`、`tests/web/main.test.ts`
+
+単一詳細が開いていると無修飾の ↑↓ は詳細を追従させる（D1）ため、詳細を開いたまま別の行を操作対象にできず、Ctrl + `Enter` による比較の開始にキーボードだけでは到達できなかった（確定仕様 §8.1-2 の未達。利用者の実画面確認で発見）。利用者決定 D4 として、Shift + ↑↓ は表示順で操作対象だけを移し、詳細・比較・要求を変えない。比較中の Shift + ↑↓ も無修飾と同じく操作対象だけを移す。ファイル履歴中の Shift 単独は従来どおり扱わない（S71 TC-681 は不変）。Ctrl / Cmd + Shift の代替親子（TC-671）と比較中の非処理（TC-664）も不変。S64 TC-569（Shift 単独は非消費）は本節 TC-767 へ置き換える。
+
+| Case ID | Input / Precondition                                                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                          | Notes                                             |
+| ------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| TC-762  | `N` の単一詳細を開き `N` に実フォーカス、Shift + `ArrowDown`、続けて Shift + `ArrowUp`          | Normal - 詳細を残して操作対象だけ移す                                      | 1 回目: `activeElement` と `tabindex="0"` が `M`、`#commitDetails` は `N` 行の直後のまま、要求 0 件、消費。2 回目: `N` へ戻り、要求 0 件 | D4。旧実装: 非消費で移動しない（RED）             |
+| TC-763  | TC-762 の 1 回目の後（操作対象 `M`、詳細 `N`）、`M` で Ctrl + `Enter`                           | Normal - キーボードだけで比較を開始                                        | `compareTarget` が `M`、`commitDetailsOpen` が `N`、`compareCommits`（`fromHash: "M"` / `toHash: "N"`）が 1 件                           | §8.1-2。旧実装: 比較に到達できない（RED）         |
+| TC-764  | 詳細なしで `M` に実フォーカス、Shift + `ArrowDown`                                              | Normal - 詳細なしは無修飾と同じ                                            | `activeElement` が `R`、要求 0 件、`#commitDetails` なし、消費                                                                           | D4                                                |
+| TC-765  | 比較 `N/M` 中、`M` に実フォーカスで Shift + `ArrowDown`                                         | Normal - 比較中も操作対象だけ                                              | `activeElement` が `R`、`commitDetailsOpen` が `N`・`compareTarget` が `M` のまま、要求 0 件、消費                                       | D4。TC-664（Ctrl / Cmd 付き）は不変               |
+| TC-766  | `N` の単一詳細を開き、先頭行 `N` で Shift + `ArrowUp`                                           | Boundary - 端では動かない                                                  | `activeElement` が `N` のまま、要求 0 件、非消費                                                                                         | §4.2 端の非消費                                   |
+| TC-767  | `tests/web/main.test.ts` の mock 構成（通常モード、`COMMIT_HASH_2` を展開）で Shift + `ArrowUp` | Normal - 詳細あり Shift 単独                                               | 消費（`preventDefault` / `stopPropagation` 各 1 回）、詳細要求 0 件                                                                      | S64 TC-569 の置き換え。`// Case: TC-569 → TC-767` |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 利用者フォローアップ（S84）
+
+| 失敗源                                        | 対応ケースまたは除外理由                           |
+| --------------------------------------------- | -------------------------------------------------- |
+| Shift + ↑↓ で詳細が追従する / 要求が出る      | TC-762、TC-767                                     |
+| キーボードだけで比較を開始できない            | TC-763                                             |
+| 詳細なし・比較中で Shift の動作が無修飾と違う | TC-764、TC-765                                     |
+| 端で循環・消費する                            | TC-766                                             |
+| ファイル履歴中に Shift で一致行探索を迂回する | S71 TC-681（不変。Shift 単独は履歴分岐で扱わない） |
+| 代替親子（Ctrl / Cmd + Shift）の退行          | S70 TC-671、TC-664（不変）                         |
+
+### 利用者フォローアップ テスト対応（Feature 061-05）— S84
+
+- テスト: `tests/web/main.keyboard.test.ts` describe `Shift + arrows move only the target (S84)`。TC-762 `keeps the open details while Shift + arrows move the target (TC-762)`、TC-763 `starts a comparison from the keyboard alone (TC-763)`、TC-764 `moves only the target without details like the plain arrow (TC-764)`、TC-765 `moves only the target during a comparison (TC-765)`、TC-766 `stops at the first row without consuming Shift + ArrowUp (TC-766)`。`tests/web/main.test.ts` TC-767 `Shift-only + ArrowUp moves only the target (TC-767)`（旧 TC-569 の書き換え）
+- RED: 旧実装（d27270a）で TC-762〜TC-765 が fail（Shift 付き矢印が非消費で移動しない）→ GREEN。TC-766 は旧実装でも pass（端の不変の保証）
+- 実行結果（2026-10-08）: `tests/web/main.keyboard.test.ts` / `tests/web/main.test.ts` 全件 pass

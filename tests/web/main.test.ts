@@ -2951,18 +2951,18 @@ describe("GitKeizuView frontend integration", () => {
         expect(vscode.postMessage).not.toHaveBeenCalled();
       });
 
-      it("Shift-only + ArrowUp skips Arrow processing (TC-569)", () => {
-        // Case: TC-569
+      it("Shift-only + ArrowUp moves only the target (TC-767)", () => {
+        // Case: TC-569 → TC-767
         // Given: normal mode and a commit is expanded
         expandCommit(COMMIT_HASH_2);
 
         // When: Shift+ArrowUp pressed (no Ctrl/Cmd)
         const spies = dispatchArrowKey("ArrowUp", { shiftKey: true });
 
-        // Then: Arrow processing is skipped (modifier pattern mismatch), event not consumed
+        // Then: the event is consumed and the details stay without a new request
         expect(vscode.postMessage).not.toHaveBeenCalled();
-        expect(spies.preventDefault).not.toHaveBeenCalled();
-        expect(spies.stopPropagation).not.toHaveBeenCalled();
+        expect(spies.preventDefault).toHaveBeenCalledTimes(1);
+        expect(spies.stopPropagation).toHaveBeenCalledTimes(1);
       });
 
       it("Alt + ArrowUp skips Arrow processing (TC-570)", () => {
@@ -8023,7 +8023,7 @@ describe("highlightFileHistory icon wiring and click handler (S54)", () => {
 
   it("requests again after the comparison is cancelled (TC-390)", () => {
     // Case: TC-390
-    // Given: the comparison of TC-389 is shown, then cancelled with the icon row re-rendered
+    // Given: the comparison of TC-389 is shown, then cancelled and the origin's details re-rendered
     expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_HTML);
     clickCommit(COMMIT_HASH_2, { ctrlKey: true });
     dispatchMessage({
@@ -8032,8 +8032,9 @@ describe("highlightFileHistory icon wiring and click handler (S54)", () => {
       fromHash: COMMIT_HASH_1,
       toHash: COMMIT_HASH_2
     });
-    vi.mocked(liveFileTreeHtml).mockReturnValueOnce(ICON_ROW_HTML);
     clickCommit(COMMIT_HASH_2, { ctrlKey: true });
+    vi.mocked(liveFileTreeHtml).mockReturnValueOnce(ICON_ROW_HTML);
+    respondCommitDetails(COMMIT_HASH_1);
     vi.clearAllMocks();
 
     // When: the history glyph is clicked
