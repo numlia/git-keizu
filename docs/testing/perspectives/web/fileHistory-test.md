@@ -352,7 +352,7 @@ S6 は端での一周（TC-032 / TC-033）と一致1件での再スクロール�
 > Status: active
 > Supersedes: -
 > Signature: `constructor(callbacks: FileHistoryCallbacks)` の bar 生成（`#fileHistoryPrev` / `#fileHistoryNext` / `#fileHistoryExit` を `button type="button"` に、名前に対象 path）/ `navigate(delta: -1 \| 1, useExpandedCommit: boolean = false): string \| null` / `exit(restore: boolean): void` / `#fileHistoryPosition` の `role="status"` `aria-live="polite"`
-> Target Path: `web/fileHistory.ts`（bar 生成、`prev()` / `next()`、`exit()`。設計時のため実装後に行範囲へ更新）
+> Target Path: `web/fileHistory.ts:96-112, 170-192, 246-300, 329-335, 406-470`（`actionName` / `createButton`、constructor、`onRepositoryChanged` / `handleCommitRowClick` / `navigate` / `exit` / `isActive`、`rememberOrigin`、`prev` / `next` / `applyClasses` / `renderBar` / `renderControls`）
 > Test File: `tests/web/fileHistory.test.ts`
 
 対応プラン R4.2・R4.6・Task 10 の観点。S1〜S11 の探索・snapshot・解除の契約は維持されるため active のまま additive（S1 TC-001 / TC-002 の id・文言・`roundedBtn` class は `button` 要素で維持）。fixture は S1 と同じ `#controls` と `#commitTable`（`[h0, x1, h1, x2, h2]`）の jsdom で、callbacks は `vi.fn()`。
@@ -376,3 +376,10 @@ S6 は端での一周（TC-032 / TC-033）と一致1件での再スクロール�
 | 状態通知の欠落                             | TC-649                                                       |
 | navigate の意味変更                        | TC-650                                                       |
 | 外部依存・例外                             | excluded(callbacks は spy で外部依存と throw 経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S12
+
+- テスト: `tests/web/fileHistory.test.ts` describe `FileHistoryController bar buttons, exit focus and status (S12)`。fixture は `configureFocusContext` を `beforeEach` で登録し `afterEach` で破棄。TC-645〜TC-650 を同番号の `it` で 1 件ずつ
+- TC-646 / TC-647 の jsdom 代替（Task 10 handoff）: native `button` の Enter は既定 click に委ねるため keydown の `defaultPrevented === false` を確認し、実行は `click()` で代替する（keyup で追加移動 0）。実機の Enter → click 1 回は `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧
+- main 側（履歴バーの前後 button で詳細を開かない、Escape 列、矢印の優先順位）は `web/main-test/13-keyboard-accessibility-01.md` S71 TC-676〜TC-682
+- 実行結果（2026-10-07）: 6 件 pass

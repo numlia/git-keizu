@@ -7,7 +7,7 @@
 > Test Framework: Vitest
 > Total Shards: 11
 > Total Sections: 37
-> Total Cases: 188
+> Total Cases: 181
 
 ## Shards
 
@@ -23,7 +23,7 @@
 | 05-branch-cleanup-01.md              | branch-cleanup              | 1        | 15    | 2026-08-25   |
 | 06-file-history-01.md                | file-history                | 1        | 12    | 2026-09-08   |
 | 07-retain-context-01.md              | retain-context              | 1        | 8     | 2026-09-12   |
-| 08-keyboard-accessibility-01.md      | keyboard-accessibility      | 1        | 8     | 2026-10-07   |
+| 08-keyboard-accessibility-01.md      | keyboard-accessibility      | 1        | 1     | 2026-10-07   |
 
 ## Origin Coverage
 

@@ -12,7 +12,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `export function reconcileRowTarget(previous: RowTarget | null, repo: string, hashes: readonly string[], head: string | null): RowTarget | null`（`RowTarget` は readonly の `repo: string` / `hash: string` / `index: number`）
-> Target Path: `web/keyboardNavigation.ts`（`reconcileRowTarget`。設計時のため実装後に行範囲へ更新）
+> Target Path: `web/keyboardNavigation.ts:158-176`（`reconcileRowTarget`）
 > Test File: `tests/web/keyboardNavigation.test.ts`
 
 対応プラン §3.4 の「対象の決定は入力を変更しない純粋関数。hash一致を先に調べ、同repoで消失した場合だけ旧indexを末尾までclampする。repo切替・旧対象なしはHEAD/先頭、空はnull。indexは識別子に使わない」の観点。DOM を一切参照せず、`document` が無い環境でも呼べることを `// @vitest-environment node` の describe で確認する。作業ツリー行の既存識別値（`UNCOMMITTED_CHANGES_HASH`）と stash の hash も通常の hash として扱い、未読込先の取得や要求送信は行わない。戻り値は `toEqual` で全フィールドを比較し、`null` は `toBeNull()` で直接比較する。
@@ -45,6 +45,12 @@
 | 外部依存・例外                           | excluded(純粋関数で外部依存と throw 経路を持たない)                      |
 | 型不正                                   | excluded(`RowTarget` / `readonly string[]` は TypeScript の型検査で担保) |
 
+### Task 12 テスト対応（Feature 061-05）— S1
+
+- テスト: `tests/web/keyboardNavigation.test.ts` describe `reconcileRowTarget`（`// @vitest-environment node` で `document` 不在を保証）。各 `it` 直前の `// Case: TC-NNN` で対応を記載
+- TC-001 `selects the HEAD row on first use without touching the DOM` / TC-002 `re-initialises to HEAD when the repo changes even if the hash exists` / TC-003 parameterized（2 通りの並び） / TC-004 `falls back to the row at the previous index when the hash disappears` / TC-005 `clamps a previous index past the end to the last row` / TC-006 4 通りの空一覧 / TC-007 `uses the first row when there is no HEAD` / TC-008 `uses the first row when HEAD is not loaded` / TC-009 行 1 件 / TC-010 `treats the working tree row and stash hashes like any other hash` / TC-011 index より hash を優先 / TC-012 `does not mutate the previous target and returns a new object`
+- 実行結果（2026-10-07）: `pnpm exec vitest run tests/web tests/src/gitGraphView.test.ts tests/src/i18n.test.ts` で 12 件 pass。`null` は `toBeNull()`、戻り値は `toEqual` で全フィールド比較
+
 ## S2: installKeyboardGuards() / isKeyboardActionBlocked() IME・repeat・対応 keyup の入力保護
 
 > Origin: Feature 061-05 (light-spec-plan)
@@ -52,7 +58,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `export function installKeyboardGuards(root: Document): () => void` / `export function isKeyboardActionBlocked(event: KeyboardEvent): boolean`
-> Target Path: `web/keyboardNavigation.ts`（`installKeyboardGuards` / `isKeyboardActionBlocked`。実装後に行範囲へ更新）
+> Target Path: `web/keyboardNavigation.ts:178-277`（`keyIdentity` / `isActionKey` / `isButtonTarget` / `withPendingKey` / composition・keydown・keyup の捕捉 / `installKeyboardGuards` / `isKeyboardActionBlocked`）
 > Test File: `tests/web/keyboardNavigation.test.ts`
 
 対応プラン §3.4 末尾の入力保護。`document` の `compositionstart` / `compositionend` と `keydown` / `keyup` を捕捉段階で追跡し、部品と main が同じ判定を読む。判定は `isComposing` または変換中、変換確定・取消に対応する `keyup`、実行キー（Enter / Space / ContextMenu）の `repeat` を「阻止」とし、`compositionend` で即解除せず対応する `keyup` で解除する。文字入力・矢印の `preventDefault` は行わない。fixture は `installKeyboardGuards(document)` の後に `<input>` と `<button>` を持つ jsdom。各ケースで `isKeyboardActionBlocked` の戻り値（`true` / `false`）を直接 assert し、`defaultPrevented` と `button` の `click` リスナー回数を併せて観測する。
@@ -84,6 +90,15 @@
 | 文字入力・カーソル移動の preventDefault        | TC-013〜TC-015、TC-018（`defaultPrevented === false`）            |
 | 外部依存・例外                                 | excluded(DOM イベントの読取だけで外部依存と throw 経路を持たない) |
 
+### Task 12 テスト対応（Feature 061-05）— S2
+
+- テスト: `tests/web/keyboardNavigation.test.ts` describe `installKeyboardGuards / isKeyboardActionBlocked`。fixture は `installGuards()` で `installKeyboardGuards(document)` を登録し `afterEach` で全 disposer を実行（`vi.resetModules` 後の旧 listener 残存なし）
+- TC-013〜TC-015 `it.each`（Enter / Escape / ArrowDown・ArrowUp の IME 中）/ TC-016 `keeps blocking until the keyup that ends the composition, then allows the next keydown` / TC-017・TC-018 repeat の実行キーと矢印・文字 / TC-019 通常押下の keydown false・keyup true / TC-020 `prevents the default button click for composition and repeat presses` / TC-021 `does not prevent a normal button press` / TC-022 `shares one registration across installs and removes it after the last disposer` / TC-023 `derives the verdict from the event alone when guards are not installed` / TC-024 `keeps the composition key pending across an unrelated keyup`
+- TC-022 の解釈（Task 2 の AUTO-CORRECTION を本表で確定）: 「両方を破棄した後は同じ操作で戻り値 `false`」の「同じ操作」は TC-013 の `compositionstart` → `keydown`（Enter、`isComposing: false`）という **状態依存の経路** を指す。`isComposing: true` を持つ keydown はイベント自身の値から常に `true`（TC-023）であり、破棄後も `false` にはならない。根拠: §3.4「`isComposing` または変換中 … はアクションを実行しない」。contract-impact: none
+- TC-021 の未自動化部分: 既定 click（Enter / Space keyup でブラウザーが合成する click）は jsdom が生成しないため、`defaultPrevented === false` までを自動化し、実 click の 1 回発火は手動 Case（下記）に残す
+- 手動 Case（未実施）TC-021: 対象 = 実 VS Code Webview の native `button`（例: toolbar の `#refreshBtn`、詳細の `#commitDetailsClose`）。手順: Tab で button へ移動 → Enter を 1 回押す → Space を 1 回押す → Enter を押し続けて repeat を発生させる → 日本語 IME で変換中に Enter。期待: 通常押下は 1 回だけ実行、repeat と IME 確定では追加実行 0。未実施の理由: 本 Task の実行環境は jsdom のみで VS Code / Chromium / IME が無い。影響: Chromium が keydown の `preventDefault` で合成 click を抑止する前提（TC-020）が実機で成立しない場合、repeat / IME 確定で button が二重実行される。代替確認: TC-020 / TC-021 の `defaultPrevented` と `click` リスナー 0 回（jsdom）。残る手順: VS Code 版・OS・入力方式（IME 名）・観測結果を本 Notes に追記。実 Webview の手動 Case は `web/main-test/13-keyboard-accessibility-01.md` 冒頭「Task 12 実 Webview 手動確認（未実施一覧）」の様式で記録し、自動テストの pass に含めない
+- 実行結果（2026-10-07）: 12 件 pass
+
 ## S3: FocusKey の印付け・起点捕捉・復元・通常停止点移動
 
 > Origin: Feature 061-05 (light-spec-plan)
@@ -91,7 +106,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `export function configureFocusContext(context: FocusContext): () => void` / `export function markFocusTarget(element: HTMLElement, key: FocusKey): void` / `export function captureFocusOrigin(element: HTMLElement | null): FocusOrigin | null` / `export function restoreFocus(origin: FocusOrigin | null, reason: FocusCloseReason): boolean` / `export function moveFocusPast(origin: FocusOrigin | null, direction: -1 \| 1): boolean`（`FocusContext` は `getRepo(): string \| null` / `getActiveRow(): HTMLElement \| null` / `getTabStops(): readonly HTMLElement[]`）
-> Target Path: `web/keyboardNavigation.ts`（`configureFocusContext` / `markFocusTarget` / `captureFocusOrigin` / `restoreFocus` / `moveFocusPast`。実装後に行範囲へ更新）
+> Target Path: `web/keyboardNavigation.ts:279-499, 587-599`（user-move tracking 279-315、`configureFocusContext` 316-339、`markFocusTarget` 340-369、`captureFocusOrigin` 370-385、候補解決 386-491、`restoreFocus` 492-499、`moveFocusPast` 587-599）
 > Test File: `tests/web/keyboardNavigation.test.ts`
 
 対応プラン §3.4 の意味上のキーによる復元。fixture は `#commitTable` 内に行 `tr[data-hash]`（M / R）、各行の参照 `button`、詳細内のファイル `button`、toolbar の `#refreshBtn`、body 直下の省略一覧複製を持つ jsdom で、`configureFocusContext` には `getRepo` / `getActiveRow` / `getTabStops` を `vi.fn()` で与える。キーは `markFocusTarget` で保存し、CSS selector へ連結しない（名前に `"` / `]` / `/` を含むキーでも解決できることで確認）。復元の成功は `document.activeElement` が接続・表示・有効な要素になったことで判定し、`focus` の呼出し回数だけで判定しない。
@@ -128,6 +143,12 @@
 | null と空配列の混同                                  | TC-039                                                  |
 | 外部依存・例外                                       | excluded(DOM 参照だけで外部依存と throw 経路を持たない) |
 
+### Task 12 テスト対応（Feature 061-05）— S3
+
+- テスト: `tests/web/keyboardNavigation.test.ts` describe `captureFocusOrigin / restoreFocus / moveFocusPast`。fixture は `registerContext()`（`configureFocusContext` を disposer 配列へ）＋ `installGuards()`、復元成功は `document.activeElement` で判定し `focus` の呼出し回数だけに依存しない（TC-031 は切断要素への `focus` 呼出しも 0 回を確認）
+- TC-025 `captures the element key followed by its row key without altering names` / TC-026 `restores to a regenerated element with the same key` / TC-027 `falls back to the owning row when the key is gone` / TC-028 `falls back to the active row, then to the named container` / TC-029 `restores a popup clone to its counter, then to the owning row` / TC-030 4 reason で `false` / TC-031 `skips hidden, disabled, disconnected and measuring candidates` / TC-032 `prefers the visible popup clone over the hidden original label` / TC-033 `moves to the next and previous tab stop` / TC-034 `does not wrap at either end` / TC-035 `uses the counter as the anchor for a popup clone origin` / TC-036 `returns null / false without side effects when no context is registered` / TC-037 `keeps the newest context when an older registration is disposed` / TC-038 `keeps the captured keys when the source element is replaced` / TC-039 `distinguishes a null element from an unmarked element`
+- 実行結果（2026-10-07）: 15 件 pass
+
 ## S4: beginFocusUpdate() / finishFocusUpdate() 置換 ticket による描画復元
 
 > Origin: Feature 061-05 (light-spec-plan)
@@ -135,7 +156,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `export function beginFocusUpdate(root: HTMLElement): FocusUpdate \| null` / `export function finishFocusUpdate(update: FocusUpdate \| null): boolean`（`FocusUpdate` は readonly の `origin: FocusOrigin` / `root: HTMLElement` / `generation: number` / `focusEpoch: number`）
-> Target Path: `web/keyboardNavigation.ts`（`beginFocusUpdate` / `finishFocusUpdate` と focusin / pointerdown / window blur の追跡。実装後に行範囲へ更新）
+> Target Path: `web/keyboardNavigation.ts:501-586`（`ownsPopupOrigin` 501-511、`withParkedKeys` 512-532、`beginFocusUpdate` 533-556、`finishFocusUpdate` 557-586。focusin / pointerdown / window blur の追跡は 279-315）
 > Test File: `tests/web/keyboardNavigation.test.ts`
 
 対応プラン §3.4 の ticket 方式。`beginFocusUpdate` は置換直前にその root 内、または同じ置換で除去される所有 popup 内に実フォーカスがあるときだけ ticket を返し、root ごとの描画世代を進める。`finishFocusUpdate` は同 repo・最新 ticket・同じ focusEpoch で、Webview が blur しておらずユーザーが別要素へ移っていない場合に限り復元し、`focus({ preventScroll: true })` を使う。fixture は S3 と同じで、`configureFocusContext` と `installKeyboardGuards` を登録した後に検証し、`HTMLElement.prototype.focus` を spy して引数も観測する。
@@ -172,3 +193,10 @@
 | preventScroll の欠落                                     | TC-040                                                        |
 | 未登録時の副作用                                         | TC-054                                                        |
 | 外部依存・例外                                           | excluded(DOM とイベントだけで外部依存と throw 経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S4
+
+- テスト: `tests/web/keyboardNavigation.test.ts` describe `beginFocusUpdate / finishFocusUpdate`（`HTMLElement.prototype.focus` を spy して `{ preventScroll: true }` を観測）
+- TC-040 `restores to the regenerated element with preventScroll` / TC-041 `returns no ticket when focus is outside the root` / TC-042 `treats a popup owned by a row of the root as inside it` / TC-043 `expires an older ticket when a newer one exists for the same root` / TC-044 `does not restore after the repo changed` / TC-045 `does not restore after the user focused another element` / TC-046 `treats focus falling to body after DOM removal as restorable` / TC-047 `does not restore after the window blurred` / TC-048 `treats pointerdown as a user move` / TC-049 `does not let its own restore invalidate the next ticket` / TC-050 `leaves focus in a connected context menu alone` / TC-051 `parks focus on the container while loading and keeps the keys for the next ticket` / TC-052 `drops the parked keys when the user leaves during loading` / TC-053 `keeps generations independent per root` / TC-054 `returns null without a context`
+- main への接続（読み込み中の退避・応答後の再解決・repo 切替の失効）は `web/main-test/13-keyboard-accessibility-02.md` S74 TC-709〜TC-720 が実 DOM で検証
+- 実行結果（2026-10-07）: 15 件 pass（S1〜S4 合計 54 件）

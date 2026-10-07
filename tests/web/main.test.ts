@@ -6878,7 +6878,7 @@ describe("worktree label rendering (S55)", () => {
   });
 
   it("shows the detached worktree menu on a detached label (TC-412)", () => {
-    // Case: TC-412
+    // Case: TC-412 (menu source is the label's button: 13-keyboard-accessibility-02.md S78 TC-743)
     // Given: the current repo has a recent action and a detached label is rendered
     dispatchMessage({
       command: "loadRepos",
@@ -7108,7 +7108,7 @@ describe("worktree label rendering (S55)", () => {
   });
 
   it("resolves a contextmenu on the label icon to the detached label (TC-423)", () => {
-    // Case: TC-423
+    // Case: TC-423 (menu source is the label's button: 13-keyboard-accessibility-02.md S78 TC-743)
     // Given: a detached label with its worktree icon is rendered
     loadWithWorktrees({
       branches: {},

@@ -15,7 +15,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `FocusContext.getTabStops(): readonly HTMLElement[]` の main 実装 / 一覧内の Tab 境界処理（操作対象行 → 表示参照・counter → 詳細操作の往復で `moveFocusPast` を使う）/ 列ヘッダーの並び順メニュー button
-> Target Path: `web/main.ts`（`getTabStops` の組み立て、`renderTable()` の列ヘッダー、一覧内 Tab の keydown 処理。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:287-320, 1657-1680, 2166-2213`（`consumeKey` / `isDisplayed` / `isTabStop` / `collectTabStops` / `activeContainer`、`bindCommitOrderingButton` / `buildCommitOrderingButtonHtml`、`getRowLabelStops` / `getTabStops` / `handleListTab`）
 > Test File: `tests/web/main.keyboard.test.ts`
 
 対応プラン §3.6・R4.3 の順序。通常 DOM 順の部分はネイティブ Tab に任せ、別行に挿入された詳細との境界だけ明示移動する。jsdom では Tab の既定動作が生成されないため、`getTabStops()` の配列と、一覧内境界で `Tab` keydown を送ったときの `activeElement` / `defaultPrevented` を観測する。実 Tab 順は Task 12 の実 Webview 確認（Notes）に残す。
@@ -43,6 +43,13 @@
 | 循環、追加読込 / 検索の位置             | TC-707、TC-708                                                                                                                                                                       |
 | 実 Tab 移動                             | excluded(jsdom では生成されない。Task 12 の実 Webview 手動 Case: toolbar → 一覧 → 参照 → 詳細 → 追加読込 → 検索 → Webview 外へ Tab で退出できることを VS Code 版・OS を記録して確認) |
 
+### Task 12 テスト対応（Feature 061-05）— S73
+
+- テスト: `tests/web/main.keyboard.test.ts` describe `Tab boundary between the target row's labels and the details (S73)`（TC-702 / TC-703 / TC-704 / TC-707）、describe `tab stop order across the toolbar, bars, panel, list, details and find (S73)`（Task 12 追加: TC-700 / TC-701 / TC-705）、describe `toolbar state, load more button, status notice and ordering button`（TC-706 `opens the ordering menu from the header button with Enter, Space and click`、TC-708 `places the load more button and the find controls after the list`）
+- TC-700 の観測方法: `getTabStops()` は private のため、公開 API `moveFocusPast(captureFocusOrigin(activeElement), 1)` を先頭の repo 起動 button から `false` になるまで繰り返し、到達した要素列（`walkTabStops()`）の所属グループ順を比較する。検索を開くとファイル履歴が終了する既存契約（`10-file-history-01.md` TC-324）があるため、履歴バーありの巡回と検索ありの巡回の 2 回に分けて全順序を確認した。全停止点が `isConnected`・非 `hidden`・非 `aria-hidden`・非 `:disabled` で重複なし
+- TC-707 残課題（手動）: 詳細が操作対象行より上にある場合、詳細最後の Tab と行の Shift+Tab はネイティブ順で一覧へ再入場し得る（Task 3 handoff）。自動テストは非消費だけを確認し、実 Tab 順は `13-keyboard-accessibility-01.md` 冒頭の手動一覧に残す
+- 実行結果（2026-10-07）: 9 件 pass
+
 ## S74: 再描画・応答後のフォーカス復元とメニュー対象の維持
 
 > Origin: Feature 061-05 (light-spec-plan)
@@ -50,7 +57,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `renderTable()` / `renderUncommitedChanges()` / 詳細の挿入・置換（`renderCommitDetailsView()` / `showCommitDetails()`）/ 追加読込 / `renderShowLoading()` での `beginFocusUpdate(root)` → `finishFocusUpdate(update)` の接続 / repo 変更入口での ticket 失効と `hideContextMenu("repository")` / 同 repo の `renderShowLoading()` でメニューを閉じない変更
-> Target Path: `web/main.ts`（各描画関数の前後と repo 変更入口。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:1113-1120, 1198-1222, 1524-1533, 2031-2051, 2367-2399, 2419-2498`（`renderTable()` の ticket、追加読込 button の click、`renderShowLoading()`、`leaveRepository` / `beginListFocusUpdate` / `finishListFocusUpdate`、`renderCommitDetailsView()`、`hideCommitDetails()` / `showCommitDetails()`）
 > Test File: `tests/web/main.keyboard.test.ts`
 
 対応プラン §3.4 の ticket 方式を main の描画へ接続した観点。ticket の判定自体は `web/keyboardNavigation-test.md` S4 の責務で、本表は main のどの描画でどの root に ticket を取り、repo 変更でいつ失効させるかを実 DOM で観測する。復元のための追加要求・自動再試行は作らない（全 Case で復元に伴う `postMessage` 増分 0）。
@@ -83,6 +90,14 @@
 | 復元のための要求                                         | TC-720                                               |
 | ticket の判定条件                                        | excluded(`web/keyboardNavigation-test.md` S4 の責務) |
 
+### Task 12 テスト対応（Feature 061-05）— S74
+
+- テスト: `tests/web/main.keyboard.test.ts` describe `focus restore after re-render and the kept menu context (S74)`。TC-709〜TC-716、TC-719 を同番号の `it` で（TC-710 は行・参照ラベル・詳細内ファイル button の 3 変種、TC-709 / TC-719 は describe `toolbar state, …` / `details, file and folder controls … (S76)` にも変種）。TC-718 は S76 describe の `restores the details' origin row after the switch started from the parent link (TC-718)`
+- Task 12 追加: TC-717 `replaces the load more button on Enter and keeps focus on a connected element (TC-717)`、TC-720 `adds no request of its own across loading, re-render and details restores (TC-720)`（参照ラベル focus → Ctrl+R → 応答 → 強制再描画 2 回 → 詳細のファイル消失まで通し、`postMessage` の command 列が操作由来の `loadBranches` / `loadCommits` / `commitDetails` だけであることを確認）
+- TC-714 の解釈（Task 3 handoff）: 同 repo の読み込み表示と **変更なし** の応答ではメニューが残り、開いた時点の `hash` で action が走る。**変更あり** の応答では `requestLoadBranchesAndCommits` の既存 callback がメニューを閉じる（`05-state-response-02.md` S67 TC-626 が active のまま）。TC-714 の test は変更なし応答で確認し、変更あり応答の閉鎖は TC-626 の test が担う
+- TC-717 の解釈: 追加読込 button は click 時に loading header へ **置換** される（Task 9「処理開始時の無効化/置換」）ため、`disabled` ではなく置換（`isConnected === false`）を観測する。置換時点で button の ticket が解決し focus は操作対象行へ移り、応答後も行に留まる（Expected の「残る追加読込 button」は、置換前に ticket が解決する現実装では復元先にならない。R4.7 の復元列「同操作 → 操作対象行」の後段で、`body` へ落ちない要件は満たす。レビュー論点として記録）。Enter 自体は native button の既定 click に委ね（`defaultPrevented === false`）、jsdom では `click()` で代替
+- 実行結果（2026-10-07）: 14 件 pass
+
 ## S75: ContextMenu / Shift + F10 によるメニュー起動経路と参照ラベルの Enter / Space
 
 > Origin: Feature 061-05 (light-spec-plan)
@@ -90,7 +105,7 @@
 > Status: active
 > Supersedes: -
 > Signature: コミット行 / 作業ツリー行 / 参照 button / stash / worktree ラベル / ファイル行 / 表ヘッダーの `keydown`（`key: "ContextMenu"` または Shift + `F10`）から既存 builder（`buildCommitContextMenuItems` / `buildUncommittedContextMenuItems` / `showRefBadgeContextMenu` / ファイル menu / 並び順 menu）へ `showContextMenu(event: ContextMenuTrigger, items, sourceElem, recentActions?, focusOptions?)` を呼ぶ経路 / キー起動直後の同じ押下由来 `contextmenu` の抑止 / 参照 button の `Enter` / `Space`
-> Target Path: `web/main.ts`（各 menu 起点の listener と `showRefBadgeContextMenu()`。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:322-330, 1270-1352, 1353-1511, 1640-1702, 2715-2752, 2838-2848`（`consumeContextMenuLaunch`、行・作業ツリー行・`gitRef` の keydown、`showCommitRowContextMenu` 〜 `showStashBadgeContextMenu`、列ヘッダーと並び順 button、ファイル行の keydown と `handleFileRowActivationKey`）
 > Test File: `tests/web/main.keyboard.test.ts`
 
 対応プラン §3.5・R4.4 の main 側。メニュー内部のフォーカス・移動・閉鎖は `web/contextMenu-test.md` S9 / S10 の責務。各起点で、同じ対象をマウスで右クリックした場合の `showContextMenu` の `items`（title 列）と action 実行時の `postMessage` 引数が一致することで builder / context の同一性を確認する。
@@ -116,6 +131,13 @@
 | 参照 Enter で checkout / 行詳細を起こす   | TC-726                                              |
 | メニュー内部の移動・閉鎖                  | excluded(`web/contextMenu-test.md` S9 / S10 の責務) |
 
+### Task 12 テスト対応（Feature 061-05）— S75
+
+- テスト: `tests/web/main.keyboard.test.ts` describe `ref label Enter / Space open the menu while dblclick keeps the checkout (S75)`。TC-726 は 2 `it`（Enter / Space / dblclick と repeat / keyup）。Task 12 追加: TC-721 `opens the row menu from Shift+F10 and ContextMenu at the row's rectangle (TC-721)`（行の `getBoundingClientRect` を stub し、同じ anchor 点で発火したマウス menu と `style.left` / `style.top`・title 列が一致、最初の項目へ実フォーカス）、TC-722 `sends every launch point to the builder its mouse right-click uses (TC-722)`（作業ツリー行 / ローカル主部 / 併記 remote / stash / detached worktree / 詳細内ファイル行 / 列ヘッダーの 7 起点で title 列が一致し、代表項目 `copyToClipboard`（`feature` / `origin/feature` / `stash@{0}` / `/tmp/wt8`）と `openFile`（`repo` / `commitHash` / `filePath`）の payload がマウス経由と `toEqual`）、TC-723 `leaves Shift+F10 and ContextMenu to the find input and to dialog inputs (TC-723)`、TC-724 `swallows only the contextmenu of the same press and keeps later right-clicks (TC-724)`（keydown → 同じ押下の `contextmenu` → keyup → 別行の独立した右クリック）、TC-727 `runs the same action and recent record from Enter as from a click (TC-727)`（`Open File` の `saveRepoState` + `openFile`、行の `Copy Commit Hash` で Enter と click の `postMessage` 列が一致）
+- TC-725 は `tests/web/main.refOverflow.test.ts` describe `… (S57)` 直後の `passes the list's focus options on a keyboard launch from a clone (TC-725)`（省略一覧の layout fixture と `showContextMenu` spy を持つファイルに置く。`// Case: TC-725` で本表を参照）
+- TC-722 の表示元: `showContextMenu` の第 3 引数は起動した操作 `button`（行内 `.gitRefButton` / `.gitRefHeadRemote`、複製の同 button、ファイル行の子 button）であり、builder へは従来どおり `.gitRef` badge / `li.gitFile` を渡す。旧 S55 / S57 / S61 の「第 3 引数が badge / ラベル要素」の契約は S78 で置き換えた
+- 実行結果（2026-10-07）: 7 件 pass（本 shard 分）＋ TC-725 pass
+
 ## S76: 詳細・ファイル・フォルダー操作の標準 button と既存アクション接続
 
 > Origin: Feature 061-05 (light-spec-plan)
@@ -123,7 +145,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `renderCommitDetailsView()` / `showCommitDetails()` の親 hash button・`#commitDetailsClose`・`#fileViewToggle` / `bindFileViewListeners()` のファイル差分 button・`.openFile` button・`.highlightFileHistory` button・folder button の `click` と `keydown` / `handleFileViewToggle()` / `alterGitFileTree` の接続
-> Target Path: `web/main.ts`（`renderCommitDetailsView()`、`bindFileViewListeners()`、`handleFileViewToggle()`。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:2367-2399, 2499-2504, 2640-2848`（`renderCommitDetailsView()`、`bindDetailsClose`、`bindParentHashListeners` / `handleFileViewToggle` / `bindFileViewListeners` / `markFileViewTargets` / `toggleFolder` / `sendViewDiffAction` / `handleFileRowActivationKey`）
 > Test File: `tests/web/main.keyboard.test.ts`
 
 対応プラン §3.7.2 R4.3 の詳細・ファイル操作を main 側で接続した観点。HTML 構造（sibling button・`hidden`・名前）は `web/fileTree-test.md` S6 の責務。各操作は `button` の `click`（jsdom では `Enter` / `Space` の既定 click が生成されないため `click` で代替し、`keydown` の `Enter` / `Space` で同じ handler が 1 回だけ呼ばれることを別に確認）で既存の要求と同じ引数を送り、子 button の実行が `li` や行の `click` へ伝播して差分 / 詳細の追加要求を出さない。
@@ -149,14 +171,21 @@
 | binary で差分起動 / メニュー消失             | TC-734                                     |
 | HTML 構造・名前                              | excluded(`web/fileTree-test.md` S6 の責務) |
 
+### Task 12 テスト対応（Feature 061-05）— S76
+
+- テスト: `tests/web/main.keyboard.test.ts` describe `details, file and folder controls as standard buttons (S76)`。TC-728〜TC-734 を同番号の `it` で（TC-731 は通常 / 比較の 2 変種、TC-734 は binary の差分 button と有効 button なし行の 2 変種）
+- jsdom の代替（Task 8 handoff）: 各 button の Enter keydown は native click に委ねるため `defaultPrevented === false` を確認し、実行は `click` で代替する（実機の Enter → click 1 回は `13-keyboard-accessibility-01.md` 冒頭の手動一覧）。TC-730 の「要求 0 件」は Git / 詳細要求 0 件の意味で、表示形式の保存 `saveRepoState` 1 件は `01-rendering-03.md` S62 TC-548 の契約として許容。TC-733 の「閉じている間は子 button が `getTabStops()` に含まれない」は `ul.gitFolderContents[hidden]` 祖先による除外（`isTabStop` の `[hidden]` 判定）で確認
+- 実行結果（2026-10-07）: 13 件 pass
+
 ## S77: 行の名前・状態説明・状態通知
 
 > Origin: Feature 061-05 (light-spec-plan)
 > Added: 2026-10-07
-> Status: active
+> Status: superseded
+> Superseded By: S79
 > Supersedes: -
 > Signature: `renderTable()` / `renderUncommitedChanges()` の行 `aria-label` と `aria-describedby`（`a11y.operationTarget` / `a11y.detailsOpen` / `a11y.compareBase` / `a11y.compareTarget` / `a11y.head` / `a11y.workingTree` / `a11y.stash`）/ `#commitTable` の `aria-label`（`a11y.commitHistory`）/ `role="status"` `aria-live="polite"` の通知要素への `a11y.commitsLoaded` / `a11y.noCommits` / エラー文言の書込み / `abbrevCommit` / `getCommitDate`
-> Target Path: `web/main.ts`（行描画と通知の書込み。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:134-149, 848-856, 1160-1200, 1851-1855, 2110-2132`（`buildRowName` / `buildRowStateHtml`、`loadCommits()` の `announceStatus` 呼出し、`renderTable()` の行属性、`announceStatus`、`refreshRowStates`）
 > Test File: `tests/web/main.keyboard.test.ts`
 
 対応プラン §3.6 末尾・R4.8 の読み上げ。辞書の値は `l10n/web/web.l10n.en.json-test.md` S11 / `web.l10n.ja.json-test.md` S12、CSS は `media/main-test.md` S9 の責務。`globalThis.webviewMessages` に実辞書（en）を設定して文言を確認する。
@@ -184,3 +213,74 @@
 | 一覧・button の名前欠落          | TC-740、TC-741                                                                                        |
 | 装飾・測定複製の読み上げ         | TC-742                                                                                                |
 | 実際の発話                       | excluded(支援技術依存。TC-742 Notes の手動確認で意味と操作可否を確認し、自動テストの pass に含めない) |
+
+### Task 12 テスト対応（Feature 061-05）— S77
+
+- 本節は S79 に置き換えた（TC-739 のエラー部分だけが契約変更。他の Case は S79 へ引き継ぎ、test method の対応は S79 の「Task 12 テスト対応」を参照）
+
+## S78: 参照・stash・worktree メニューの表示元は起動した操作 button、複製再生成でメニューを維持
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: S55, S57, S61
+> Signature: `showRefBadgeContextMenu(event: ContextMenuTrigger, badge: HTMLElement, focusOptions?: ContextMenuFocusOptions): void` / `showStashBadgeContextMenu(event, badge, source, focusOptions?)` / `resolveRefSource(event, badge): HTMLElement` / `RefOverflowOptions.onRefContextMenu(event, ref, focusOptions?)` と `renderPopupItems()`（`hideContextMenu()` を呼ばない）
+> Target Path: `web/main.ts:157-172, 1313-1329, 1408-1511`（`resolveRefType` / `resolveRefSource`、`gitRef` の contextmenu / keydown、`showRefBadgeContextMenu` 〜 `showStashBadgeContextMenu`）、`web/refOverflow.ts:728-759`（`renderPopupItems` / `clonePopupItem` / `forwardRefMenu`）
+> Test File: `tests/web/main.refOverflow.test.ts`（S55 / S57 / S61 由来の Case）、`tests/web/main.test.ts`（S55 TC-412 / TC-423）、`tests/web/main.keyboard.test.ts`（TC-722）
+
+Task 7（参照ラベルの `button` 化）と R4.7 により、S55（`01-rendering-02.md`）・S57（`02-context-menu-01.md`）・S61（`02-context-menu-02.md`）の 3 点が置き換わる: (1) S55 TC-412 / TC-423 と S57 TC-445 / TC-449 / TC-453 の「`showContextMenu` の第 3 引数が `.detachedWorktree` / バッジ / 複製要素 / ラベル」は、起動した **操作 `button`**（`.gitRef > button.gitRefButton`、併記 remote は `button.gitRefHeadRemote`、複製も同じ button）になる。builder（`buildRefContextMenuItems` / `buildDetachedWorktreeContextMenuItems` / `buildStashContextMenuItems`）へ渡す引数は従来どおり `.gitRef` badge / 元の `.commit` 行で変わらない。(2) S61 TC-531 の「複製再生成でメニュー消去（`hideContextMenu` 1 回）」は、複製 DOM の更新だけを理由に開いているメニューを閉じない契約（`web/refOverflow-test.md` S6 TC-102 と同じ）へ変わる。上記 6 件以外の S55 / S57 / S61 の Case（S55 TC-394〜TC-411・TC-413〜TC-422・TC-424〜TC-426、S57 TC-446〜TC-448・TC-450〜TC-452・TC-454〜TC-456、S61 TC-494〜TC-530・TC-532〜TC-545）は期待結果を変えずに本節へ引き継ぎ、テストは同じ Case ID のまま各 test file に残る。
+
+| Case ID | Input / Precondition                                                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                 | Notes                                                                                              |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| TC-743  | S57 TC-445 / TC-449 と S55 TC-412 / TC-423 の各状態（行内の worktree 付き branch、その複製、detached ラベル本体とその icon）で contextmenu | Normal - 表示元は起動した操作 button                                       | builder の引数は旧 Case と同じ（`(TEST_REPO, "feature/x", バッジ, false, gitBranchHead, ["origin"], { path, isMainWorktree })` / `(TEST_REPO, "/tmp/wt8")`）で、`showContextMenu` の第 3 引数が当該 badge 内の `button.gitRefButton`（複製では複製内の同 button）。第 2 引数は builder の戻り値と `toBe` で同一 | S55 TC-412 / TC-423、S57 TC-445 / TC-449 の置き換え。`contextMenuActive` もその button に付く      |
+| TC-744  | S57 TC-453 / S61 の各状態で stash ラベル（行内・複製、icon / `span.findMatch` / 本体）を contextmenu                                       | Normal - stash の表示元                                                    | `buildStashContextMenuItems` が行内・一覧で各 1 回、同じ `(TEST_REPO, hash, selector, 元の .commit 行)`。`showContextMenu` の第 3 引数が各ラベル内の `button.gitRefButton`。参照 builder は 0 回                                                                                                                | S57 TC-453 の置き換え。S61 の対象解決（icon / 検索マーク / 本体）は引き継ぎ                        |
+| TC-745  | 一覧の複製からメニューを開いた後、実 FindWidget の検索更新（`SEARCH_DEBOUNCE_MS` 待機）で複製を再生成                                      | Normal - 複製再生成でメニューを維持                                        | 古い複製は `isConnected === false`、`#contextMenu` は `active` のまま（`hideContextMenu` 0 回）、一覧は同じ要素で開いたまま新しい複製（`data-stash-hash` が同じ）を持ち、`postMessage` 0 件                                                                                                                     | S61 TC-531 の置き換え（R4.7 / `web/refOverflow-test.md` S6 TC-102）。製品へ固定 delay を追加しない |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S78）
+
+| 失敗源                                                   | 対応ケースまたは除外理由                                                               |
+| -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| 表示元が badge のままで focus 復元先が button にならない | TC-743、TC-744                                                                         |
+| builder 引数が button 化で変わる                         | TC-743、TC-744（旧 Case と同じ引数）                                                   |
+| 複製再生成でメニューが閉じる / 旧複製が残る              | TC-745                                                                                 |
+| 対象解決（icon / 検索マーク / 本体 / 特殊文字）          | 引き継いだ S55 / S57 / S61 の Case（期待結果不変）                                     |
+| 外部依存・例外                                           | excluded(builder と `showContextMenu` の引数観測だけで外部依存と throw 経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S78
+
+- TC-743: `tests/web/main.refOverflow.test.ts` `passes the existing arguments for an in-row worktree branch (TC-445)` / `passes the in-row arguments for the listed worktree branch (TC-449)`、`tests/web/main.test.ts` `shows the detached worktree menu on a detached label (TC-412)` / `resolves a contextmenu on the label icon to the detached label (TC-423)`（各 test は第 3 引数を `menuSourceOf(badge)` / `label.querySelector("button.gitRefButton")` で assert。`// Case:` は旧 ID のまま本節を参照）
+- TC-744: `tests/web/main.refOverflow.test.ts` `opens the stash menu from the stash badge in the row and in the list (TC-453)` と S61 由来の describe `stash label lifecycle and clicks (S61)` の各 `it`（`expectStashMenuFrom` が表示元 button を assert）
+- TC-745: `tests/web/main.refOverflow.test.ts` `keeps the list menu when a find update regenerates the clones (TC-531)`（`// Case: TC-531` の注記で本節への置き換えを明記）
+- 実行結果（2026-10-07）: `tests/web/main.refOverflow.test.ts` 185 件・`tests/web/main.test.ts` 全件 pass
+
+## S79: 行の名前・状態説明・状態通知（読み込み完了 / 空結果は status、エラーは既存ダイアログ）
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: S77
+> Signature: `announceStatus(text: string)` と `loadCommits()` の `a11y.commitsLoaded` / `a11y.noCommits` の書込み / `showErrorDialog(message, reason, sourceElem, explanation?)`（`web/dialogs.ts`、`role="dialog"` `aria-modal="true"` `aria-labelledby`）/ S77 と同じ行の `aria-label` / `aria-describedby` / `#commitTable` の名前
+> Target Path: `web/main.ts:134-149, 848-856, 1160-1200, 1851-1855, 2110-2132`、`web/dialogs.ts:270-294`
+> Test File: `tests/web/main.keyboard.test.ts`
+
+S77 TC-739 は「エラー応答（`error` 付き）の受理で `[role="status"]` にエラー文言」を期待したが、一覧読み込み（`ResponseLoadCommits` / `ResponseLoadBranches`）はホスト protocol に `error` フィールドを持たず（§7 により protocol は変更しない）、操作応答のエラーは既存契約 R5 どおり `showErrorDialog`（`aria-modal` の dialog。初期フォーカスが閉じる button へ移り、名前が質問文を指す: `web/dialogs-test.md` S9 TC-049 / TC-055）で通知される。本節は TC-739 を「読み込み完了 / 空結果は polite な status、エラーは dialog（status 不変）」へ置き換え、S77 の TC-735〜TC-738・TC-740〜TC-742 は期待結果を変えずに引き継ぐ（テストは同じ Case ID のまま `tests/web/main.keyboard.test.ts` describe `row names, state descriptions and decorative icons (S77)` に残る）。レビュー論点: エラー文言を status へも書く（`showErrorDialog` から `announceStatus` を呼ぶ）案は製品変更のため本 Task では行わない。
+
+| Case ID | Input / Precondition                                                                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                                                                                                                                     | Notes                                                                                    |
+| ------- | ----------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| TC-746  | 標準 fixture の受理、`commits = []` の受理、続けて操作応答のエラー（`addTag` の `status` が失敗文字列）を受理する | Normal - polite な状態通知と dialog の分担                                 | 受理で `[role="status"]` の `textContent` が `a11y.commitsLoaded` の `{0}` に件数（`3`）、空で `a11y.noCommits`。エラーでは `#dialog` が `active`・`role="dialog"`・`aria-modal="true"` で `textContent` に `error.addTag` の訳と失敗文字列を含み、閉じる button に実フォーカス、`[role="status"]` の `textContent` は直前の値のまま。要素は `aria-live="polite"` を持ち、`#commitTable` / `#commitGraph` は `aria-live` を持たない | S77 TC-739 の置き換え（K45）。「グラフ全体の再描画をlive領域として読み直させない」は維持 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S79）
+
+| 失敗源                                                    | 対応ケースまたは除外理由                                                                    |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 通知の欠落、グラフ全体の live 化                          | TC-746                                                                                      |
+| エラーが status と dialog の両方に出る / どちらにも出ない | TC-746                                                                                      |
+| 名前・状態・種類・role・装飾                              | 引き継いだ S77 TC-735〜TC-738、TC-740〜TC-742（期待結果不変）                               |
+| 一覧読み込みのエラー応答                                  | excluded(ホスト protocol に `error` が無く §7 で protocol を変更しない)                     |
+| 実際の発話                                                | excluded(支援技術依存。TC-742 の手動確認。`13-keyboard-accessibility-01.md` 冒頭の手動一覧) |
+
+### Task 12 テスト対応（Feature 061-05）— S79
+
+- TC-746: `tests/web/main.keyboard.test.ts` describe `toolbar state, load more button, status notice and ordering button` の `writes the loaded count and the empty result to the polite status notice (TC-739)`（読み込み完了 / 空結果）と `keeps the status notice unchanged while an error dialog announces a failure (TC-746)`（Task 12 追加。`addTag` 応答の失敗 `status` を受理し、`#dialog` の属性・フォーカスと status の不変を確認）
+- 引き継ぎ: TC-735 `names a row by short hash, subject, author and date without interpreting HTML (TC-735)` / TC-736 `describes the target, details, compare base, compare target and HEAD together (TC-736)` / TC-737 `states the working tree and stash kinds in the row name (TC-737)` / TC-738 `keeps the native table structure without grid roles or aria-selected (TC-738)` / TC-740・TC-742 `names the list and hides the decorative ref icons from the accessibility tree (TC-740 / TC-742)` / TC-741 `uses the standard disabled state on the current button (TC-741)`。TC-742 の測定複製 `.refOverflowMeasure`（`aria-hidden="true"`・停止点なし）は `web/refOverflow-test.md` S6 TC-104 の test が assert
+- 実行結果（2026-10-07）: 全件 pass

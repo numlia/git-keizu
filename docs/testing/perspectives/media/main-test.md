@@ -453,8 +453,8 @@ S1は層数を10定義に固定していたため、ref一覧層の追加で期�
 > Status: active
 > Supersedes: -
 > Signature: `:focus-visible` の `outline: 2px solid var(--vscode-focusBorder)` を行の各 cell・参照 / ファイル / toolbar / バー / 整理 / 詳細 / メニュー項目 / 候補の操作要素へ適用する宣言 / 操作対象行の行頭矢印（`tr.commit.keyboardTarget td:first-child::before` 相当）/ 視覚非表示の説明 class（`.visuallyHidden` 相当）/ `.gitFile:focus-within .gitFileActions` / 既存 `commitDetailsOpen` / `compareTarget` / `current`（HEAD）/ `findMatch` class の維持
-> Target Path: `media/main.css`（フォーカス枠・操作対象・ファイル操作・行状態の宣言群。設計時のため実装後に行範囲へ更新）
-> Test File: `tests/web/keyboardStyles.test.ts`（TC-101〜TC-106）、実 VS Code Webview（TC-107〜TC-109）
+> Target Path: `media/main.css:150-160, 215-217, 459-490, 533-535, 583-585, 626-630, 679-690, 740-742, 767-769, 811-815, 853-859, 880-882, 912-914, 969-975, 1004-1007, 1158-1161, 1211-1213, 1256-1272, 1298-1300`（行・一覧の枠と行頭矢印、並び順 button、詳細 / ファイル / folder の枠と `:disabled`、`.gitFile:focus-within`、`.parentHash`、参照 button / counter、`.refOverflowMeasure`、toolbar checkbox、履歴バー `:disabled`、経路バー、toolbar button と `#currentBtn:disabled`、`#branchCleanupPanel[hidden]`、整理 button `:disabled`、メニュー項目、dialog 入力、`#dialog .roundedBtn:disabled`、`.roundedBtn:focus-visible` と `.visuallyHidden`、checkbox の枠）
+> Test File: `tests/web/keyboardStyles.test.ts`（TC-101〜TC-106）、実 VS Code Webview（TC-107〜TC-109。Task 12 時点で未実施）
 
 対応プラン §3.1・R4.8・Task 11 の観点。CSS は文字列として読み込み、対象セレクターの宣言を抽出して検証する。固定色による focus 表現を追加せず、`--vscode-focusBorder` だけを使う。2px はユーザー指定値で実測由来ではない。実画面の確認は手動 Case として VS Code 版・OS・テーマ名を記録し、自動テストの pass に含めない。
 
@@ -481,3 +481,9 @@ S1は層数を10定義に固定していたため、ref一覧層の追加で期�
 | 非表示 / 無効 / 測定複製の表示                              | TC-106                                     |
 | テーマ・狭幅・実 Tab の見え方                               | TC-107〜TC-109（手動。jsdom で代替しない） |
 | 外部依存・例外                                              | excluded(静的 CSS 契約)                    |
+
+### Task 12 テスト対応（Feature 061-05）— S9
+
+- テスト: `tests/web/keyboardStyles.test.ts` describe `media/main.css focus frame, target marker, row states and focus-within (S9)`。TC-101 `draws a 2px focusBorder outline on the row box and every operable control` / TC-102 `uses only the theme focusBorder variable in focus declarations` / TC-103 `marks the target row head with an arrow and keeps the description readable` / TC-104 `keeps the existing state classes on properties the target marker does not use` / TC-105 `shows the file actions on focus-within exactly as on hover` / TC-106 `backs hidden, disabled and measuring elements with matching display rules`（CSS をテキストとして読み宣言を抽出）
+- 手動 Case TC-107 / TC-108 / TC-109: **未実施**。理由: 本 Task の実行環境は jsdom のみで VS Code Webview・テーマ描画が無い。影響: `--vscode-focusBorder` の解決、Blink の `<tr>` への `outline` 描画、狭幅での枠のはみ出し、hover → focus-within の見え方は静的宣言では確認できない。代替確認: TC-101〜TC-106。残る手順と記録様式（VS Code 版 / OS / テーマ名 / スクリーンショット）は `web/main-test/13-keyboard-accessibility-01.md` 冒頭「Task 12 実 Webview 手動確認（未実施一覧）」。実施後に観測結果を本 Notes へ追記する
+- 実行結果（2026-10-07）: 6 件 pass

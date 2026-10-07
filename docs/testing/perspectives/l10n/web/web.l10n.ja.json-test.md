@@ -431,3 +431,9 @@ counterのtitle/aria-labelに使う新キーが ja bundle に追加され、値�
 | 片 locale だけの追加                   | TC-104                                              |
 | 実画面との不整合                       | TC-105（手動）                                      |
 | 外部依存・例外・型                     | excluded(静的 JSON で外部依存・throw・型分岐が無い) |
+
+### Task 12 テスト対応（Feature 061-05）— S12
+
+- テスト: `tests/web/i18n.test.ts`。TC-101 `Japanese bundle holds the twelve keys without raw key fallback (ja l10n TC-101)` / TC-102 `Japanese bundle holds exactly the fixed values of the Task 11 table (ja l10n TC-102)` / TC-103 `Japanese placeholders match the English sets (ja l10n TC-103)` / TC-104 `keeps the a11y key sets of both locales in parity (en l10n TC-104 / ja l10n TC-104)`
+- 手動 Case TC-105（ja locale のアクセシビリティツリー）: **未実施**。理由・影響・代替確認・残る手順は `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧（スクリーンリーダーの行）。代替確認: TC-101〜TC-104 と `web/main-test/13-keyboard-accessibility-02.md` S79（旧 S77）TC-735〜TC-737 の属性（en 辞書）
+- 実行結果（2026-10-07）: 4 件 pass

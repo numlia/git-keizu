@@ -58,8 +58,8 @@
 > Status: active
 > Supersedes: -
 > Signature: `.dropdownCurrentValue`（`button` 化）/ `.dropdownOption[role="option"]` の `:focus-visible` と `[aria-selected="true"]` / 装飾 checkbox（`.dropdownOptionCheck` 相当）/ `.dropdownCurrentValue:disabled` / `.dropdownHintBtn`（`button` 化）の宣言
-> Target Path: `media/dropdown.css`（起動 button・候補・hint button の宣言。設計時のため実装後に行範囲へ更新）
-> Test File: `tests/web/keyboardStyles.test.ts`（TC-013〜TC-016）、実 VS Code Webview（TC-017）
+> Target Path: `media/dropdown.css:19-58, 87-108, 128-131, 168-170, 200-216`（`.dropdownCurrentValue` の reset / `:disabled` / `:focus-visible` / `:after`、`.dropdownOption` と `[aria-selected]` の装飾 check / `:focus-visible`、開いた状態の起動 button、`.dropdownFilterInput:focus-visible`、`.dropdownHintBtn` の reset / `:focus-visible`）
+> Test File: `tests/web/keyboardStyles.test.ts`（TC-013〜TC-016）、実 VS Code Webview（TC-017。Task 12 時点で未実施）
 
 対応プラン Task 11 実装内容 1〜2 の観点。`button` 化で UA 既定の font / color / border / padding が入るため、既存表示へ合わせる reset 宣言と、隠れた停止点（`input[type=checkbox]`）を残さない宣言を検証する。
 
@@ -80,3 +80,9 @@
 | 隠れた checkbox の停止点    | TC-015                   |
 | 無効表示の欠落              | TC-016                   |
 | 外部依存・例外              | excluded(静的 CSS 契約)  |
+
+### Task 12 テスト対応（Feature 061-05）— S2
+
+- テスト: `tests/web/keyboardStyles.test.ts` describe `media/dropdown.css trigger, options, decorative checkbox and disabled state (S2)`。TC-013 `resets the native button look of the trigger and hint buttons` / TC-014 `outlines the trigger and the options with the inset focus frame` / TC-015 `drives the decorative check mark from aria-selected without a hidden input` / TC-016 `dims the disabled trigger and drops its pointer cursor`
+- 手動 Case TC-017: **未実施**（理由・影響・代替確認・残る手順は `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧。狭幅で branch 複数選択を Tab / Enter で開き候補を ↓ で移動し、apply / cancel の枠を確認）
+- 実行結果（2026-10-07）: 4 件 pass

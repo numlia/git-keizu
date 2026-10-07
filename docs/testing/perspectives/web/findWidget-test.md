@@ -243,7 +243,7 @@ stash の照合値を完全な `commit.stash.selector`（例 `stash@{0}`）か�
 > Status: active
 > Supersedes: -
 > Signature: `new FindWidget(callbacks)`（公開 signature は維持。`#findCaseSensitive` / `#findRegex` / `#findOpenCdv` / `#findPrev` / `#findNext` / `#findClose` を `button type="button"` にし `aria-pressed` / `disabled` を同期）/ `#findInput` の `keydown`（`Enter` / Shift + `Enter` を `isKeyboardActionBlocked` 後に `next()` / `prev()` へ）/ `show(focus?: boolean)` / `close()` / `findMatches()` / `clearMatches()`
-> Target Path: `web/findWidget.ts`（constructor の DOM 生成、input の keydown、`close`、`findMatches` / `clearMatches`。設計時のため実装後に行範囲へ更新）
+> Target Path: `web/findWidget.ts:125-271, 302-471, 490-501, 524-563`（constructor の DOM 生成と input の keydown、`show` / `close` / `refresh` / `isVisible` / `setInputEnabled`、`findMatches` / `clearMatches`、`prev` / `next`、`buttonHtml` / `toggleClass` / `setPressed` / `syncNavigationState` / `setControlsReachable`）
 > Test File: `tests/web/findWidget.test.ts`
 
 対応プラン R4.3・R4.6 と Task 9 の観点。S1〜S10 の検索意味・debounce・regex 判定・走査除外は維持されるため active のまま additive（S1 TC-001 の構成要素は `button` 要素として存在する）。現行は `span` の修飾子と `keyup` の Enter 判定で、IME 確定の keyup で `next()` が走る。fixture は S1 と同じ callbacks（`vi.fn()`）と、`tr.commit` / 参照 `button` を含む `#commitTable` を持つ jsdom。
@@ -272,3 +272,9 @@ stash の照合値を完全な `commit.stash.selector`（例 `stash@{0}`）か�
 | 検索 span が button / 属性を壊す                            | TC-500                                                       |
 | debounce / regex の退行、矢印の横取り                       | TC-501、TC-502                                               |
 | 外部依存・例外                                              | excluded(callbacks は spy で外部依存と throw 経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S11
+
+- テスト: `tests/web/findWidget.test.ts` describe `FindWidget standard controls, IME guard and focus survival (S11)`。fixture は `configureFocusContext` と `installKeyboardGuards` を `beforeEach` で登録し `afterEach` で破棄。TC-493〜TC-502 を同番号の `it` で 1 件ずつ
+- 手動 Case（未実施）TC-497（IME 確定直後の Enter / keyup）: `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧（IME の行）。jsdom では合成した `compositionstart → keydown → compositionend → keyup` 列で代替
+- 実行結果（2026-10-07）: 10 件 pass

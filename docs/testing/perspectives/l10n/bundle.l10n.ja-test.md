@@ -32,3 +32,8 @@
 | 既存訳の変更                     | TC-002                                              |
 | 片 locale だけの追加             | TC-003                                              |
 | 外部依存・例外・型               | excluded(静的 JSON で外部依存・throw・型分岐が無い) |
+
+### Task 12 テスト対応（Feature 061-05）— S1
+
+- テスト: `tests/src/i18n.test.ts`。TC-001 `Japanese host bundle translates the list name and status region name (ja TC-001)` / TC-002 `Japanese host bundle keeps the nine toolbar keys translated (ja TC-002)` / TC-003 `adds the two host keys to both locales (en TC-003 / ja TC-003)`
+- 実行結果（2026-10-07）: 3 件 pass

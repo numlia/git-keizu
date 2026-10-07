@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-10-07T15:13:57+00:00
+> Auto-generated: 2026-10-07T20:12:37+00:00
 > Total sources: 58
 > Total physical files: 104
-> Total sections: 609
-> Total cases: 3800
+> Total sections: 607
+> Total cases: 3666
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -32,7 +32,7 @@
 | `src/fileHistory.ts` | single-file | `src/fileHistory-test.md` | 1 | 8 | 80 | 2026-09-08 |
 | `src/gitExecutable.ts` | single-file | `src/gitExecutable-test.md` | 1 | 1 | 6 | 2026-07-19 |
 | `src/gitGraphView.ts` | single-file | `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md` | 1 | 17 | 60 | 2026-03-20 |
-| `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 11 | 37 | 188 | 2026-10-07 |
+| `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 11 | 37 | 181 | 2026-10-07 |
 | `src/i18n.ts` | single-file | `src/i18n-test.md` | 1 | 2 | 11 | 2026-08-25 |
 | `src/refValidation.ts` | single-file | `src/refValidation-test.md` | 1 | 1 | 19 | 2026-08-03 |
 | `src/repoFileWatcher.ts` | single-file | `src/repoFileWatcher-test.md` | 1 | 10 | 74 | 2026-08-08 |
@@ -56,14 +56,14 @@
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 3 | 11 | 2026-10-03 |
 | `web/keyboardNavigation.ts` | single-file | `web/keyboardNavigation-test.md` | 1 | 4 | 54 | 2026-10-07 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 19 | 58 | 521 | 2026-10-07 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 19 | 56 | 420 | 2026-10-07 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
 | `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 17 | 67 | 2026-09-29 |
 | `web/pathHighlight.ts` | single-file | `web/pathHighlight-test.md` | 1 | 3 | 21 | 2026-10-03 |
 | `web/pathHighlightController.ts` | single-file | `web/pathHighlightController-test.md` | 1 | 2 | 17 | 2026-10-07 |
 | `web/refMenu.ts` | single-file | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md` | 1 | 14 | 74 | 2026-07-19 |
 | `web/refMenu.ts` | sharded | `web/refMenu-test/INDEX.md` | 3 | 20 | 102 | 2026-10-03 |
-| `web/refOverflow.ts` | single-file | `web/refOverflow-test.md` | 1 | 5 | 103 | 2026-10-07 |
+| `web/refOverflow.ts` | single-file | `web/refOverflow-test.md` | 1 | 5 | 77 | 2026-10-07 |
 | `web/stashMenu.ts` | single-file | `web/stashMenu-test.md` | 1 | 8 | 30 | 2026-04-30 |
 | `web/uncommittedMenu.ts` | single-file | `web/uncommittedMenu-test.md` | 1 | 1 | 3 | 2026-03-09 |
 | `web/utils.ts` | single-file | `web/utils-test.md` | 1 | 5 | 31 | 2026-08-08 |
@@ -129,7 +129,7 @@
 | Feature 050 (pnpm-security-update) (light-spec-plan) | `package.json-test.md` |
 | Feature 051 (remote-checkout-pull) (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | Feature 052 (detached-worktree-display) (light-spec-plan) | `src/dataSource-test/INDEX.md`, `src/repoFileWatcher-test.md`, `src/types-test.md`, `src/utils-test.md`, `src/worktree-test.md`, `web/utils-test.md` |
-| Feature 053 (detached-worktree-menu) (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
+| Feature 053 (detached-worktree-menu) (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/types-test.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | Feature 055-01 (light-spec-plan) | `web/dialogs-test.md`, `web/messageHandler-test/INDEX.md` |
 | Feature 055-02 (light-spec-plan) | `media/dropdown-test.md`, `media/findwidget-test.md` |
 | Feature 055-03 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `src/branchCleanup-test.md`, `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `src/i18n-test.md`, `src/types-test.md`, `web/branchCleanupPanel-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
@@ -140,7 +140,6 @@
 | Feature 056 (retain-context-when-hidden) issue #48 | `src/config-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `web/main-test/INDEX.md` |
 | Feature 057 (multi-repo-single-folder-workspace) issue #49 | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/gitGraphView-test/INDEX.md` |
 | Feature 057 (multi-repo-single-folder-workspace) issue #49 PR #60 レビュー指摘 | `src/gitGraphView-test/INDEX.md` |
-| Feature 059-01 (stash-label-context-menu) | `web/main-test/INDEX.md` |
 | Feature 059-02 (PR #82 実機確認) | `media/main-test.md` |
 | Feature 059-02 (light-spec-plan) | `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/main-test.md`, `web/findWidget-test.md`, `web/i18n-test.md`, `web/main-test/INDEX.md`, `web/refOverflow-test.md` |
 | Feature 060 (light-spec-plan) | `media/main-test.md`, `web/main-test/INDEX.md` |

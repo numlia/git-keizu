@@ -58,8 +58,8 @@
 > Status: active
 > Supersedes: -
 > Signature: `.findWidget button`（`#findCaseSensitive` / `#findRegex` / `#findOpenCdv` / `#findPrev` / `#findNext` / `#findClose`）の reset・`:focus-visible`・`[aria-pressed="true"]`（既存 `.active`）・`:disabled` の宣言
-> Target Path: `media/findwidget.css`（検索 button の宣言。設計時のため実装後に行範囲へ更新）
-> Test File: `tests/web/keyboardStyles.test.ts`（TC-013〜TC-015）、実 VS Code Webview（TC-016）
+> Target Path: `media/findwidget.css:37-61, 64-82, 96-131`（`#findInput:focus-visible` / `.findWidget button` の reset / `:focus-visible` / `:disabled` / `#findInput:disabled`、`.findModifier` と `.active` / `[aria-pressed="true"]`、action button と `#findPrev` / `#findNext` の `:disabled`、`#findOpenCdv[aria-pressed="true"]`）
+> Test File: `tests/web/keyboardStyles.test.ts`（TC-013〜TC-015）、実 VS Code Webview（TC-016。Task 12 時点で未実施）
 
 対応プラン Task 11 実装内容 2 の観点。S1 の z-index 契約は維持。
 
@@ -78,3 +78,9 @@
 | 枠の欠落                    | TC-014、TC-016           |
 | 押下 / 無効表示の欠落       | TC-015                   |
 | 外部依存・例外              | excluded(静的 CSS 契約)  |
+
+### Task 12 テスト対応（Feature 061-05）— S2
+
+- テスト: `tests/web/keyboardStyles.test.ts` describe `media/findwidget.css button look, focus and pressed / disabled states (S2)`。TC-013 `resets the native buttons to the former span look` / TC-014 `outlines every find button and the input with the focus frame` / TC-015 `shows pressed state from aria-pressed as from .active and dims disabled buttons`
+- 手動 Case TC-016: **未実施**（理由・影響・代替確認・残る手順は `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧。検索を開き Tab で各 button を巡回し Aa / .* を Space で切り替えて枠と押下表示を確認）
+- 実行結果（2026-10-07）: 3 件 pass

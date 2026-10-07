@@ -10,10 +10,11 @@
 
 > Origin: Feature 061-05 (light-spec-plan)
 > Added: 2026-10-07
-> Status: active
+> Status: superseded
+> Superseded By: S43
 > Supersedes: -
 > Signature: `private getHtmlForWebview(...)` の `#controls` 内 HTML（`#branchCleanupBtn` / `#searchBtn` / `#fetchBtn` / `#currentBtn` / `#refreshBtn` を `button type="button"` に、`#repoSelect` / `#branchSelect` / `#authorSelect` の起動 button 名、`#showRemoteBranchesControl` の `label` と checkbox の DOM 順維持）/ `#commitTable` の `aria-label`（`hostT("Commit history")`）/ `role="status"` `aria-live="polite"` の通知要素（`hostT("Git Keizu status")`）
-> Target Path: `src/gitGraphView.ts`（`getHtmlForWebview()` の `#controls` と `#content` 生成。設計時のため実装後に行範囲へ更新）
+> Target Path: `src/gitGraphView.ts:755-851, 1086-1088`（`getHtmlForWebview()` の `#controls` 798-806、`#statusNotice` 809、`#commitTable` 814、`toolbarButton()`）
 > Test File: `tests/src/gitGraphView.test.ts`
 
 対応プラン Task 9 実装内容 1 の観点。既存 ID と DOM 順を維持し、設定・プロトコル・依存を追加しない。生成 HTML を `JSDOM` で parse して属性と順序を観測し、`hostT` は `vscode.l10n.t` の mock で英語値を返す。Webview 側のキー処理・`disabled` の同期は `web/main-test/13-keyboard-accessibility-01.md` S69 / `-02.md` S77、辞書の値は `l10n/bundle.l10n-test.md` / `l10n/bundle.l10n.ja-test.md` の責務で本表には含めない。
@@ -41,3 +42,37 @@
 | 既存 ID の消失・重複                        | TC-416                                            |
 | 設定・プロトコル追加                        | TC-417                                            |
 | 外部依存・例外                              | excluded(HTML 生成は文字列組立で `hostT` は mock) |
+
+### Task 12 テスト対応（Feature 061-05）— S42
+
+- 本節は S43 に置き換えた（TC-411 だけが契約変更。他の Case は S43 へ引き継ぎ、test method の対応は S43 の「Task 12 テスト対応」を参照）
+
+## S43: ホスト生成 HTML の toolbar button・label・DOM 順・一覧名・状態通知要素（Dropdown 名は webview 辞書）
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: S42
+> Signature: `private getHtmlForWebview(...)` の `#controls` 内 HTML（`toolbarButton(id, name)` による `#branchCleanupBtn` / `#searchBtn` / `#fetchBtn` / `#currentBtn` / `#refreshBtn`、`#repoControl` / `#branchControl` / `#authorControl` の `span.unselectable` label 文言と `div.dropdown` の隣接、`#showRemoteBranchesControl`）/ `#commitTable[aria-label=hostT("Commit history")]` / `#statusNotice[role="status"][aria-live="polite"][aria-label=hostT("Git Keizu status")]`
+> Target Path: `src/gitGraphView.ts:755-851, 1086-1088`（`getHtmlForWebview()` の `#controls` 798-806、`#statusNotice` 809、`#commitTable` 814、`toolbarButton()`）
+> Test File: `tests/src/gitGraphView.test.ts`
+
+S42 TC-411 は Dropdown 起動 button の名前を host 側の `data-label` / `aria-labelledby` で渡す契約だったが、Task 9 は起動 button の名前を webview 側 `Dropdown` の `label` 引数（`t("toolbar.repo")` 等の webview 辞書）で付け、host は従来どおり `span.unselectable` の表示文言を `div.dropdown` の隣に置くだけとした（`web/dropdown-test.md` S11 TC-039 が名前の存在を検証）。本節は TC-411 を置き換え、S42 の TC-410・TC-412〜TC-417 は期待結果を変えずに引き継ぐ（テストは同じ Case ID のまま describe `GitKeizuView host HTML toolbar buttons, list name and status notice (S42)` に残る）。
+
+| Case ID | Input / Precondition                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                  | Notes                                                                                  |
+| ------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| TC-418  | `#repoControl` / `#branchControl` / `#authorControl` の周辺 HTML | Normal - label 文言と mount の隣接                                         | 各 wrapper が `span.unselectable`（文言 `hostT("Repo:")` / `hostT("Branches:")` / `hostT("Authors:")`）と `div.dropdown`（`#repoSelect` / `#branchSelect` / `#authorSelect`）を持ち、host は `data-label` / `aria-labelledby` を追加しない。起動 button の名前は webview 側（`web/dropdown-test.md` S11 TC-039） | S42 TC-411 の置き換え（K44）。Task 9「既存 toolbar 文言で付ける」は webview 辞書で充足 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S43）
+
+| 失敗源                                         | 対応ケースまたは除外理由                              |
+| ---------------------------------------------- | ----------------------------------------------------- |
+| label 文言の消失・mount の分離                 | TC-418                                                |
+| toolbar button・順序・一覧名・status・ID・設定 | 引き継いだ S42 TC-410・TC-412〜TC-417（期待結果不変） |
+| 外部依存・例外                                 | excluded(HTML 生成は文字列組立で `hostT` は mock)     |
+
+### Task 12 テスト対応（Feature 061-05）— S43
+
+- TC-418: `tests/src/gitGraphView.test.ts` `keeps the dropdown labels next to their mounts (TC-411)`（`// Case:` は旧 ID のまま本節を参照）
+- 引き継ぎ: TC-410 `renders the five toolbar actions as named standard buttons` / TC-412 `keeps the remote checkbox label structure and order` / TC-413 `orders the toolbar children per R4.3 without any tabindex` / TC-414 `names the commit list` / TC-415 `places one polite status element outside the graph and the list` / TC-416 `keeps every existing id and never duplicates one` / TC-417 `adds no viewState key and no configuration entry`
+- 実行結果（2026-10-07）: 8 件 pass

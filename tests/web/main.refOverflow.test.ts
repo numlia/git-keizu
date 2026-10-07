@@ -481,6 +481,12 @@ function pressEscape(): void {
   );
 }
 
+function pressEscapeOn(target: EventTarget): void {
+  target.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+  );
+}
+
 function pressShortcut(key: string): void {
   document.dispatchEvent(new KeyboardEvent("keydown", { key, ctrlKey: true, bubbles: true }));
 }
@@ -1120,7 +1126,7 @@ describe("ref badge right-click from the row and the list (S57)", () => {
   });
 
   it("passes the existing arguments for an in-row worktree branch (TC-445)", () => {
-    // Case: TC-445
+    // Case: TC-445 (menu source is the launching button: 13-keyboard-accessibility-02.md S78 TC-743)
     // Given: the in-row badge of feature/x (worktree /tmp/wtx, remote origin)
     const badge = inRow("feature/x");
 
@@ -1182,7 +1188,7 @@ describe("ref badge right-click from the row and the list (S57)", () => {
   });
 
   it("passes the in-row arguments for the listed worktree branch (TC-449)", () => {
-    // Case: TC-449 (AC-03)
+    // Case: TC-449 (AC-03; the menu source is the clone's button: 13-keyboard-accessibility-02.md S78 TC-743)
     // When: feature/x is right-clicked in the row and then in the list
     const result = rightClickInRowAndInList(
       () => inRow("feature/x"),
@@ -1237,7 +1243,7 @@ describe("ref badge right-click from the row and the list (S57)", () => {
   });
 
   it("opens the stash menu from the stash badge in the row and in the list (TC-453)", () => {
-    // Case: TC-453 (AC-14)
+    // Case: TC-453 (AC-14; the stash label source is the button: 13-keyboard-accessibility-02.md S78 TC-744)
     // Given: the stash row (hashOf(2), stash@{0}) and its in-row stash badge
     const row = commitRow(1);
     const rowBadge = descriptionCell(1).querySelector<HTMLElement>(":scope > .gitRef.stash")!;
@@ -1536,6 +1542,84 @@ describe("handleEscape with the ref list (S58)", () => {
     }
     expect(findWidgetClose).not.toHaveBeenCalled();
     expect(popups()).toHaveLength(0);
+  });
+
+  // @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-01.md
+  it("closes the clone menu, then the list, and lands on the counter (TC-697)", async () => {
+    // Case: TC-697 (S72; S58 TC-457 / TC-458 / TC-461 carried over with the real focus moves).
+    // A keyboard launch needs actionable items, so the real ref builder is used here.
+    const actual = await vi.importActual<RefMenuModule>("../../web/refMenu");
+    vi.mocked(refMenu.buildRefContextMenuItems).mockImplementation(actual.buildRefContextMenuItems);
+    // Given: details expanded, find open, the list open and a menu opened by keyboard from a clone
+    expandCommitDetails();
+    pressShortcut("f");
+    const list = openList(0);
+    const part = requireElement(
+      list.children[0].querySelector<HTMLElement>("button.gitRefButton"),
+      "listed clone button"
+    );
+    part.focus();
+    part.dispatchEvent(
+      new KeyboardEvent("keydown", { key: "F10", shiftKey: true, bubbles: true, cancelable: true })
+    );
+    vi.mocked(refMenu.buildRefContextMenuItems).mockImplementation(() => MENU_ITEMS as never);
+    expect(contextMenu.isContextMenuActive()).toBe(true);
+    expect(document.activeElement).toBe(document.querySelector("#contextMenu li.contextMenuItem"));
+    const counter = requireElement(
+      descriptionCell(0).querySelector<HTMLElement>(":scope > button.refOverflowCounter"),
+      "counter"
+    );
+    vi.clearAllMocks();
+
+    // When: Escape is pressed once on the focused item
+    pressEscapeOn(document.activeElement!);
+
+    // Then: only the menu closes and focus returns to the clone
+    expect(contextMenu.isContextMenuActive()).toBe(false);
+    expect(popups()).toEqual([list]);
+    expect(document.activeElement).toBe(list.querySelector("button.gitRefButton"));
+
+    // When: Escape is pressed again on the clone
+    pressEscapeOn(document.activeElement!);
+
+    // Then: only the list closes, focus lands on the counter, find and details stay
+    expect(popups()).toHaveLength(0);
+    expect(document.activeElement).toBe(counter);
+    expect(findWidgetClose).not.toHaveBeenCalled();
+    expect(document.querySelector(".findWidget.active")).not.toBeNull();
+    expect(document.getElementById("commitDetails")).not.toBeNull();
+    expect(vscode.postMessage).not.toHaveBeenCalled();
+  });
+
+  // @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-01.md
+  it("closes a real dialog and a dropdown before the list (TC-698)", () => {
+    // Case: TC-698 (S72; S58 TC-459 / TC-460 carried over). The dialog is the real component;
+    // the dropdowns are this file's mocks, so their stage only fixes the order here and the
+    // cancel semantics are main.keyboard.test.ts TC-692.
+    // Given: the list and a confirmation dialog
+    const list = openList(0);
+    dialogs.showConfirmationDialog("Confirm?", () => {}, null);
+    expect(dialogs.isDialogActive()).toBe(true);
+    vi.clearAllMocks();
+
+    // When: Escape is pressed
+    pressEscape();
+
+    // Then: only the dialog closes
+    expect(dialogs.isDialogActive()).toBe(false);
+    expect(popups()).toEqual([list]);
+
+    // Given / When: each toolbar dropdown reports itself open while the list stays
+    for (const id of ["repoSelect", "branchSelect", "authorSelect"]) {
+      dropdowns[id].open = true;
+      pressEscape();
+      dropdowns[id].open = false;
+
+      // Then: that dropdown is cancelled (not applied) and the list is untouched
+      expect(dropdowns[id].cancelAndClose).toHaveBeenCalledTimes(1);
+      expect(dropdowns[id].close).not.toHaveBeenCalled();
+      expect(popups()).toEqual([list]);
+    }
   });
 });
 
@@ -2715,8 +2799,9 @@ describe("stash label lifecycle and clicks (S61)", () => {
   });
 
   it("keeps the list menu when a find update regenerates the clones (TC-531)", async () => {
-    // Case: TC-531; its "menu closes on re-clone" expectation is superseded by 061-05 R4.7 and
-    // web/refOverflow-test.md S6 TC-102: a clone-only DOM update keeps the open menu
+    // Case: TC-531; its "menu closes on re-clone" expectation is superseded by 061-05 R4.7,
+    // web/refOverflow-test.md S6 TC-102 and 13-keyboard-accessibility-02.md S78 TC-745: a clone-only
+    // DOM update keeps the open menu
     // Given: the real find widget open, the list and a menu opened from stash A's clone
     loadStashCommits(true);
     pressShortcut("f");

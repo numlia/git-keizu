@@ -4,7 +4,13 @@ import { resolve } from "node:path";
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { GitCommitNode, GitFileChange, GitRef } from "../../src/types";
+import type {
+  BranchCleanupRow,
+  GitCommitNode,
+  GitFileChange,
+  GitRef,
+  WorktreeCollection
+} from "../../src/types";
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 import { getCommitDate } from "../../web/dates";
 import { captureFocusOrigin, moveFocusPast } from "../../web/keyboardNavigation";
@@ -28,6 +34,12 @@ const STASH_HASH = "S";
 const DIRECT_TITLE = "Direct parents and children";
 const HIGHLIGHT_TITLE = "Highlight path";
 const COPY_HASH_TITLE = "Copy Commit Hash to Clipboard";
+const OPEN_FILE_TITLE = "Open File";
+const COMPARE_BRANCH = "main";
+const WORKTREE_PATH = "/tmp/wt8";
+// A scrollTop no scrollToCommit() result reaches in this fixture (rows have offsetTop 0).
+const SCROLL_SENTINEL = 999;
+const MAX_TAB_STOPS = 200;
 const CLASS_ACTIVE = "active";
 const CLASS_DROPDOWN_OPEN = "dropdownOpen";
 const CLASS_DETAILS_OPEN = "commitDetailsOpen";
@@ -121,6 +133,38 @@ function uncommittedCommits(): GitCommitNode[] {
   ];
 }
 
+/** Every menu launch point at once: working tree row, stash row, combined remote label on M. */
+function menuLaunchCommits(): GitCommitNode[] {
+  return [
+    node(UNCOMMITTED_CHANGES_HASH, ["N"], { message: "Uncommitted Changes (1)" }),
+    node("N", ["M"]),
+    node(STASH_HASH, ["M"], {
+      message: "WIP on main",
+      stash: { selector: "stash@{0}", baseHash: "M", untrackedFilesHash: null }
+    }),
+    node("M", ["R"], { refs: [ref("M", "feature", "head"), ref("M", "origin/feature", "remote")] }),
+    node("R", [])
+  ];
+}
+
+function detachedWorktreeAt(hash: string): WorktreeCollection {
+  return { branches: {}, detached: [{ path: WORKTREE_PATH, head: hash, isMain: false }] };
+}
+
+function cleanupRow(branchName: string): BranchCleanupRow {
+  return {
+    branchName,
+    isCurrent: false,
+    ancestry: "ancestor",
+    aheadBehind: { kind: "known", ahead: 1, behind: 2 },
+    treeDifference: "same",
+    upstream: { kind: "present", name: `origin/${branchName}` },
+    worktree: { kind: "unused" },
+    lastCommit: { kind: "known", unixSeconds: 1724500000 },
+    remotes: ["origin"]
+  };
+}
+
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -131,14 +175,20 @@ function dispatch(data: Record<string, unknown>): void {
 
 function loadCommits(
   commits: GitCommitNode[],
-  options: { head?: string | null; hard?: boolean; moreCommitsAvailable?: boolean } = {}
+  options: {
+    head?: string | null;
+    hard?: boolean;
+    moreCommitsAvailable?: boolean;
+    worktrees?: WorktreeCollection;
+  } = {}
 ): void {
   dispatch({
     command: "loadCommits",
     commits,
     head: options.head === undefined ? "M" : options.head,
     moreCommitsAvailable: options.moreCommitsAvailable ?? false,
-    hard: options.hard ?? true
+    hard: options.hard ?? true,
+    ...(options.worktrees === undefined ? {} : { worktrees: options.worktrees })
   });
 }
 
@@ -324,8 +374,51 @@ function menuItem(title: string): HTMLElement {
   return item!;
 }
 
+function menuTitles(): string[] {
+  return Array.from(contextMenuElem().querySelectorAll<HTMLElement>("li.contextMenuItem")).map(
+    (item) => item.textContent ?? ""
+  );
+}
+
+function menuPosition(): [string, string] {
+  return [contextMenuElem().style.left, contextMenuElem().style.top];
+}
+
 function dialogIsActive(): boolean {
   return document.getElementById("dialog")!.classList.contains(CLASS_ACTIVE);
+}
+
+/** Opens the cleanup panel through its toolbar button and answers the request it sends. */
+function openCleanupPanel(rows: BranchCleanupRow[]): void {
+  fire(document.getElementById("branchCleanupBtn")!, "click");
+  const [request] = posts("loadBranchCleanup");
+  expect(request, "loadBranchCleanup request").toBeDefined();
+  dispatch({
+    command: "loadBranchCleanup",
+    repo: REPO,
+    requestId: request!.requestId,
+    result: { kind: "ok", compareBranch: COMPARE_BRANCH, rows }
+  });
+  expect(document.querySelectorAll("#branchCleanupPanel .branchCleanupActionBtn")).toHaveLength(
+    rows.length * 2
+  );
+}
+
+function comparisonTrigger(): HTMLButtonElement {
+  return dropdownTrigger("branchCleanupComparisonSelect");
+}
+
+/** Follows moveFocusPast() from the first toolbar control to the end of the tab-stop list. */
+function walkTabStops(): HTMLElement[] {
+  const first = dropdownTrigger("repoSelect");
+  first.focus();
+  expect(document.activeElement).toBe(first);
+  const stops: HTMLElement[] = [first];
+  while (moveFocusPast(captureFocusOrigin(document.activeElement as HTMLElement), 1)) {
+    stops.push(document.activeElement as HTMLElement);
+    expect(stops.length).toBeLessThan(MAX_TAB_STOPS);
+  }
+  return stops;
 }
 
 function findWidgetIsVisible(): boolean {
@@ -1144,6 +1237,33 @@ describe("arrows while the file history or a path highlight is active (S71)", ()
     expect(events.map((event) => event.defaultPrevented)).toEqual([false, false, false]);
   });
 
+  it("moves the history position from the bar buttons without opening details (TC-682)", () => {
+    // Case: TC-682 (K42 / A8.2-1); the bar's own button contract is web/fileHistory-test.md S12
+    requestFileHistory(["N", "M", "R"]);
+    if (details() !== null) fire(document.getElementById("commitDetailsClose")!, "click");
+    expect(details()).toBeNull();
+    expect(historyIsActive()).toBe(true);
+    clearPosts();
+    const position = document.getElementById("fileHistoryPosition")!;
+    const positionBefore = position.textContent;
+    scrollContainer().scrollTop = SCROLL_SENTINEL;
+
+    fire(document.getElementById("fileHistoryNext")!, "click");
+    const positionAfterNext = position.textContent;
+    expect(positionAfterNext).not.toBe(positionBefore);
+    expect(scrollContainer().scrollTop).not.toBe(SCROLL_SENTINEL);
+    expect(posts("commitDetails")).toEqual([]);
+    expect(details()).toBeNull();
+
+    scrollContainer().scrollTop = SCROLL_SENTINEL;
+    fire(document.getElementById("fileHistoryPrev")!, "click");
+    expect(position.textContent).not.toBe(positionAfterNext);
+    expect(scrollContainer().scrollTop).not.toBe(SCROLL_SENTINEL);
+    expect(posts()).toEqual([]);
+    expect(details()).toBeNull();
+    expect(historyIsActive()).toBe(true);
+  });
+
   it("neither follows the move nor clears on Escape while a path is highlighted (TC-683)", () => {
     // Case: TC-683 (K43 / A8.2-2)
     const highlightSpy = vi.spyOn(Graph.prototype, "setPathHighlight");
@@ -1406,6 +1526,43 @@ describe("configurable shortcuts and the global Escape chain (S72)", () => {
     expect(detailsOwner()).toBe("M");
   });
 
+  it("closes the focused cleanup comparison dropdown before the repo dropdown and the panel (TC-694)", () => {
+    // Case: TC-694 (R4.6). The comparison dropdown is opened by keyboard so the repo dropdown
+    // stays open beside it (a pointer click would be the repo dropdown's outside click).
+    const cancelSpy = vi.spyOn(Dropdown.prototype, "cancelAndClose");
+    openCleanupPanel([cleanupRow("feature/x"), cleanupRow("develop")]);
+    const panel = document.getElementById("branchCleanupPanel")!;
+    openDropdown("repoSelect");
+    const trigger = comparisonTrigger();
+    trigger.focus();
+    press(trigger, "Enter");
+    expect(dropdownIsOpen("branchCleanupComparisonSelect")).toBe(true);
+    expect(dropdownIsOpen("repoSelect")).toBe(true);
+    const filter = document.querySelector<HTMLInputElement>(
+      "#branchCleanupComparisonSelect .dropdownFilterInput"
+    )!;
+    expect(document.activeElement).toBe(filter);
+    cancelSpy.mockClear();
+    clearPosts();
+
+    const keydown = pressEscape(filter);
+
+    expect(keydown.defaultPrevented).toBe(true);
+    expect(dropdownIsOpen("branchCleanupComparisonSelect")).toBe(false);
+    expect(document.activeElement).toBe(trigger);
+    expect(dropdownIsOpen("repoSelect")).toBe(true);
+    expect(panel.hasAttribute("hidden")).toBe(false);
+    expect(cancelSpy).toHaveBeenCalledTimes(1);
+
+    // The next Escape reaches the global chain: the repo dropdown cancels, the panel stays.
+    pressEscape(trigger);
+    expect(dropdownIsOpen("repoSelect")).toBe(false);
+    expect(panel.hasAttribute("hidden")).toBe(false);
+    expect(cancelSpy).toHaveBeenCalledTimes(2);
+    expect(posts("loadCommits")).toEqual([]);
+    expect(posts("loadBranchCleanup")).toEqual([]);
+  });
+
   it("keeps the cleanup panel and the path highlight out of the Escape chain (TC-695)", () => {
     // Case: TC-695 (A8.2-2)
     const highlightSpy = vi.spyOn(Graph.prototype, "setPathHighlight");
@@ -1519,6 +1676,137 @@ describe("Tab boundary between the target row's labels and the details (S73)", (
     const target = focusRow("R");
     expect(press(target, "Tab", { shiftKey: true }).defaultPrevented).toBe(false);
     expect(document.activeElement).toBe(target);
+  });
+});
+
+// @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-02.md
+describe("tab stop order across the toolbar, bars, panel, list, details and find (S73)", () => {
+  type StopGroup =
+    | "toolbar"
+    | "pathBar"
+    | "historyBar"
+    | "cleanup"
+    | "header"
+    | "row"
+    | "label"
+    | "details"
+    | "loadMore"
+    | "find";
+
+  function groupOf(stop: HTMLElement): StopGroup {
+    if (stop.closest("#controls") !== null) return "toolbar";
+    if (stop.closest("#pathHighlightBar") !== null) return "pathBar";
+    if (stop.closest("#fileHistoryBar") !== null) return "historyBar";
+    if (stop.closest("#branchCleanupPanel") !== null) return "cleanup";
+    if (stop.closest("#tableColHeaders") !== null) return "header";
+    if (stop.closest("#commitDetails") !== null) return "details";
+    if (stop.closest(".gitRef, .refOverflowCounter") !== null) return "label";
+    if (stop.matches("tr[data-hash]")) return "row";
+    if (stop.id === "loadMoreCommitsBtn") return "loadMore";
+    if (stop.closest(".findWidget") !== null) return "find";
+    throw new Error(`unexpected tab stop ${stop.outerHTML}`);
+  }
+
+  function groupSequence(stops: HTMLElement[]): StopGroup[] {
+    return stops
+      .map(groupOf)
+      .filter((group, index, groups) => index === 0 || groups[index - 1] !== group);
+  }
+
+  function isReachable(stop: HTMLElement): boolean {
+    return (
+      stop.isConnected &&
+      stop.closest("[hidden], [aria-hidden='true']") === null &&
+      !stop.matches(":disabled")
+    );
+  }
+
+  it("orders the stops toolbar, bars, panel, header, row, labels, details, load more, find (TC-700)", () => {
+    // Case: TC-700 (R4.3). Opening the find widget exits the file history (10-file-history-01.md
+    // TC-324), so the history bar and the find widget are walked in two passes.
+    loadCommits(standardCommits(), { moreCommitsAvailable: true });
+    openCleanupPanel([cleanupRow("feature/x")]);
+    highlightThroughMenu("M");
+    requestFileHistory(["N", "M", "R"]);
+    if (details() === null) openDetails("M");
+
+    const withHistory = walkTabStops();
+
+    expect(groupSequence(withHistory)).toEqual([
+      "toolbar",
+      "pathBar",
+      "historyBar",
+      "cleanup",
+      "header",
+      "row",
+      "label",
+      "details",
+      "loadMore"
+    ]);
+    expect(withHistory.filter((stop) => groupOf(stop) === "row")).toEqual([row("M")]);
+    expect(withHistory.filter((stop) => groupOf(stop) === "label")).toEqual(labelsOf("M"));
+    expect(withHistory.every(isReachable)).toBe(true);
+    expect(new Set(withHistory).size).toBe(withHistory.length);
+
+    focusRow("M");
+    press(row("M"), "f", { ctrlKey: true });
+    expect(findWidgetIsVisible()).toBe(true);
+    expect(historyIsActive()).toBe(false);
+    if (details() === null) openDetails("M");
+
+    const withFind = walkTabStops();
+
+    expect(groupSequence(withFind)).toEqual([
+      "toolbar",
+      "pathBar",
+      "cleanup",
+      "header",
+      "row",
+      "label",
+      "details",
+      "loadMore",
+      "find"
+    ]);
+    expect(withFind.every(isReachable)).toBe(true);
+    expect(new Set(withFind).size).toBe(withFind.length);
+  });
+
+  it("keeps the toolbar order repo, branch, author, remote checkbox and the five buttons (TC-701)", () => {
+    // Case: TC-701 (R4.3)
+    const stops = walkTabStops();
+    expect(stops.slice(0, 9)).toEqual([
+      dropdownTrigger("repoSelect"),
+      dropdownTrigger("branchSelect"),
+      dropdownTrigger("authorSelect"),
+      document.getElementById("showRemoteBranchesCheckbox"),
+      document.getElementById("branchCleanupBtn"),
+      document.getElementById("searchBtn"),
+      document.getElementById("fetchBtn"),
+      document.getElementById("currentBtn"),
+      document.getElementById("refreshBtn")
+    ]);
+    expect(groupOf(stops[9])).toBe("header");
+  });
+
+  it("excludes hidden and disabled controls and uses only tabindex 0 and -1 (TC-705)", () => {
+    // Case: TC-705 (R4.1 / R4.3)
+    loadCommits(standardCommits(), { head: null });
+    expect(document.getElementById("currentBtn")!.hasAttribute("disabled")).toBe(true);
+    expect(pathBar().classList.contains(CLASS_ACTIVE)).toBe(false);
+    expect(findWidgetIsVisible()).toBe(false);
+    expect(document.getElementById("branchCleanupPanel")!.hasAttribute("hidden")).toBe(true);
+
+    const stops = walkTabStops();
+
+    expect(stops).not.toContain(document.getElementById("currentBtn"));
+    expect(groupSequence(stops)).toEqual(["toolbar", "header", "row", "label"]);
+    expect(stops.every(isReachable)).toBe(true);
+    const tabIndexValues = new Set(
+      Array.from(document.querySelectorAll("[tabindex]")).map((elem) =>
+        elem.getAttribute("tabindex")
+      )
+    );
+    expect(Array.from(tabIndexValues).sort()).toEqual([PROGRAMMATIC_ONLY, TAB_STOP]);
   });
 });
 
@@ -1664,6 +1952,65 @@ describe("focus restore after re-render and the kept menu context (S74)", () => 
     expect(posts("copyToClipboard")).toEqual([expect.objectContaining({ data: "M" })]);
   });
 
+  it("replaces the load more button on Enter and keeps focus on a connected element (TC-717)", () => {
+    // Case: TC-717 (Task 9 "disable / replace at start"): the button is replaced by the loading
+    // header, so its ticket resolves to the row target before the response; Enter itself is left
+    // to the native button click, which jsdom does not synthesize (click() stands in).
+    loadCommits(standardCommits(), { moreCommitsAvailable: true });
+    const loadMore = document.getElementById("loadMoreCommitsBtn")!;
+    loadMore.focus();
+    clearPosts();
+
+    const enter = press(loadMore, "Enter");
+    expect(enter.defaultPrevented).toBe(false);
+    expect(posts()).toEqual([]);
+    loadMore.click();
+
+    expect(loadMore.isConnected).toBe(false);
+    expect(document.getElementById("loadMoreCommitsBtn")).toBeNull();
+    expect(document.getElementById("loadingHeader")).not.toBeNull();
+    expect(posts("loadCommits")).toHaveLength(1);
+    expect(document.activeElement).toBe(row("M"));
+
+    loadCommits([...standardCommits(), node("Q", [])], { moreCommitsAvailable: true });
+    expect(document.activeElement).toBe(row("M"));
+    expect(document.activeElement!.isConnected).toBe(true);
+    expect(document.getElementById("loadMoreCommitsBtn")).not.toBeNull();
+    expect(posts("loadCommits")).toHaveLength(1);
+
+    document.getElementById("loadMoreCommitsBtn")!.click();
+    loadCommits([...standardCommits(), node("Q", [])], { moreCommitsAvailable: false });
+    expect(document.getElementById("loadMoreCommitsBtn")).toBeNull();
+    expect(document.activeElement).toBe(row("M"));
+    expect(posts("loadCommits")).toHaveLength(2);
+  });
+
+  it("adds no request of its own across loading, re-render and details restores (TC-720)", () => {
+    // Case: TC-720 (R4.7): only the operations' own requests appear
+    const [label] = labelsOf("M");
+    label.focus();
+    clearPosts();
+    press(label, "r", { ctrlKey: true });
+    expect(postedCommands()).toEqual(["loadBranches"]);
+    loadBranches();
+    expect(postedCommands()).toEqual(["loadBranches", "loadCommits"]);
+    loadCommits(standardCommits());
+    expect(document.activeElement).toBe(labelsOf("M")[0]);
+
+    loadCommits(standardCommits(), { hard: true });
+    loadCommits([...standardCommits()].reverse());
+    expect(row("M").dataset.id).toBe("1");
+    expect(document.activeElement).toBe(labelsOf("M")[0]);
+    expect(postedCommands()).toEqual(["loadBranches", "loadCommits"]);
+
+    openDetails("M");
+    const diffButton = details()!.querySelector<HTMLElement>("button.gitFileDiff")!;
+    diffButton.focus();
+    respondDetails("M", [], []);
+    expect(document.activeElement).toBe(row("M"));
+    expect(postedCommands()).toEqual(["loadBranches", "loadCommits", "commitDetails"]);
+  });
+
   it("returns focus to the origin row when details are closed from inside them (TC-719)", () => {
     // Case: TC-719 (A8.3-5; file keys arrive with Task 8, the details row key resolves meanwhile)
     openDetails("N");
@@ -1713,6 +2060,249 @@ describe("ref label Enter / Space open the menu while dblclick keeps the checkou
       { command: "checkoutBranch", repo: REPO, branchName: "hotfix", remoteBranch: null }
     ]);
     expect(details()).toBeNull();
+  });
+
+  it("opens the row menu from Shift+F10 and ContextMenu at the row's rectangle (TC-721)", () => {
+    // Case: TC-721 (K28 / A8.1-4). The mouse is fired on the keyboard anchor (left, bottom) of
+    // the stubbed row rectangle, so both launches must place the menu on the same point.
+    const target = row("M");
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      x: 100,
+      y: 200,
+      left: 100,
+      top: 200,
+      right: 160,
+      bottom: 220,
+      width: 60,
+      height: 20,
+      toJSON: () => ({})
+    });
+    fire(target, "contextmenu", { clientX: 100, clientY: 220 });
+    expect(menuIsActive()).toBe(true);
+    const mouseTitles = menuTitles();
+    const mousePosition = menuPosition();
+    expect(mouseTitles).toContain(COPY_HASH_TITLE);
+    fire(document, "click");
+    expect(menuIsActive()).toBe(false);
+
+    for (const init of [{ key: "F10", shiftKey: true }, { key: "ContextMenu" }]) {
+      target.focus();
+      const launch = press(target, init.key, init);
+      expect(launch.defaultPrevented).toBe(true);
+      expect(menuIsActive()).toBe(true);
+      expect(menuTitles()).toEqual(mouseTitles);
+      expect(menuPosition()).toEqual(mousePosition);
+      expect(document.activeElement).toBe(contextMenuElem().querySelector("li.contextMenuItem"));
+      pressEscape(document.activeElement!);
+      expect(menuIsActive()).toBe(false);
+      expect(document.activeElement).toBe(target);
+    }
+    expect(posts()).toEqual([]);
+  });
+
+  it("sends every launch point to the builder its mouse right-click uses (TC-722)", () => {
+    // Case: TC-722 (K28 / A8.1-4); stash / worktree resolution is the entry 02-context-menu-02.md
+    // S61 inherited by 13-keyboard-accessibility-02.md S78
+    loadCommits(menuLaunchCommits(), { worktrees: detachedWorktreeAt("M") });
+    openDetails("M");
+    const launches: {
+      readonly name: string;
+      readonly focusTarget: HTMLElement;
+      readonly mouseTarget: Element;
+      readonly action: {
+        readonly title: string;
+        readonly command: string;
+        readonly payload: Record<string, unknown>;
+      } | null;
+    }[] = [
+      {
+        name: "working tree row",
+        focusTarget: row(UNCOMMITTED_CHANGES_HASH),
+        mouseTarget: row(UNCOMMITTED_CHANGES_HASH),
+        action: null
+      },
+      {
+        name: "local head label",
+        focusTarget: row("M").querySelector<HTMLElement>(".gitRef.head > button.gitRefButton")!,
+        mouseTarget: row("M").querySelector(".gitRef.head > button.gitRefButton")!,
+        action: {
+          title: "Copy Branch Name to Clipboard",
+          command: "copyToClipboard",
+          payload: { type: "Branch Name", data: "feature" }
+        }
+      },
+      {
+        name: "combined remote label",
+        focusTarget: row("M").querySelector<HTMLElement>(".gitRef.head > .gitRefHeadRemote")!,
+        mouseTarget: row("M").querySelector(".gitRef.head > .gitRefHeadRemote")!,
+        action: {
+          title: "Copy Branch Name to Clipboard",
+          command: "copyToClipboard",
+          payload: { type: "Branch Name", data: "origin/feature" }
+        }
+      },
+      {
+        name: "stash label",
+        focusTarget: row(STASH_HASH).querySelector<HTMLElement>(".gitRef.stash > button")!,
+        mouseTarget: row(STASH_HASH).querySelector(".gitRef.stash > button")!,
+        action: {
+          title: "Copy Stash Name to Clipboard",
+          command: "copyToClipboard",
+          payload: { type: "Stash Name", data: "stash@{0}" }
+        }
+      },
+      {
+        name: "detached worktree label",
+        focusTarget: row("M").querySelector<HTMLElement>(".gitRef.detachedWorktree > button")!,
+        mouseTarget: row("M").querySelector(".gitRef.detachedWorktree > button")!,
+        action: {
+          title: "Copy Worktree Path",
+          command: "copyToClipboard",
+          payload: { type: "worktreePath", data: WORKTREE_PATH }
+        }
+      },
+      {
+        name: "file row",
+        focusTarget: details()!.querySelector<HTMLElement>("li.gitFile > button.gitFileDiff")!,
+        mouseTarget: details()!.querySelector("li.gitFile")!,
+        action: {
+          title: OPEN_FILE_TITLE,
+          command: "openFile",
+          payload: { repo: REPO, commitHash: "M", filePath: FILE_PATH }
+        }
+      },
+      {
+        name: "column header",
+        focusTarget: document.getElementById("commitOrderingBtn")!,
+        mouseTarget: document.getElementById("tableColHeaders")!,
+        action: null
+      }
+    ];
+    for (const launch of launches) {
+      expect(launch.focusTarget, launch.name).not.toBeNull();
+      launch.focusTarget.focus();
+      expect(document.activeElement, launch.name).toBe(launch.focusTarget);
+      const keydown = press(launch.focusTarget, "F10", { shiftKey: true });
+      expect(keydown.defaultPrevented, launch.name).toBe(true);
+      expect(menuIsActive(), launch.name).toBe(true);
+      const keyboardTitles = menuTitles();
+      expect(keyboardTitles.length, launch.name).toBeGreaterThan(0);
+      expect(document.activeElement).toBe(contextMenuElem().querySelector("li.contextMenuItem"));
+      fire(document, "click");
+
+      fire(launch.mouseTarget, "contextmenu");
+      expect(menuIsActive(), launch.name).toBe(true);
+      expect(menuTitles(), launch.name).toEqual(keyboardTitles);
+      if (launch.action === null) {
+        fire(document, "click");
+        continue;
+      }
+      clearPosts();
+      fire(menuItem(launch.action.title), "click");
+      const mousePosts = posts(launch.action.command);
+      expect(mousePosts, launch.name).toEqual([
+        expect.objectContaining({ command: launch.action.command, ...launch.action.payload })
+      ]);
+
+      launch.focusTarget.focus();
+      press(launch.focusTarget, "F10", { shiftKey: true });
+      clearPosts();
+      fire(menuItem(launch.action.title), "click");
+      expect(posts(launch.action.command), launch.name).toEqual(mousePosts);
+      expect(menuIsActive()).toBe(false);
+    }
+    expect(detailsOwner()).toBe("M");
+  });
+
+  it("leaves Shift+F10 and ContextMenu to the find input and to dialog inputs (TC-723)", () => {
+    // Case: TC-723 (R4.4)
+    focusRow("M");
+    press(row("M"), "f", { ctrlKey: true });
+    const findInput = document.getElementById("findInput")!;
+    expect(document.activeElement).toBe(findInput);
+    for (const init of [{ key: "F10", shiftKey: true }, { key: "ContextMenu" }]) {
+      const keydown = press(findInput, init.key, init);
+      expect(keydown.defaultPrevented).toBe(false);
+      expect(menuIsActive()).toBe(false);
+    }
+    fire(document.getElementById("findClose")!, "click");
+
+    fire(row("M"), "contextmenu");
+    const createBranch = Array.from(
+      contextMenuElem().querySelectorAll<HTMLElement>("li.contextMenuItem")
+    ).find((item) => item.textContent?.startsWith("Create Branch"));
+    expect(createBranch, "Create Branch item").toBeDefined();
+    fire(createBranch!, "click");
+    expect(dialogIsActive()).toBe(true);
+    const dialogInput = document.querySelector<HTMLInputElement>("#dialog input[type='text']")!;
+    expect(document.activeElement).toBe(dialogInput);
+    for (const init of [{ key: "F10", shiftKey: true }, { key: "ContextMenu" }]) {
+      const keydown = press(dialogInput, init.key, init);
+      expect(keydown.defaultPrevented).toBe(false);
+      expect(menuIsActive()).toBe(false);
+      expect(dialogIsActive()).toBe(true);
+    }
+    expect(posts()).toEqual([]);
+  });
+
+  it("swallows only the contextmenu of the same press and keeps later right-clicks (TC-724)", () => {
+    // Case: TC-724 (K28 / A8.3-2): keydown → contextmenu → keyup, then an independent right-click
+    const target = focusRow("M");
+    const launch = press(target, "F10", { shiftKey: true, keyup: false });
+    expect(launch.defaultPrevented).toBe(true);
+    expect(menuIsActive()).toBe(true);
+    const items = Array.from(contextMenuElem().children);
+
+    const duplicate = fire(target, "contextmenu");
+
+    expect(duplicate.defaultPrevented).toBe(true);
+    expect(menuIsActive()).toBe(true);
+    const afterDuplicate = Array.from(contextMenuElem().children);
+    expect(afterDuplicate).toHaveLength(items.length);
+    expect(afterDuplicate.every((item, index) => item === items[index])).toBe(true);
+    target.dispatchEvent(
+      new KeyboardEvent("keyup", { key: "F10", shiftKey: true, bubbles: true, cancelable: true })
+    );
+
+    const independent = fire(row("R"), "contextmenu");
+
+    expect(independent.defaultPrevented).toBe(false);
+    expect(menuIsActive()).toBe(true);
+    expect(contextMenuElem().children[0]).not.toBe(items[0]);
+    clearPosts();
+    fire(menuItem(COPY_HASH_TITLE), "click");
+    expect(posts("copyToClipboard")).toEqual([expect.objectContaining({ data: "R" })]);
+  });
+
+  it("runs the same action and recent record from Enter as from a click (TC-727)", () => {
+    // Case: TC-727 (A8.2-3 / R5)
+    openDetails("M");
+    const diffButton = details()!.querySelector<HTMLElement>("li.gitFile > button.gitFileDiff")!;
+    diffButton.focus();
+    press(diffButton, "F10", { shiftKey: true });
+    expect(document.activeElement).toBe(menuItem(OPEN_FILE_TITLE));
+    clearPosts();
+    press(document.activeElement!, "Enter");
+    const keyboardPosts = posts();
+    expect(postedCommands()).toEqual(["saveRepoState", "openFile"]);
+    expect(menuIsActive()).toBe(false);
+
+    fire(details()!.querySelector("li.gitFile")!, "contextmenu");
+    clearPosts();
+    fire(menuItem(OPEN_FILE_TITLE), "click");
+    expect(posts()).toEqual(keyboardPosts);
+
+    focusRow("M");
+    press(row("M"), "F10", { shiftKey: true });
+    menuItem(COPY_HASH_TITLE).focus();
+    clearPosts();
+    press(document.activeElement!, "Enter");
+    const keyboardCopy = posts();
+    expect(keyboardCopy).toEqual([{ command: "copyToClipboard", type: "Commit Hash", data: "M" }]);
+    fire(row("M"), "contextmenu");
+    clearPosts();
+    fire(menuItem(COPY_HASH_TITLE), "click");
+    expect(posts()).toEqual(keyboardCopy);
   });
 
   it("ignores repeated and released Enter on a label (TC-726)", () => {
@@ -2161,6 +2751,26 @@ describe("toolbar state, load more button, status notice and ordering button (S6
     expect(table().hasAttribute("aria-live")).toBe(false);
     expect(document.getElementById("commitGraph")!.hasAttribute("aria-live")).toBe(false);
     expect(table().contains(statusNotice())).toBe(false);
+  });
+
+  it("keeps the status notice unchanged while an error dialog announces a failure (TC-746)", () => {
+    // Case: TC-746 (S79, replacing the error part of TC-739): operation errors go through the
+    // existing aria-modal error dialog, not the polite status region
+    loadCommits(standardCommits());
+    const noticeBefore = statusNotice().textContent;
+    expect(noticeBefore).not.toBe("");
+
+    dispatch({ command: "addTag", status: "fatal: tag already exists" });
+
+    const dialog = document.getElementById("dialog")!;
+    expect(dialogIsActive()).toBe(true);
+    expect(dialog.getAttribute("role")).toBe("dialog");
+    expect(dialog.getAttribute("aria-modal")).toBe("true");
+    expect(dialog.textContent).toContain("Unable to Add Tag");
+    expect(dialog.textContent).toContain("fatal: tag already exists");
+    expect(document.activeElement).toBe(document.getElementById("dialogDismiss"));
+    expect(statusNotice().textContent).toBe(noticeBefore);
+    expect(statusNotice().getAttribute("aria-live")).toBe("polite");
   });
 
   it("uses the standard disabled state on the current button (TC-741)", () => {

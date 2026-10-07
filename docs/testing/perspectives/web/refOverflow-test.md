@@ -193,7 +193,8 @@ jsdomはレイアウトしないため、`getBoundingClientRect`・`getComputedS
 
 > Origin: Feature 059-02 (light-spec-plan)
 > Added: 2026-09-24
-> Status: active
+> Status: superseded
+> Superseded By: S7
 > Supersedes: -
 > Signature: `RefOverflowController.closePopup(): boolean`、counterのclick、`.refOverflowPopup` の生成・配置、documentのcapture click
 > Target Path: `web/refOverflow.ts`（一覧の開閉・複製・配置・外側判定。実装後に行範囲へ更新）
@@ -342,7 +343,7 @@ jsdomはレイアウトしないため、`getBoundingClientRect`・`getComputedS
 > Status: active
 > Supersedes: S5
 > Signature: `RefOverflowController.closePopup(reason?: FocusCloseReason): boolean` / `RefOverflowOptions.onRefContextMenu(event: ContextMenuTrigger, ref: HTMLElement, focusOptions?: ContextMenuFocusOptions): void` / counter `button` の `Enter` / `Space`、一覧 `.refOverflowPopup` 内の `keydown`（`ArrowUp` / `ArrowDown` / `Home` / `End` / `Enter` / `Space` / `Escape` / `Tab`）/ `syncSearchHighlights(): void` / `renderPopupItems()` の FocusKey 保存 / 幅変更時の閉鎖と復元
-> Target Path: `web/refOverflow.ts`（`closePopup`、一覧の keydown、`renderPopupItems`、`layout` の閉鎖経路。設計時のため実装後に行範囲へ更新）
+> Target Path: `web/refOverflow.ts:479-516, 547-553, 623-842`（`closePopup` / `syncSearchHighlights` / `dispose`、`closeInvalidatedPopup`、`applyVisibleCount` / `createCounter` / `openCounterPopupByKey` / `toggleCounterPopup` / `openPopup` / `renderPopupItems` / `clonePopupItem` / `forwardRefMenu` / `handlePopupKeydown` / `movePopupFocus` / `leavePopupByTab` / `hidePopupContextMenu`）
 > Test File: `tests/web/refOverflow.test.ts`
 
 対応プラン §3.5・R4.3・R4.7 と Task 7 の観点。S5（検索一致の同期）は「開いた一覧の再複製で `hideContextMenu` が 1 回呼ばれる」（TC-092）としていたが、複製 DOM の更新だけを理由に開いているメニューを閉じない契約へ変わるため置き換え、counter の強調（TC-087〜TC-091、TC-093〜TC-097）の意味は本節へ引き継ぐ。S4（開閉と操作）は閉鎖理由なしの契約として成り立ち続けるため active のまま additive。fixture は S3 TC-030 と同じ `+4` の行で、元 ref が「ローカル主部 + 併記 remote」「stash」「detached worktree」の sibling `button` 構造（Task 7 実装内容 1）を持ち、`onRefContextMenu` は `vi.fn()`。実装前の構造では `.gitRef` が `span` で `.gitRefHeadRemote` が入れ子のため、Tab 停止点と名前が分かれない。
@@ -380,3 +381,40 @@ jsdomはレイアウトしないため、`getBoundingClientRect`・`getComputedS
 | 名前・所有関係の欠落                                | TC-112                                                                           |
 | counter の強調規則                                  | TC-102（S5 TC-087〜TC-091・TC-093〜TC-097 の規則を引き継ぎ、同期の観測に含める） |
 | 外部依存・例外                                      | excluded(DOM と callback だけで外部依存と throw 経路を持たない)                  |
+
+### Task 12 テスト対応（Feature 061-05）— S6
+
+- テスト: `tests/web/refOverflow.test.ts` describe `RefOverflowController keyboard reach, movement, exits and restore (S6)`。fixture は `configureFocusContext` を `beforeEach` で登録し `afterEach` で破棄、controller は `afterEach` で `dispose()`。TC-099〜TC-114 を同番号の `it` で（TC-103 / TC-107 / TC-109 / TC-110 は `it.each`）。S5 TC-087〜TC-091・TC-093〜TC-097 の counter 強調は同ファイル describe `RefOverflowController.syncSearchHighlights` の同番号 `it` が引き続き検証し、TC-092 の test は TC-102 `keeps focus and the open menu through a search re-clone (TC-102)` へ書き換えた
+- TC-107 の未自動化部分と手動 Case（未実施）: counter は native `button` のため Enter / Space の既定 click は jsdom が生成しない。Chromium が keydown の `preventDefault` で合成 click を抑止する前提（実装は keydown で開き `consumeKey`）を実 Webview で確認する。手順: counter へ Tab → Enter（別試行 Space）→ 一覧が 1 個開き最初の複製へフォーカス、keyup で閉じない。影響: 前提が崩れると keydown で開き click で閉じる二重 toggle。代替確認: TC-107（`aria-expanded` と `.refOverflowPopup` 1 個、keyup 後も維持）。実 Webview の手動 Case は `web/main-test/13-keyboard-accessibility-01.md` 冒頭「Task 12 実 Webview 手動確認（未実施一覧）」の様式で記録し、自動テストの pass に含めない
+- TC-104 は `web/main-test/13-keyboard-accessibility-02.md` S79（旧 S77）TC-742 の測定複製部分（`.refOverflowMeasure` が `aria-hidden="true"` で停止点なし）も担う
+- 実行結果（2026-10-07）: 24 件 pass（S6）
+
+## S7: 隠れたバッジ一覧の開閉と操作（一覧 container の固定 id を許容）
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: S4
+> Signature: `RefOverflowController.closePopup(reason?: FocusCloseReason): boolean`、counter（`button.refOverflowCounter[aria-controls="refOverflowPopup"]`）の click、`div#refOverflowPopup.refOverflowPopup[role="group"]` の生成・配置、document の capture click
+> Target Path: `web/refOverflow.ts:479-500, 660-759, 830-851`（`closePopup`、`createCounter` / `openCounterPopupByKey` / `toggleCounterPopup` / `openPopup` / `renderPopupItems` / `clonePopupItem` / `forwardRefMenu`、`hidePopupContextMenu` / `closePopupOnOutsideClick`）
+> Test File: `tests/web/refOverflow.test.ts`
+
+S4 TC-064 は「一覧内に `id` 属性を持つ要素が 0 個」としていたが、Task 7 で counter の `aria-controls` が一覧 container の固定 id `refOverflowPopup` を指す（S6 TC-112）ため、container 自身の id を許容し **複製とその子孫** に id を複製しない契約へ置き換える。S4 の他の Case（TC-061〜TC-063、TC-065〜TC-086、TC-098）は期待結果を変えずに本節へ引き継ぎ、テストは同じ Case ID のまま describe `RefOverflowController hidden-badge list` に残る（`closePopup()` の引数なし呼出しは S6 TC-110 のとおり従来のプログラム閉鎖）。
+
+| Case ID | Input / Precondition                                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                | Notes                                  |
+| ------- | ------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| TC-115  | 隠れた元 ref が `.contextMenuActive` を持ち、元 ref 自身と子孫に `id` 属性を持つ状態で一覧を開く | Validation - 操作中クラスと id を複製しない                                | 複製に `.contextMenuActive` が無く、一覧内で `id` を持つ要素が 0 個（`popup.querySelectorAll("[id]")` が空）。一覧 container 自身の `id` は `refOverflowPopup` | S4 TC-064 の置き換え。§3.5 / S6 TC-112 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S7）
+
+| 失敗源                                 | 対応ケースまたは除外理由                                        |
+| -------------------------------------- | --------------------------------------------------------------- |
+| 操作中クラスや id の複製               | TC-115                                                          |
+| 一覧の表示・複製・位置・開閉・外側判定 | 引き継いだ S4 の Case（期待結果不変）                           |
+| 外部依存・例外                         | excluded(DOM の参照・更新だけで外部依存と throw 経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S7
+
+- TC-115: `tests/web/refOverflow.test.ts` `drops menu state and ids from clones (TC-064)`（`popup.querySelectorAll("[id]")` 0 個と `popup.id === "refOverflowPopup"` を assert。`// Case:` は旧 ID のまま本節を参照）
+- 引き継ぎ: describe `RefOverflowController hidden-badge list` の TC-061〜TC-063、TC-065〜TC-086、TC-098 の各 `it`
+- 実行結果（2026-10-07）: `tests/web/refOverflow.test.ts` 全件 pass

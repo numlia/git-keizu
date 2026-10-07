@@ -6,18 +6,18 @@
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 19
-> Total Sections: 58
-> Total Cases: 521
+> Total Sections: 56
+> Total Cases: 420
 
 ## Shards
 
 | Shard File                      | Responsibility         | Sections | Cases | Last Updated |
 | ------------------------------- | ---------------------- | -------- | ----- | ------------ |
 | 01-rendering-01.md              | rendering              | 7        | 35    | 2026-03-05   |
-| 01-rendering-02.md              | rendering              | 1        | 33    | 2026-09-13   |
+| 01-rendering-02.md              | rendering              | 0        | 0     | 2026-09-13   |
 | 01-rendering-03.md              | rendering              | 2        | 24    | 2026-09-27   |
-| 02-context-menu-01.md           | context-menu           | 6        | 52    | 2026-09-25   |
-| 02-context-menu-02.md           | context-menu           | 1        | 52    | 2026-09-25   |
+| 02-context-menu-01.md           | context-menu           | 5        | 40    | 2026-07-04   |
+| 02-context-menu-02.md           | context-menu           | 0        | 0     | 2026-09-25   |
 | 03-compare-find-01.md           | compare-find           | 3        | 25    | 2026-03-01   |
 | 04-keyboard-selection-01.md     | keyboard-selection     | 1        | 8     | 2026-02-27   |
 | 04-keyboard-selection-02.md     | keyboard-selection     | 0        | 0     | 2026-09-28   |
@@ -31,7 +31,7 @@
 | 11-state-persistence-01.md      | state-persistence      | 1        | 3     | 2026-09-12   |
 | 12-path-highlight-01.md         | path-highlight         | 1        | 15    | 2026-10-03   |
 | 13-keyboard-accessibility-01.md | keyboard-accessibility | 4        | 55    | 2026-10-07   |
-| 13-keyboard-accessibility-02.md | keyboard-accessibility | 5        | 43    | 2026-10-07   |
+| 13-keyboard-accessibility-02.md | keyboard-accessibility | 6        | 39    | 2026-10-07   |
 
 ## Origin Coverage
 

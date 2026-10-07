@@ -173,7 +173,7 @@
 > Status: active
 > Supersedes: S6
 > Signature: `new Dropdown(id, showInfo, label, callback, multipleAllowed?)`（既存 overload を維持）/ `setOptions(options, selected)` / 起動 `button`（名前・`aria-expanded`・`aria-controls`）/ 検索 `input` と `listbox` / `option` の keydown
-> Target Path: `web/dropdown.ts`（`render()` / 起動 button・候補の keydown / `filter()` 後の再解決。設計時のため実装後に行範囲へ更新）
+> Target Path: `web/dropdown.ts:69-178, 209-294, 315-386, 407-474, 490-511`（constructor と `createHintButton`、`setOptions` / `refresh` / `render`、`filter` と候補の再解決、`handleTriggerKeydown` / `handleFilterKeydown` / `handleOptionKeydown`、`handleTab`）
 > Test File: `tests/web/dropdown.test.ts`
 
 対応プラン §3.7.2 R4.5 と Task 4 の観点。S6（マルチセレクト初期化）は option 内に `input type="checkbox"` を描画する契約（TC-018）だったが、checkbox を装飾表示に置き換え `listbox` / `option` / `aria-multiselectable` / `aria-selected` で状態を表すため置き換える。S6 の単一 / 複数のモード判定（TC-016 / TC-017 / TC-019）の意味は本節へ引き継ぐ。fixture は `#branchSelect` 相当の `div.dropdown` に options `[Show All, feature, hotfix, main]`（複数選択）と `[/a, /b]`（単一）を与え、`document.activeElement` と `aria-*` 属性、変更 callback の回数を観測する。候補のフォーカスは選択状態と別に `value` で保持し、表示候補のうち 1 個だけを Tab 停止点にする。実装前実測: 現在値要素は `div`（`tabIndex -1`）で `focus()` しても `activeElement` は `body`。
@@ -208,6 +208,13 @@
 | 内部 Tab 順・外部退出の適用 / 破棄・移動先の横取り | TC-049〜TC-052                                                  |
 | 外部依存・例外                                     | excluded(DOM と callback だけで外部依存と throw 経路を持たない) |
 
+### Task 12 テスト対応（Feature 061-05）— S11
+
+- テスト: `tests/web/dropdown.test.ts` describe `S11: Trigger button, option movement, internal Tab order and re-resolution`。TC-039〜TC-052 を同番号の `it` で 1 件ずつ（`it` 名末尾が Case ID）。TC-044 は加えて describe `S6 (superseded by S11)` の `renders decorative checkboxes without focusable inputs in multi-select mode (TC-018)` が S6 TC-018 の契約変更として本節を参照
+- TC-046 の解釈（Task 4 handoff）: 「表示候補 0 件のまま `Enter` で閉じない」は **単一選択** の契約。複数選択の検索 input 上の Enter は R4.5 により変更を適用して閉じる（S12 TC-059）。TC-046 の test は単一選択で 0 件を作って確認する
+- TC-048 の解釈（Task 4 handoff）: 「候補 1 件以下」は `options.length <= 1`（Show All を含む全候補数）。複数選択は Show All + 0 件、単一選択は 1 件で閉じ、起動 button へ復元する
+- 実行結果（2026-10-07）: 14 件 pass。実装前実測（`div.dropdownCurrentValue` が focus 不可）は TC-039 で GREEN
+
 ## S12: 適用・取消・IME / repeat / keyup の保護と close / cancelAndClose の契約
 
 > Origin: Feature 061-05 (light-spec-plan)
@@ -215,7 +222,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `public close(reason?: FocusCloseReason): void` / `public cancelAndClose(reason?: FocusCloseReason): void`（公開化）/ 候補・検索 input の `Enter` / `Space` / `Escape` keydown / `isKeyboardActionBlocked(event)` の利用 / `setOptions()` の取消基準更新
-> Target Path: `web/dropdown.ts`（`close` / `cancelAndClose` / 部品内 keydown / `setOptions` / `fireMultiSelectCallbackIfChanged`。実装後に行範囲へ更新）
+> Target Path: `web/dropdown.ts:188-208, 387-406, 475-489, 519-597`（`toggleMultiSelectOption` / `confirmSingleOption`、`handleKeydown`、`activateOption`、`toggleFromTrigger` / `open` / `leave` / `isOpen` / `close` / `cancelAndClose` / `hideMenu` / `fireMultiSelectCallbackIfChanged`）
 > Test File: `tests/web/dropdown.test.ts`
 
 対応プラン §3.5「Dropdownのcloseは適用、cancelAndCloseは取消であり、同じ意味へまとめない」と R4.5 / R4.6 の観点。document の capture Enter / Escape リスナーを部品内の keydown へ置き換える。S8（閉じ・callback）と S10（イベント）は適用の意味が変わらないため active のまま。実装前実測（実 Dropdown、`M` の詳細を開いた状態）: 候補変更後の `Escape` keydown で取消は成立するが同じ押下の keyup で背後の詳細が閉じる。`isComposing: true` の `Enter` keydown で閉じて callback が 1 回実行される（IME 確定で適用）。
@@ -251,3 +258,10 @@
 | フォーカス移動で値が変わる                              | TC-065                                                       |
 | document capture リスナーの残存                         | TC-066                                                       |
 | 外部依存・例外                                          | excluded(callback 呼出だけで外部依存と throw 経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S12
+
+- テスト: `tests/web/dropdown.test.ts` describe `S12: Apply / cancel, input guards and the close / cancelAndClose contract`。TC-053〜TC-066 を同番号の `it` で 1 件ずつ。fixture は `installKeyboardGuards(document)` を `beforeEach` で登録し各 `it` 後に破棄
+- RED → GREEN: 実装前実測「`isComposing: true` の Enter で閉じて callback 1 回」は TC-061、「keyup で背後の詳細が閉じる」は TC-054（本表）と `web/main-test/13-keyboard-accessibility-01.md` S72 TC-690（main）で GREEN
+- TC-063 の未自動化部分: 標準 button（候補は `div[role=option]` のため対象外、Apply / Cancel の `button.dropdownHintBtn` と起動 button）の既定 click は jsdom が生成しない。手動 Case（未実施）: 実 Webview で branch 複数選択を Tab / Enter で開き、候補で Space → Enter、別試行で Apply button 上の Enter / Space を 1 回・repeat・IME 確定直後に押す。期待: 適用が合計 1 回（`loadCommits` 要求 1 件）。影響: 二重適用で要求 2 件。代替確認: TC-062 / TC-063 の callback 回数（jsdom）。実 Webview の手動 Case は `web/main-test/13-keyboard-accessibility-01.md` 冒頭「Task 12 実 Webview 手動確認（未実施一覧）」の様式で記録し、自動テストの pass に含めない
+- 実行結果（2026-10-07）: 14 件 pass

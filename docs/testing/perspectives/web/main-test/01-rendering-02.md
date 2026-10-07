@@ -88,7 +88,8 @@ webview 内部状態と `loadCommits()` の worktree 引数を `WorktreeCollecti
 
 > Origin: Feature 053 (detached-worktree-menu) (light-spec-plan)
 > Added: 2026-09-13
-> Status: active
+> Status: superseded
+> Superseded By: S78（[13-keyboard-accessibility-02.md](13-keyboard-accessibility-02.md)）
 > Supersedes: S48
 > Signature: `private renderTable(): void` / `loadCommits(commits, commitHead, moreAvailable, forceRender, authors?, worktrees?: GG.WorktreeCollection)` / `addListenerToClass("gitRef", "contextmenu", ...)`
 > Target Path: `web/main.ts:870-878`（detachedラベル描画）、`web/main.ts:1080-1136`（`gitRef` の contextmenu / dblclick / click handler）

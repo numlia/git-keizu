@@ -64,7 +64,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `constructor(callbacks: PathHighlightCallbacks)` の bar 生成（`label` 付き `select`、`Clear path highlight` の `button`、`details`）/ `select(selection)` / `onCommitsChanged()` / `clear()`（公開 signature と選択の意味は変更しない）
-> Target Path: `web/pathHighlightController.ts`（bar 生成、`clear`、`onCommitsChanged` の DOM 保持。実装後に行範囲へ更新）
+> Target Path: `web/pathHighlightController.ts:132-177, 184-206, 221-291`（constructor の bar 生成、`onCommitsChanged` / `onRepositoryChanged` / `clear`、`render` / `renderEmpty` / `renderModeOptions` / `renderBoundaries`）
 > Test File: `tests/web/pathHighlightController.test.ts`
 
 対応プラン R4.3・R4.6・Task 10 実装内容 4 の観点。S1 の選択保持・状態バー・描画 callback は維持（R5）。fixture は S1 と同じで、`FocusContext` を登録し `document.activeElement` を観測する。
@@ -90,3 +90,10 @@
 | 名前 / label の欠落、境界の停止点        | TC-023、TC-024                                         |
 | 境界消失時の復元                         | TC-025                                                 |
 | 外部依存・例外                           | excluded(callbacks は同期の供給元で失敗経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S2
+
+- テスト: `tests/web/pathHighlightController.test.ts` describe `PathHighlightController bar controls and focus (S2)`。fixture は `configureFocusContext` を `beforeEach` で登録し `afterEach` で破棄。TC-019〜TC-025 を同番号の `it` で 1 件ずつ（加えて `keeps an inactive bar hidden so its controls are not tab stops` が非表示時の `hidden` を確認）
+- TC-021 の jsdom 代替（Task 10 handoff）: 解除 `button` の Enter は既定 click に委ねるため keydown の `defaultPrevented === false` を確認し、実行は `click()` で代替（keyup で 2 回目の解除なし）
+- main 側（矢印で追従しない、Escape で解除しない、select の keydown）は `web/main-test/13-keyboard-accessibility-01.md` S71 TC-683 / S72 TC-687 / TC-695
+- 実行結果（2026-10-07）: 7 件 pass

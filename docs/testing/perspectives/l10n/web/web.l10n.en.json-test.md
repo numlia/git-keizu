@@ -410,3 +410,9 @@ counterのtitle/aria-labelに使う新キーが en bundle に追加され、値�
 | 片 locale だけの追加   | TC-104                                              |
 | 未使用キー・未定義キー | TC-105                                              |
 | 外部依存・例外・型     | excluded(静的 JSON で外部依存・throw・型分岐が無い) |
+
+### Task 12 テスト対応（Feature 061-05）— S11
+
+- テスト: `tests/web/i18n.test.ts` describe の末尾（`// @see` 本ファイル）。TC-101 `English bundle holds the twelve keys with non-empty values (en l10n TC-101)` / TC-102 `English bundle holds exactly the fixed values of the Task 11 table (en l10n TC-102)` / TC-103 `English placeholders exist only on actionFor and commitsLoaded (en l10n TC-103)` / TC-104 `keeps the a11y key sets of both locales in parity (en l10n TC-104 / ja l10n TC-104)` / TC-105 `references every a11y key from web/ and defines every referenced one (en l10n TC-105)`
+- Task 11 は表の 12 キーに加えて `a11y.closeDetails` を追加した。TC-101 / TC-102 の「12 キー」は Task 11 の表の集合を指し、TC-104 / TC-105 の parity と参照検査は `a11y.closeDetails` を含む全 `a11y.` キーを対象にする（追加キーも en / ja に揃い `web/main.ts` から参照される）
+- 実行結果（2026-10-07）: 5 件 pass

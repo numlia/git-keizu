@@ -5671,7 +5671,8 @@ describe("GitKeizuView host HTML toolbar buttons, list name and status notice (S
   });
 
   it("keeps the dropdown labels next to their mounts (TC-411)", () => {
-    // Case: TC-411 (K44): the trigger name itself comes from the webview dictionary (toolbar.*)
+    // Case: TC-411 (K44) as S43 TC-418: the trigger name itself comes from the webview dictionary
+    // (toolbar.*), so the host only keeps the label text next to the mount
     for (const [control, label] of [
       ["repoControl", "Repo:"],
       ["branchControl", "Branches:"],

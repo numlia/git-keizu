@@ -322,7 +322,7 @@ S1 の lifecycle 契約を引き継ぎ、比較先変更の描画契約だけを
 > Status: active
 > Supersedes: -
 > Signature: `BranchCleanupPanel.handleResponse(response)` の行 `button`（`buildShowButton` / `buildDeleteButton` を `button type="button"` に）/ `requestInFlight` 中の `disabled` / render 前後の `beginFocusUpdate(panel)` → `finishFocusUpdate(update)` と `cleanup` 種別の FocusKey / 比較先 Dropdown（共通契約）
-> Target Path: `web/branchCleanupPanel.ts`（`buildShowButton` / `buildDeleteButton` / render 前後の focus 処理。設計時のため実装後に行範囲へ更新）
+> Target Path: `web/branchCleanupPanel.ts:133-151, 203-265, 266-302, 340-398, 498-517`（`handleResponse`、`render` / `captureFocus` / `restoreFocus` / `hasEnabledAction`、`buildHeader` / `syncComparisonOptions`、`buildRow` / `buildShowButton` / `buildDeleteButton`、`buildActionButton`）
 > Test File: `tests/web/branchCleanupPanel.test.ts`
 
 対応プラン R4.3・R4.7・Task 10 の観点。S4（eligibility と callback）の判定は維持され、現行の「再要求中は `div` に `disabled` class を付けリスナーを付けない」（`buildDeleteButton`）を標準 `disabled` へ揃える。fixture は S1〜S6 と同じ `#branchCleanupPanel` / `#branchCleanupBtn` の jsdom に、`actions` を `vi.fn()` で与え、`FocusContext` を登録する。
@@ -349,3 +349,11 @@ S1 の lifecycle 契約を引き継ぎ、比較先変更の描画契約だけを
 | 同操作の復元                      | TC-060                                                                |
 | eligibility・dialog payload       | excluded(S4 と `web/refMenu-test/01-branch-actions-01.md` S21 の責務) |
 | 外部依存・例外                    | excluded(callback は spy で外部依存と throw 経路を持たない)           |
+
+### Task 12 テスト対応（Feature 061-05）— S7
+
+- テスト: `tests/web/branchCleanupPanel.test.ts` describe `BranchCleanupPanel keyboard buttons and focus restoration`。fixture は `configureFocusContext` を `beforeEach` で登録し `afterEach` で破棄。TC-054〜TC-060 を同番号の `it` で 1 件ずつ
+- TC-055 の解釈（Task 10 handoff）: 再要求中の再描画では削除 button が `disabled` になり停止点でなくなるため、その時点の focus は比較先 Dropdown の起動 button へ移る。応答で同じ branch の有効な削除 button が戻ると、保留した ticket が同じ削除 button へ復元する（test は両時点を assert）
+- TC-057 の解釈（Task 10 handoff）: パネルは常にヘッダー（比較先 Dropdown）を描画するため「比較先 button も無い」前提は現実装では発生しない。test では比較先の起動 button を `hidden` にして不在の代替とし、error 応答で `#branchCleanupBtn` へ復元することを確認する
+- main との結合（Escape の順序: 比較先 Dropdown → repo Dropdown、パネルは閉じない）は `web/main-test/13-keyboard-accessibility-01.md` S72 TC-694。実機の外部移動（別パネル / VS Code 側）は同 shard 冒頭の手動一覧
+- 実行結果（2026-10-07）: 7 件 pass

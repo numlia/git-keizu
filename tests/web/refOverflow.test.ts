@@ -1438,7 +1438,7 @@ describe("RefOverflowController hidden-badge list", () => {
   });
 
   it("drops menu state and ids from clones (TC-064)", () => {
-    // Case: TC-064
+    // Case: TC-064 (the list container keeps its fixed id: S7 TC-115)
     // Given: a hidden original that is menu-active and contains an element with an id
     const { table } = setupTable([{ refs: ac01Refs(), head: true }]);
     const original = descriptionCell(table).querySelector<HTMLElement>('[data-name="wt-3"]')!;

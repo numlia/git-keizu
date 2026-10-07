@@ -150,7 +150,7 @@ S2は`openFile`アイコンだけを前提にし、`D`行では`.gitFileActions`
 > Status: active
 > Supersedes: -
 > Signature: `generateGitFileListHtml(gitFiles: GitFileChange[], canHighlightFileHistory: FileHistoryActionPredicate): string` / `generateGitFileTreeHtml(folder: GitFolder, gitFiles: GitFileChange[], canHighlightFileHistory: FileHistoryActionPredicate): string`（signature は維持。`buildFileItemHtml()` が差分 `button` と `.gitFileAction` の `button` を兄弟に配置し、folder を `button` にする）
-> Target Path: `web/fileTree.ts`（`buildFileItemHtml` / `generateGitFileTreeHtml`。設計時のため実装後に行範囲へ更新）
+> Target Path: `web/fileTree.ts:5-13, 63-168`（`BINARY_FILE_TITLE` / `MENU_STOP_TAB_INDEX` 等の定数、`buildFileItemHtml` / `buildFolderHtml` / `generateGitFileTreeHtml` / `generateGitFileListHtml`）
 > Test File: `tests/web/fileTree.test.ts`
 
 対応プラン R4.3・Task 8 の HTML 構造の観点。S1 / S3 / S4 / S5 の class・data 属性・履歴アイコンの判定委譲は維持されるため active のまま additive（`.gitFileAction.openFile` / `.highlightFileHistory` の class と順序は S5 のまま、要素が `button` になる）。main 側のイベント接続は `web/main-test/13-keyboard-accessibility-02.md` S76 の責務。名前は `t("a11y.actionFor", <操作名>, <path>)` で、`webviewMessages` に実辞書（en）を設定して確認する。
@@ -179,3 +179,9 @@ S2は`openFile`アイコンだけを前提にし、`D`行では`.gitFileActions`
 | 空入力                                            | TC-050                                                                  |
 | click / keydown の接続・要求                      | excluded(`web/main-test/13-keyboard-accessibility-02.md` S76 の責務)    |
 | 外部依存・例外                                    | excluded(HTML 生成は引数と `t()` だけで外部依存と throw 経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S6
+
+- テスト: `tests/web/fileTree.test.ts` describe `file and folder controls as standard buttons (S6)`。TC-042〜TC-050 を同番号の `it` で（TC-045 は binary の差分 button と有効 button なし行の 2 `it`）。`globalThis.webviewMessages` に実辞書（en）を設定し `a11y.actionFor` の名前を確認
+- main 側の click / keydown 接続は `web/main-test/13-keyboard-accessibility-02.md` S76 TC-728〜TC-734
+- 実行結果（2026-10-07）: 10 件 pass

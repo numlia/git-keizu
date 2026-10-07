@@ -75,6 +75,32 @@
 
 **§3.7.5 A8.3 境界 → Case ID**: A8.3-1: TC-647、TC-655、TC-656、`web/keyboardNavigation-test.md` TC-006〜TC-010、TC-672、`web/dropdown-test.md` TC-046〜TC-048、TC-056、TC-065、`web/refOverflow-test.md` TC-103、TC-104、TC-111。A8.3-2: `web/keyboardNavigation-test.md` TC-013〜TC-021、TC-659、TC-690、TC-691、TC-696、`web/dropdown-test.md` TC-061〜TC-063、`web/contextMenu-test.md` TC-124、TC-128〜TC-130、`web/dialogs-test.md` TC-052〜TC-054、TC-057、`web/findWidget-test.md` TC-496〜TC-498。A8.3-3: TC-685、TC-675、TC-693、TC-711、TC-712、`web/refOverflow-test.md` TC-099〜TC-102、`web/contextMenu-test.md` TC-132、TC-143、TC-145、`web/dialogs-test.md` TC-058。A8.3-4: `web/dropdown-test.md` TC-049〜TC-051、TC-054、`web/refOverflow-test.md` TC-108、TC-109、`web/contextMenu-test.md` TC-135〜TC-138、`web/dialogs-test.md` TC-050、TC-051。A8.3-5: TC-709、TC-713、TC-715、TC-716、TC-719、`web/keyboardNavigation-test.md` TC-051、TC-052、`web/branchCleanupPanel-test.md` TC-055〜TC-057、`web/pathHighlightController-test.md` TC-025。A8.3-6: `media/main-test.md` TC-107〜TC-109、`media/dropdown-test.md` TC-017、`media/findwidget-test.md` TC-016、TC-742（手動）。
 
+**RED → GREEN 対応（Task 12 実測、2026-10-07）**: 上表の RED 証跡は、製品コード変更後に次の test method で GREEN になった。`pnpm exec vitest run tests/web tests/src/gitGraphView.test.ts tests/src/i18n.test.ts` で `tests/web/main.keyboard.test.ts` 103 件 pass。
+
+| RED 行（上表）                           | GREEN を示す test method（`tests/web/main.keyboard.test.ts` ほか）                                                                                                                            |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `[tabindex]` 0 件・`focus()` 後も `body` | `gives the HEAD row real focus with tabindex 0 and no details request (TC-645)`、`marks every other row programmatic-only and uses no positive tabindex (TC-651)`                             |
+| `ArrowDown` で移動しない                 | `moves only the target on ArrowDown without details (TC-658)`                                                                                                                                 |
+| `Enter` 未割当（要求 0 件）              | `opens the single details once on Enter, ignoring repeat and keyup (TC-659)`                                                                                                                  |
+| Escape keyup で詳細も閉じる二重閉鎖      | `cancels the multi-select on Escape keydown and keeps the details on keyup (TC-690)`、`cancels every dropdown on Escape instead of applying it (TC-692)`、`tests/web/dropdown.test.ts` TC-054 |
+| IME 変換中の Enter で適用                | `tests/web/dropdown.test.ts` `… (TC-061)`                                                                                                                                                     |
+| `div.dropdownCurrentValue` が focus 不可 | `tests/web/dropdown.test.ts` `opens from the trigger with Enter, Space and ArrowDown and focuses the filter (TC-039)`                                                                         |
+
+**Task 12 Case → test file 対応（owner 別の要約）**: 各 owner の表に「Task 12 テスト対応」節を置き、Case ID と `it` 名を記録した。test file は次のとおり: `web/keyboardNavigation-test.md` S1〜S4 → `tests/web/keyboardNavigation.test.ts`（54 件）、本 shard S69〜S72 と `13-keyboard-accessibility-02.md` S73〜S79 → `tests/web/main.keyboard.test.ts`（103 件。TC-697 / TC-698 / TC-725 は `tests/web/main.refOverflow.test.ts`）、`web/dropdown-test.md` S11〜S12 → `tests/web/dropdown.test.ts`、`web/contextMenu-test.md` S9〜S10 → `tests/web/contextMenu.test.ts`、`web/dialogs-test.md` S9 → `tests/web/dialogs.test.ts`、`web/refOverflow-test.md` S6〜S7 → `tests/web/refOverflow.test.ts`、`web/fileTree-test.md` S6 → `tests/web/fileTree.test.ts`、`web/findWidget-test.md` S11 → `tests/web/findWidget.test.ts`、`web/branchCleanupPanel-test.md` S7 → `tests/web/branchCleanupPanel.test.ts`、`web/fileHistory-test.md` S12 → `tests/web/fileHistory.test.ts`、`web/pathHighlightController-test.md` S2 → `tests/web/pathHighlightController.test.ts`、`src/gitGraphView-test/08-keyboard-accessibility-01.md` S43 → `tests/src/gitGraphView.test.ts`、`media/*-test.md` の各節 → `tests/web/keyboardStyles.test.ts`、`l10n/web/*.json-test.md` S11 / S12 → `tests/web/i18n.test.ts`、`l10n/bundle.l10n*-test.md` S1 → `tests/src/i18n.test.ts`。
+
+**Task 12 実 Webview 手動確認（未実施一覧）**: 本 Task の実行環境は jsdom（Node）だけで、VS Code Webview・Chromium・IME・スクリーンリーダー・テーマ描画が無いため、下表の Case はすべて **未実施** である。自動テストの pass には含めず、本プランの受け入れ未充足として残す。記録様式: VS Code 版 / OS / 入力方式（IME 名） / テーマ / スクリーンリーダー名・版 / 手順 / 期待値 / 観測結果（実施後に各 owner の Notes へ追記する）。
+
+| Owner / Case                                                                                                                                                          | 残る手順（実 VS Code Webview）                                                                                                                                                                                                                                | 期待値                                                                                   | 影響（未実施のまま出荷した場合）                                                                                          | 代替確認（自動）                                                                          |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 本 shard S73 全体（実 Tab 順）                                                                                                                                        | マウスなしで toolbar → 一覧（操作対象行）→ 参照 → 詳細 → ファイル → 追加読込 → 検索 → 整理 → 両バーを Tab / Shift+Tab で往復し、Webview 外（VS Code 側）へ Tab で退出する。詳細と操作対象が異なる行、hidden / disabled / 空表示を含める                       | §3.6 の順で止まり、循環せず端で VS Code 側へ出る                                         | ネイティブ Tab 順の崩れ（DOM 順と論理順の不一致）を検出できない                                                           | TC-700〜TC-708（`getTabStops()` の順と境界 keydown の `activeElement`）                   |
+| 本 shard S73 TC-707 残課題                                                                                                                                            | 詳細が操作対象行より **上** にある状態で、詳細最後の操作から Tab、操作対象行から Shift+Tab                                                                                                                                                                    | 一覧へ循環再入場しないこと（ネイティブ順で詳細 → 参照群へ戻る場合の挙動を観測）          | 詳細最後の Tab / 行の Shift+Tab はネイティブに任せているため、詳細が上にあると DOM 順で一覧へ再入場する（Task 3 handoff） | TC-707（非消費の確認のみ）                                                                |
+| `web/keyboardNavigation-test.md` S2 TC-021 / `web/refOverflow-test.md` S6 TC-107 / `web/dialogs-test.md` S9 TC-057 / `web/dropdown-test.md` S12 TC-063 / 本 shard S76 | native `button`（toolbar、counter、dialog の action、候補、詳細・ファイル操作）で Enter / Space を 1 回押す、押し続ける（repeat）、IME 確定直後に押す                                                                                                         | 通常押下 1 回で既存アクションが 1 回、repeat / IME 確定 / keyup で追加 0                 | Chromium が keydown の `preventDefault` で合成 click を抑止する前提が崩れると二重実行                                     | `isKeyboardActionBlocked` の `defaultPrevented` と `click()` 代替（各 owner の該当 Case） |
+| `web/dialogs-test.md` S9 TC-053 / `web/dropdown-test.md` S12 TC-061 / `web/findWidget-test.md` S11 TC-497 / 本 shard S72 TC-696                                       | 日本語 IME（例: Microsoft IME / macOS 日本語入力）で変換中に Enter / Escape / ↑↓、確定直後の keyup                                                                                                                                                            | 変換の確定・取消だけが起き、実行・閉鎖・移動 0                                           | `isComposing` / `compositionend` の実際のイベント順が jsdom の合成と異なると二重処理                                      | `compositionstart → keydown → compositionend → keyup` の合成列（各 owner の該当 Case）    |
+| `web/dialogs-test.md` S9 TC-056                                                                                                                                       | VS Code 1.74 以上で dialog 表示中に背景の `#refreshBtn` / 行へ Tab・クリック・Ctrl+F                                                                                                                                                                          | `inert` により背景へ到達せず、ショートカットも通らない                                   | `inert` 非対応環境では Tab trap（TC-050）だけが保護になる                                                                 | TC-050 / TC-056（属性と `focusin` の戻し）                                                |
+| `media/main-test.md` S9 TC-107〜TC-109、`media/dropdown-test.md` S2 TC-017、`media/findwidget-test.md` S2 TC-016                                                      | Light / Dark / High Contrast の 3 テーマで `M` を操作対象、`N` の詳細、`N/R` 比較、HEAD = `M`、検索一致を同時に作り Tab で巡回。幅 400px・60 文字以上の参照名、counter と一覧、検索 button、狭幅の dropdown も確認。Blink の `<tr>` への `outline` 描画も観測 | 2px 枠・行頭矢印・各状態の背景が同時に判別でき、枠が全 cell で連続し要素外へはみ出さない | テーマ変数の解決・`<tr>` の outline 描画は jsdom で確認できない                                                           | TC-101〜TC-106、dropdown TC-013〜TC-016、findwidget TC-013〜TC-015（CSS 宣言の静的検証）  |
+| 本 shard S77 TC-742、`l10n/web/web.l10n.ja.json-test.md` S12 TC-105                                                                                                   | NVDA（Windows）/ VoiceOver（macOS）で `M` の行へ移動し名前・状態（操作対象 / 詳細表示中 / 比較 / HEAD）・種類（作業ツリー / スタッシュ）を聞く。ja locale でファイル操作 button の名前 `<操作名>: <path>` を確認                                              | 辞書どおりの意味で読まれ、英日で対応する。全環境で同一の発話文字列は合格条件にしない     | 支援技術の名前計算（`aria-describedby` の連結）は jsdom で確認できない                                                    | TC-735〜TC-742、i18n TC-101〜TC-104（属性と辞書）                                         |
+| 本 shard S74 / `web/branchCleanupPanel-test.md` S7 / A8.2-4                                                                                                           | データ更新中に別パネル（検索・整理）や VS Code 側（エディター）へ移動し、応答受信後に focus が戻らないことを確認                                                                                                                                              | 応答後も移動先に focus が残る                                                            | `window` blur / `focusin` の実イベント順が合成と異なると奪い返す                                                          | TC-709、TC-657、`web/keyboardNavigation-test.md` TC-045 / TC-047 / TC-052                 |
+
 ## S69: 操作対象の初期化・維持・repo 切替・一覧への入場
 
 > Origin: Feature 061-05 (light-spec-plan)
@@ -82,7 +108,7 @@
 > Status: active
 > Supersedes: -
 > Signature: `GitKeizuView` の行対象 `RowTarget \| null` の保持と `reconcileRowTarget()` の呼出し / `public loadCommits(...)` / `private renderTable()` / `private renderUncommitedChanges()` / `renderShowLoading()` / `selectRepo()`・repo dropdown callback・`loadRepos()` / `FocusContext.getActiveRow()` の実装 / `currentBtn` の `disabled` 同期
-> Target Path: `web/main.ts`（行対象の保持・`renderTable()` の `tabindex` 付与・repo 変更の全入口・`currentBtn`。設計時のため実装後に行範囲へ更新）
+> Target Path: `web/main.ts:408-410, 630-689, 773-863, 1113-1130, 1512-1533, 1856-1871, 2031-2035, 2052-2067, 2100-2109, 2133-2165`（`rowTarget` の保持、`loadRepos` / `selectRepo`、`loadCommits` の `reconcileRowTarget` 呼出し、`renderTable()` / `renderUncommitedChanges()` / `renderShowLoading()` の先頭、`updateCurrentBtnState`、`leaveRepository`、`applyRowTargets`、`setRowTabIndex`、`setRowTarget` / `syncRowTargetFromFocus` / `findRowByHash` / `getRowTargetElem`）
 > Test File: `tests/web/main.keyboard.test.ts`
 
 対応プラン §3.6・§3.7.2 R4.1 の観点。「操作対象」は詳細・比較・HEAD・検索一致・履歴の現在位置・経路強調対象とは別の状態で、repo と hash 全文で識別し index は消失時の復元にだけ使う。初期表示やデータ受信だけで別の操作要素・VS Code 側からフォーカスを奪わない。空一覧の入口は名前付きの `#commitTable`（Task 9 の `a11y.commitHistory`）。
@@ -118,6 +144,13 @@
 | 純粋な再計算の分岐                                             | excluded(`web/keyboardNavigation-test.md` S1 の責務)                      |
 | 外部依存・例外                                                 | excluded(ホスト要求は `postMessage` の件数で観測し、throw 経路を持たない) |
 
+### Task 12 テスト対応（Feature 061-05）— S69
+
+- テスト: `tests/web/main.keyboard.test.ts` describe `row target initialisation, maintenance and repository switch (S69)`。各 `it` 名の末尾が Case ID（TC-645〜TC-657 を 1 件ずつ）。TC-655 は加えて describe `toolbar state, load more button, status notice and ordering button` の `drops the disabled current button from the tab stops (TC-655)`（停止点変種）
+- TC-654 の解釈: 読み込み表示中の「内部の操作対象が `M` のまま」は、直後の標準 fixture 受理で `M` だけが `tabindex="0"` になることで観測する。受理した 0 件は focus を一覧の外（`#refreshBtn`）へ置いた状態で確認する（一覧内に退避した focus はキーで再解決されるため）。意味は変えていない
+- TC-646 / TC-657 は `HTMLElement.prototype.focus` の spy で行への `focus` 呼出し 0 回も確認（データ受信で奪わない）
+- 実行結果（2026-10-07）: 13 件 pass（RED → GREEN は冒頭の対応表）
+
 ## S70: 行キーの状態別動作（↑↓ / Ctrl・Cmd ↑↓ / Enter / Ctrl・Cmd + Enter）
 
 > Origin: Feature 061-05 (light-spec-plan)
@@ -125,7 +158,7 @@
 > Status: active
 > Supersedes: S29, S30, S31, S46
 > Signature: `private handleKeyboardShortcut(e: KeyboardEvent): void` の行キー分岐（行 / 行内参照に実フォーカスがある場合だけ処理）/ 操作対象の移動と `loadCommitDetails(sourceElem)` の接続 / Enter 用の「開く」経路（click 用の `handleCommitRowActivation(clickedHash, sourceElem, isModifierClick)` の同一行閉鎖分岐を経由しない）/ 修飾 Enter → `handleCommitRowActivation(hash, sourceElem, true)` / `Graph.getFirstChildIndex` / `getFirstParentIndex` / `getAlternativeChildIndex` / `getAlternativeParentIndex`
-> Target Path: `web/main.ts`（`handleKeyboardShortcut()` の Arrow / Enter 分岐と `loadCommitDetails()` の比較表示解除経路。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:1872-1943, 1961-1994, 2296-2366`（`handleKeyboardShortcut` / `resolveFocusedRow` / `isListScopeTarget` / `handleRowKey`、`moveRowTarget` / `openRowDetails` / `isComparing` / `hasSingleDetailsFor`、`handleCommitRowActivation` / `loadCommitDetails`）
 > Test File: `tests/web/main.keyboard.test.ts`
 
 `04-keyboard-selection-01.md` の S29〜S31 は「`expandedCommit` あり」を前提に矢印で詳細を切り替える契約、S46 は `document.body` を target にした Arrow で `loadCommitDetails` が呼ばれる契約（TC-261）だったが、対応プラン §3.6・R4.2 では行 / 行内参照に実フォーカスがある場合だけ処理し、詳細なしでは操作対象だけを移し、比較中は無修飾矢印で操作対象だけを移すため置き換える。S29〜S31 / S46 の表は改変せず、親子・代替の選び方（`Graph` の 4 method）と入力可能要素の抑止は本節へ引き継ぐ。「状態」は `{ 操作対象, 詳細（単一）, 比較 }` の 3 値で、Expected Result では `tabindex="0"` の行・`#commitDetails` の位置と `commitDetailsOpen` / `compareTarget` の行・要求件数で観測する。Enter は既存 click 処理の「同じ行を閉じる」分岐を経由しない。
@@ -167,6 +200,12 @@
 | 参照・入力子孫からの誤分類                       | TC-675                                                              |
 | 外部依存・例外                                   | excluded(要求は `postMessage` の件数で観測し、throw 経路を持たない) |
 
+### Task 12 テスト対応（Feature 061-05）— S70
+
+- テスト: `tests/web/main.keyboard.test.ts` describe `row keys per state (S70)`。TC-658〜TC-675 を同番号の `it` で 1 件ずつ（TC-659 は keydown → repeat → keyup を同一要素へ連続送信し `commitDetails` 要求が合計 1 件、TC-664 / TC-666〜TC-669 は Ctrl と Cmd（`metaKey`）の両方、TC-666 / TC-667 は同じ状態の Ctrl + click の `postMessage` 引数と `toEqual`）
+- 部品は mock せず実 Dropdown / ContextMenu / dialogs / FindWidget / FileHistoryController / RefOverflowController / Graph を使う（`vi.mock` なし）。`Graph.prototype` の 4 method は `vi.spyOn` で呼出し回数だけ観測（実装はそのまま）
+- 実行結果（2026-10-07）: 18 件 pass
+
 ## S71: ファイル履歴・経路強調中の矢印と履歴バー
 
 > Origin: Feature 061-05 (light-spec-plan)
@@ -174,7 +213,7 @@
 > Status: active
 > Supersedes: S64
 > Signature: `private handleFileHistoryArrowKey(e: KeyboardEvent): boolean`（`FileHistoryController.navigate(delta: -1 \| 1, useExpandedCommit: boolean = false): string \| null` を `navigate(delta, true)` で呼ぶ）/ `handleKeyboardShortcut()` の優先順位（局所 UI → 入力保護 → 比較 → ファイル履歴 → 通常一覧）
-> Target Path: `web/main.ts`（`handleFileHistoryArrowKey()` と `handleKeyboardShortcut()` の分岐順。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:1902-1960`（`handleRowKey` の比較 → ファイル履歴 → 通常一覧の分岐順と `handleFileHistoryArrowKey`）
 > Test File: `tests/web/main.keyboard.test.ts`
 
 `04-keyboard-selection-02.md` S64 は通常モードで「詳細なしの ArrowDown は要求 0・非消費」（TC-562）、「比較中は非消費」（TC-563 / TC-589）とし、履歴分岐の前に行フォーカスを要求しなかったため、R4.2 の表（詳細なしは操作対象を移す、比較中は無修飾矢印で操作対象だけ移す、行 / 参照フォーカス時だけ処理）と矛盾し置き換える。S64 の履歴モードの振り分け（TC-571〜TC-593、TC-622）の意味は本節へ引き継ぎ、移動先の選定・端での停止は `web/fileHistory-test.md` S10 / S12、経路強調の状態は `web/pathHighlightController-test.md` S1 / S2 の責務で本表には含めない。fixture は `tests/web/main.pathHighlight.test.ts` の `startFileHistory()` と同じ実 controller で、一致集合 `[N, R]`、非一致 `M`。
@@ -203,6 +242,12 @@
 | 移動先の選定・snapshot 復元                  | excluded(`web/fileHistory-test.md` S10 / S12 の責務) |
 | 外部依存・例外                               | excluded(controller は実物で、throw 経路を持たない)  |
 
+### Task 12 テスト対応（Feature 061-05）— S71
+
+- テスト: `tests/web/main.keyboard.test.ts` describe `arrows while the file history or a path highlight is active (S71)`。TC-676〜TC-683 を同番号の `it` で 1 件ずつ。TC-682 `moves the history position from the bar buttons without opening details (TC-682)` を Task 12 で追加（`#fileHistoryPosition` の文言と `scrollTop` の更新、`commitDetails` 要求 0、`#commitDetails` なし）
+- fixture 補足: 実 `FileHistoryController` は anchor が一致集合に含まれる応答だけを受理する（`web/fileHistory-test.md` S2）ため、TC-676〜TC-682 の一致集合は `[M, R]` または `[N, M, R]`（anchor `M` を含む）とし、「非一致 `M`」の前提は TC-676 の詳細 `M` の扱い（起点規則）で読み替える。TC-680 は履歴有効のまま比較 `N/M` を作る
+- 実行結果（2026-10-07）: 8 件 pass
+
 ## S72: 画面全体キー: 設定可能ショートカットの適用範囲と global Escape（keydown）
 
 > Origin: Feature 061-05 (light-spec-plan)
@@ -210,7 +255,7 @@
 > Status: active
 > Supersedes: S10, S12, S58, S65
 > Signature: `private handleKeyboardShortcut(e: KeyboardEvent): void` の設定可能ショートカット分岐（`keybindings.find` / `refresh` / `scrollToHead` / `scrollToStash`）/ `public handleEscape(): void` を `document` の `keydown` bubble 段階で呼ぶ global listener（`keyup` 閉鎖の削除）/ `Dropdown.cancelAndClose(reason?: FocusCloseReason)` の呼出し / `isKeyboardActionBlocked(event)` による保護
-> Target Path: `web/main.ts`（`handleKeyboardShortcut()` の末尾分岐、`handleEscape()`、末尾の global listener。実装後に行範囲へ更新）
+> Target Path: `web/main.ts:2007-2030, 2259-2294, 2882-2919`（`handleConfiguredShortcut`、`handleEscape`、`installKeyboardGuards` の登録と末尾の `escapeHandler` / listener cleanup）
 > Test File: `tests/web/main.keyboard.test.ts`
 
 `04-keyboard-selection-01.md` S10 は focus の前提なしに Ctrl/Cmd ショートカットを適用し、`02-context-menu-01.md` S12・`04-keyboard-selection-01.md` S58・`04-keyboard-selection-02.md` S65 は Escape を `keyup` で発火し各 Dropdown に適用の `close()` を呼ぶ契約だったため、R4.6（ショートカットは行 / 参照フォーカス時に適用、Escape は keydown に統一し取消を呼ぶ）と矛盾し置き換える。Escape の順序（メニュー → ダイアログ → repo → branch → author → 省略一覧 → 検索 → 詳細 → 履歴）は S12 / S58 / S65 から引き継ぎ、S11（stash 巡回）は active のまま変えない。局所 UI（Dropdown / ContextMenu / dialog / FindWidget / 整理の比較先）は実部品で開き、`close` 系を mock した結果だけで二重閉鎖を検証済みとしない。
@@ -248,3 +293,11 @@
 | 何も開いていないときの副作用                            | TC-699                                                           |
 | stash 巡回の内部規則                                    | excluded(`04-keyboard-selection-01.md` S11 が active のまま担当) |
 | 外部依存・例外                                          | excluded(DOM 状態の判定だけで外部依存と throw 経路を持たない)    |
+
+### Task 12 テスト対応（Feature 061-05）— S72
+
+- テスト: `tests/web/main.keyboard.test.ts` describe `configurable shortcuts and the global Escape chain (S72)`。TC-684〜TC-696、TC-699 を同番号の `it` で 1 件ずつ。TC-686 は describe `details, file and folder controls as standard buttons (S76)` の `does not treat list keys on a file button as row keys (TC-686)`。TC-689 は加えて `returns focus to the find launcher when Escape closes the find widget (TC-689)`（検索段の復元変種）
+- Task 12 追加: TC-694 `closes the focused cleanup comparison dropdown before the repo dropdown and the panel (TC-694)`（実 BranchCleanupPanel を toolbar button と `loadBranchCleanup` 応答で開き、比較先 Dropdown は起動 button の Enter で開く。click で開くと repo dropdown の外側 click になり同時に開けないため）。TC-697 / TC-698 は省略一覧の layout fixture を持つ `tests/web/main.refOverflow.test.ts` describe `handleEscape with the ref list (S58)` の `closes the clone menu, then the list, and lands on the counter (TC-697)` / `closes a real dialog and a dropdown before the list (TC-698)`（TC-698 の Dropdown 段は同ファイルの Dropdown mock で順序だけを確認し、取消の意味は TC-692 の実部品で確認）
+- TC-696 の解釈: IME 変種（`compositionstart` → Escape keydown（`isComposing: true`）→ `compositionend` → keyup）は自動化済み。「`window` の `blur` 後に Escape keydown」は、blur した Webview へ keydown が配送される経路が実ブラウザーに存在せず（keydown の前に必ず `window` の `focus` が先行し、`keyboardNavigation` の blur 状態は復元 ticket（S4 TC-047）だけに使う）、jsdom でだけ作れる状態のため自動化しない。影響なし（観測不能）。代替確認: S4 TC-047。実機確認は上記手動一覧「A8.2-4」の項
+- Escape は keydown と keyup を別々に送り（`pressEscape` / `releaseEscape`）、`close` 系を mock した結果だけで二重閉鎖を判定していない（TC-692 の `close` spy は「呼ばれない」ことの観測）
+- 実行結果（2026-10-07）: 17 件 pass（本 shard 分）＋ `tests/web/main.refOverflow.test.ts` 2 件 pass

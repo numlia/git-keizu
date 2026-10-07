@@ -248,7 +248,7 @@ Test file: `tests/web/dialogs.test.ts`, describe `isErrorDialogActive` (`@see` t
 > Status: active
 > Supersedes: S1
 > Signature: `showFormDialog(message, inputs, actionName, actioned, sourceElem, afterCreate?)` / `showConfirmationDialog(...)` / `showErrorDialog(message, reason, sourceElem, explanation?)` / `hideDialog(): void`（公開 signature は維持）/ `#dialog` の `role="dialog"`・`aria-modal`・名前 / 内部 `keydown`（`Enter` / `Escape` / `Tab`）/ `isKeyboardActionBlocked(event)` / `captureFocusOrigin` / `restoreFocus`
-> Target Path: `web/dialogs.ts`（`showDialog` 系の生成、keydown、`hideDialog`。設計時のため実装後に行範囲へ更新）
+> Target Path: `web/dialogs.ts:53-60, 136-262, 270-490`（`DialogSession` / `lastDialogFocus` / `inertBackground`、入力 HTML と `initialFormInput` / `showFormDialog`、`showErrorDialog`、`captureSession` / `focusOrigin` / `tabStops` / `focusInDialog` / `cycleFocus` / `handleEnter` / `handleDialogKeydown` / `handleDocumentFocusIn` / `excludeBackground` / `restoreBackground` / `closeSession` / `showDialog` / `hideDialog` / `isDialogActive` / `isErrorDialogActive`）
 > Test File: `tests/web/dialogs.test.ts`
 
 対応プラン §3.7.2 R4.6 と Task 6 の観点。S1（フォーカス優先順位）は入力なしのダイアログで「フォーカスなし」（TC-003）としていたが、入力がなければ取消 / 閉じる button へ初期フォーカスする契約へ変わるため置き換える。S1 の text-ref → text の優先（TC-001 / TC-002 / TC-004）は本節へ引き継ぐ。S2（Enter 確定）は有効 / 無効状態の意味が変わらないため active のまま additive（IME と二重発火は本節）。fixture は `#dialog` / `#dialogBacking` と背景の `#refreshBtn`、`sourceElem`（メニューの起点）を持つ jsdom で、`actioned` / `confirmed` は `vi.fn()`。
@@ -281,3 +281,10 @@ Test file: `tests/web/dialogs.test.ts`, describe `isErrorDialogActive` (`@see` t
 | 背景の停止点・ショートカット                        | TC-056                                                      |
 | 古い閉鎖の復元、非同期 error の所有者判定           | TC-058                                                      |
 | 外部依存・例外                                      | excluded(callback は spy で外部依存と throw 経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S9
+
+- テスト: `tests/web/dialogs.test.ts` describe `modal focus, Tab cycle, Escape keydown, IME guard and origin restore (S9)`。fixture は `configureFocusContext` と `installKeyboardGuards` を `beforeEach` で登録し `afterEach` で破棄（`vi.resetModules` 後の旧 listener なし）、`activeElement()` で復元を判定
+- TC-047 2 `it`（text-ref 優先 / text のみ）/ TC-048 `runs the action only after a valid ref value and never on keyup` / TC-049 `it.each`（confirmation / error の初期フォーカス）＋ `renders the action button as a native type=button with its name` / TC-050 2 `it`（循環 / 無効 button を飛ばす）/ TC-051 2 `it`（Escape keydown / dismiss button）/ TC-052 2 `it`（keyup 単独 / repeat）/ TC-053 `does not run the action for Enter during IME composition` / TC-054 `does not run the action for repeated Enter keydown` / TC-055 2 `it` / TC-056 2 `it`（背景の除外と復元 / 既に `inert` の要素）/ TC-057 2 `it`（Enter 1 回で 1 回実行 + 遅延 click で追加 0 / 無効 button）/ TC-058 2 `it`（置換後の古い閉鎖 / 非同期 error の所有者）
+- 手動 Case（未実施）TC-053（IME）/ TC-056（`inert`、VS Code 1.74 以上）/ TC-057（native button の Enter → click 1 回）: 手順・期待・影響・代替確認は `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧（dialogs の行）。jsdom では TC-057 を keydown の `defaultPrevented === true` と、切り離した button への `click()` 追加実行 0 回で代替した
+- 実行結果（2026-10-07）: 20 件 pass
