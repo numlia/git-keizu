@@ -7,6 +7,13 @@ import {
   CLASS_FILE_HISTORY_NOTE
 } from "./fileHistoryClasses";
 import { t } from "./i18n";
+import {
+  captureFocusOrigin,
+  type FocusCloseReason,
+  type FocusOrigin,
+  markFocusTarget,
+  restoreFocus
+} from "./keyboardNavigation";
 import { insertAfter, sendMessage, svgIcons } from "./utils";
 
 export {
@@ -30,6 +37,16 @@ const CONTROLS_ELEMENT_ID = "controls";
 const CLASS_ACTIVE = "active";
 const CLASS_LOADING = "loading";
 const CLASS_ROUNDED_BTN = "roundedBtn";
+const ATTR_ARIA_LABEL = "aria-label";
+const ATTR_ARIA_HIDDEN = "aria-hidden";
+const ATTR_ROLE = "role";
+const ATTR_ARIA_LIVE = "aria-live";
+const ROLE_STATUS = "status";
+const LIVE_POLITE = "polite";
+const ATTR_TRUE = "true";
+/** Joins an action label and the file path into the button's accessible name. */
+const ACTION_NAME_SEPARATOR = ": ";
+const REASON_KEYBOARD: FocusCloseReason = "keyboard";
 const COMMIT_ROW_SELECTOR = ".commit[data-hash]";
 const FILE_ROW_CURRENT_SELECTOR = `.gitFile.${CLASS_FILE_HISTORY_CURRENT}`;
 const NOTE_SELECTOR = `.${CLASS_FILE_HISTORY_NOTE}`;
@@ -75,12 +92,21 @@ interface FileHistoryState {
 
 /* === DOM Helpers === */
 
-function createButton(id: string, title: string | null, content: string): HTMLSpanElement {
-  const button = document.createElement("span");
+/** Interim accessible name until the shared `a11y.actionFor` text exists. */
+function actionName(action: string, filePath: string | null): string {
+  return filePath === null ? action : `${action}${ACTION_NAME_SEPARATOR}${filePath}`;
+}
+
+function createButton(id: string, title: string | null, content: string): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
   button.id = id;
   button.className = CLASS_ROUNDED_BTN;
   if (title !== null) button.title = title;
   button.innerHTML = content;
+  // An icon child is decorative: the button is named through its aria-label.
+  for (const icon of Array.from(button.children)) icon.setAttribute(ATTR_ARIA_HIDDEN, ATTR_TRUE);
+  markFocusTarget(button, { kind: "control", id });
   return button;
 }
 
@@ -132,10 +158,14 @@ export class FileHistoryController {
   private readonly barElem: HTMLDivElement;
   private readonly pathElem: HTMLSpanElement;
   private readonly positionElem: HTMLSpanElement;
+  private readonly prevBtn: HTMLButtonElement;
+  private readonly nextBtn: HTMLButtonElement;
+  private readonly exitBtn: HTMLButtonElement;
   private nextRequestId: number = FIRST_REQUEST_ID;
   private latestRequestId: number | null = null;
   private pending: PendingRequest | null = null;
   private state: FileHistoryState | null = null;
+  private origin: FocusOrigin | null = null;
 
   constructor(callbacks: FileHistoryCallbacks) {
     this.callbacks = callbacks;
@@ -143,13 +173,18 @@ export class FileHistoryController {
     this.barElem.id = FILE_HISTORY_BAR_ID;
     this.pathElem = createSpan(PATH_ELEMENT_ID);
     this.positionElem = createSpan(POSITION_ELEMENT_ID);
-    const prevBtn = createButton(PREV_BUTTON_ID, t("fileHistory.previous"), svgIcons.arrowUp);
-    const nextBtn = createButton(NEXT_BUTTON_ID, t("fileHistory.next"), svgIcons.arrowDown);
-    const exitBtn = createButton(EXIT_BUTTON_ID, null, t("fileHistory.exit"));
-    prevBtn.addEventListener("click", () => this.prev());
-    nextBtn.addEventListener("click", () => this.next());
-    exitBtn.addEventListener("click", () => this.exit(true));
-    this.barElem.append(this.pathElem, this.positionElem, prevBtn, nextBtn, exitBtn);
+    // Only the position text is live: loading and the current position are announced politely
+    // without re-reading the whole bar.
+    this.positionElem.setAttribute(ATTR_ROLE, ROLE_STATUS);
+    this.positionElem.setAttribute(ATTR_ARIA_LIVE, LIVE_POLITE);
+    this.prevBtn = createButton(PREV_BUTTON_ID, t("fileHistory.previous"), svgIcons.arrowUp);
+    this.nextBtn = createButton(NEXT_BUTTON_ID, t("fileHistory.next"), svgIcons.arrowDown);
+    this.exitBtn = createButton(EXIT_BUTTON_ID, null, t("fileHistory.exit"));
+    this.prevBtn.addEventListener("click", () => this.prev());
+    this.nextBtn.addEventListener("click", () => this.next());
+    this.exitBtn.addEventListener("click", () => this.exit(true));
+    this.barElem.append(this.pathElem, this.positionElem, this.prevBtn, this.nextBtn, this.exitBtn);
+    this.renderBar();
     insertAfter(this.barElem, document.getElementById(CONTROLS_ELEMENT_ID)!);
   }
 
@@ -162,6 +197,7 @@ export class FileHistoryController {
     this.latestRequestId = requestId;
     const repo = this.callbacks.getCurrentRepo();
     this.pending = { requestId, repo, anchorHash, filePath };
+    this.rememberOrigin();
     this.callbacks.closeFindWidget();
     this.renderBar();
     sendMessage({ command: "fileHistory", repo, requestId, anchorHash, filePath });
@@ -246,19 +282,17 @@ export class FileHistoryController {
 
   public exit(restore: boolean): void {
     const state = this.state;
+    // Focus on the disappearing bar returns to where the history started once the snapshot
+    // (whose details may hold that origin) is back; a programmatic exit leaves focus alone.
+    const returnFocus = restore && this.barElem.contains(document.activeElement);
     this.pending = null;
     // Cleared before the restore callbacks run so a re-render they trigger sees inactive state.
     this.state = null;
     this.renderBar();
     clearHighlightClasses();
     this.callbacks.setGraphHighlight(null);
-    if (!restore || state === null || state.repo !== this.callbacks.getCurrentRepo()) return;
-    const expanded = state.snapshot.expanded;
-    if (expanded !== null) {
-      if (this.callbacks.getCommitId(expanded.hash) === null) return;
-      this.callbacks.restoreExpandedCommit(expanded);
-    }
-    this.callbacks.setScrollTop(state.snapshot.scrollTop);
+    this.restoreSnapshot(restore, state);
+    if (returnFocus) restoreFocus(this.origin, REASON_KEYBOARD);
   }
 
   public isActive(): boolean {
@@ -280,6 +314,24 @@ export class FileHistoryController {
   }
 
   /* === State transitions === */
+
+  private restoreSnapshot(restore: boolean, state: FileHistoryState | null): void {
+    if (!restore || state === null || state.repo !== this.callbacks.getCurrentRepo()) return;
+    const expanded = state.snapshot.expanded;
+    if (expanded !== null) {
+      if (this.callbacks.getCommitId(expanded.hash) === null) return;
+      this.callbacks.restoreExpandedCommit(expanded);
+    }
+    this.callbacks.setScrollTop(state.snapshot.scrollTop);
+  }
+
+  // The element focused when a history starts is where a keyboard exit from the bar returns to.
+  private rememberOrigin(): void {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && !this.barElem.contains(active)) {
+      this.origin = captureFocusOrigin(active);
+    }
+  }
 
   private isAnchorLoaded(target: { repo: string; anchorHash: string }): boolean {
     return (
@@ -384,6 +436,7 @@ export class FileHistoryController {
       this.pathElem.textContent = this.pending.filePath;
       this.positionElem.textContent = t("fileHistory.loading");
       this.barElem.classList.add(CLASS_ACTIVE, CLASS_LOADING);
+      this.renderControls(this.pending.filePath, true);
     } else if (this.state !== null) {
       const index = this.state.visibleHashes.indexOf(this.state.currentHash);
       this.pathElem.textContent = this.state.filePath;
@@ -394,8 +447,24 @@ export class FileHistoryController {
       );
       this.barElem.classList.remove(CLASS_LOADING);
       this.barElem.classList.add(CLASS_ACTIVE);
+      this.renderControls(this.state.filePath, false);
     } else {
       this.barElem.classList.remove(CLASS_ACTIVE, CLASS_LOADING);
+      this.renderControls(null, false);
     }
+  }
+
+  // Names carry the path the bar is about. Prev / next are disabled while a request is pending;
+  // a focused one hands focus to the exit button instead of dropping it on body (R4.3). The
+  // hidden attribute keeps an inactive bar's controls out of the tab order.
+  private renderControls(filePath: string | null, loading: boolean): void {
+    this.prevBtn.setAttribute(ATTR_ARIA_LABEL, actionName(t("fileHistory.previous"), filePath));
+    this.nextBtn.setAttribute(ATTR_ARIA_LABEL, actionName(t("fileHistory.next"), filePath));
+    this.exitBtn.setAttribute(ATTR_ARIA_LABEL, actionName(t("fileHistory.exit"), filePath));
+    const active = document.activeElement;
+    this.prevBtn.disabled = loading;
+    this.nextBtn.disabled = loading;
+    if (loading && (active === this.prevBtn || active === this.nextBtn)) this.exitBtn.focus();
+    this.barElem.hidden = filePath === null;
   }
 }
