@@ -72,19 +72,27 @@ describe("showFormDialog focus priority", () => {
     expect(document.activeElement).toBe(textElem);
   });
 
-  it("does not error when no focusable input exists (TC-003)", () => {
-    // Given: inputs with only a checkbox (no text/text-ref)
-    const inputs: DialogInput[] = [createCheckboxInput("Option")];
-
+  // S1 TC-003 ("no focus without text inputs") is superseded by S9 TC-047.
+  // @see docs/testing/perspectives/web/dialogs-test.md
+  it.each([
+    {
+      kind: "checkbox",
+      inputs: [createCheckboxInput("Option")] as DialogInput[]
+    },
+    {
+      kind: "select",
+      inputs: [
+        { type: "select", name: "", default: "a", options: [{ name: "A", value: "a" }] }
+      ] as DialogInput[]
+    }
+  ])("focuses the first $kind input when no text input exists (TC-047)", ({ inputs }) => {
+    // Case: TC-047
+    // Given: a form whose only input is a checkbox / select
     // When: showFormDialog is called
-    // Then: no error is thrown
-    expect(() => {
-      showFormDialog("Test", inputs, "OK", vi.fn(), null);
-    }).not.toThrow();
+    showFormDialog("Test", inputs, "OK", vi.fn(), null);
 
-    // And: no input element is focused (activeElement stays on body or dialog)
-    const checkboxElem = document.getElementById("dialogInput0");
-    expect(document.activeElement).not.toBe(checkboxElem);
+    // Then: that input holds the real focus
+    expect(document.activeElement).toBe(document.getElementById("dialogInput0"));
   });
 
   it("focuses the first text input when multiple text inputs exist (TC-004)", () => {
@@ -562,12 +570,11 @@ describe("showFormDialog multi-form checkbox label association", () => {
     // When: showFormDialog renders the form
     showFormDialog("Test", inputs, "OK", vi.fn(), null);
 
-    // Then: exactly one label exists in the checkbox name cell, its for attribute is
-    // "dialogInput1" (the checkbox id), and its textContent equals the checkbox name
-    const labels = dialogEl.querySelectorAll("table.dialogForm td > label");
+    // Then: exactly one label points at the checkbox id "dialogInput1" and its textContent
+    // equals the checkbox name (the text input has its own label, see S9 TC-055)
+    const labels = dialogEl.querySelectorAll('table.dialogForm td > label[for="dialogInput1"]');
     expect(labels).toHaveLength(1);
     const label = labels[0];
-    expect(label.getAttribute("for")).toBe("dialogInput1");
     expect(label.textContent).toBe("Option");
   });
 
@@ -965,11 +972,600 @@ describe("isErrorDialogActive", () => {
     expect(dialogEl.className).toBe("active");
     expect(document.getElementById("dialogBacking")!.className).toBe("active");
 
-    // And: the dialog has no attribute other than id and class
-    expect(dialogEl.getAttributeNames().sort()).toEqual(["class", "id"]);
+    // And: the dialog has no attribute other than id, class and the modal ARIA attributes
+    // (role / aria-modal / aria-labelledby, see S9 TC-055)
+    expect(dialogEl.getAttributeNames().sort()).toEqual([
+      "aria-labelledby",
+      "aria-modal",
+      "class",
+      "id",
+      "role"
+    ]);
 
     // And: it contains one dismiss button and no action button
     expect(dialogEl.querySelectorAll("#dialogDismiss")).toHaveLength(1);
     expect(dialogEl.querySelector("#dialogAction")).toBeNull();
+  });
+});
+
+// S9: モーダルのフォーカス・Tab 循環・Escape keydown・IME 保護・起点復元
+// @see docs/testing/perspectives/web/dialogs-test.md
+describe("modal focus, Tab cycle, Escape keydown, IME guard and origin restore (S9)", () => {
+  const DIALOG_MESSAGE = "Enter the branch name:";
+  let dialogs: typeof import("../../web/dialogs");
+  let refreshBtn: HTMLButtonElement;
+  let content: HTMLDivElement;
+  let rowM: HTMLTableRowElement;
+  let sourceElem: HTMLButtonElement;
+  let actioned: ReturnType<typeof vi.fn>;
+
+  beforeAll(async () => {
+    dialogs = await import("../../web/dialogs");
+  });
+
+  beforeEach(() => {
+    refreshBtn = document.createElement("button");
+    refreshBtn.id = "refreshBtn";
+    refreshBtn.type = "button";
+    document.body.appendChild(refreshBtn);
+    content = document.createElement("div");
+    content.id = "content";
+    content.innerHTML = '<table><tbody><tr id="rowM" tabindex="0"><td>M</td></tr></tbody></table>';
+    document.body.appendChild(content);
+    rowM = content.querySelector("tr")!;
+    sourceElem = document.createElement("button");
+    sourceElem.id = "menuSource";
+    sourceElem.type = "button";
+    document.body.appendChild(sourceElem);
+    actioned = vi.fn();
+  });
+
+  afterEach(() => {
+    dialogs.hideDialog();
+    refreshBtn.remove();
+    content.remove();
+    sourceElem.remove();
+  });
+
+  function key(type: "keydown" | "keyup", target: Element, init: KeyboardEventInit): KeyboardEvent {
+    const event = new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init });
+    target.dispatchEvent(event);
+    return event;
+  }
+
+  function pressKey(target: Element, init: KeyboardEventInit): KeyboardEvent {
+    const keydown = key("keydown", target, init);
+    key("keyup", target, init);
+    return keydown;
+  }
+
+  function activeElement(): Element | null {
+    return document.activeElement;
+  }
+
+  function setValue(input: HTMLInputElement, value: string): void {
+    input.value = value;
+    input.dispatchEvent(new Event("input"));
+  }
+
+  function input(index: number): HTMLInputElement {
+    return document.getElementById(`dialogInput${index}`) as HTMLInputElement;
+  }
+
+  function actionBtn(): HTMLButtonElement {
+    return document.getElementById("dialogAction") as HTMLButtonElement;
+  }
+
+  function dismissBtn(): HTMLButtonElement {
+    return document.getElementById("dialogDismiss") as HTMLButtonElement;
+  }
+
+  function openRefAndTextForm(source: HTMLElement | null = sourceElem): void {
+    dialogs.showFormDialog(
+      DIALOG_MESSAGE,
+      [createTextRefInput(""), createTextInput("Path", "../x")],
+      "Create",
+      actioned,
+      source
+    );
+  }
+
+  // Case: TC-047
+  it("moves the real focus from the menu source to the text-ref input (TC-047)", () => {
+    // Given: the menu source element holds the real focus
+    sourceElem.focus();
+    expect(activeElement()).toBe(sourceElem);
+
+    // When: a form with a text-ref input and a text input opens from that source
+    openRefAndTextForm();
+
+    // Then: the text-ref input is the active element and the dialog is active
+    expect(activeElement()).toBe(input(0));
+    expect(input(0).type).toBe("text");
+    expect(dialogEl.classList.contains("active")).toBe(true);
+  });
+
+  // Case: TC-047
+  it("focuses the first text input when there is no text-ref input (TC-047)", () => {
+    // Given: a form with a checkbox before two text inputs
+    dialogs.showFormDialog(
+      DIALOG_MESSAGE,
+      [createCheckboxInput("Force"), createTextInput("First"), createTextInput("Second")],
+      "OK",
+      actioned,
+      sourceElem
+    );
+
+    // Then: the first text input (index 1) holds focus, not the checkbox nor the second text
+    expect(activeElement()).toBe(input(1));
+  });
+
+  // Case: TC-048
+  it("runs the action only after a valid ref value and never on keyup (TC-048)", () => {
+    // Given: a ref input dialog whose value is empty (noInput) at open
+    openRefAndTextForm();
+    const refInput = input(0);
+    expect(dialogEl.className).toBe("active noInput");
+    expect(actionBtn().disabled).toBe(true);
+
+    // When: Enter is pressed with the empty value
+    pressKey(refInput, { key: "Enter" });
+
+    // Then: nothing ran and the dialog stays open
+    expect(actioned).not.toHaveBeenCalled();
+    expect(dialogEl.classList.contains("active")).toBe(true);
+
+    // When: an invalid value is entered (space is invalid) and Enter is pressed
+    setValue(refInput, "bad name");
+    expect(dialogEl.className).toBe("active inputInvalid");
+    expect(actionBtn().disabled).toBe(true);
+    pressKey(refInput, { key: "Enter" });
+
+    // Then: still nothing ran and the dialog stays open
+    expect(actioned).not.toHaveBeenCalled();
+    expect(dialogEl.classList.contains("active")).toBe(true);
+
+    // When: a valid value is entered and Enter keydown then keyup are sent
+    setValue(refInput, "feature/x");
+    expect(dialogEl.className).toBe("active");
+    expect(actionBtn().disabled).toBe(false);
+    key("keydown", refInput, { key: "Enter" });
+
+    // Then: the action ran once with every value and the dialog closed
+    expect(actioned).toHaveBeenCalledTimes(1);
+    expect(actioned).toHaveBeenCalledWith(["feature/x", "../x"]);
+    expect(dialogEl.classList.contains("active")).toBe(false);
+
+    // When: the matching keyup arrives on the detached input
+    key("keyup", refInput, { key: "Enter" });
+
+    // Then: no additional execution
+    expect(actioned).toHaveBeenCalledTimes(1);
+  });
+
+  // Case: TC-049
+  it.each([
+    {
+      name: "showConfirmationDialog",
+      label: "No",
+      show: () => dialogs.showConfirmationDialog("Are you sure?", vi.fn(), null)
+    },
+    {
+      name: "showErrorDialog",
+      label: "Dismiss",
+      show: () => dialogs.showErrorDialog("Unable to Fetch", "fatal", null)
+    }
+  ])("focuses the native dismiss button of $name initially (TC-049)", ({ label, show }) => {
+    // Given: the background refresh button holds focus
+    refreshBtn.focus();
+
+    // When: a dialog without inputs opens
+    show();
+
+    // Then: the dismiss button is a native type="button" with the translated name and has focus
+    const dismiss = dismissBtn();
+    expect(activeElement()).toBe(dismiss);
+    expect(dismiss.tagName).toBe("BUTTON");
+    expect(dismiss.getAttribute("type")).toBe("button");
+    expect(dismiss.textContent).toBe(label);
+  });
+
+  // Case: TC-049
+  it("renders the action button as a native type=button with its name (TC-049)", () => {
+    // Given / When: a confirmation dialog opens
+    dialogs.showConfirmationDialog("Are you sure?", vi.fn(), null);
+
+    // Then: the action button is a native button carrying the Yes label, and dismiss has focus
+    const action = actionBtn();
+    expect(action.tagName).toBe("BUTTON");
+    expect(action.getAttribute("type")).toBe("button");
+    expect(action.textContent).toBe("Yes");
+    expect(activeElement()).toBe(dismissBtn());
+  });
+
+  // Case: TC-050
+  it("cycles Tab and Shift+Tab inside the dialog without reaching the background (TC-050)", () => {
+    // Given: a two-input form (valid ref) with action and dismiss buttons
+    dialogs.showFormDialog(
+      DIALOG_MESSAGE,
+      [createTextRefInput("main"), createTextInput("Path", "../x")],
+      "Create",
+      actioned,
+      sourceElem
+    );
+    expect(activeElement()).toBe(input(0));
+    const order = [input(1), actionBtn(), dismissBtn(), input(0), input(1)];
+
+    // When: Tab is pressed five times from the first input
+    const consumed: boolean[] = [];
+    const visited: (Element | null)[] = [];
+    for (let i = 0; i < 5; i++) {
+      consumed.push(pressKey(activeElement()!, { key: "Tab" }).defaultPrevented);
+      visited.push(activeElement());
+    }
+
+    // Then: input 1 -> input 2 -> action -> dismiss -> input 1 -> input 2, never the background
+    expect(visited).toEqual(order);
+    expect(consumed[2]).toBe(true);
+    expect(visited).not.toContain(refreshBtn);
+
+    // When: Shift+Tab is pressed on the first input
+    input(0).focus();
+    const shiftTab = pressKey(input(0), { key: "Tab", shiftKey: true });
+
+    // Then: focus wraps to the dismiss button and the key is consumed
+    expect(shiftTab.defaultPrevented).toBe(true);
+    expect(activeElement()).toBe(dismissBtn());
+  });
+
+  // Case: TC-050
+  it("skips a disabled action button in the Tab cycle (TC-050)", () => {
+    // Given: a form whose ref input is empty, so the action button is disabled
+    openRefAndTextForm();
+    expect(actionBtn().disabled).toBe(true);
+    input(1).focus();
+
+    // When: Tab is pressed on the last input
+    pressKey(input(1), { key: "Tab" });
+
+    // Then: focus lands on dismiss, not on the disabled action button
+    expect(activeElement()).toBe(dismissBtn());
+
+    // When: Shift+Tab is pressed on dismiss
+    pressKey(dismissBtn(), { key: "Tab", shiftKey: true });
+
+    // Then: focus returns to the last input, again skipping the disabled action button
+    expect(activeElement()).toBe(input(1));
+  });
+
+  // Case: TC-051
+  it("closes only this dialog on Escape keydown and restores the source element (TC-051)", () => {
+    // Given: a form opened from the menu source, with a document listener behind the dialog
+    sourceElem.focus();
+    openRefAndTextForm();
+    const documentKeydown = vi.fn();
+    document.addEventListener("keydown", documentKeydown);
+    expect(activeElement()).toBe(input(0));
+
+    // When: Escape keydown is pressed on the input
+    const keydown = key("keydown", input(0), { key: "Escape" });
+
+    // Then: the dialog closed without running the action, focus is back on the source, and the
+    // keydown was consumed before reaching the global Escape chain
+    expect(dialogEl.classList.contains("active")).toBe(false);
+    expect(actioned).not.toHaveBeenCalled();
+    expect(activeElement()).toBe(sourceElem);
+    expect(keydown.defaultPrevented).toBe(true);
+    expect(documentKeydown).not.toHaveBeenCalled();
+
+    // When: the matching keyup arrives
+    key("keyup", sourceElem, { key: "Escape" });
+
+    // Then: nothing changes
+    expect(dialogEl.classList.contains("active")).toBe(false);
+    expect(activeElement()).toBe(sourceElem);
+    document.removeEventListener("keydown", documentKeydown);
+  });
+
+  // Case: TC-051
+  it("restores the source element when the dismiss button closes the dialog (TC-051)", () => {
+    // Given: a confirmation dialog opened from the menu source
+    sourceElem.focus();
+    const confirmed = vi.fn();
+    dialogs.showConfirmationDialog("Are you sure?", confirmed, sourceElem);
+    expect(activeElement()).toBe(dismissBtn());
+
+    // When: Enter is pressed on the dismiss button
+    pressKey(dismissBtn(), { key: "Enter" });
+
+    // Then: the dialog closed without confirming and the source holds focus again
+    expect(dialogEl.classList.contains("active")).toBe(false);
+    expect(confirmed).not.toHaveBeenCalled();
+    expect(activeElement()).toBe(sourceElem);
+  });
+
+  // Case: TC-052
+  it("does not close the dialog on an Escape keyup alone (TC-052)", () => {
+    // Given: an open form dialog
+    openRefAndTextForm();
+
+    // When: only the Escape keyup is sent
+    key("keyup", input(0), { key: "Escape" });
+
+    // Then: the dialog is still active with focus inside
+    expect(dialogEl.classList.contains("active")).toBe(true);
+    expect(activeElement()).toBe(input(0));
+  });
+
+  // Case: TC-052
+  it("ignores a repeated Escape keydown (TC-052)", () => {
+    // Given: an open form dialog
+    openRefAndTextForm();
+
+    // When: Escape arrives as a key repeat
+    const repeat = key("keydown", input(0), { key: "Escape", repeat: true });
+
+    // Then: the dialog stays open and the repeat is still consumed locally
+    expect(dialogEl.classList.contains("active")).toBe(true);
+    expect(repeat.defaultPrevented).toBe(true);
+  });
+
+  // Case: TC-053
+  it("does not run the action for Enter during IME composition (TC-053)", () => {
+    // Given: a valid text form
+    dialogs.showFormDialog(
+      DIALOG_MESSAGE,
+      [createTextInput("Message", "wip")],
+      "Stash",
+      actioned,
+      null
+    );
+    const textInput = input(0);
+
+    // When: a composition starts and Enter keydown arrives while composing
+    textInput.dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+    key("keydown", textInput, { key: "Enter", isComposing: true });
+
+    // Then: nothing ran and the dialog stays open
+    expect(actioned).not.toHaveBeenCalled();
+    expect(dialogEl.classList.contains("active")).toBe(true);
+
+    // When: the composition ends and the matching keyup arrives
+    textInput.dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
+    key("keyup", textInput, { key: "Enter" });
+
+    // Then: still nothing ran
+    expect(actioned).not.toHaveBeenCalled();
+
+    // When: a normal Enter follows
+    pressKey(textInput, { key: "Enter" });
+
+    // Then: the action ran exactly once
+    expect(actioned).toHaveBeenCalledTimes(1);
+    expect(actioned).toHaveBeenCalledWith(["wip"]);
+  });
+
+  // Case: TC-054
+  it("does not run the action for repeated Enter keydown (TC-054)", () => {
+    // Given: a valid text form
+    dialogs.showFormDialog(
+      DIALOG_MESSAGE,
+      [createTextInput("Message", "wip")],
+      "Stash",
+      actioned,
+      null
+    );
+
+    // When: Enter keydown arrives three times as a key repeat
+    for (let i = 0; i < 3; i++) {
+      key("keydown", input(0), { key: "Enter", repeat: true });
+    }
+
+    // Then: the action never ran and the dialog is still open
+    expect(actioned).not.toHaveBeenCalled();
+    expect(dialogEl.classList.contains("active")).toBe(true);
+  });
+
+  // Case: TC-055
+  it("exposes role, aria-modal, a name and labels for every input (TC-055)", () => {
+    // Given / When: a multi form with an unnamed ref input and a named text input opens
+    openRefAndTextForm();
+
+    // Then: the dialog is a modal dialog named by the question text
+    expect(dialogEl.getAttribute("role")).toBe("dialog");
+    expect(dialogEl.getAttribute("aria-modal")).toBe("true");
+    const labelledBy = dialogEl.getAttribute("aria-labelledby");
+    expect(labelledBy).not.toBeNull();
+    const messageEl = document.getElementById(labelledBy!);
+    expect(messageEl).not.toBeNull();
+    expect(messageEl!.textContent).toBe(DIALOG_MESSAGE);
+
+    // And: the unnamed ref input borrows the question as its name
+    expect(input(0).getAttribute("aria-labelledby")).toBe(labelledBy);
+
+    // And: the named text input has a label with a matching for attribute
+    const label = dialogEl.querySelector('label[for="dialogInput1"]');
+    expect(label).not.toBeNull();
+    expect(label!.textContent).toBe("Path");
+    expect(input(1).hasAttribute("aria-labelledby")).toBe(false);
+  });
+
+  // Case: TC-055
+  it("names a single named input and a single select without a visible label (TC-055)", () => {
+    // Given / When: a single text-ref form whose name is not rendered as a cell
+    dialogs.showFormDialog(
+      DIALOG_MESSAGE,
+      [{ type: "text-ref", name: "Name: ", default: "" }],
+      "Add Tag",
+      actioned,
+      null
+    );
+
+    // Then: the input is named by aria-label
+    expect(input(0).getAttribute("aria-label")).toBe("Name: ");
+    expect(input(0).hasAttribute("aria-labelledby")).toBe(false);
+
+    // When: a select dialog with an empty name replaces it
+    dialogs.showSelectDialog(
+      "Select a mode",
+      "soft",
+      [{ name: "Soft", value: "soft" }],
+      "Reset",
+      vi.fn(),
+      null
+    );
+
+    // Then: the select borrows the question text as its name
+    expect(input(0).tagName).toBe("SELECT");
+    expect(input(0).getAttribute("aria-labelledby")).toBe("dialogMessage");
+  });
+
+  // Case: TC-056
+  it("excludes the background while open and restores it on close (TC-056)", () => {
+    // Given: the background controls and a commit row exist, none inert
+    expect(refreshBtn.closest("[inert]")).toBeNull();
+    expect(rowM.closest("[inert]")).toBeNull();
+
+    // When: a dialog opens
+    openRefAndTextForm();
+
+    // Then: the background controls are inert while the dialog is not
+    expect(refreshBtn.closest("[inert]")).not.toBeNull();
+    expect(rowM.closest("[inert]")).not.toBeNull();
+    expect(dialogEl.closest("[inert]")).toBeNull();
+
+    // When: focus escapes to the background refresh button
+    refreshBtn.dispatchEvent(new FocusEvent("focusin", { bubbles: true }));
+
+    // Then: the active element is pulled back inside the dialog
+    expect(dialogEl.contains(activeElement())).toBe(true);
+
+    // When: Ctrl+F is pressed inside the dialog with a document listener behind it
+    const documentKeydown = vi.fn();
+    document.addEventListener("keydown", documentKeydown);
+    key("keydown", input(0), { key: "f", ctrlKey: true });
+
+    // Then: the dialog consumed the shortcut before the global handler
+    expect(documentKeydown).not.toHaveBeenCalled();
+    document.removeEventListener("keydown", documentKeydown);
+
+    // When: the dialog closes
+    dialogs.hideDialog();
+
+    // Then: the background is back to its original state
+    expect(refreshBtn.closest("[inert]")).toBeNull();
+    expect(rowM.closest("[inert]")).toBeNull();
+    expect(document.querySelectorAll("[inert]")).toHaveLength(0);
+  });
+
+  // Case: TC-056
+  it("keeps an element that was already inert untouched after close (TC-056)", () => {
+    // Given: a background element that is inert on its own
+    content.setAttribute("inert", "");
+
+    // When: a dialog opens and closes
+    openRefAndTextForm();
+    dialogs.hideDialog();
+
+    // Then: the pre-existing inert attribute survives, while others were removed
+    expect(content.hasAttribute("inert")).toBe(true);
+    expect(refreshBtn.hasAttribute("inert")).toBe(false);
+  });
+
+  // Case: TC-057
+  it("runs the action once for Enter on the focused action button (TC-057)", () => {
+    // Given: a confirmation dialog whose action button has focus and a click listener
+    const confirmed = vi.fn();
+    dialogs.showConfirmationDialog("Are you sure?", confirmed, sourceElem);
+    const action = actionBtn();
+    action.focus();
+    expect(activeElement()).toBe(action);
+
+    // When: Enter keydown then keyup are pressed on the button
+    const keydown = pressKey(action, { key: "Enter" });
+
+    // Then: the confirm ran exactly once, the keydown default (native click) was suppressed and
+    // the dialog closed
+    expect(confirmed).toHaveBeenCalledTimes(1);
+    expect(keydown.defaultPrevented).toBe(true);
+    expect(dialogEl.classList.contains("active")).toBe(false);
+
+    // When: a stale native click still reaches the detached button
+    action.click();
+
+    // Then: no second execution
+    expect(confirmed).toHaveBeenCalledTimes(1);
+  });
+
+  // Case: TC-057
+  it("does not run the action for Enter on a disabled action button (TC-057)", () => {
+    // Given: a form whose empty ref input disables the action button
+    openRefAndTextForm();
+    const action = actionBtn();
+    expect(action.disabled).toBe(true);
+
+    // When: Enter is pressed on the disabled action button
+    pressKey(action, { key: "Enter" });
+
+    // Then: nothing ran and the dialog stays open
+    expect(actioned).not.toHaveBeenCalled();
+    expect(dialogEl.classList.contains("active")).toBe(true);
+  });
+
+  // Case: TC-058
+  it("ignores a stale close from a replaced dialog and restores only for the owner (TC-058)", () => {
+    // Given: dialog A opened from the menu source, then replaced by confirmation dialog B
+    sourceElem.focus();
+    openRefAndTextForm();
+    const staleDismiss = dismissBtn();
+    const confirmed = vi.fn();
+    dialogs.showConfirmationDialog("Replace?", confirmed, null);
+    expect(activeElement()).toBe(dismissBtn());
+    expect(staleDismiss.isConnected).toBe(false);
+
+    // When: A's dismiss handler runs after the replacement
+    staleDismiss.click();
+
+    // Then: B stays open and focus stays inside B
+    expect(dialogEl.classList.contains("active")).toBe(true);
+    expect(dialogEl.textContent).toContain("Replace?");
+    expect(activeElement()).toBe(dismissBtn());
+    expect(activeElement()).not.toBe(sourceElem);
+
+    // When: an asynchronous error replaces B and a stale close of the error dialog runs after
+    // yet another dialog C took over
+    dialogs.showErrorDialog("Unable to Fetch", "fatal", null);
+    const staleErrorDismiss = dismissBtn();
+    dialogs.showConfirmationDialog("Again?", vi.fn(), null);
+    const activeBefore = activeElement();
+    key("keydown", staleErrorDismiss, { key: "Escape" });
+    staleErrorDismiss.click();
+
+    // Then: the stale error close changes neither the dialog nor the focus
+    expect(dialogEl.textContent).toContain("Again?");
+    expect(activeElement()).toBe(activeBefore);
+
+    // When: the error dialog is the current owner and closes by Escape
+    dialogs.showErrorDialog("Unable to Fetch", "fatal", null);
+    key("keydown", dismissBtn(), { key: "Escape" });
+
+    // Then: focus returns to the launch origin inherited through the replacements
+    expect(dialogEl.classList.contains("active")).toBe(false);
+    expect(activeElement()).toBe(sourceElem);
+  });
+
+  // Case: TC-058
+  it("returns to the element focused before an error dialog opened with no source (TC-058)", () => {
+    // Given: the background refresh button holds focus and an error arrives with no source
+    refreshBtn.focus();
+    dialogs.showErrorDialog("Unable to Fetch", "fatal", null);
+    expect(activeElement()).toBe(dismissBtn());
+
+    // When: the error dialog is dismissed by Enter on its button
+    pressKey(dismissBtn(), { key: "Enter" });
+
+    // Then: the refresh button holds focus again
+    expect(dialogEl.classList.contains("active")).toBe(false);
+    expect(activeElement()).toBe(refreshBtn);
   });
 });
