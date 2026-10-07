@@ -307,7 +307,8 @@ export function buildCommitContextMenuItems(
         "Are you sure you want to merge commit {0} into the current branch?",
         `<b><i>${abbrevCommit(hash)}</i></b>`
       ),
-    (options) => ({ command: "mergeCommit", repo: repo, commitHash: hash, ...options })
+    (options) => ({ command: "mergeCommit", repo: repo, commitHash: hash, ...options }),
+    sourceElem
   );
   const resetItem: ContextMenuItem = {
     title: `${t("Reset current branch to this Commit")}${ELLIPSIS}`,

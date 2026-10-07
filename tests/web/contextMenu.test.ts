@@ -2336,3 +2336,147 @@ describe("S11: focus after a completed action", () => {
     expect(originFocus).not.toHaveBeenCalled();
   });
 });
+
+// @see docs/testing/perspectives/web/contextMenu-test.md
+describe("S12: contextmenu dispatched on the launching key's keyup", () => {
+  const tabStops = { current: [] as HTMLElement[] };
+  let disposeContext: () => void;
+
+  beforeEach(() => {
+    tabStops.current = [];
+    disposeContext = registerKeyboardContext(tabStops);
+    document.addEventListener("contextmenu", hideContextMenuListener);
+  });
+
+  afterEach(() => {
+    document.removeEventListener("contextmenu", hideContextMenuListener);
+    hideContextMenu();
+    disposeContext();
+    document.body.querySelectorAll("button").forEach((button) => button.remove());
+  });
+
+  function openByContextMenuKey(fixture: KeyboardFixture): void {
+    fixture.sourceElem.focus();
+    showContextMenu(
+      new KeyboardEvent("keydown", { key: "ContextMenu", bubbles: true, cancelable: true }),
+      fixture.items,
+      fixture.sourceElem
+    );
+  }
+
+  function contextMenuAt(target: Element): MouseEvent {
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    target.dispatchEvent(event);
+    return event;
+  }
+
+  function rightClick(target: Element, clientX: number, clientY: number): MouseEvent {
+    target.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 2 }));
+    const event = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      clientX,
+      clientY
+    });
+    target.dispatchEvent(event);
+    return event;
+  }
+
+  it("keeps the menu open when the keyup contextmenu targets the focused item (TC-148)", () => {
+    // Case: TC-148
+    // Given: a menu opened by the ContextMenu key, the document closing menus on contextmenu
+    const fixture = createKeyboardFixture();
+    openByContextMenuKey(fixture);
+    const focusedItem = activeElem();
+    expect(focusedItem).toBe(rootItem("Item A"));
+    const rendered = Array.from(contextMenuEl.querySelectorAll("li"));
+
+    // When: the key is released and the browser's contextmenu lands on the focused item
+    release(focusedItem, "ContextMenu");
+    const late = contextMenuAt(focusedItem);
+
+    // Then: the event is swallowed, the same li nodes stay and item A keeps focus
+    expect(late.defaultPrevented).toBe(true);
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    const after = Array.from(contextMenuEl.querySelectorAll("li"));
+    expect(after).toHaveLength(rendered.length);
+    after.forEach((li, index) => expect(li).toBe(rendered[index]));
+    expect(activeElem()).toBe(focusedItem);
+  });
+
+  it("cancels only the launching key's keyup, once (TC-149)", () => {
+    // Case: TC-149
+    // Given: a menu opened from Shift+F10
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+
+    // When: the launching key and then an unrelated key are released
+    const launchKeyup = release(activeElem(), "F10");
+    const shiftKeyup = release(activeElem(), "Shift");
+    const arrowKeyup = release(activeElem(), "ArrowDown");
+    const secondLaunchKeyup = release(activeElem(), "F10");
+
+    // Then: only the first F10 keyup is cancelled and the menu is untouched
+    expect(launchKeyup.defaultPrevented).toBe(true);
+    expect(shiftKeyup.defaultPrevented).toBe(false);
+    expect(arrowKeyup.defaultPrevented).toBe(false);
+    expect(secondLaunchKeyup.defaultPrevented).toBe(false);
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(activeElem()).toBe(rootItem("Item A"));
+  });
+
+  it("lets an independent right-click open another menu after the swallowed keyup (TC-150)", () => {
+    // Case: TC-150
+    // Given: the keyup contextmenu of a ContextMenu launch was swallowed on the focused item
+    const fixture = createKeyboardFixture();
+    openByContextMenuKey(fixture);
+    release(activeElem(), "ContextMenu");
+    contextMenuAt(activeElem());
+    const other = createSourceElem();
+    // As main's launchers do, the handler keeps the event from the document-level dismissal.
+    const relaunch = vi.fn((e: Event) => {
+      e.stopPropagation();
+      showContextMenu(e as MouseEvent, createItems(), other);
+    });
+    other.addEventListener("contextmenu", relaunch);
+
+    // When: another element is right-clicked (pointerdown, then contextmenu)
+    const independent = rightClick(other, 250, 150);
+
+    // Then: the click is not suppressed and the new menu opens at the pointer
+    expect(independent.defaultPrevented).toBe(false);
+    expect(relaunch).toHaveBeenCalledTimes(1);
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(contextMenuEl.style.left).toBe(`${250 - OFFSET}px`);
+    expect(contextMenuEl.style.top).toBe(`${150 - OFFSET}px`);
+  });
+
+  it("does not treat a right-click inside the menu or its submenu as an outside click (TC-151)", () => {
+    // Case: TC-151
+    // Given: an open keyboard menu whose same-press suppression is already spent
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+    release(activeElem(), "F10");
+    contextMenuAt(activeElem());
+
+    // When: item B is right-clicked independently
+    const onItem = rightClick(rootItem("Item B"), 120, 210);
+
+    // Then: the menu stays open and the event is left to the browser
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(onItem.defaultPrevented).toBe(false);
+    expect(fixture.itemB).not.toHaveBeenCalled();
+
+    // When: the submenu is opened and its child is right-clicked
+    rootItem("More").focus();
+    press(rootItem("More"), "ArrowRight");
+    expect(activeElem()).toBe(submenuItem("Child 1"));
+    rightClick(submenuItem("Child 1"), 200, 240);
+
+    // Then: root and submenu stay open with focus unchanged
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(document.querySelector("ul.contextMenuSubmenu.active")).not.toBeNull();
+    expect(activeElem()).toBe(submenuItem("Child 1"));
+    expect(fixture.child1).not.toHaveBeenCalled();
+  });
+});

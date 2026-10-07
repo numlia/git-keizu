@@ -430,3 +430,39 @@ R4.7「キーボードによる閉鎖と処理完了は起動元に戻す」の�
 - テスト: `tests/web/contextMenu.test.ts` describe `S11: focus after a completed action`。TC-146 `returns focus to the origin when the action moved it nowhere else` / TC-147 `leaves focus with the element the action focused`。RED: 旧実装で TC-146 が fail（`activeElement` が `body`）→ GREEN。S10 TC-141〜TC-143 は変更なしで pass
 - main 側: `web/main-test/13-keyboard-accessibility-02.md` S75 TC-727 の `it` が `Enter` 実行後の `activeElement`（ファイル行の差分 button / `M` の行）を assert
 - 実行結果（2026-10-07）: 2 件 pass
+
+## S12: 起動キーの keyup 由来 contextmenu とメニュー内の右クリック
+
+> Origin: Feature 061-05 (light-spec-plan) review fix
+> Added: 2026-10-07
+> Status: active
+> Supersedes: -
+> Signature: `trackKeyboardLaunch(target: HTMLElement, key: string): void` / `suppressFollowingContextMenu(event: Event): void`（`launch.target` 内または `#contextMenu` / `ul.contextMenuSubmenu` 内を対象とする `contextmenu` を 1 回だけ抑止）/ `suppressLaunchKeyup(event: KeyboardEvent): void`（起動キーと同じ `key` の keyup を 1 回だけ `preventDefault`）/ `hideContextMenuListener(event?: Event): void`（メニュー内を対象とする `contextmenu` を無視）
+> Target Path: `web/contextMenu.ts:72-82`（`KeyboardLaunch.key`）、`web/contextMenu.ts:406-447`（`isInsideMenu` / `suppressFollowingContextMenu` / `suppressLaunchKeyup` / `trackKeyboardLaunch`）、`web/contextMenu.ts:687-690`（キー起動時の `trackKeyboardLaunch(sourceElem, event.key)`）、`web/contextMenu.ts:753-760`（`hideContextMenuListener`）
+> Test File: `tests/web/contextMenu.test.ts`
+
+R4.4「キーとブラウザー由来contextmenuが重なっても1回だけ開く」の Windows 側。Blink は ContextMenu キー（VK_APPS）由来の `contextmenu` を keyup 時に、その時点でフォーカスしている要素（keydown で開いたメニューの最初の `li`）を対象に発火する。S9 TC-124 の抑止は `launch.target`（起点）内の対象だけを飲み込むため、この `contextmenu` は document の `hideContextMenuListener` まで到達して開いたばかりのメニューを `"outside"` で閉じ、フォーカスが `body` に落ちていた（レビュー指摘 round 2 G1）。対策は (a) 保留中の起動がある間はメニュー / サブメニュー内を対象とする `contextmenu` も同じ押下として 1 回だけ飲み込む、(b) 起動キーと同じ `key` の keyup を 1 回だけ `preventDefault` して合成自体を止める、(c) `hideContextMenuListener` はメニュー内を対象とする `contextmenu` を外側クリックと見なさない。独立した右クリック（`pointerdown` / `mousedown` 先行）と新しい keydown が抑止を解除し、keyup は解除しない（round 1 F3）契約は維持する。fixture は S9 と同じで、main と同様に `document` の `contextmenu` へ `hideContextMenuListener` を登録する。
+
+| Case ID | Input / Precondition                                                                                                                                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                     | Notes                                                                                                       |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| TC-148  | `key: "ContextMenu"` の keydown 起点で開き item A にフォーカスした状態で、item A へ `ContextMenu` の keyup → item A を対象に `contextmenu`                                     | Normal - keyup 由来の contextmenu を同じ押下として抑止                     | `contextmenu` が `defaultPrevented === true`、`#contextMenu` が `active` のまま、`li` の DOM ノードが同一、`activeElement` が item A のまま（`hideContextMenuListener` が閉じない） | R4.4 / A8.1-4。対策 (a)                                                                                     |
+| TC-149  | Shift + `F10` 起点で開いた後、item A へ `F10` keyup → `Shift` keyup → `ArrowDown` keyup → 2 回目の `F10` keyup                                                                 | Validation - 起動キーの keyup だけを 1 回 `preventDefault`                 | 1 回目の `F10` keyup だけ `defaultPrevented === true`、`Shift` / `ArrowDown` / 2 回目の `F10` は `false`。メニューと `activeElement` は不変                                         | 対策 (b)。他の keyup を阻害しない                                                                           |
+| TC-150  | TC-148 の後、別要素（`contextmenu` で `showContextMenu` を呼び `stopPropagation` する main 相当の listener 付き）を `pointerdown` → `contextmenu`（clientX 250 / clientY 150） | Normal - 独立した右クリックは抑止しない                                    | `defaultPrevented === false`、listener が 1 回呼ばれ、`#contextMenu` が `active` で位置がポインター座標（250 - 2 / 150 - 2 px）                                                     | S9 TC-125 の keyup 経路版。「次の独立したマウス右クリックまで抑止しない」                                   |
+| TC-151  | 抑止を消費した後に item B を `pointerdown` → `contextmenu`。続けて More を `ArrowRight` で開き child 1 を `pointerdown` → `contextmenu`                                        | Validation - メニュー内の右クリックは外側クリックではない                  | `#contextMenu`（と submenu）が `active` のまま、`contextmenu` は `defaultPrevented === false`、`activeElement` 不変、`onClick` 0 回                                                 | 対策 (c)。ContextMenu を押したまま ↓ で抑止が解除された後に keyup 由来の `contextmenu` が来る順でも閉じない |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 review fix round 2（S12）
+
+| 失敗源                                             | 対応ケースまたは除外理由                                                                                       |
+| -------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| keyup 由来の `contextmenu` がメニューを閉じる      | TC-148、TC-151                                                                                                 |
+| 起動キー以外の keyup を阻害、2 回以上阻害          | TC-149                                                                                                         |
+| 独立した右クリックの抑止残り                       | TC-150                                                                                                         |
+| 起点対象の同じ押下 contextmenu、keyup での抑止解除 | excluded(S9 TC-124 / TC-125 が不変のまま pass することで確認)                                                  |
+| 実ブラウザーの keyup → `contextmenu` 合成          | excluded(jsdom は合成しない。Windows の VK_APPS は `web/main-test/13-keyboard-accessibility-01.md` の手動一覧) |
+
+### レビュー修正 round 2 テスト対応（Feature 061-05）— S12
+
+- テスト: `tests/web/contextMenu.test.ts` describe `S12: contextmenu dispatched on the launching key's keyup`。TC-148 `keeps the menu open when the keyup contextmenu targets the focused item` / TC-149 `cancels only the launching key's keyup, once` / TC-150 `lets an independent right-click open another menu after the swallowed keyup` / TC-151 `does not treat a right-click inside the menu or its submenu as an outside click`
+- RED: 旧実装（a0e8503）で TC-148 / TC-149 / TC-151 が fail（メニューが閉じて `activeElement` が `body`、keyup が非抑止）→ GREEN。TC-150 は旧実装でも pass（独立性の対照）。S9 TC-124 / TC-125、S10 TC-141〜TC-143、S11 TC-146 / TC-147 は変更なしで pass
+- main 側: `web/main-test/13-keyboard-accessibility-02.md` S81 TC-751
+- 実行結果（2026-10-07）: 4 件 pass

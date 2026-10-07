@@ -2383,6 +2383,41 @@ describe("ref label Enter / Space open the menu while dblclick keeps the checkou
     expect(posts("copyToClipboard")).toEqual([expect.objectContaining({ data: "R" })]);
   });
 
+  it("keeps the menu when the keyup contextmenu lands on the focused item (TC-751)", () => {
+    // Case: TC-751 (R4.4 / A8.1-4): Windows VK_APPS order keydown → keyup → contextmenu, where
+    // the contextmenu targets the element focused by then (the first menu item, not the row).
+    const launchTarget = focusRow("M");
+    press(launchTarget, "ContextMenu", { keyup: false });
+    expect(menuIsActive()).toBe(true);
+    const focusedItem = document.activeElement!;
+    expect(focusedItem).toBe(contextMenuElem().querySelector("li.contextMenuItem"));
+    const rendered = Array.from(contextMenuElem().children);
+
+    const keyup = new KeyboardEvent("keyup", {
+      key: "ContextMenu",
+      bubbles: true,
+      cancelable: true
+    });
+    focusedItem.dispatchEvent(keyup);
+    const late = fire(focusedItem, "contextmenu");
+
+    expect(keyup.defaultPrevented).toBe(true);
+    expect(late.defaultPrevented).toBe(true);
+    expect(menuIsActive()).toBe(true);
+    expect(Array.from(contextMenuElem().children)).toEqual(rendered);
+    expect(document.activeElement).toBe(focusedItem);
+
+    fire(row("R"), "pointerdown", { button: 2 });
+    const independent = fire(row("R"), "contextmenu");
+
+    expect(independent.defaultPrevented).toBe(false);
+    expect(menuIsActive()).toBe(true);
+    expect(contextMenuElem().children[0]).not.toBe(rendered[0]);
+    clearPosts();
+    fire(menuItem(COPY_HASH_TITLE), "click");
+    expect(posts("copyToClipboard")).toEqual([expect.objectContaining({ data: "R" })]);
+  });
+
   it("runs the same action and recent record from Enter as from a click (TC-727)", () => {
     // Case: TC-727 (A8.2-3 / R5)
     openDetails("M");
@@ -2429,6 +2464,63 @@ describe("ref label Enter / Space open the menu while dblclick keeps the checkou
     );
     expect(menuIsActive()).toBe(false);
     expect(posts()).toEqual([]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S81: merge dialog opened from a keyboard menu                      */
+/* ------------------------------------------------------------------ */
+
+const MERGE_TITLE = "Merge into current branch\u2026";
+
+// @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-02.md
+describe("merge dialog opened from a keyboard menu returns focus to the row (S81)", () => {
+  function openMergeDialogFromKeyboard(hash: string): void {
+    focusRow(hash);
+    press(row(hash), "F10", { shiftKey: true });
+    expect(menuIsActive()).toBe(true);
+    const item = menuItem(MERGE_TITLE);
+    item.focus();
+    press(item, "Enter");
+    expect(menuIsActive()).toBe(false);
+    expect(dialogIsActive()).toBe(true);
+    expect(document.getElementById("dialog")!.contains(document.activeElement)).toBe(true);
+  }
+
+  it("returns focus to the row when the merge dialog is cancelled with Escape (TC-752)", () => {
+    // Case: TC-752 (R4.7 / A8.1-6)
+    openMergeDialogFromKeyboard("M");
+    clearPosts();
+
+    pressEscape(document.activeElement!);
+    releaseEscape(document.activeElement!);
+
+    expect(dialogIsActive()).toBe(false);
+    expect(document.activeElement).toBe(row("M"));
+    expect(posts("mergeCommit")).toEqual([]);
+  });
+
+  it("posts one merge request and returns focus to the row on confirm (TC-753)", () => {
+    // Case: TC-753 (R4.7 / A8.1-6)
+    openMergeDialogFromKeyboard("M");
+    clearPosts();
+    const actionBtn = document.getElementById("dialogAction")!;
+    actionBtn.focus();
+
+    press(actionBtn, "Enter");
+
+    expect(dialogIsActive()).toBe(false);
+    expect(posts("mergeCommit")).toEqual([
+      {
+        command: "mergeCommit",
+        repo: REPO,
+        commitHash: "M",
+        createNewCommit: true,
+        squash: false,
+        noCommit: false
+      }
+    ]);
+    expect(document.activeElement).toBe(row("M"));
   });
 });
 

@@ -6,8 +6,8 @@
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 19
-> Total Sections: 57
-> Total Cases: 424
+> Total Sections: 58
+> Total Cases: 427
 
 ## Shards
 
@@ -31,7 +31,7 @@
 | 11-state-persistence-01.md      | state-persistence      | 1        | 3     | 2026-09-12   |
 | 12-path-highlight-01.md         | path-highlight         | 1        | 15    | 2026-10-03   |
 | 13-keyboard-accessibility-01.md | keyboard-accessibility | 4        | 55    | 2026-10-07   |
-| 13-keyboard-accessibility-02.md | keyboard-accessibility | 7        | 43    | 2026-10-07   |
+| 13-keyboard-accessibility-02.md | keyboard-accessibility | 8        | 46    | 2026-10-07   |
 
 ## Origin Coverage
 

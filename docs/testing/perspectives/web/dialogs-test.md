@@ -288,3 +288,36 @@ Test file: `tests/web/dialogs.test.ts`, describe `isErrorDialogActive` (`@see` t
 - TC-047 2 `it`（text-ref 優先 / text のみ）/ TC-048 `runs the action only after a valid ref value and never on keyup` / TC-049 `it.each`（confirmation / error の初期フォーカス）＋ `renders the action button as a native type=button with its name` / TC-050 2 `it`（循環 / 無効 button を飛ばす）/ TC-051 2 `it`（Escape keydown / dismiss button）/ TC-052 2 `it`（keyup 単独 / repeat）/ TC-053 `does not run the action for Enter during IME composition` / TC-054 `does not run the action for repeated Enter keydown` / TC-055 2 `it` / TC-056 2 `it`（背景の除外と復元 / 既に `inert` の要素）/ TC-057 2 `it`（Enter 1 回で 1 回実行 + 遅延 click で追加 0 / 無効 button）/ TC-058 2 `it`（置換後の古い閉鎖 / 非同期 error の所有者）
 - 手動 Case（未実施）TC-053（IME）/ TC-056（`inert`、VS Code 1.74 以上）/ TC-057（native button の Enter → click 1 回）: 手順・期待・影響・代替確認は `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧（dialogs の行）。jsdom では TC-057 を keydown の `defaultPrevented === true` と、切り離した button への `click()` 追加実行 0 回で代替した
 - 実行結果（2026-10-07）: 20 件 pass
+
+## S10: 起点なしで開いたダイアログの閉鎖後復元（メニュー閉鎖後の merge ダイアログ）
+
+> Origin: Feature 061-05 (light-spec-plan) review fix
+> Added: 2026-10-07
+> Status: active
+> Supersedes: -
+> Signature: `captureSession(sourceElem: HTMLElement | null): DialogSession`（`sourceElem` なしで `activeElement` が `body` / なしのとき、`captureFocusOrigin(document.body)` から repo 付き・`keys: []`・`source: null` の origin を保持）/ `buildMergeMenuItem(repo, recentActionId, getMessage, buildRequest, sourceElem: HTMLElement)`（`web/mergeDialog.ts`。メニューの `sourceElem` を `showFormDialog` へ渡す）
+> Target Path: `web/dialogs.ts:293-312`（`captureSession`）、`web/dialogs.ts:315-322`（`focusOrigin`）、`web/mergeDialog.ts:13-23, 63-65`、`web/commitMenu.ts:302-312`、`web/refMenu.ts:80-96, 237, 438`
+> Test File: `tests/web/dialogs.test.ts`
+
+R4.7「キーボードによる閉鎖と処理完了は起動元に戻す」/ A8.1-6。メニュー項目の `onClick` は `activateItem` が先にメニューを隠した後に走るため、`sourceElem = null` で `showFormDialog` を呼んでいた merge ダイアログでは `captureSession(null)` が `activeElement === body` を見て `{ origin: null, source: null }` を保持し、Escape / Dismiss / 「Yes, merge」の後の `restoreFocus(null, "keyboard")` が `false` を返してフォーカスが `body` に落ちていた（レビュー指摘 round 2 G2。Task 6 handoff の「context chain へ fallback する」は実装されていなかった）。対策は (a) merge 項目へメニューの `sourceElem` を通す、(b) 起点なし・`body` のときも repo だけ持つ空キーの origin を保持して `restoreFocus` の context fallback（操作対象行 → `#commitTable` → repo button）へ落とす。`web/keyboardNavigation.ts` の公開 API は不変。fixture は `#commitTable` 内の行 `M` を `getActiveRow` とする `configureFocusContext` を `beforeEach` で登録し（`web/dialogs` と同じ module registry から import）、`activeElement` を `body` にしてから開く。
+
+| Case ID | Input / Precondition                                                                                                                                                                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                       | Notes                                       |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| TC-059  | `activeElement` が `body` の状態で `showFormDialog`（checkbox 3 件、`sourceElem = null`）→ 最初の入力で `Escape` keydown。別途 action button（`#dialogAction`）へフォーカスして `Enter`。別途 dismiss button へフォーカスして `Enter` | Normal - 起点なしは context fallback の操作対象行へ                        | いずれも `#dialog` の `active` が外れ、`activeElement` が行 `M`（`getActiveRow`）。`actioned` は action 経路だけ 1 回 | R4.7 / A8.1-6。対策 (b)                     |
+| TC-060  | 同じ条件で `sourceElem` を渡して開き、`Escape` keydown                                                                                                                                                                                | Normal - 起点ありは起点を優先                                              | `activeElement` が `sourceElem`（行 `M` ではない）                                                                    | 対策 (a) の dialog 側。S9 TC-051 と同じ復元 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 review fix round 2（S10）
+
+| 失敗源                                     | 対応ケースまたは除外理由                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| 起点なしで `body` に落ちたまま             | TC-059                                                                                                   |
+| 起点ありなのに context fallback へ奪われる | TC-060                                                                                                   |
+| 古い閉鎖・置換の復元                       | excluded(S9 TC-058 が不変のまま pass することで確認)                                                     |
+| FocusContext 未登録                        | excluded(`captureFocusOrigin` が `null` を返し従来どおり `false`。S9 の既存 Case が context なしで pass) |
+
+### レビュー修正 round 2 テスト対応（Feature 061-05）— S10
+
+- テスト: `tests/web/dialogs.test.ts` describe `origin restore for a dialog opened without a source after its menu closed (S10)`。TC-059 `falls back to the active row when no source is given and nothing is focused` / TC-060 `restores the given source element ahead of the context fallback`
+- RED: 旧実装（a0e8503）で TC-059 が fail（`activeElement` が `body`）→ GREEN。TC-060 は旧実装でも pass（`focusOrigin` が接続中の `source` を直接 focus）。S9 TC-047〜TC-058 は変更なしで pass
+- main 側: `web/main-test/13-keyboard-accessibility-02.md` S81 TC-752 / TC-753（キー起動のコミットメニュー → merge 項目 → 実 `showFormDialog`）
+- 実行結果（2026-10-07）: 2 件 pass

@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-10-07T20:50:14+00:00
+> Auto-generated: 2026-10-07T21:59:12+00:00
 > Total sources: 58
 > Total physical files: 104
-> Total sections: 609
-> Total cases: 3672
+> Total sections: 612
+> Total cases: 3681
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -44,9 +44,9 @@
 | `web/branchCleanupPanel.ts` | single-file | `web/branchCleanupPanel-test.md` | 1 | 6 | 51 | 2026-10-07 |
 | `web/branchLabels.ts` | single-file | `web/branchLabels-test.md` | 1 | 1 | 17 | 2026-03-21 |
 | `web/commitMenu.ts` | single-file | `web/commitMenu-test.md` | 1 | 12 | 53 | 2026-10-03 |
-| `web/contextMenu.ts` | single-file | `web/contextMenu-test.md` | 1 | 9 | 73 | 2026-10-07 |
+| `web/contextMenu.ts` | single-file | `web/contextMenu-test.md` | 1 | 10 | 77 | 2026-10-07 |
 | `web/dates.ts` | single-file | `web/dates-test.md` | 1 | 8 | 31 | 2026-07-04 |
-| `web/dialogs.ts` | single-file | `web/dialogs-test.md` | 1 | 8 | 54 | 2026-10-07 |
+| `web/dialogs.ts` | single-file | `web/dialogs-test.md` | 1 | 9 | 56 | 2026-10-07 |
 | `web/dropdown.ts` | single-file | `web/dropdown-test.md` | 1 | 11 | 62 | 2026-10-07 |
 | `web/fileHistory.ts` | single-file | `web/fileHistory-test.md` | 1 | 11 | 100 | 2026-10-07 |
 | `web/fileMenu.ts` | single-file | `web/fileMenu-test.md` | 1 | 4 | 39 | 2026-09-13 |
@@ -56,7 +56,7 @@
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 3 | 11 | 2026-10-03 |
 | `web/keyboardNavigation.ts` | single-file | `web/keyboardNavigation-test.md` | 1 | 4 | 54 | 2026-10-07 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 19 | 57 | 424 | 2026-10-07 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 19 | 58 | 427 | 2026-10-07 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
 | `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 17 | 67 | 2026-09-29 |
 | `web/pathHighlight.ts` | single-file | `web/pathHighlight-test.md` | 1 | 3 | 21 | 2026-10-03 |
@@ -148,7 +148,7 @@
 | Feature 060-03 addendum (light-spec-plan) | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
 | Feature 061-01 (light-spec-plan) | `media/main-test.md`, `web/commitMenu-test.md`, `web/fileHistory-test.md`, `web/graph-test.md`, `web/i18n-test.md`, `web/main-test/INDEX.md`, `web/pathHighlight-test.md`, `web/pathHighlightController-test.md`, `web/refMenu-test/INDEX.md` |
 | Feature 061-05 (light-spec-plan) | `l10n/bundle.l10n-test.md`, `l10n/bundle.l10n.ja-test.md`, `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/dropdown-test.md`, `media/findwidget-test.md`, `media/main-test.md`, `src/gitGraphView-test/INDEX.md`, `web/branchCleanupPanel-test.md`, `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/dropdown-test.md`, `web/fileHistory-test.md`, `web/fileTree-test.md`, `web/findWidget-test.md`, `web/keyboardNavigation-test.md`, `web/main-test/INDEX.md`, `web/pathHighlightController-test.md`, `web/refOverflow-test.md` |
-| Feature 061-05 (light-spec-plan) review fix | `web/contextMenu-test.md`, `web/main-test/INDEX.md` |
+| Feature 061-05 (light-spec-plan) review fix | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md` |
 | K2 demo-repository-config (light-spec-plan) | `scripts/readme-media/make-demo-repo-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |

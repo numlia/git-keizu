@@ -12,12 +12,14 @@ export interface MergeOptions {
 
 /**
  * Build the "Merge into current branch..." menu item shared by the commit and ref menus.
+ * `sourceElem` is the menu's source so the dialog returns focus there when it closes.
  */
 export function buildMergeMenuItem(
   repo: string,
   recentActionId: RecentActionId,
   getMessage: () => string,
-  buildRequest: (options: MergeOptions) => RequestMergeBranch | RequestMergeCommit
+  buildRequest: (options: MergeOptions) => RequestMergeBranch | RequestMergeCommit,
+  sourceElem: HTMLElement
 ): ContextMenuItem {
   return {
     title: `${t("Merge into current branch")}${ELLIPSIS}`,
@@ -60,7 +62,7 @@ export function buildMergeMenuItem(
             })
           );
         },
-        null,
+        sourceElem,
         (dialogEl) => {
           const squashInput = dialogEl.querySelector("#dialogInput1") as HTMLInputElement;
           const noFfInput = dialogEl.querySelector("#dialogInput0") as HTMLInputElement;

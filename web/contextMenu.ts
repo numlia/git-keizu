@@ -29,6 +29,7 @@ const KEY_HOME = "Home";
 const KEY_END = "End";
 
 const EVENT_KEYDOWN = "keydown";
+const EVENT_KEYUP = "keyup";
 const EVENT_POINTERDOWN = "pointerdown";
 const EVENT_MOUSEDOWN = "mousedown";
 const EVENT_CONTEXTMENU = "contextmenu";
@@ -68,11 +69,13 @@ interface MenuSession {
 let activeSession: MenuSession | null = null;
 
 // The browser may follow the ContextMenu / Shift+F10 keydown that opened a menu with its own
-// `contextmenu` event on the same target; only that one event is swallowed. Some platforms
-// dispatch it after the launching key's keyup, so only a new key press or pointer press counts
-// as an independent input.
+// `contextmenu` event; only that one event is swallowed. Some platforms dispatch it on the
+// launching key's keyup, aimed at the element focused by then (the first menu item), so that
+// keyup is cancelled and a contextmenu inside the menu counts as the same press. Only a new key
+// press or pointer press counts as an independent input.
 interface KeyboardLaunch {
   readonly target: HTMLElement;
+  readonly key: string;
   readonly dispose: () => void;
 }
 let pendingKeyboardLaunch: KeyboardLaunch | null = null;
@@ -400,25 +403,42 @@ function clearKeyboardLaunch(): void {
   launch.dispose();
 }
 
+function isInsideMenu(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return contextMenu.contains(target) || target.closest(SUBMENU_SELECTOR) !== null;
+}
+
 function suppressFollowingContextMenu(event: Event): void {
   const launch = pendingKeyboardLaunch;
   clearKeyboardLaunch();
-  if (launch !== null && event.target instanceof Node && launch.target.contains(event.target)) {
+  if (launch === null) return;
+  const target = event.target;
+  if ((target instanceof Node && launch.target.contains(target)) || isInsideMenu(target)) {
     event.preventDefault();
     event.stopPropagation();
   }
 }
 
-function trackKeyboardLaunch(target: HTMLElement): void {
+// Cancelling the launching key's keyup keeps the browser from synthesising its contextmenu.
+function suppressLaunchKeyup(event: KeyboardEvent): void {
+  if (pendingKeyboardLaunch === null || event.key !== pendingKeyboardLaunch.key) return;
+  event.preventDefault();
+  document.removeEventListener(EVENT_KEYUP, suppressLaunchKeyup, CAPTURE);
+}
+
+function trackKeyboardLaunch(target: HTMLElement, key: string): void {
   clearKeyboardLaunch();
   document.addEventListener(EVENT_CONTEXTMENU, suppressFollowingContextMenu, CAPTURE);
+  document.addEventListener(EVENT_KEYUP, suppressLaunchKeyup, CAPTURE);
   KEYBOARD_LAUNCH_INDEPENDENT_EVENTS.forEach((type) => {
     document.addEventListener(type, clearKeyboardLaunch, CAPTURE);
   });
   pendingKeyboardLaunch = {
     target,
+    key,
     dispose: () => {
       document.removeEventListener(EVENT_CONTEXTMENU, suppressFollowingContextMenu, CAPTURE);
+      document.removeEventListener(EVENT_KEYUP, suppressLaunchKeyup, CAPTURE);
       KEYBOARD_LAUNCH_INDEPENDENT_EVENTS.forEach((type) => {
         document.removeEventListener(type, clearKeyboardLaunch, CAPTURE);
       });
@@ -665,7 +685,7 @@ export function showContextMenu(
   activeSession = session;
 
   if (fromKeyboard) {
-    trackKeyboardLaunch(sourceElem);
+    trackKeyboardLaunch(sourceElem, event.key);
     focusMenuItem(menuItemsOf(contextMenu)[0]);
   }
 }
@@ -730,10 +750,12 @@ export function hideContextMenu(reason?: FocusCloseReason): void {
   }
 }
 
-// Document-level dismissal: a pointer leaving the document never closes a menu that holds focus.
+// Document-level dismissal: a pointer leaving the document never closes a menu that holds focus,
+// and a contextmenu raised inside the menu itself is not an outside click.
 export function hideContextMenuListener(event?: Event): void {
   if (!contextMenu.classList.contains("active")) return;
   if (event !== undefined && event.type === EVENT_MOUSELEAVE && menuHasFocus()) return;
+  if (event !== undefined && event.type === EVENT_CONTEXTMENU && isInsideMenu(event.target)) return;
   hideContextMenu(event === undefined ? undefined : REASON_OUTSIDE);
 }
 

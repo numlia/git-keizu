@@ -291,12 +291,18 @@ export function showErrorDialog(
 /* === Focus origin, Tab cycle and background exclusion === */
 
 // The launch origin: the menu's source element when given, else the element focused before the
-// dialog opened. A dialog replacing another one while focus is inside inherits the origin.
+// dialog opened. A dialog replacing another one while focus is inside inherits the origin. With
+// nothing focused (a menu action has already hidden its menu) only the repository is kept, so a
+// keyboard close falls through to the context chain (active row → list container).
 function captureSession(sourceElem: HTMLElement | null): DialogSession {
   if (sourceElem !== null) return { origin: captureFocusOrigin(sourceElem), source: sourceElem };
   const active = document.activeElement;
   if (!(active instanceof HTMLElement) || active === document.body) {
-    return { origin: null, source: null };
+    const contextOrigin = captureFocusOrigin(document.body);
+    return {
+      origin: contextOrigin === null ? null : { ...contextOrigin, source: null },
+      source: null
+    };
   }
   if (dialog.contains(active)) {
     return { origin: activeSession?.origin ?? null, source: activeSession?.source ?? null };

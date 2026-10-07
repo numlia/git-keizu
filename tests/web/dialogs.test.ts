@@ -1569,3 +1569,120 @@ describe("modal focus, Tab cycle, Escape keydown, IME guard and origin restore (
     expect(activeElement()).toBe(refreshBtn);
   });
 });
+
+// @see docs/testing/perspectives/web/dialogs-test.md
+describe("origin restore for a dialog opened without a source after its menu closed (S10)", () => {
+  const REPO = "/test/repo";
+  const MERGE_MESSAGE = "Merge?";
+  let dialogs: typeof import("../../web/dialogs");
+  let configureFocusContext: typeof import("../../web/keyboardNavigation").configureFocusContext;
+  let disposeContext: () => void;
+  let content: HTMLDivElement;
+  let rowM: HTMLTableRowElement;
+  let sourceElem: HTMLButtonElement;
+  let actioned: ReturnType<typeof vi.fn>;
+
+  beforeAll(async () => {
+    // The same module registry as `web/dialogs` so the context reaches its restoreFocus.
+    dialogs = await import("../../web/dialogs");
+    configureFocusContext = (await import("../../web/keyboardNavigation")).configureFocusContext;
+  });
+
+  beforeEach(() => {
+    content = document.createElement("div");
+    content.id = "content";
+    content.innerHTML =
+      '<div id="commitTable" tabindex="-1"><table><tbody><tr id="rowM" tabindex="0"><td>M</td></tr></tbody></table></div>';
+    document.body.appendChild(content);
+    rowM = content.querySelector("tr")!;
+    sourceElem = document.createElement("button");
+    sourceElem.type = "button";
+    document.body.appendChild(sourceElem);
+    actioned = vi.fn();
+    disposeContext = configureFocusContext({
+      getRepo: () => REPO,
+      getActiveRow: () => rowM,
+      getTabStops: () => [rowM]
+    });
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+  });
+
+  afterEach(() => {
+    dialogs.hideDialog();
+    disposeContext();
+    content.remove();
+    sourceElem.remove();
+  });
+
+  function openMergeForm(source: HTMLElement | null): void {
+    dialogs.showFormDialog(
+      MERGE_MESSAGE,
+      [
+        createCheckboxInput("No FF"),
+        createCheckboxInput("Squash"),
+        createCheckboxInput("No Commit")
+      ],
+      "Yes, merge",
+      actioned,
+      source
+    );
+  }
+
+  function keydown(target: Element, key: string): void {
+    target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    target.dispatchEvent(new KeyboardEvent("keyup", { key, bubbles: true, cancelable: true }));
+  }
+
+  // Case: TC-059
+  it("falls back to the active row when no source is given and nothing is focused (TC-059)", () => {
+    // Given: a form dialog opened with no source while the activeElement is body
+    openMergeForm(null);
+    expect(dialogEl.classList.contains("active")).toBe(true);
+    expect(dialogEl.contains(document.activeElement)).toBe(true);
+
+    // When: Escape closes it
+    keydown(document.activeElement!, "Escape");
+
+    // Then: the active row of the focus context holds focus
+    expect(dialogEl.classList.contains("active")).toBe(false);
+    expect(actioned).not.toHaveBeenCalled();
+    expect(document.activeElement).toBe(rowM);
+
+    // When: the same dialog is confirmed from its action button
+    rowM.blur();
+    openMergeForm(null);
+    const actionBtn = document.getElementById("dialogAction")!;
+    actionBtn.focus();
+    keydown(actionBtn, "Enter");
+
+    // Then: the action ran once and the row holds focus again
+    expect(actioned).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(rowM);
+
+    // When: the dismiss button closes it
+    rowM.blur();
+    openMergeForm(null);
+    const dismissBtn = document.getElementById("dialogDismiss")!;
+    dismissBtn.focus();
+    keydown(dismissBtn, "Enter");
+
+    // Then: the row holds focus and the action did not run again
+    expect(actioned).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(rowM);
+  });
+
+  // Case: TC-060
+  it("restores the given source element ahead of the context fallback (TC-060)", () => {
+    // Given: the same form opened with the menu's source while the activeElement is body
+    openMergeForm(sourceElem);
+    expect(dialogEl.contains(document.activeElement)).toBe(true);
+
+    // When: Escape closes it
+    keydown(document.activeElement!, "Escape");
+
+    // Then: the source element holds focus, not the active row
+    expect(dialogEl.classList.contains("active")).toBe(false);
+    expect(document.activeElement).toBe(sourceElem);
+  });
+});

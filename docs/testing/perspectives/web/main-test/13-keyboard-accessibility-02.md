@@ -6,7 +6,7 @@
 > Test Framework: Vitest
 > Responsibility: keyboard-accessibility
 
-`13-keyboard-accessibility-01.md` の続き（同じ共通 fixture・用語・計画 ID 対応表を参照）。本 shard は Tab 順と一覧内の往復、再描画・応答後の復元とメニュー維持、メニュー起動経路、詳細・ファイル操作の既存アクション接続、行の名前・状態説明・通知、blur した Webview へフォーカスを取り戻さない契約を持つ。
+`13-keyboard-accessibility-01.md` の続き（同じ共通 fixture・用語・計画 ID 対応表を参照）。本 shard は Tab 順と一覧内の往復、再描画・応答後の復元とメニュー維持、メニュー起動経路、詳細・ファイル操作の既存アクション接続、行の名前・状態説明・通知、blur した Webview へフォーカスを取り戻さない契約、キー起動メニューの keyup 由来 `contextmenu` と merge ダイアログの起点復元を持つ。
 
 ## S73: Tab 順序・一覧内の往復・停止点の構成
 
@@ -320,3 +320,37 @@ A8.2-4「フォーカスが別の部品・VS Code側へ移った後に、更新�
 - テスト: `tests/web/main.keyboard.test.ts` describe `no focus pulled back into a blurred webview (S80)`。TC-747 `leaves focus on body when a response replaces the rows after the webview blurred` / TC-748 `restores the row again once the webview has focus back` / TC-749 `parks on the list container across a repository change while the webview has focus` / TC-750 `does not park on the list container after the webview blurred`。`blurWebview()` が `document.hasFocus` を `false` に stub して window `blur` を発火し、`refocusWebview()` / `afterEach` の window `focus` で `web/keyboardNavigation.ts` の blur 状態を戻す
 - RED: 旧実装（`document.hasFocus()` 条件なし）で TC-747 / TC-750 が fail（`activeElement` が `#commitTable`）→ GREEN。TC-709〜TC-713 は変更なしで pass
 - 実行結果（2026-10-07）: 4 件 pass
+
+## S81: キー起動メニューの keyup 由来 contextmenu（main 経路）と merge ダイアログの起点復元
+
+> Origin: Feature 061-05 (light-spec-plan) review fix
+> Added: 2026-10-07
+> Status: active
+> Supersedes: -
+> Signature: 行の `keydown`（`key: "ContextMenu"`）→ `showCommitRowContextMenu` → `showContextMenu(KeyboardEvent, ...)` の後の keyup / `contextmenu`（`web/contextMenu.ts` S12 の抑止と document 登録の `hideContextMenuListener` の組み合わせ）/ `buildCommitContextMenuItems(..., sourceElem)` → `buildMergeMenuItem(..., sourceElem)` → `showFormDialog(..., sourceElem)` → `hideDialog("keyboard")`
+> Target Path: `web/main.ts:1269-1300, 2925`（行の `contextmenu` / keydown 起動と document の `hideContextMenuListener`）、`web/commitMenu.ts:302-312`、`web/mergeDialog.ts:17-23, 63-65`
+> Test File: `tests/web/main.keyboard.test.ts`
+
+レビュー指摘 round 2 の main 側統合。S75 TC-724 は keyup 後の `contextmenu` を起点行へ発火していたが、実ブラウザー（Windows の VK_APPS）の対象はその時点でフォーカスしている最初の `li` であり、旧実装では document の `hideContextMenuListener` が開いたばかりのメニューを閉じていた（`web/contextMenu-test.md` S12）。merge ダイアログは `sourceElem = null` で開かれていたため、閉鎖後の復元先が無く `body` に落ちていた（`web/dialogs-test.md` S10）。本節は実 main の起動経路と実 `showFormDialog` で両方を観測する。
+
+| Case ID | Input / Precondition                                                                                                                                                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type)   | Expected Result                                                                                                                                                                                                                     | Notes                                                                                        |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| TC-751  | `M` の行に実フォーカスして `ContextMenu` keydown（メニューが開き最初の `li` へフォーカス）→ その `li` へ `ContextMenu` keyup → 同じ `li` を対象に `contextmenu`。続けて `R` の行を `pointerdown` → `contextmenu` | Validation - `li` 対象の keyup 由来 contextmenu を抑止し独立右クリックは通す | keyup と `contextmenu` が `defaultPrevented === true`、`#contextMenu` が `active` のまま、子要素の並びが同一、`activeElement` がその `li` のまま。`R` の右クリックは非抑止で `R` のメニューが開く（Copy Commit Hash → `data: "R"`） | R4.4 / A8.1-4。S75 TC-724（起点行対象）の補完。`web/contextMenu-test.md` S12 TC-148 / TC-150 |
+| TC-752  | `M` の行で Shift + `F10` → 「Merge into current branch…」へフォーカスして `Enter`（`#dialog` が開き内部へフォーカス）→ `Escape` keydown → keyup                                                                  | Normal - merge ダイアログの取消で起点行へ                                    | `#dialog` の `active` が外れ、`activeElement` が `M` の行、`mergeCommit` 要求 0 件                                                                                                                                                  | R4.7 / A8.1-6。`web/dialogs-test.md` S10 TC-059 / TC-060                                     |
+| TC-753  | TC-752 と同じく開いた後、`#dialogAction` へフォーカスして `Enter`                                                                                                                                                | Normal - 確定で要求 1 件と起点行へ                                           | `mergeCommit` 要求が 1 件（`repo` / `commitHash: "M"` / `createNewCommit: true` / `squash: false` / `noCommit: false` = `dialogDefaults.merge`）、`#dialog` が閉じ `activeElement` が `M` の行                                      | R4.7。`recordRecentAction`（`saveRepoState`）の記録は従来どおり                              |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 review fix round 2（S81）
+
+| 失敗源                                                  | 対応ケースまたは除外理由                                                                                                                |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `li` 対象の keyup 由来 `contextmenu` でメニューが閉じる | TC-751                                                                                                                                  |
+| merge ダイアログの取消 / 確定後に `body` へ落ちる       | TC-752、TC-753                                                                                                                          |
+| 起点行対象の同じ押下 `contextmenu`、独立右クリック      | excluded(S75 TC-724 が不変のまま pass することで確認)                                                                                   |
+| ref メニューの merge 項目                               | excluded(同じ `buildMergeMenuItem` に `sourceElem` を渡す。`tests/web/refMenu.test.ts` TC-029〜TC-031 が builder 経由で不変のまま pass) |
+
+### レビュー修正 round 2 テスト対応（Feature 061-05）— S81
+
+- テスト: `tests/web/main.keyboard.test.ts`。TC-751 は S75 の describe 内 `keeps the menu when the keyup contextmenu lands on the focused item (TC-751)`。TC-752 / TC-753 は describe `merge dialog opened from a keyboard menu returns focus to the row (S81)` の `returns focus to the row when the merge dialog is cancelled with Escape` / `posts one merge request and returns focus to the row on confirm`
+- RED: 旧実装（a0e8503）で 3 件とも fail（TC-751: `#contextMenu` が非 `active`、TC-752 / TC-753: `activeElement` が `body`）→ GREEN。S75 TC-724 / TC-727 は変更なしで pass
+- Windows 実機の VK_APPS keyup → `contextmenu` 合成は `13-keyboard-accessibility-01.md` 冒頭の手動一覧に追加（未実施）
+- 実行結果（2026-10-07）: 3 件 pass
