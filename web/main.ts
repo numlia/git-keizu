@@ -124,6 +124,10 @@ const FILE_VIEW_TREE = "tree" as const;
 type FileViewType = typeof FILE_VIEW_LIST | typeof FILE_VIEW_TREE;
 const DEFAULT_FILE_VIEW_TYPE: FileViewType = FILE_VIEW_TREE;
 
+function buildDetailsCloseHtml(): string {
+  return `<button type="button" id="${COMMIT_DETAILS_CLOSE_ID}" ${ATTRIBUTE_ARIA_LABEL}="${t("find.close")}">${svgIcons.close}</button>`;
+}
+
 function getFileViewToggle(mode: FileViewType): { icon: string; title: string } {
   return mode === FILE_VIEW_LIST
     ? { icon: svgIcons.treeView, title: t("toolbar.switchToTreeView") }
@@ -181,6 +185,29 @@ const KEY_TAB = "Tab";
 const TAB_INDEX_STOP = 0;
 const TAB_INDEX_PROGRAMMATIC = -1;
 const COMMIT_DETAILS_ID = "commitDetails";
+const COMMIT_DETAILS_CLOSE_ID = "commitDetailsClose";
+const COMMIT_DETAILS_FILES_ID = "commitDetailsFiles";
+const FILE_VIEW_TOGGLE_ID = "fileViewToggle";
+const FILE_ROW_SELECTOR = ".gitFile";
+const FILE_DIFF_BUTTON_CLASS = "gitFileDiff";
+const FILE_OPEN_BUTTON_CLASS = "openFile";
+const FILE_HISTORY_BUTTON_CLASS = "highlightFileHistory";
+const FOLDER_BUTTON_CLASS = "gitFolder";
+const FOLDER_CONTENTS_SELECTOR = ":scope > .gitFolderContents";
+const FOLDER_ICON_SELECTOR = ".gitFolderIcon";
+const FOLDER_CLOSED_CLASS = "closed";
+const FOLDER_CONTENTS_HIDDEN_CLASS = "hidden";
+const PARENT_HASH_CLASS = "parentHash";
+// Parent links have no element id; their control key is derived from the hash they open.
+const PARENT_HASH_KEY_PREFIX = "parentHash:";
+const ATTRIBUTE_ARIA_EXPANDED = "aria-expanded";
+const ATTRIBUTE_ARIA_LABEL = "aria-label";
+type FileActionKind = Extract<FocusKey, { kind: "file" }>["action"];
+const FILE_ACTION_BUTTONS: readonly (readonly [string, FileActionKind])[] = [
+  [FILE_DIFF_BUTTON_CLASS, "diff"],
+  [FILE_OPEN_BUTTON_CLASS, "open"],
+  [FILE_HISTORY_BUTTON_CLASS, "history"]
+];
 const LOAD_MORE_BUTTON_ID = "loadMoreCommitsBtn";
 const TABLE_HEADERS_ID = "tableColHeaders";
 const BRANCH_CLEANUP_PANEL_ID = "branchCleanupPanel";
@@ -1294,16 +1321,21 @@ class GitKeizuView {
     );
   }
   private showFileRowContextMenu(event: ContextMenuTrigger): void {
-    const sourceElem = event.target instanceof Element ? resolveFileRow(event.target) : null;
-    if (sourceElem === null) return;
+    if (!(event.target instanceof Element)) return;
+    const target = event.target;
+    const fileRow = resolveFileRow(target);
+    if (fileRow === null) return;
     const items = buildFileContextMenuItems(
-      sourceElem,
+      fileRow,
       this.expandedCommit,
       this.currentRepo,
       this.buildFileHistoryMenuContext()
     );
     if (items.length === 0) return;
-    showContextMenu(event, items, sourceElem, this.getCurrentRepoRecentActions());
+    // The builder keeps the row (its dataset); the menu is anchored to and restores focus to the
+    // child button that launched it, or to the row when the row itself is the tab stop.
+    const source = target.closest<HTMLElement>("button") ?? fileRow;
+    showContextMenu(event, items, source, this.getCurrentRepoRecentActions());
   }
   private showRefBadgeContextMenu(
     event: ContextMenuTrigger,
@@ -2222,11 +2254,9 @@ class GitKeizuView {
       elem.innerHTML =
         `<td></td><td colspan="${COMMIT_DETAILS_COLSPAN}">` +
         `<div id="cdvLoading">${svgIcons.loading} ${t("loading.commitDetails", loadingLabel)}</div>` +
-        `<div id="commitDetailsClose">${svgIcons.close}</div>` +
+        buildDetailsCloseHtml() +
         "</td>";
-      document.getElementById("commitDetailsClose")!.addEventListener("click", () => {
-        this.hideCommitDetails();
-      });
+      this.bindDetailsClose();
     }
 
     this.renderGraph();
@@ -2298,7 +2328,7 @@ class GitKeizuView {
       `<td></td><td colspan="${COMMIT_DETAILS_COLSPAN}">` +
       `<div id="commitDetailsSummary">${summaryHtml}</div>` +
       filesSectionHtml +
-      `<div id="commitDetailsClose">${svgIcons.close}</div>` +
+      buildDetailsCloseHtml() +
       "</td>";
 
     let elem = document.getElementById(COMMIT_DETAILS_ID);
@@ -2319,16 +2349,22 @@ class GitKeizuView {
     this.renderGraph();
     this.scrollToExpandedCommit(elem);
 
-    document.getElementById("commitDetailsClose")!.addEventListener("click", () => {
-      this.hideCommitDetails();
-    });
-    document.getElementById("fileViewToggle")?.addEventListener("click", () => {
-      this.handleFileViewToggle();
-    });
+    this.bindDetailsClose();
+    const toggleElem = document.getElementById(FILE_VIEW_TOGGLE_ID);
+    if (toggleElem !== null) {
+      markFocusTarget(toggleElem, { kind: "control", id: FILE_VIEW_TOGGLE_ID });
+      toggleElem.addEventListener("click", () => this.handleFileViewToggle());
+    }
     this.bindFileViewListeners();
     this.applyFileHistoryToFileRows();
     this.bindParentHashListeners();
     finishFocusUpdate(focusUpdate);
+  }
+  private bindDetailsClose(): void {
+    const closeElem = document.getElementById(COMMIT_DETAILS_CLOSE_ID);
+    if (closeElem === null) return;
+    markFocusTarget(closeElem, { kind: "control", id: COMMIT_DETAILS_CLOSE_ID });
+    closeElem.addEventListener("click", () => this.hideCommitDetails());
   }
   private findCommitRowByHash(hash: string): HTMLElement | null {
     return document.querySelector<HTMLElement>(`.commit[data-hash="${hash}"]`);
@@ -2429,7 +2465,7 @@ class GitKeizuView {
       .map((hash) => {
         const escapedHash = escapeHtml(hash);
         return typeof this.commitLookup[hash] === "number"
-          ? `<span class="parentHash" data-hash="${escapedHash}">${escapedHash}</span>`
+          ? `<button type="button" class="${PARENT_HASH_CLASS}" data-hash="${escapedHash}">${escapedHash}</button>`
           : escapedHash;
       })
       .join(", ");
@@ -2449,7 +2485,7 @@ class GitKeizuView {
   ): string {
     const innerHtml = this.buildFilesSectionInnerHtml(fileViewType, fileChanges, fileTree);
     const { icon, title } = getFileViewToggle(fileViewType);
-    return `<div id="commitDetailsFiles">${innerHtml}</div><span id="fileViewToggle" class="fileViewToggleBtn" title="${title}">${icon}</span>`;
+    return `<div id="${COMMIT_DETAILS_FILES_ID}">${innerHtml}</div><button type="button" id="${FILE_VIEW_TOGGLE_ID}" class="fileViewToggleBtn" title="${title}" ${ATTRIBUTE_ARIA_LABEL}="${title}">${icon}</button>`;
   }
   private scrollToExpandedCommit(detailsElem: HTMLElement) {
     if (this.expandedCommit === null || this.expandedCommit.srcElem === null) return;
@@ -2466,8 +2502,16 @@ class GitKeizuView {
     }
   }
   private bindParentHashListeners() {
-    addListenerToClass("parentHash", "click", (e: Event) => {
-      const target = <HTMLElement>e.target;
+    document
+      .querySelectorAll<HTMLElement>(`#${COMMIT_DETAILS_ID} .${PARENT_HASH_CLASS}`)
+      .forEach((link) => {
+        const hash = link.dataset.hash;
+        if (hash !== undefined) {
+          markFocusTarget(link, { kind: "control", id: `${PARENT_HASH_KEY_PREFIX}${hash}` });
+        }
+      });
+    addListenerToClass(PARENT_HASH_CLASS, "click", (e: Event) => {
+      const target = <HTMLElement>e.currentTarget;
       const parentHash = target.dataset.hash;
       if (parentHash && typeof this.commitLookup[parentHash] === "number") {
         this.scrollToCommit(parentHash, true, true);
@@ -2488,21 +2532,24 @@ class GitKeizuView {
     const newMode: FileViewType = currentMode === FILE_VIEW_TREE ? FILE_VIEW_LIST : FILE_VIEW_TREE;
     const updatedRepo: GG.GitRepoState = { ...repo, fileViewType: newMode };
     this.gitRepos[this.currentRepo] = updatedRepo;
-    const filesDiv = document.getElementById("commitDetailsFiles");
+    const filesDiv = document.getElementById(COMMIT_DETAILS_FILES_ID);
     if (filesDiv !== null && this.expandedCommit.commitDetails !== null) {
+      const focusUpdate = beginFocusUpdate(filesDiv);
       filesDiv.innerHTML = this.buildFilesSectionInnerHtml(
         newMode,
         this.expandedCommit.commitDetails.fileChanges,
         this.expandedCommit.fileTree!
       );
-      const toggleElem = document.getElementById("fileViewToggle");
+      const toggleElem = document.getElementById(FILE_VIEW_TOGGLE_ID);
       if (toggleElem !== null) {
         const { icon, title } = getFileViewToggle(newMode);
         toggleElem.innerHTML = icon;
         toggleElem.title = title;
+        toggleElem.setAttribute(ATTRIBUTE_ARIA_LABEL, title);
       }
       this.bindFileViewListeners();
       this.applyFileHistoryToFileRows();
+      finishFocusUpdate(focusUpdate);
     }
     sendMessage({
       command: "saveRepoState",
@@ -2527,28 +2574,23 @@ class GitKeizuView {
       ? generateGitFileListHtml(fileChanges, canHighlight)
       : generateGitFileTreeHtml(fileTree, fileChanges, canHighlight);
   }
+  // Every control is a native button: Enter / Space run the same click handler as the mouse,
+  // and the child buttons stop propagation so neither the row wrapper nor the commit row acts.
   private bindFileViewListeners() {
-    addListenerToClass("gitFolder", "click", (e) => {
-      let sourceElem = <HTMLElement>(<Element>e.target!).closest(".gitFolder");
-      let parent = sourceElem.parentElement!;
-      parent.classList.toggle("closed");
-      let isOpen = !parent.classList.contains("closed");
-      parent.children[0].children[0].innerHTML = isOpen
-        ? svgIcons.openFolder
-        : svgIcons.closedFolder;
-      parent.children[1].classList.toggle("hidden");
-      alterGitFileTree(
-        this.expandedCommit!.fileTree!,
-        decodeURIComponent(sourceElem.dataset.folderpath!),
-        isOpen
-      );
-      this.saveState();
+    this.markFileViewTargets();
+    addListenerToClass(FOLDER_BUTTON_CLASS, "click", (e) => {
+      e.stopPropagation();
+      this.toggleFolder(<HTMLElement>e.currentTarget);
     });
-    addListenerToClass("openFile", "click", (e) => {
+    addListenerToClass(FILE_DIFF_BUTTON_CLASS, "click", (e) => {
+      e.stopPropagation();
+      this.sendViewDiffAction(resolveFileRow(<Element>e.currentTarget));
+    });
+    addListenerToClass(FILE_OPEN_BUTTON_CLASS, "click", (e) => {
       e.stopPropagation();
       sendOpenFileAction(resolveFileRow(<Element>e.target), this.expandedCommit, this.currentRepo);
     });
-    addListenerToClass("highlightFileHistory", "click", (e) => {
+    addListenerToClass(FILE_HISTORY_BUTTON_CLASS, "click", (e) => {
       e.stopPropagation();
       sendHighlightFileHistoryAction(
         resolveFileRow(<Element>e.target),
@@ -2563,30 +2605,110 @@ class GitKeizuView {
       this.showFileRowContextMenu(<MouseEvent>e);
     });
     addListenerToClass("gitFile", "keydown", (e: Event) => {
-      if (!consumeContextMenuLaunch(e)) return;
-      this.showFileRowContextMenu(e);
-    });
-    addListenerToClass("gitFile", "click", (e) => {
-      let sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;
-      if (this.expandedCommit === null || !sourceElem.classList.contains("gitDiffPossible")) return;
-      // When in comparison mode, normalize order so diff always shows old → new
-      let diffCommitHash = this.expandedCommit.hash;
-      let diffCompareWithHash = this.expandedCommit.compareWithHash;
-      if (diffCompareWithHash !== null) {
-        const order = this.getCommitOrder(diffCommitHash, diffCompareWithHash);
-        diffCommitHash = order.from;
-        diffCompareWithHash = order.to;
+      if (consumeContextMenuLaunch(e)) {
+        this.showFileRowContextMenu(e);
+        return;
       }
-      sendMessage({
-        command: "viewDiff",
-        repo: this.currentRepo!,
-        commitHash: diffCommitHash,
-        oldFilePath: decodeURIComponent(sourceElem.dataset.oldfilepath!),
-        newFilePath: decodeURIComponent(sourceElem.dataset.newfilepath!),
-        type: <GG.GitFileChangeType>sourceElem.dataset.type,
-        ...(diffCompareWithHash !== null ? { compareWithHash: diffCompareWithHash } : {})
+      this.handleFileRowActivationKey(e);
+    });
+  }
+  // File and folder keys carry the details' displayed hashes (origin and compare target), which
+  // differ from the time-ordered from / to hashes of the requests (plan §3.4).
+  private markFileViewTargets(): void {
+    const filesElem = document.getElementById(COMMIT_DETAILS_FILES_ID);
+    if (filesElem === null || this.expandedCommit === null) return;
+    const base = {
+      repo: this.currentRepo,
+      hash: this.expandedCommit.hash,
+      compareWithHash: this.expandedCommit.compareWithHash
+    } as const;
+    filesElem.querySelectorAll<HTMLElement>(`.${FOLDER_BUTTON_CLASS}`).forEach((button) => {
+      const path = button.dataset.folderpath;
+      if (path !== undefined) {
+        markFocusTarget(button, { kind: "folder", ...base, path: decodeURIComponent(path) });
+      }
+    });
+    filesElem.querySelectorAll<HTMLElement>(FILE_ROW_SELECTOR).forEach((fileRow) => {
+      const oldPath = fileRow.dataset.oldfilepath;
+      const newPath = fileRow.dataset.newfilepath;
+      if (oldPath === undefined || newPath === undefined) return;
+      const fileBase = {
+        kind: "file",
+        ...base,
+        oldPath: decodeURIComponent(oldPath),
+        newPath: decodeURIComponent(newPath)
+      } as const;
+      // A row that is itself the tab stop (no enabled child button) stands for its diff target.
+      if (fileRow.hasAttribute("tabindex"))
+        markFocusTarget(fileRow, { ...fileBase, action: "diff" });
+      FILE_ACTION_BUTTONS.forEach(([className, action]) => {
+        fileRow.querySelectorAll<HTMLElement>(`.${className}`).forEach((button) => {
+          markFocusTarget(button, { ...fileBase, action });
+        });
       });
     });
+  }
+  private toggleFolder(button: HTMLElement): void {
+    const item = button.parentElement;
+    const contents = item?.querySelector<HTMLElement>(FOLDER_CONTENTS_SELECTOR) ?? null;
+    const folderPath = button.dataset.folderpath;
+    if (
+      item === null ||
+      contents === null ||
+      folderPath === undefined ||
+      this.expandedCommit === null ||
+      this.expandedCommit.fileTree === null
+    ) {
+      return;
+    }
+    const isOpen = !item.classList.toggle(FOLDER_CLOSED_CLASS);
+    const iconElem = button.querySelector<HTMLElement>(FOLDER_ICON_SELECTOR);
+    if (iconElem !== null)
+      iconElem.innerHTML = isOpen ? svgIcons.openFolder : svgIcons.closedFolder;
+    button.setAttribute(ATTRIBUTE_ARIA_EXPANDED, String(isOpen));
+    contents.classList.toggle(FOLDER_CONTENTS_HIDDEN_CLASS, !isOpen);
+    contents.hidden = !isOpen;
+    alterGitFileTree(this.expandedCommit.fileTree, decodeURIComponent(folderPath), isOpen);
+    this.saveState();
+  }
+  private sendViewDiffAction(fileRow: HTMLElement | null): void {
+    if (
+      fileRow === null ||
+      this.expandedCommit === null ||
+      !fileRow.classList.contains("gitDiffPossible")
+    ) {
+      return;
+    }
+    // When in comparison mode, normalize order so diff always shows old → new
+    let diffCommitHash = this.expandedCommit.hash;
+    let diffCompareWithHash = this.expandedCommit.compareWithHash;
+    if (diffCompareWithHash !== null) {
+      const order = this.getCommitOrder(diffCommitHash, diffCompareWithHash);
+      diffCommitHash = order.from;
+      diffCompareWithHash = order.to;
+    }
+    sendMessage({
+      command: "viewDiff",
+      repo: this.currentRepo,
+      commitHash: diffCommitHash,
+      oldFilePath: decodeURIComponent(fileRow.dataset.oldfilepath!),
+      newFilePath: decodeURIComponent(fileRow.dataset.newfilepath!),
+      type: <GG.GitFileChangeType>fileRow.dataset.type,
+      ...(diffCompareWithHash !== null ? { compareWithHash: diffCompareWithHash } : {})
+    });
+  }
+  // A row that is its own tab stop (no enabled child button) opens its menu on Enter / Space;
+  // keys bubbling up from a child button are that button's own.
+  private handleFileRowActivationKey(e: Event): void {
+    if (!(e instanceof KeyboardEvent) || e.defaultPrevented || e.target !== e.currentTarget) return;
+    if (e.key !== KEY_ENTER && e.key !== KEY_SPACE) return;
+    if (!(e.currentTarget instanceof HTMLElement) || !e.currentTarget.hasAttribute("tabindex")) {
+      return;
+    }
+    e.preventDefault();
+    if (isKeyboardActionBlocked(e)) return;
+    e.stopPropagation();
+    this.showFileRowContextMenu(e);
   }
   public showCompareResult(fileChanges: GG.GitFileChange[], fromHash: string, toHash: string) {
     if (this.expandedCommit === null || this.expandedCommit.compareWithHash === null) return;

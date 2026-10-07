@@ -707,3 +707,237 @@ describe("generateGitFileTree", () => {
     expect(foo.contents["bar"].type).toBe("file");
   });
 });
+
+/* ------------------------------------------------------------------ */
+/* S6: standard button structure and names (fileTree-test.md)          */
+/* ------------------------------------------------------------------ */
+
+const OPEN_FILE_TITLE = "Open File";
+
+function fileRowOf(fragment: ParentNode, newFilePath: string): HTMLElement {
+  const row = fragment.querySelector<HTMLElement>(
+    `li[data-newfilepath="${encodeURIComponent(newFilePath)}"]`
+  );
+  expect(row, newFilePath).not.toBeNull();
+  return row!;
+}
+
+function buttonSummary(row: Element): string[] {
+  return Array.from(row.querySelectorAll("button")).map(
+    (button) => `${button.className}|${button.disabled}|${button.getAttribute("aria-label") ?? ""}`
+  );
+}
+
+// @see docs/testing/perspectives/web/fileTree-test.md
+describe("file and folder controls as standard buttons (S6)", () => {
+  it("renders the diff button and the action buttons as siblings under a non-operable li (TC-042)", () => {
+    // Case: TC-042
+    // Given: a list with one M row and an allowing predicate
+    const fragment = parseHtml(generateGitFileListHtml([makeFile()], ALLOW));
+    const row = fileRowOf(fragment, "src/file.ts");
+
+    // Then: the li has no tabindex, the diff button is a direct child named by the path
+    expect(row.hasAttribute("tabindex")).toBe(false);
+    const diffButton = row.querySelector<HTMLButtonElement>(":scope > button.gitFileDiff");
+    expect(diffButton).not.toBeNull();
+    expect(diffButton!.getAttribute("type")).toBe("button");
+    expect(diffButton!.getAttribute("aria-label")).toContain("src/file.ts");
+    expect(diffButton!.disabled).toBe(false);
+
+    // Then: the action buttons live in .gitFileActions and no button nests another
+    expect(row.querySelector(".gitFileActions > button.gitFileAction.openFile")).not.toBeNull();
+    expect(
+      row.querySelector(".gitFileActions > button.gitFileAction.highlightFileHistory")
+    ).not.toBeNull();
+    expect(row.querySelectorAll("button button")).toHaveLength(0);
+    for (const button of Array.from(row.querySelectorAll("button"))) {
+      expect(button.getAttribute("type")).toBe("button");
+    }
+
+    // Then: the datasets stay on the li
+    expect(row.dataset.oldfilepath).toBe(encodeURIComponent("src/file.ts"));
+    expect(row.dataset.newfilepath).toBe(encodeURIComponent("src/file.ts"));
+    expect(row.dataset.type).toBe("M");
+  });
+
+  it("renders the diff and history buttons but no open button for a deleted row (TC-043)", () => {
+    // Case: TC-043
+    const fragment = parseHtml(
+      generateGitFileListHtml([makeFile({ type: "D", additions: null, deletions: null })], ALLOW)
+    );
+    const row = fileRowOf(fragment, "src/file.ts");
+
+    expect(row.querySelector("button.gitFileDiff")).not.toBeNull();
+    expect(row.querySelector("button.highlightFileHistory")).not.toBeNull();
+    expect(row.querySelector(".openFile")).toBeNull();
+  });
+
+  it("keeps both rename paths on the li and names the diff button by the new path (TC-044)", () => {
+    // Case: TC-044
+    const fragment = parseHtml(
+      generateGitFileListHtml(
+        [
+          makeFile({
+            oldFilePath: "old.ts",
+            newFilePath: "new.ts",
+            type: "R",
+            additions: 0,
+            deletions: 0
+          })
+        ],
+        ALLOW
+      )
+    );
+    const row = fileRowOf(fragment, "new.ts");
+
+    expect(row.dataset.oldfilepath).toBe(encodeURIComponent("old.ts"));
+    expect(row.dataset.newfilepath).toBe(encodeURIComponent("new.ts"));
+    expect(row.querySelector("button.gitFileDiff")!.getAttribute("aria-label")).toContain("new.ts");
+    expect(row.querySelector(".gitFileRename")!.getAttribute("title")).toBe(
+      "old.ts was renamed to new.ts"
+    );
+  });
+
+  it("disables only the diff button of a binary row and keeps the other actions (TC-045)", () => {
+    // Case: TC-045
+    const fragment = parseHtml(
+      generateGitFileListHtml([makeFile({ additions: null, deletions: null })], ALLOW)
+    );
+    const row = fileRowOf(fragment, "src/file.ts");
+
+    const diffButton = row.querySelector<HTMLButtonElement>("button.gitFileDiff")!;
+    expect(diffButton.disabled).toBe(true);
+    expect(row.classList.contains("gitDiffPossible")).toBe(false);
+    expect(row.getAttribute("title")).toBe("This is a binary file, unable to view diff.");
+    expect(row.querySelector<HTMLButtonElement>("button.openFile")!.disabled).toBe(false);
+    expect(row.querySelector<HTMLButtonElement>("button.highlightFileHistory")!.disabled).toBe(
+      false
+    );
+    // The row has reachable child buttons, so it is not a tab stop itself.
+    expect(row.hasAttribute("tabindex")).toBe(false);
+  });
+
+  it("makes a row without any enabled button its own tab stop for the file menu (TC-045)", () => {
+    // Case: TC-045 (R4.3 menu reach point: binary D row whose history action is denied)
+    const fragment = parseHtml(
+      generateGitFileListHtml([makeFile({ type: "D", additions: null, deletions: null })], DENY)
+    );
+    const row = fileRowOf(fragment, "src/file.ts");
+
+    expect(row.getAttribute("tabindex")).toBe("0");
+    expect(row.querySelector<HTMLButtonElement>("button.gitFileDiff")!.disabled).toBe(true);
+    expect(row.querySelectorAll("button:not([disabled])")).toHaveLength(0);
+  });
+
+  it("renders folders as expandable buttons whose closed contents are hidden (TC-046)", () => {
+    // Case: TC-046
+    // Given: src/deep/a.ts and src/x.ts with the deep folder closed
+    const files = [
+      makeFile({ oldFilePath: "src/deep/a.ts", newFilePath: "src/deep/a.ts" }),
+      makeFile({ oldFilePath: "src/x.ts", newFilePath: "src/x.ts" })
+    ];
+    const tree = generateGitFileTree(files);
+    const src = asFolder(tree.contents["src"]);
+    asFolder(src.contents["deep"]).open = false;
+    const fragment = parseHtml(generateGitFileTreeHtml(tree, files, ALLOW));
+
+    // Then: the closed folder button exposes its state and controls the hidden list
+    const deep = fragment.querySelector<HTMLButtonElement>(
+      `button.gitFolder[data-folderpath="${encodeURIComponent("src/deep")}"]`
+    );
+    expect(deep).not.toBeNull();
+    expect(deep!.getAttribute("type")).toBe("button");
+    expect(deep!.getAttribute("aria-label")).toContain("src/deep");
+    expect(deep!.getAttribute("aria-expanded")).toBe("false");
+    const deepContents = fragment.getElementById(deep!.getAttribute("aria-controls")!);
+    expect(deepContents).not.toBeNull();
+    expect(deepContents!.matches("ul.gitFolderContents")).toBe(true);
+    expect(deepContents!.hasAttribute("hidden")).toBe(true);
+    for (const button of Array.from(deepContents!.querySelectorAll("button"))) {
+      expect(button.closest("[hidden]")).toBe(deepContents);
+    }
+
+    // Then: the open folder has the open state and no hidden list
+    const srcButton = fragment.querySelector<HTMLButtonElement>(
+      `button.gitFolder[data-folderpath="${encodeURIComponent("src")}"]`
+    );
+    expect(srcButton!.getAttribute("aria-expanded")).toBe("true");
+    const srcContents = fragment.getElementById(srcButton!.getAttribute("aria-controls")!);
+    expect(srcContents!.hasAttribute("hidden")).toBe(false);
+    expect(fragment.querySelectorAll("button button")).toHaveLength(0);
+  });
+
+  it("renders the same buttons in list and tree views (TC-047)", () => {
+    // Case: TC-047
+    const files = [
+      makeFile({ oldFilePath: "src/m.ts", newFilePath: "src/m.ts" }),
+      makeFile({
+        oldFilePath: "src/d.ts",
+        newFilePath: "src/d.ts",
+        type: "D",
+        additions: null,
+        deletions: null
+      })
+    ];
+    const listFragment = parseHtml(generateGitFileListHtml(files, ALLOW));
+    const treeFragment = parseHtml(
+      generateGitFileTreeHtml(generateGitFileTree(files), files, ALLOW)
+    );
+
+    for (const path of ["src/m.ts", "src/d.ts"]) {
+      expect(
+        buttonSummary(
+          treeFragment.querySelector(`li[data-newfilepath="${encodeURIComponent(path)}"]`)!
+        ),
+        path
+      ).toEqual(
+        buttonSummary(
+          listFragment.querySelector(`li[data-newfilepath="${encodeURIComponent(path)}"]`)!
+        )
+      );
+    }
+  });
+
+  it("does not interpret the path as HTML in the name or the display (TC-048)", () => {
+    // Case: TC-048
+    const path = 'a<b>&"x.ts';
+    const fragment = parseHtml(
+      generateGitFileListHtml([makeFile({ oldFilePath: path, newFilePath: path })], ALLOW)
+    );
+    const row = fileRowOf(fragment, path);
+
+    const diffButton = row.querySelector("button.gitFileDiff")!;
+    expect(diffButton.getAttribute("aria-label")).toBe(path);
+    expect(diffButton.textContent).toBe(path);
+    expect(row.querySelectorAll("b")).toHaveLength(0);
+    expect(row.dataset.newfilepath).toBe(encodeURIComponent(path));
+  });
+
+  it("hides the decorative file icon and names the action buttons with the path (TC-049)", () => {
+    // Case: TC-049 (interim names until the a11y.actionFor key exists)
+    const fragment = parseHtml(generateGitFileListHtml([makeFile()], ALLOW));
+    const row = fileRowOf(fragment, "src/file.ts");
+
+    expect(row.querySelector(".gitFileIcon")!.getAttribute("aria-hidden")).toBe("true");
+    const openLabel = row.querySelector("button.openFile")!.getAttribute("aria-label")!;
+    expect(openLabel).toContain(OPEN_FILE_TITLE);
+    expect(openLabel).toContain("src/file.ts");
+    const historyLabel = row
+      .querySelector("button.highlightFileHistory")!
+      .getAttribute("aria-label")!;
+    expect(historyLabel).toContain(HIGHLIGHT_TITLE);
+    expect(historyLabel).toContain("src/file.ts");
+  });
+
+  it("returns an empty root list without buttons for no files (TC-050)", () => {
+    // Case: TC-050
+    const listFragment = parseHtml(generateGitFileListHtml([], ALLOW));
+    const treeFragment = parseHtml(generateGitFileTreeHtml(generateGitFileTree([]), [], ALLOW));
+
+    for (const fragment of [listFragment, treeFragment]) {
+      expect(fragment.children).toHaveLength(1);
+      expect(fragment.children[0].matches("ul.gitFolderContents")).toBe(true);
+      expect(fragment.querySelectorAll("button")).toHaveLength(0);
+    }
+  });
+});

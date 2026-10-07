@@ -1536,9 +1536,9 @@ describe("GitKeizuView frontend integration", () => {
       // Given: compare mode active with file tree HTML containing a clickable file
       expandCommit(COMMIT_HASH_1);
 
-      // Override generateGitFileTreeHtml to return a clickable file element
+      // Override generateGitFileTreeHtml to return a file row with its diff button
       vi.mocked(generateGitFileTreeHtml).mockReturnValueOnce(
-        '<table><tr class="gitFile gitDiffPossible" data-oldfilepath="old.ts" data-newfilepath="new.ts" data-type="M"><td>new.ts</td></tr></table>'
+        '<table><tr class="gitFile gitDiffPossible" data-oldfilepath="old.ts" data-newfilepath="new.ts" data-type="M"><td><button type="button" class="gitFileDiff">new.ts</button></td></tr></table>'
       );
 
       // Ctrl+click commit 2 and receive compare result
@@ -1559,8 +1559,8 @@ describe("GitKeizuView frontend integration", () => {
       });
       vi.clearAllMocks();
 
-      // When: a file element in the commit details is clicked
-      const fileElem = document.querySelector(".gitFile.gitDiffPossible");
+      // When: the diff button of a file row in the commit details is clicked
+      const fileElem = document.querySelector(".gitFile.gitDiffPossible .gitFileDiff");
       expect(fileElem).not.toBeNull();
       fileElem!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
