@@ -2541,7 +2541,7 @@ describe("RefOverflowController keyboard reach, movement, exits and restore (S6)
     // Given: two rows hiding a ref named topic, the second row's list open on its topic clone
     // Neither badge fits with the counter, so both rows fold long and topic.
     fixture.badgeOuter = { long: 400, topic: S6_NARROW_BADGE };
-    const refs = headRef("long") + headRef("topic");
+    const refs = `${headRef("long")}${headRef("topic")}`;
     const { controller, table } = setupKeyboardTable([
       { refs, head: true, hash: S6_OTHER_HASH, tabIndex: S6_PROGRAMMATIC },
       { refs, head: true, hash: S6_HASH, tabIndex: S6_TAB_STOP }
