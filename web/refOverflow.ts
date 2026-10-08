@@ -1,5 +1,13 @@
 import { hideContextMenu } from "./contextMenu";
 import { t } from "./i18n";
+import {
+  beginFocusUpdate,
+  captureFocusOrigin,
+  finishFocusUpdate,
+  type FocusCloseReason,
+  isKeyboardActionBlocked,
+  moveFocusPast
+} from "./keyboardNavigation";
 
 export const REF_BADGE_WIDTH_RATIO = 0.6;
 export const DESCRIPTION_MIN_WIDTH = 64;
@@ -116,10 +124,41 @@ const MEASURE_FONT_PROPERTIES = [
 const OBSERVED_ROOT_ATTRIBUTES = ["style", "class"];
 const OBSERVED_BODY_ATTRIBUTES = ["class"];
 const FONT_LOADING_DONE_EVENT = "loadingdone";
+const REASON_KEYBOARD: FocusCloseReason = "keyboard";
+const REASON_REPLACE: FocusCloseReason = "replace";
+const REASON_TAB: FocusCloseReason = "tab";
+const KEY_ARROW_UP = "ArrowUp";
+const KEY_ARROW_DOWN = "ArrowDown";
+const KEY_HOME = "Home";
+const KEY_END = "End";
+const KEY_ENTER = "Enter";
+const KEY_SPACE = " ";
+const KEY_ESCAPE = "Escape";
+const KEY_TAB = "Tab";
+const KEY_CONTEXT_MENU = "ContextMenu";
+const KEY_F10 = "F10";
+const POPUP_ID = "refOverflowPopup";
+const ATTR_ROLE = "role";
+const ROLE_GROUP = "group";
+const ATTR_ARIA_LABEL = "aria-label";
+const ATTR_ARIA_HAS_POPUP = "aria-haspopup";
+const ATTR_ARIA_EXPANDED = "aria-expanded";
+const ATTR_ARIA_CONTROLS = "aria-controls";
+const ATTR_TRUE = "true";
+const ATTR_FALSE = "false";
+const TAB_INDEX_PROGRAMMATIC = -1;
+// The focusable parts of a badge: the local head, each co-displayed remote, or the single label.
+const FOCUSABLE_SELECTOR = "button";
 
 export interface RefOverflowOptions {
   readonly onMinimumWidth: (minimum: number | null) => void;
-  readonly onRefContextMenu: (event: MouseEvent, badge: HTMLElement) => void;
+  readonly onRefContextMenu: (
+    event: ContextMenuTrigger,
+    ref: HTMLElement,
+    focusOptions?: ContextMenuFocusOptions
+  ) => void;
+  // Listed clones are new elements, so the owner gives each one the focus key of its original.
+  readonly onRefCloned?: (original: HTMLElement, clone: HTMLElement) => void;
 }
 
 interface RefOverflowRow {
@@ -158,11 +197,43 @@ function getCounterText(hiddenCount: number): string {
   return `${COUNTER_PREFIX}${hiddenCount}`;
 }
 
+function focusableParts(ref: HTMLElement): HTMLElement[] {
+  return Array.from(ref.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR));
+}
+
+function setPartsTabIndex(ref: HTMLElement, tabIndex: number): void {
+  for (const part of focusableParts(ref)) part.tabIndex = tabIndex;
+}
+
+function focusFirstConnected(candidates: readonly (HTMLElement | null)[]): boolean {
+  for (const candidate of candidates) {
+    if (candidate === null || !candidate.isConnected) continue;
+    candidate.focus();
+    if (document.activeElement === candidate) return true;
+  }
+  return false;
+}
+
+function consumeKey(event: KeyboardEvent): void {
+  event.preventDefault();
+  event.stopPropagation();
+}
+
+function isActivationKey(event: KeyboardEvent): boolean {
+  return event.key === KEY_ENTER || event.key === KEY_SPACE;
+}
+
+function isMenuLaunchKey(event: KeyboardEvent): boolean {
+  return event.key === KEY_CONTEXT_MENU || (event.key === KEY_F10 && event.shiftKey);
+}
+
 function createCounterElement(hiddenCount: number): HTMLButtonElement {
   const counter = document.createElement("button");
   counter.type = "button";
   counter.className = CLASS_COUNTER;
   counter.setAttribute(REF_OVERFLOW_IGNORE_ATTRIBUTE, "");
+  counter.setAttribute(ATTR_ARIA_HAS_POPUP, ATTR_TRUE);
+  counter.setAttribute(ATTR_ARIA_EXPANDED, ATTR_FALSE);
   updateCounterElement(counter, hiddenCount);
   return counter;
 }
@@ -207,6 +278,11 @@ function cloneRef(ref: HTMLElement): HTMLElement {
   for (let i = 0; i < descendantsWithId.length; i++) {
     descendantsWithId[i].removeAttribute("id");
   }
+  // Menu / dialog state belongs to the original's parts; copies are never in the normal Tab order.
+  for (const part of focusableParts(clone)) {
+    part.classList.remove(...CLONE_EXCLUDED_CLASSES);
+    part.tabIndex = TAB_INDEX_PROGRAMMATIC;
+  }
   return clone;
 }
 
@@ -224,7 +300,11 @@ function createMeasureRow(row: RefOverflowRow): { elem: HTMLElement; probe: RefO
   const elem = document.createElement("div");
   copyRowAppearance(elem, row.cell);
   const badges = row.refs.map(cloneRef);
-  const counters = row.refs.map((_ref, index) => createCounterElement(index + 1));
+  const counters = row.refs.map((_ref, index) => {
+    const counter = createCounterElement(index + 1);
+    counter.tabIndex = TAB_INDEX_PROGRAMMATIC;
+    return counter;
+  });
   elem.append(...badges, ...counters);
   return { elem, probe: { badges, counters } };
 }
@@ -330,12 +410,18 @@ export class RefOverflowController {
   private disposed = false;
   private popup: HTMLElement | null = null;
   private popupCounter: HTMLButtonElement | null = null;
+  private popupRow: HTMLElement | null = null;
+  private popupFocusOptions: ContextMenuFocusOptions | null = null;
+  // The clone a menu was last launched from; it keeps the menu-active mark even after a re-clone.
+  private menuOrigin: HTMLElement | null = null;
   private readonly styleObserver: MutationObserver;
   private readonly fonts: FontFaceSet | undefined;
   private readonly handleLayoutTrigger = () => this.scheduleLayout();
   // Row selection, details and checkout listen for bubbling clicks; the counter and list stop them.
   private readonly stopPropagation = (event: Event) => event.stopPropagation();
   private readonly handleCounterClick = (event: MouseEvent) => this.toggleCounterPopup(event);
+  private readonly handleCounterKeydown = (event: KeyboardEvent) =>
+    this.openCounterPopupByKey(event);
   private readonly handleDocumentClick = (event: MouseEvent) =>
     this.closePopupOnOutsideClick(event);
 
@@ -385,14 +471,29 @@ export class RefOverflowController {
     });
   }
 
-  public closePopup(): boolean {
+  /**
+   * Closes the list. `"keyboard"` returns focus to the counter, or to the owning row once the
+   * counter is gone; every other reason (including none) leaves focus where it is, a table
+   * replacement restoring through the owner's ticket instead.
+   */
+  public closePopup(reason?: FocusCloseReason): boolean {
     const popup = this.popup;
     if (popup === null) return false;
+    const counter = this.popupCounter;
+    const row = this.popupRow;
     this.hidePopupContextMenu();
     popup.remove();
     this.popup = null;
     this.popupCounter = null;
+    this.popupRow = null;
+    this.popupFocusOptions = null;
+    this.menuOrigin = null;
+    if (counter !== null) {
+      counter.setAttribute(ATTR_ARIA_EXPANDED, ATTR_FALSE);
+      counter.removeAttribute(ATTR_ARIA_CONTROLS);
+    }
     document.removeEventListener("click", this.handleDocumentClick, true);
+    if (reason === REASON_KEYBOARD) focusFirstConnected([counter, row]);
     return true;
   }
 
@@ -402,7 +503,7 @@ export class RefOverflowController {
       const counters = this.table.querySelectorAll(`button.${CLASS_COUNTER}`);
       for (let i = 0; i < counters.length; i++) syncCounterHighlight(counters[i]);
     }
-    if (this.popup !== null && !this.renderPopupItems()) this.closePopup();
+    if (this.popup !== null && !this.renderPopupItems()) this.closeInvalidatedPopup();
   }
 
   public dispose(): void {
@@ -414,7 +515,7 @@ export class RefOverflowController {
   }
 
   private releaseTable(): void {
-    this.closePopup();
+    this.closePopup(REASON_REPLACE);
     this.generation++;
     if (this.frameId !== null) {
       window.cancelAnimationFrame(this.frameId);
@@ -436,8 +537,18 @@ export class RefOverflowController {
     if (this.header === null) return;
     // Our own writes keep the column width unchanged; only a real size change needs another pass.
     if (this.header.getBoundingClientRect().width === this.lastHeaderWidth) return;
-    this.closePopup();
+    this.closeInvalidatedPopup();
     this.scheduleLayout();
+  }
+
+  // Layout and search changes close the list like a programmatic close, but focus that was inside
+  // it returns to the counter, or to the row once the counter is gone; focus the user already
+  // moved elsewhere is left alone (R4.7).
+  private closeInvalidatedPopup(): void {
+    if (this.popup === null) return;
+    const update = beginFocusUpdate(this.popup);
+    this.closePopup();
+    finishFocusUpdate(update);
   }
 
   private isCurrent(table: HTMLTableElement, generation: number): boolean {
@@ -468,7 +579,7 @@ export class RefOverflowController {
       const budget = getAvailableWidth(row, measurement) * REF_BADGE_WIDTH_RATIO;
       return selectVisibleRefCount(measurement.badgeWidths, budget, measurement.counterWidths);
     });
-    if (this.isPopupStale(rows, visibleCounts)) this.closePopup();
+    if (this.isPopupStale(rows, visibleCounts)) this.closeInvalidatedPopup();
     this.recordHeaderWidth();
 
     let foldingChanged = false;
@@ -507,13 +618,17 @@ export class RefOverflowController {
     this.lastHeaderWidth = this.header === null ? null : this.header.getBoundingClientRect().width;
   }
 
-  // Returns whether the row's folding (hidden refs or counter placement) was rewritten.
+  // Returns whether the row's folding (hidden refs or counter placement) was rewritten. Hidden
+  // labels leave the Tab order; labels shown again follow their row's tabindex, as the counter does.
   private applyVisibleCount(row: RefOverflowRow, visibleCount: number): boolean {
     let changed = false;
+    const rowElem = row.cell.parentElement;
+    const rowTabIndex = rowElem === null ? TAB_INDEX_PROGRAMMATIC : rowElem.tabIndex;
     row.refs.forEach((ref, index) => {
       const hidden = index >= visibleCount;
       if (ref.classList.contains(CLASS_HIDDEN) !== hidden) {
         ref.classList.toggle(CLASS_HIDDEN, hidden);
+        setPartsTabIndex(ref, hidden ? TAB_INDEX_PROGRAMMATIC : rowTabIndex);
         changed = true;
       }
     });
@@ -521,24 +636,50 @@ export class RefOverflowController {
     const hiddenCount = row.refs.length - visibleCount;
     if (hiddenCount === 0) {
       if (row.counter === null) return changed;
+      // A focused counter that disappears hands focus to its row instead of dropping it to body.
+      const hadFocus = row.counter === document.activeElement;
       row.counter.remove();
+      if (hadFocus && rowElem !== null) rowElem.focus({ preventScroll: true });
       return true;
     }
-    const counter = row.counter ?? this.createCounter(hiddenCount);
+    const counter = row.counter ?? this.createCounter(hiddenCount, rowTabIndex);
     updateCounterElement(counter, hiddenCount);
     const firstHiddenRef = row.refs[visibleCount];
     if (counter.nextSibling !== firstHiddenRef) {
       row.cell.insertBefore(counter, firstHiddenRef);
       changed = true;
     }
+    // A focused label that was just folded away continues at the counter standing for it.
+    const active = document.activeElement;
+    if (active !== null && row.refs.slice(visibleCount).some((ref) => ref.contains(active))) {
+      counter.focus({ preventScroll: true });
+    }
     return changed;
   }
 
-  private createCounter(hiddenCount: number): HTMLButtonElement {
+  private createCounter(hiddenCount: number, tabIndex: number): HTMLButtonElement {
     const counter = createCounterElement(hiddenCount);
+    counter.tabIndex = tabIndex;
     counter.addEventListener("click", this.handleCounterClick);
+    counter.addEventListener("keydown", this.handleCounterKeydown);
     counter.addEventListener("dblclick", this.stopPropagation);
     return counter;
+  }
+
+  // Enter / Space open the list and move real focus to its first label; the keydown is consumed
+  // so the native click that would follow does not toggle the list a second time (R4.3).
+  private openCounterPopupByKey(event: KeyboardEvent): void {
+    if (!isActivationKey(event) || isKeyboardActionBlocked(event)) return;
+    const counter = event.currentTarget;
+    if (!(counter instanceof HTMLButtonElement)) return;
+    consumeKey(event);
+    if (counter !== this.popupCounter) {
+      this.closePopup();
+      this.openPopup(counter);
+    }
+    if (this.popup !== null) {
+      focusFirstConnected([this.popup.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)]);
+    }
   }
 
   private toggleCounterPopup(event: MouseEvent): void {
@@ -556,41 +697,146 @@ export class RefOverflowController {
     if (!this.table.contains(cell)) return;
     const popup = document.createElement("div");
     popup.className = CLASS_POPUP;
+    popup.id = POPUP_ID;
+    popup.setAttribute(ATTR_ROLE, ROLE_GROUP);
+    popup.setAttribute(ATTR_ARIA_LABEL, counter.getAttribute(ATTR_ARIA_LABEL) ?? "");
     popup.setAttribute(REF_OVERFLOW_IGNORE_ATTRIBUTE, "");
     copyRowAppearance(popup, cell);
     popup.addEventListener("click", this.stopPropagation);
     popup.addEventListener("dblclick", this.stopPropagation);
+    popup.addEventListener("keydown", (event) => this.handlePopupKeydown(event, popup));
     this.popup = popup;
     this.popupCounter = counter;
+    this.popupRow = cell.parentElement;
+    // A menu opened from the list leaves by Tab from the counter after the list closed itself.
+    this.popupFocusOptions = {
+      tabOrigin: counter,
+      onTabExit: () => this.closePopup(REASON_TAB)
+    };
     // The same sync as a search refresh fills the list, so it opens with the current marks.
     this.syncSearchHighlights();
     if (this.popup !== popup) return;
     document.body.appendChild(popup);
     positionPopup(popup, counter);
+    counter.setAttribute(ATTR_ARIA_EXPANDED, ATTR_TRUE);
+    counter.setAttribute(ATTR_ARIA_CONTROLS, POPUP_ID);
     document.addEventListener("click", this.handleDocumentClick, true);
   }
 
-  // Rebuilt from the row's current hidden refs, so names and search marks always match it.
+  // Rebuilt from the row's current hidden refs, so names and search marks always match it. A
+  // focused clone is re-resolved by its key, and a menu opened from the list stays open.
   private renderPopupItems(): boolean {
     const popup = this.popup;
     const cell = this.popupCounter?.parentElement ?? null;
     if (popup === null || cell === null) return false;
-    const clones = getHiddenRefs(cell).map(cloneRef);
+    const clones = getHiddenRefs(cell).map((ref) => this.clonePopupItem(ref));
     if (clones.length === 0) return false;
-    this.hidePopupContextMenu();
     for (const clone of clones) {
-      clone.addEventListener("contextmenu", (event) => this.options.onRefContextMenu(event, clone));
+      clone.addEventListener("contextmenu", (event) => this.forwardRefMenu(event, clone, popup));
     }
+    const update = beginFocusUpdate(popup);
     popup.replaceChildren(...clones);
+    finishFocusUpdate(update);
     return true;
   }
 
-  // Only a menu opened from the list belongs to it; menus opened elsewhere are left alone.
+  private clonePopupItem(ref: HTMLElement): HTMLElement {
+    const clone = cloneRef(ref);
+    const originals = focusableParts(ref);
+    focusableParts(clone).forEach((part, index) => {
+      const original = originals[index];
+      if (original !== undefined) this.options.onRefCloned?.(original, part);
+    });
+    return clone;
+  }
+
+  // Clones of a closed list (table replaced, repository switched) must not act any more.
+  private forwardRefMenu(event: ContextMenuTrigger, clone: HTMLElement, popup: HTMLElement): void {
+    if (this.popup !== popup) return;
+    this.menuOrigin = clone;
+    this.options.onRefContextMenu(event, clone, this.popupFocusOptions ?? undefined);
+  }
+
+  private handlePopupKeydown(event: KeyboardEvent, popup: HTMLElement): void {
+    if (this.popup !== popup || event.defaultPrevented) return;
+    if (isActivationKey(event) || isMenuLaunchKey(event)) {
+      if (isKeyboardActionBlocked(event)) return;
+      const clone =
+        event.target instanceof Element
+          ? event.target.closest<HTMLElement>(`.${CLASS_GIT_REF}`)
+          : null;
+      if (clone === null || !popup.contains(clone)) return;
+      consumeKey(event);
+      this.forwardRefMenu(event, clone, popup);
+      return;
+    }
+    switch (event.key) {
+      case KEY_ARROW_UP:
+        this.movePopupFocus(event, popup, (current) => current - 1);
+        break;
+      case KEY_ARROW_DOWN:
+        this.movePopupFocus(event, popup, (current) => current + 1);
+        break;
+      case KEY_HOME:
+        this.movePopupFocus(event, popup, () => 0);
+        break;
+      case KEY_END:
+        this.movePopupFocus(event, popup, (_current, last) => last);
+        break;
+      case KEY_ESCAPE:
+        if (isKeyboardActionBlocked(event)) return;
+        consumeKey(event);
+        this.closePopup(REASON_KEYBOARD);
+        break;
+      case KEY_TAB:
+        this.leavePopupByTab(event);
+        break;
+      default:
+        break;
+    }
+  }
+
+  // Arrows move among the listed labels in display order and stop at the ends (R4.3).
+  private movePopupFocus(
+    event: KeyboardEvent,
+    popup: HTMLElement,
+    pick: (current: number, last: number) => number
+  ): void {
+    const parts = focusableParts(popup);
+    if (parts.length === 0) return;
+    const target = event.target;
+    const current = target instanceof Node ? parts.findIndex((part) => part.contains(target)) : -1;
+    const last = parts.length - 1;
+    const next = Math.max(0, Math.min(pick(current, last), last));
+    consumeKey(event);
+    parts[next].focus();
+  }
+
+  // Tab closes the list and continues from the counter's neighbours; at either end the counter
+  // takes focus back so the native Tab leaves the webview from there.
+  private leavePopupByTab(event: KeyboardEvent): void {
+    const counter = this.popupCounter;
+    const origin = captureFocusOrigin(counter);
+    this.closePopup(REASON_TAB);
+    if (moveFocusPast(origin, event.shiftKey ? -1 : 1)) {
+      consumeKey(event);
+      return;
+    }
+    if (counter !== null && counter.isConnected) counter.focus();
+  }
+
+  // Only a menu opened from the list belongs to it; menus opened elsewhere are left alone. The
+  // launching clone keeps the menu-active mark while the menu is open, even after a re-clone.
   private hidePopupContextMenu(): void {
     const popup = this.popup;
-    if (popup !== null && popup.querySelector(`.${CLASS_CONTEXT_MENU_ACTIVE}`) !== null) {
-      hideContextMenu();
-    }
+    if (popup === null) return;
+    const origin = this.menuOrigin;
+    const ownsMenu =
+      popup.querySelector(`.${CLASS_CONTEXT_MENU_ACTIVE}`) !== null ||
+      (origin !== null &&
+        (origin.classList.contains(CLASS_CONTEXT_MENU_ACTIVE) ||
+          origin.querySelector(`.${CLASS_CONTEXT_MENU_ACTIVE}`) !== null));
+    if (ownsMenu) hideContextMenu();
   }
 
   // Capture phase sees the original target even if a menu item's own handler later removes it.

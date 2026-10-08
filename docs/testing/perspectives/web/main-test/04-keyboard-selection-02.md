@@ -10,7 +10,8 @@
 
 > Origin: Feature 060-02 (light-spec-plan)
 > Added: 2026-09-28
-> Status: active
+> Status: superseded
+> Superseded By: S71（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: S32, S33
 > Signature: `handleKeyboardShortcut(e: KeyboardEvent): void`（Arrow 分岐。履歴モードでは `FileHistoryController.navigate(delta: -1 | 1, useExpandedCommit: boolean = false): string | null` を `navigate(delta, true)` で呼ぶ）
 > Target Path: `web/main.ts:1529-1550`（履歴用 Arrow 分岐の `handleFileHistoryArrowKey()`）、`web/main.ts:1455-1504`（`handleKeyboardShortcut()` の IME ガード・履歴分岐の呼出し・通常の Arrow 分岐）
@@ -80,7 +81,8 @@ S32 の「詳細が閉じていれば Arrow を処理しない」と S33 の「�
 
 > Origin: Feature 060-02 (light-spec-plan)
 > Added: 2026-09-28
-> Status: active
+> Status: superseded
+> Superseded By: S72（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: S40
 > Signature: `handleEscape(): void`（詳細の段階の後に `FileHistoryController.exit(restore: boolean): void` を `exit(true)` で呼ぶ）
 > Target Path: `web/main.ts:1591-1625`（`handleEscape()`。履歴の段階は 1621-1624）

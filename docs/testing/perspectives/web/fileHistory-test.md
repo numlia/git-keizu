@@ -344,3 +344,42 @@ S6 は端での一周（TC-032 / TC-033）と一致1件での再スクロール�
 - Boundary: excluded(上表のとおり)
 - Type: excluded(上表のとおり)
 - Normal: TC-103、TC-104
+
+## S12: 履歴バーの標準 button・前後移動で詳細を開かない契約・終了時の復元と状態通知
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: -
+> Signature: `constructor(callbacks: FileHistoryCallbacks)` の bar 生成（`#fileHistoryPrev` / `#fileHistoryNext` / `#fileHistoryExit` を `button type="button"` に、名前に対象 path）/ `navigate(delta: -1 \| 1, useExpandedCommit: boolean = false): string \| null` / `exit(restore: boolean): void` / `#fileHistoryPosition` の `role="status"` `aria-live="polite"`
+> Target Path: `web/fileHistory.ts:96-112, 170-192, 246-300, 329-335, 406-470`（`actionName` / `createButton`、constructor、`onRepositoryChanged` / `handleCommitRowClick` / `navigate` / `exit` / `isActive`、`rememberOrigin`、`prev` / `next` / `applyClasses` / `renderBar` / `renderControls`）
+> Test File: `tests/web/fileHistory.test.ts`
+
+対応プラン R4.2・R4.6・Task 10 の観点。S1〜S11 の探索・snapshot・解除の契約は維持されるため active のまま additive（S1 TC-001 / TC-002 の id・文言・`roundedBtn` class は `button` 要素で維持）。fixture は S1 と同じ `#controls` と `#commitTable`（`[h0, x1, h1, x2, h2]`）の jsdom で、callbacks は `vi.fn()`。
+
+| Case ID | Input / Precondition                                                                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                 | Notes              |
+| ------- | -------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ |
+| TC-645  | constructor 実行後の bar の操作要素                                                                      | Normal - 名前付き標準 button                                               | `#fileHistoryPrev` / `#fileHistoryNext` / `#fileHistoryExit` が `button` 要素で `type="button"`、`request("h0", "src/a.txt")` 受理後の `aria-label` が `t("a11y.actionFor", t("fileHistory.previous"), "src/a.txt")` 等と一致、装飾 svg が `aria-hidden="true"` | K42 / A8.1-6       |
+| TC-646  | 受理後（current `h0`）に `#fileHistoryNext` を `click`、続けて `Enter` keydown → keyup                   | Validation - 前後 button は詳細を開かない                                  | current が `h1` → `h2` と移り `scrollToCommit` 相当の callback が各 1 回、`openCommitDetails` 相当の callback は 0 回。keyup で追加移動 0                                                                                                                       | K42 / A8.2-1       |
+| TC-647  | 行 `h1` の要素に実フォーカスがある状態で履歴を開始し、`#fileHistoryExit` を `click` / `Enter`            | Normal - 終了時の詳細 / scroll 復元と focus                                | `exit(true)` 相当で S8 の snapshot 復元（詳細・`scrollTop`）が維持され、`activeElement` が起点の行 `h1`（接続・有効）                                                                                                                                           | K42 / A8.2-1       |
+| TC-648  | `#fileHistoryNext` に実フォーカスがある状態で `exit(true)`（バーが消える）、別途 `onRepositoryChanged()` | Normal - 消えるバー内の focus を起点 / 行へ                                | `activeElement` が履歴の起点行（無ければ操作対象行）で `body` ではない。repo 変更では focus を奪わず現在位置を維持                                                                                                                                              | A8.3-5             |
+| TC-649  | `request()` 直後（loading）と受理後（position）の `#fileHistoryPosition` / loading 表示                  | Normal - polite な状態通知                                                 | 要素が `role="status"` と `aria-live="polite"` を持ち、`textContent` が `fileHistory.loading` の訳 → `fileHistory.position` の訳（`1 of 3`）へ変わる                                                                                                            | Task 10 実装内容 3 |
+| TC-650  | `navigate(1)` / `navigate(-1)`（button 経由）と `navigate(1, true)`（キー経由）を同じ状態で呼ぶ          | Normal - 既存 navigate の意味を維持                                        | 戻り値と current の変化が S10 TC-058〜TC-074 と同じ（button 化で変わらない）                                                                                                                                                                                    | A8.2-1。R5         |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S12）
+
+| 失敗源                                     | 対応ケースまたは除外理由                                     |
+| ------------------------------------------ | ------------------------------------------------------------ |
+| 操作が button でない・名前なし             | TC-645                                                       |
+| 前後 button で詳細を開く、keyup で二重移動 | TC-646                                                       |
+| 終了時の復元の退行、focus が body へ       | TC-647、TC-648                                               |
+| 状態通知の欠落                             | TC-649                                                       |
+| navigate の意味変更                        | TC-650                                                       |
+| 外部依存・例外                             | excluded(callbacks は spy で外部依存と throw 経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S12
+
+- テスト: `tests/web/fileHistory.test.ts` describe `FileHistoryController bar buttons, exit focus and status (S12)`。fixture は `configureFocusContext` を `beforeEach` で登録し `afterEach` で破棄。TC-645〜TC-650 を同番号の `it` で 1 件ずつ
+- TC-646 / TC-647 の jsdom 代替（Task 10 handoff）: native `button` の Enter は既定 click に委ねるため keydown の `defaultPrevented === false` を確認し、実行は `click()` で代替する（keyup で追加移動 0）。実機の Enter → click 1 回は `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧
+- main 側（履歴バーの前後 button で詳細を開かない、Escape 列、矢印の優先順位）は `web/main-test/13-keyboard-accessibility-01.md` S71 TC-676〜TC-682
+- 実行結果（2026-10-07）: 6 件 pass

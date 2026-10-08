@@ -2,6 +2,13 @@ import * as GG from "../src/types";
 import { getBranchLabels } from "./branchLabels";
 import { getCommitDate } from "./dates";
 import { t } from "./i18n";
+import {
+  captureFocusOrigin,
+  type FocusCloseReason,
+  type FocusOrigin,
+  isKeyboardActionBlocked,
+  restoreFocus
+} from "./keyboardNavigation";
 import { REF_OVERFLOW_IGNORE_ATTRIBUTE } from "./refOverflow";
 import { buildStashSelectorDisplay, svgIcons, UNCOMMITTED_CHANGES_HASH } from "./utils";
 
@@ -16,6 +23,13 @@ const CLASS_ACTIVE = "active";
 const CLASS_TRANSITION = "transition";
 const CLASS_DISABLED = "disabled";
 const ATTR_ERROR = "data-error";
+const ATTR_PRESSED = "aria-pressed";
+const ATTR_HIDDEN = "aria-hidden";
+const ATTR_TRUE = "true";
+const KEY_ENTER = "Enter";
+const TAB_INDEX_STOP = 0;
+const TAB_INDEX_PROGRAMMATIC = -1;
+const REASON_KEYBOARD: FocusCloseReason = "keyboard";
 const ABBREV_COMMIT_LENGTH = 8;
 const ZERO_LENGTH_MATCH_ERROR = "find.zeroLengthRegex";
 
@@ -96,15 +110,17 @@ export class FindWidget {
   private caseSensitive: boolean = false;
   private regex: boolean = false;
   private openCdvEnabled: boolean = false;
+  // Where focus came from when the widget was shown; a keyboard close returns there.
+  private origin: FocusOrigin | null = null;
 
   private readonly widgetElem: HTMLElement;
   private readonly inputElem: HTMLInputElement;
-  private readonly caseSensitiveElem: HTMLElement;
-  private readonly regexElem: HTMLElement;
+  private readonly caseSensitiveElem: HTMLButtonElement;
+  private readonly regexElem: HTMLButtonElement;
   private readonly positionElem: HTMLElement;
-  private readonly prevElem: HTMLElement;
-  private readonly nextElem: HTMLElement;
-  private readonly openCdvElem: HTMLElement;
+  private readonly prevElem: HTMLButtonElement;
+  private readonly nextElem: HTMLButtonElement;
+  private readonly openCdvElem: HTMLButtonElement;
 
   constructor(callbacks: FindWidgetCallbacks) {
     this.callbacks = callbacks;
@@ -112,56 +128,57 @@ export class FindWidget {
     this.widgetElem = document.createElement("div");
     this.widgetElem.className = "findWidget";
     this.widgetElem.innerHTML = [
-      `<input id="findInput" type="text" placeholder="${t("find.placeholder")}" disabled/>`,
-      `<span id="findCaseSensitive" class="findModifier" title="${t("find.matchCase")}">Aa</span>`,
-      `<span id="findRegex" class="findModifier" title="${t("find.useRegex")}">.*</span>`,
+      `<input id="findInput" type="text" placeholder="${t("find.placeholder")}" aria-label="${t("find.placeholder")}" disabled/>`,
+      FindWidget.buttonHtml("findCaseSensitive", t("find.matchCase"), "findModifier", "Aa"),
+      FindWidget.buttonHtml("findRegex", t("find.useRegex"), "findModifier", ".*"),
       '<span id="findPosition"></span>',
-      `<span id="findPrev" title="${t("find.previous")}"></span>`,
-      `<span id="findNext" title="${t("find.next")}"></span>`,
-      `<span id="findOpenCdv" title="${t("find.openCommitDetails")}"></span>`,
-      `<span id="findClose" title="${t("find.close")}"></span>`
+      FindWidget.buttonHtml("findPrev", t("find.previous"), "", svgIcons.arrowUp),
+      FindWidget.buttonHtml("findNext", t("find.next"), "", svgIcons.arrowDown),
+      FindWidget.buttonHtml("findOpenCdv", t("find.openCommitDetails"), "", svgIcons.cdv),
+      FindWidget.buttonHtml("findClose", t("find.close"), "", svgIcons.close)
     ].join("");
     document.body.appendChild(this.widgetElem);
 
     this.inputElem = document.getElementById("findInput") as HTMLInputElement;
-    let keyupTimeout: ReturnType<typeof setTimeout> | null = null;
-    this.inputElem.addEventListener("keyup", (e) => {
-      if (e.key === "Enter" && this.text !== "") {
-        if (e.shiftKey) {
-          this.prev();
-        } else {
-          this.next();
-        }
-        e.stopPropagation();
+    // Enter runs on keydown behind the shared guard, so composition, repeat and keyup never move.
+    this.inputElem.addEventListener("keydown", (e) => {
+      if (e.key !== KEY_ENTER || isKeyboardActionBlocked(e) || this.text === "") return;
+      if (e.shiftKey) {
+        this.prev();
       } else {
-        if (keyupTimeout !== null) clearTimeout(keyupTimeout);
-        keyupTimeout = setTimeout(() => {
-          keyupTimeout = null;
-          if (this.text !== this.inputElem.value) {
-            this.text = this.inputElem.value;
-            this.clearMatches();
-            this.findMatches(this.getCurrentHash(), true);
-            this.openCommitDetailsViewForCurrentMatchIfEnabled();
-          }
-        }, SEARCH_DEBOUNCE_MS);
+        this.next();
       }
+      e.stopPropagation();
+    });
+    let keyupTimeout: ReturnType<typeof setTimeout> | null = null;
+    this.inputElem.addEventListener("keyup", () => {
+      if (keyupTimeout !== null) clearTimeout(keyupTimeout);
+      keyupTimeout = setTimeout(() => {
+        keyupTimeout = null;
+        if (this.text !== this.inputElem.value) {
+          this.text = this.inputElem.value;
+          this.clearMatches();
+          this.findMatches(this.getCurrentHash(), true);
+          this.openCommitDetailsViewForCurrentMatchIfEnabled();
+        }
+      }, SEARCH_DEBOUNCE_MS);
     });
 
-    this.caseSensitiveElem = document.getElementById("findCaseSensitive")!;
-    this.toggleClass(this.caseSensitiveElem, CLASS_ACTIVE, this.caseSensitive);
+    this.caseSensitiveElem = document.getElementById("findCaseSensitive") as HTMLButtonElement;
+    this.setPressed(this.caseSensitiveElem, this.caseSensitive);
     this.caseSensitiveElem.addEventListener("click", () => {
       this.caseSensitive = !this.caseSensitive;
-      this.toggleClass(this.caseSensitiveElem, CLASS_ACTIVE, this.caseSensitive);
+      this.setPressed(this.caseSensitiveElem, this.caseSensitive);
       this.clearMatches();
       this.findMatches(this.getCurrentHash(), true);
       this.openCommitDetailsViewForCurrentMatchIfEnabled();
     });
 
-    this.regexElem = document.getElementById("findRegex")!;
-    this.toggleClass(this.regexElem, CLASS_ACTIVE, this.regex);
+    this.regexElem = document.getElementById("findRegex") as HTMLButtonElement;
+    this.setPressed(this.regexElem, this.regex);
     this.regexElem.addEventListener("click", () => {
       this.regex = !this.regex;
-      this.toggleClass(this.regexElem, CLASS_ACTIVE, this.regex);
+      this.setPressed(this.regexElem, this.regex);
       this.clearMatches();
       this.findMatches(this.getCurrentHash(), true);
       this.openCommitDetailsViewForCurrentMatchIfEnabled();
@@ -169,37 +186,36 @@ export class FindWidget {
 
     this.positionElem = document.getElementById("findPosition")!;
 
-    this.prevElem = document.getElementById("findPrev")!;
-    this.prevElem.classList.add(CLASS_DISABLED);
-    this.prevElem.innerHTML = svgIcons.arrowUp;
+    this.prevElem = document.getElementById("findPrev") as HTMLButtonElement;
     this.prevElem.addEventListener("click", () => this.prev());
 
-    this.nextElem = document.getElementById("findNext")!;
-    this.nextElem.classList.add(CLASS_DISABLED);
-    this.nextElem.innerHTML = svgIcons.arrowDown;
+    this.nextElem = document.getElementById("findNext") as HTMLButtonElement;
     this.nextElem.addEventListener("click", () => this.next());
+    this.syncNavigationState();
 
-    this.openCdvElem = document.getElementById("findOpenCdv")!;
-    this.openCdvElem.innerHTML = svgIcons.cdv;
-    this.toggleClass(this.openCdvElem, CLASS_ACTIVE, this.openCdvEnabled);
+    this.openCdvElem = document.getElementById("findOpenCdv") as HTMLButtonElement;
+    this.setPressed(this.openCdvElem, this.openCdvEnabled);
     this.openCdvElem.addEventListener("click", () => {
       this.openCdvEnabled = !this.openCdvEnabled;
-      this.toggleClass(this.openCdvElem, CLASS_ACTIVE, this.openCdvEnabled);
+      this.setPressed(this.openCdvElem, this.openCdvEnabled);
       this.openCommitDetailsViewForCurrentMatchIfEnabled();
     });
 
+    // The close button disappears with the widget, so its activation returns like Escape does.
     const findCloseElem = document.getElementById("findClose")!;
-    findCloseElem.innerHTML = svgIcons.close;
-    findCloseElem.addEventListener("click", () => this.close());
+    findCloseElem.addEventListener("click", () => this.close(REASON_KEYBOARD));
+    this.setControlsReachable(false);
   }
 
   /* === Public Methods === */
 
   public show(transition: boolean) {
+    this.rememberOrigin();
     if (!this.visible) {
       this.visible = true;
       this.inputElem.value = this.text;
       this.inputElem.disabled = false;
+      this.setControlsReachable(true);
       this.updatePosition(-1, false);
       this.toggleClass(this.widgetElem, CLASS_TRANSITION, transition);
       this.widgetElem.classList.add(CLASS_ACTIVE);
@@ -208,7 +224,8 @@ export class FindWidget {
     this.inputElem.select();
   }
 
-  public close() {
+  // "keyboard" returns focus to where the widget was opened from; a programmatic close leaves it.
+  public close(reason?: FocusCloseReason) {
     if (!this.visible) return;
     this.visible = false;
     this.widgetElem.classList.add(CLASS_TRANSITION);
@@ -221,9 +238,10 @@ export class FindWidget {
     this.inputElem.value = this.text;
     this.inputElem.disabled = true;
     this.widgetElem.removeAttribute(ATTR_ERROR);
-    this.prevElem.classList.add(CLASS_DISABLED);
-    this.nextElem.classList.add(CLASS_DISABLED);
+    this.syncNavigationState();
+    this.setControlsReachable(false);
     this.callbacks.saveState();
+    if (reason === REASON_KEYBOARD) restoreFocus(this.origin, REASON_KEYBOARD);
   }
 
   public refresh() {
@@ -239,6 +257,7 @@ export class FindWidget {
   public setInputEnabled(enabled: boolean) {
     if (!this.visible) return;
     this.inputElem.disabled = !enabled;
+    this.syncNavigationState();
   }
 
   /* === State === */
@@ -260,13 +279,13 @@ export class FindWidget {
 
   public restoreState(state: FindWidgetState) {
     this.openCdvEnabled = state.openCdvEnabled === true;
-    this.toggleClass(this.openCdvElem, CLASS_ACTIVE, this.openCdvEnabled);
+    this.setPressed(this.openCdvElem, this.openCdvEnabled);
     if (!state.visible) return;
     this.text = state.text;
     this.caseSensitive = state.caseSensitive;
     this.regex = state.regex;
-    this.toggleClass(this.caseSensitiveElem, CLASS_ACTIVE, this.caseSensitive);
-    this.toggleClass(this.regexElem, CLASS_ACTIVE, this.regex);
+    this.setPressed(this.caseSensitiveElem, this.caseSensitive);
+    this.setPressed(this.regexElem, this.regex);
     this.show(false);
     if (this.text !== "") this.findMatches(state.currentHash, false);
   }
@@ -396,8 +415,7 @@ export class FindWidget {
       this.widgetElem.removeAttribute(ATTR_ERROR);
     }
 
-    this.toggleClass(this.prevElem, CLASS_DISABLED, this.matches.length === 0);
-    this.toggleClass(this.nextElem, CLASS_DISABLED, this.matches.length === 0);
+    this.syncNavigationState();
 
     let newPos = -1;
     if (this.matches.length > 0) {
@@ -496,11 +514,60 @@ export class FindWidget {
 
   /* === Helpers === */
 
+  private static buttonHtml(id: string, name: string, className: string, content: string): string {
+    const classAttr = className === "" ? "" : ` class="${className}"`;
+    return `<button type="button" id="${id}"${classAttr} title="${name}" aria-label="${name}">${content}</button>`;
+  }
+
   private toggleClass(elem: HTMLElement, className: string, condition: boolean) {
     if (condition) {
       elem.classList.add(className);
     } else {
       elem.classList.remove(className);
+    }
+  }
+
+  private setPressed(elem: HTMLButtonElement, pressed: boolean) {
+    this.toggleClass(elem, CLASS_ACTIVE, pressed);
+    elem.setAttribute(ATTR_PRESSED, String(pressed));
+  }
+
+  // Previous / next need results and an enabled input (results are stale while the list reloads).
+  private syncNavigationState() {
+    const disabled = this.inputElem.disabled || this.matches.length === 0;
+    for (const elem of [this.prevElem, this.nextElem]) {
+      this.toggleClass(elem, CLASS_DISABLED, disabled);
+      elem.disabled = disabled;
+    }
+  }
+
+  // A new session never reuses an earlier origin. Opened from the page body, only the repository
+  // is kept, so a keyboard close falls through to the context chain (active row → list container).
+  private rememberOrigin() {
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      !this.widgetElem.contains(active)
+    ) {
+      this.origin = captureFocusOrigin(active);
+    } else if (!this.visible) {
+      const contextOrigin = captureFocusOrigin(document.body);
+      this.origin = contextOrigin === null ? null : { ...contextOrigin, source: null };
+    }
+  }
+
+  // The hidden widget is only translated off-screen, so its buttons must leave the tab order and
+  // the accessibility tree explicitly.
+  private setControlsReachable(reachable: boolean) {
+    const tabIndex = reachable ? TAB_INDEX_STOP : TAB_INDEX_PROGRAMMATIC;
+    this.widgetElem.querySelectorAll("button").forEach((button) => {
+      button.tabIndex = tabIndex;
+    });
+    if (reachable) {
+      this.widgetElem.removeAttribute(ATTR_HIDDEN);
+    } else {
+      this.widgetElem.setAttribute(ATTR_HIDDEN, ATTR_TRUE);
     }
   }
 }

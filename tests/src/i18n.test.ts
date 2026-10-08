@@ -187,3 +187,84 @@ describe("branch cleanup host toolbar title keys", () => {
     expect(missingInEn).toEqual([]);
   });
 });
+
+describe("commit history and status notice host keys (Feature 061-05)", () => {
+  const COMMIT_HISTORY_KEY = "Commit history";
+  const STATUS_KEY = "Git Keizu status";
+  const TOOLBAR_VALUES: Record<string, string> = {
+    "Repo:": "Repo:",
+    "Branches:": "Branches:",
+    "Authors:": "Authors:",
+    "Show Remote Branches": "Show Remote Branches",
+    "Branch Cleanup": "Branch Cleanup",
+    Search: "Search",
+    "Fetch --prune": "Fetch --prune",
+    Current: "Current",
+    Refresh: "Refresh"
+  };
+
+  function loadHostBundle(fileName: string): Record<string, string> {
+    const jsonPath = resolvePath(process.cwd(), `l10n/${fileName}`);
+    return JSON.parse(readFileSync(jsonPath, "utf-8"));
+  }
+
+  it("English host bundle holds the list name and status region name (en TC-001)", () => {
+    // Case: TC-001 (l10n/bundle.l10n-test.md S1, K45)
+    // Given: the English host bundle on disk
+    const messages = loadHostBundle("bundle.l10n.json");
+    // When: the two keys are read
+    // Then: both exist with exactly the fixed wording
+    expect(messages[COMMIT_HISTORY_KEY]).toBe("Commit history");
+    expect(messages[STATUS_KEY]).toBe("Git Keizu status");
+  });
+
+  it("English host bundle keeps the nine toolbar texts unchanged (en TC-002)", () => {
+    // Case: TC-002 (l10n/bundle.l10n-test.md S1)
+    // Given: the English host bundle on disk
+    const messages = loadHostBundle("bundle.l10n.json");
+    // When: the existing toolbar keys are read
+    // Then: each keeps its value from before the feature
+    for (const [key, value] of Object.entries(TOOLBAR_VALUES)) {
+      expect(messages[key], key).toBe(value);
+    }
+  });
+
+  it("Japanese host bundle translates the list name and status region name (ja TC-001)", () => {
+    // Case: TC-001 (l10n/bundle.l10n.ja-test.md S1, K45)
+    // Given: the Japanese host bundle on disk
+    const messages = loadHostBundle("bundle.l10n.ja.json");
+    // When: the two keys are read
+    // Then: both exist with the fixed translation, which is not the raw key
+    expect(messages[COMMIT_HISTORY_KEY]).toBe("コミット履歴");
+    expect(messages[STATUS_KEY]).toBe("Git Keizuの状態");
+    expect(messages[COMMIT_HISTORY_KEY]).not.toBe(COMMIT_HISTORY_KEY);
+    expect(messages[STATUS_KEY]).not.toBe(STATUS_KEY);
+  });
+
+  it("Japanese host bundle keeps the nine toolbar keys translated (ja TC-002)", () => {
+    // Case: TC-002 (l10n/bundle.l10n.ja-test.md S1)
+    // Given: the Japanese host bundle on disk
+    const messages = loadHostBundle("bundle.l10n.ja.json");
+    // When: the existing toolbar keys are read
+    // Then: each exists with a non-empty value that is not the raw key
+    for (const key of Object.keys(TOOLBAR_VALUES)) {
+      expect(typeof messages[key], key).toBe("string");
+      expect(messages[key].length, key).toBeGreaterThan(0);
+      expect(messages[key], key).not.toBe(key);
+    }
+  });
+
+  it("adds the two host keys to both locales (en TC-003 / ja TC-003)", () => {
+    // Case: TC-003 (l10n/bundle.l10n-test.md S1 and bundle.l10n.ja-test.md S1)
+    // Given: both host bundles on disk
+    const enKeys = Object.keys(loadHostBundle("bundle.l10n.json"));
+    const jaKeys = Object.keys(loadHostBundle("bundle.l10n.ja.json"));
+    // When: the two keys are looked up in each key set
+    // Then: neither locale lacks them and the key sets stay identical
+    for (const key of [COMMIT_HISTORY_KEY, STATUS_KEY]) {
+      expect(enKeys, key).toContain(key);
+      expect(jaKeys, key).toContain(key);
+    }
+    expect([...enKeys].sort()).toEqual([...jaKeys].sort());
+  });
+});

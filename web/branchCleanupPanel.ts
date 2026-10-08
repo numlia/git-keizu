@@ -2,6 +2,13 @@ import * as GG from "../src/types";
 import { getCommitDate } from "./dates";
 import { Dropdown } from "./dropdown";
 import { t } from "./i18n";
+import {
+  beginFocusUpdate,
+  finishFocusUpdate,
+  type FocusKey,
+  type FocusUpdate,
+  markFocusTarget
+} from "./keyboardNavigation";
 import { sendMessage } from "./utils";
 
 /* === Constants === */
@@ -16,7 +23,12 @@ const CLASS_MESSAGE = "branchCleanupMessage";
 const CLASS_ACTION_CELL = "branchCleanupActionCell";
 const CLASS_ACTION_BTN = "roundedBtn branchCleanupActionBtn";
 const CLASS_DELETE_BTN = "roundedBtn branchCleanupActionBtn branchCleanupDeleteBtn";
-const CLASS_DISABLED = "disabled";
+const ACTION_BUTTON_SELECTOR = "button.branchCleanupActionBtn";
+const ATTR_ARIA_LABEL = "aria-label";
+/** Dictionary key that joins an action label and the branch name into one accessible name. */
+const ACTION_FOR_KEY = "a11y.actionFor";
+const ACTION_SHOW: CleanupAction = "show";
+const ACTION_DELETE: CleanupAction = "delete";
 const FIRST_REQUEST_ID = 1;
 const COMPARISON_AUTO_VALUE = "";
 
@@ -45,11 +57,14 @@ type PanelView =
   | { kind: "failed" }
   | { kind: "loaded"; compareBranch: string | null; rows: readonly GG.BranchCleanupRow[] };
 
+type CleanupAction = Extract<FocusKey, { kind: "cleanup" }>["action"];
+
 /* === Panel === */
 
 export class BranchCleanupPanel {
   private readonly actions: BranchCleanupPanelActions;
   private readonly panelElem: HTMLElement;
+  private readonly headerElem: HTMLElement;
   private readonly comparisonDropdownElem: HTMLDivElement;
   private readonly comparisonDropdown: Dropdown;
   private open: boolean = false;
@@ -60,6 +75,7 @@ export class BranchCleanupPanel {
   private nextRequestId: number = FIRST_REQUEST_ID;
   private view: PanelView = { kind: "loading" };
   private branchNames: readonly string[] = [];
+  private parkedUpdate: FocusUpdate | null = null;
 
   constructor(actions: BranchCleanupPanelActions) {
     this.actions = actions;
@@ -67,9 +83,10 @@ export class BranchCleanupPanel {
     this.comparisonDropdownElem = document.createElement("div");
     this.comparisonDropdownElem.id = COMPARISON_DROPDOWN_ID;
     this.comparisonDropdownElem.className = CLASS_DROPDOWN;
-    // Dropdown resolves its element via document.getElementById, so the element must be
-    // connected while the component is constructed; render() moves it into the header.
-    this.panelElem.appendChild(this.comparisonDropdownElem);
+    this.headerElem = this.buildHeader();
+    // Dropdown resolves its element via document.getElementById, so the header must be
+    // connected while the component is constructed; render() attaches it again on open.
+    this.panelElem.appendChild(this.headerElem);
     this.comparisonDropdown = new Dropdown(
       COMPARISON_DROPDOWN_ID,
       false,
@@ -79,7 +96,7 @@ export class BranchCleanupPanel {
         this.requestLoad(this.view.kind === "loaded");
       }
     );
-    this.panelElem.removeChild(this.comparisonDropdownElem);
+    this.panelElem.removeChild(this.headerElem);
   }
 
   public isOpen(): boolean {
@@ -139,6 +156,7 @@ export class BranchCleanupPanel {
     this.requestInFlight = false;
     this.view = { kind: "loading" };
     this.branchNames = [];
+    this.parkedUpdate = null;
     this.comparisonDropdown.close();
     this.panelElem.setAttribute("hidden", "");
     clearChildren(this.panelElem);
@@ -180,9 +198,14 @@ export class BranchCleanupPanel {
 
   /* === Rendering === */
 
+  // The header (with the comparison dropdown) stays connected across renders, so a focused
+  // dropdown option is never detached and its own re-render keeps the focus.
   private render(): void {
-    clearChildren(this.panelElem);
-    this.panelElem.appendChild(this.buildHeader());
+    const update = this.captureFocus();
+    if (this.headerElem.parentNode !== this.panelElem) this.panelElem.prepend(this.headerElem);
+    for (const child of Array.from(this.panelElem.children)) {
+      if (child !== this.headerElem) child.remove();
+    }
     this.syncComparisonOptions();
     const view = this.view;
     if (view.kind === "loading") {
@@ -194,6 +217,50 @@ export class BranchCleanupPanel {
     } else if (this.repo !== null) {
       this.panelElem.appendChild(this.buildTable(this.repo, view.compareBranch, view.rows));
     }
+    this.restoreFocus(update);
+  }
+
+  /* === Focus restoration === */
+
+  // Focus inside the comparison dropdown is the Dropdown's own; the ticket parked by the
+  // disabling render is reused there so the response can bring focus back to the same action.
+  private captureFocus(): FocusUpdate | null {
+    if (this.comparisonDropdownElem.contains(document.activeElement)) return this.parkedUpdate;
+    return beginFocusUpdate(this.panelElem);
+  }
+
+  // Same enabled action → comparison trigger → toolbar cleanup button (the cleanup key's own
+  // fallback). While a re-request disables the delete buttons the ticket is parked, so the
+  // response render returns to that button unless the user moved meanwhile.
+  private restoreFocus(update: FocusUpdate | null): void {
+    this.parkedUpdate = null;
+    if (update === null) return;
+    if (this.hasEnabledAction(update.origin.keys)) {
+      finishFocusUpdate(update);
+      return;
+    }
+    const trigger: FocusKey = { kind: "control", id: COMPARISON_DROPDOWN_ID };
+    const origin = { ...update.origin, keys: [trigger, ...update.origin.keys] };
+    finishFocusUpdate({ ...update, origin });
+    if (this.requestInFlight && update.origin.keys.some((key) => key.kind === "cleanup")) {
+      this.parkedUpdate = update;
+    }
+  }
+
+  private hasEnabledAction(keys: readonly FocusKey[]): boolean {
+    const buttons = Array.from(
+      this.panelElem.querySelectorAll<HTMLButtonElement>(ACTION_BUTTON_SELECTOR)
+    );
+    return keys.some(
+      (key) =>
+        key.kind === "cleanup" &&
+        buttons.some(
+          (button) =>
+            !button.disabled &&
+            button.dataset.branch === key.branch &&
+            button.dataset.action === key.action
+        )
+    );
   }
 
   private buildHeader(): HTMLElement {
@@ -296,7 +363,7 @@ export class BranchCleanupPanel {
 
     const actionCell = document.createElement("td");
     actionCell.className = CLASS_ACTION_CELL;
-    actionCell.appendChild(this.buildShowButton(row.branchName));
+    actionCell.appendChild(this.buildShowButton(repo, row.branchName));
     if (row.remotes !== null && isDeleteEligible(row, compareBranch)) {
       actionCell.appendChild(this.buildDeleteButton(repo, row.branchName, row.remotes));
     }
@@ -304,22 +371,22 @@ export class BranchCleanupPanel {
     return tr;
   }
 
-  private buildShowButton(branchName: string): HTMLElement {
-    const btn = document.createElement("div");
-    btn.className = CLASS_ACTION_BTN;
-    btn.textContent = t("cleanup.action.show");
+  private buildShowButton(repo: string, branchName: string): HTMLButtonElement {
+    const btn = buildActionButton(repo, branchName, ACTION_SHOW, CLASS_ACTION_BTN);
     btn.addEventListener("click", () => this.actions.showBranch(branchName));
     return btn;
   }
 
-  private buildDeleteButton(repo: string, branchName: string, remotes: string[]): HTMLElement {
-    const btn = document.createElement("div");
-    btn.className = CLASS_DELETE_BTN;
-    btn.textContent = t("cleanup.action.delete");
+  private buildDeleteButton(
+    repo: string,
+    branchName: string,
+    remotes: string[]
+  ): HTMLButtonElement {
+    const btn = buildActionButton(repo, branchName, ACTION_DELETE, CLASS_DELETE_BTN);
     if (this.requestInFlight) {
       // While a re-request is in flight the shown rows are stale: keep the button visible in
       // its box so the row height never jumps, but disable it and attach no click listener
-      btn.classList.add(CLASS_DISABLED);
+      btn.disabled = true;
     } else {
       btn.addEventListener("click", () => this.actions.showDeleteDialog(repo, branchName, remotes));
     }
@@ -426,6 +493,24 @@ function buildMessage(text: string): HTMLElement {
   message.className = CLASS_MESSAGE;
   message.textContent = text;
   return message;
+}
+
+function buildActionButton(
+  repo: string,
+  branchName: string,
+  action: CleanupAction,
+  className: string
+): HTMLButtonElement {
+  const label = action === ACTION_SHOW ? t("cleanup.action.show") : t("cleanup.action.delete");
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = className;
+  btn.textContent = label;
+  btn.setAttribute(ATTR_ARIA_LABEL, t(ACTION_FOR_KEY, label, branchName));
+  btn.dataset.branch = branchName;
+  btn.dataset.action = action;
+  markFocusTarget(btn, { kind: "cleanup", repo, branch: branchName, action });
+  return btn;
 }
 
 /* === Runtime validation === */

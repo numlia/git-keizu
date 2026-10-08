@@ -1,6 +1,12 @@
 import type { GitCommitNode } from "../src/types";
 import { t } from "./i18n";
 import {
+  type FocusCloseReason,
+  type FocusOrigin,
+  markFocusTarget,
+  restoreFocus
+} from "./keyboardNavigation";
+import {
   type BranchPathMode,
   type CommitPathMode,
   computePathHighlight,
@@ -28,6 +34,7 @@ const CLASS_ACTIVE = "active";
 const CLASS_ROUNDED_BTN = "roundedBtn";
 const CLASS_BOUNDARY_HASH = "pathHighlightBoundaryHash";
 const BOUNDARY_SEPARATOR = " → ";
+const REASON_KEYBOARD: FocusCloseReason = "keyboard";
 
 /** Menu and select order for a commit target. */
 const COMMIT_MODES: readonly CommitPathMode[] = [
@@ -99,6 +106,15 @@ function setOptionalText(elem: HTMLElement, text: string): void {
   elem.hidden = text === "";
 }
 
+/** The highlighted row, with restoreFocus' context chain (current row target) behind it. */
+function rowOrigin(selection: PathHighlightSelection): FocusOrigin {
+  return {
+    repo: selection.repo,
+    keys: [{ kind: "row", repo: selection.repo, hash: selection.hash }],
+    source: null
+  };
+}
+
 /* === Controller === */
 
 export class PathHighlightController {
@@ -126,6 +142,7 @@ export class PathHighlightController {
     this.modeSelect = document.createElement("select");
     this.modeSelect.id = MODE_SELECT_ID;
     this.modeSelect.addEventListener("change", () => this.onModeChange());
+    markFocusTarget(this.modeSelect, { kind: "control", id: MODE_SELECT_ID });
     const scopeElem = createSpan(SCOPE_ELEMENT_ID);
     scopeElem.textContent = t("pathHighlight.loadedOnly");
     this.statusElem = createSpan(STATUS_ELEMENT_ID);
@@ -135,6 +152,7 @@ export class PathHighlightController {
     clearBtn.className = CLASS_ROUNDED_BTN;
     clearBtn.textContent = t("pathHighlight.clear");
     clearBtn.addEventListener("click", () => this.clear());
+    markFocusTarget(clearBtn, { kind: "control", id: CLEAR_BUTTON_ID });
     this.boundariesElem = document.createElement("details");
     this.boundariesElem.id = BOUNDARIES_ELEMENT_ID;
     const summary = document.createElement("summary");
@@ -173,10 +191,15 @@ export class PathHighlightController {
   }
 
   public clear(): void {
-    if (this.selection === null) return;
+    const selection = this.selection;
+    if (selection === null) return;
+    // Focus on the bar's own controls would drop to body with the bar: it goes to the
+    // highlighted row, else the current row target.
+    const returnFocus = this.barElem.contains(document.activeElement);
     this.selection = null;
     this.renderEmpty();
     this.callbacks.setGraphHighlight(null);
+    if (returnFocus) restoreFocus(rowOrigin(selection), REASON_KEYBOARD);
   }
 
   /* === State transitions === */
@@ -215,11 +238,14 @@ export class PathHighlightController {
     setOptionalText(this.statusElem, result.targetFound ? "" : t("pathHighlight.targetOutside"));
     this.renderBoundaries(result.boundaries);
     this.barElem.classList.add(CLASS_ACTIVE);
+    this.barElem.hidden = false;
     this.callbacks.setGraphHighlight(result.targetFound ? result : null);
   }
 
+  // The hidden attribute keeps an inactive bar's controls out of the tab order.
   private renderEmpty(): void {
     this.barElem.classList.remove(CLASS_ACTIVE);
+    this.barElem.hidden = true;
     this.nameElem.textContent = "";
     setOptionalText(this.kindElem, "");
     this.hashElem.textContent = "";
@@ -250,8 +276,11 @@ export class PathHighlightController {
 
   private renderBoundaries(boundaries: readonly PathBoundary[]): void {
     if (boundaries.length === 0) {
+      // The summary may hold focus; the mode select is the bar's nearest remaining control.
+      const returnFocus = this.boundariesElem.contains(document.activeElement);
       this.boundariesElem.remove();
       this.boundaryList.replaceChildren();
+      if (returnFocus) this.modeSelect.focus();
       return;
     }
     this.boundaryList.replaceChildren(...boundaries.map(createBoundaryItem));

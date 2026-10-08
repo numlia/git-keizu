@@ -77,7 +77,11 @@ function buildHighlightPathSubmenu(
   };
 }
 
-function buildMergeBranchMenuItem(repo: string, refName: string): ContextMenuItem {
+function buildMergeBranchMenuItem(
+  repo: string,
+  refName: string,
+  sourceElem: HTMLElement
+): ContextMenuItem {
   return buildMergeMenuItem(
     repo,
     "ref.mergeBranch",
@@ -86,7 +90,8 @@ function buildMergeBranchMenuItem(repo: string, refName: string): ContextMenuIte
         "Are you sure you want to merge branch {0} into the current branch?",
         `<b><i>${escapeHtml(refName)}</i></b>`
       ),
-    (options) => ({ command: "mergeBranch", repo: repo, branchName: refName, ...options })
+    (options) => ({ command: "mergeBranch", repo: repo, branchName: refName, ...options }),
+    sourceElem
   );
 }
 
@@ -229,7 +234,7 @@ export function buildRefContextMenuItems(
         recentActionId: "ref.checkoutBranch",
         onClick: () => checkoutBranchAction(repo, sourceElem, refName, isRemoteCombined, true)
       },
-      buildMergeBranchMenuItem(repo, refName),
+      buildMergeBranchMenuItem(repo, refName, sourceElem),
       null,
       {
         title: t("context.more"),
@@ -430,7 +435,7 @@ export function buildRefContextMenuItems(
           recentActionId: "ref.checkoutBranch",
           onClick: () => checkoutBranchAction(repo, sourceElem, refName, undefined, true)
         },
-        buildMergeBranchMenuItem(repo, refName),
+        buildMergeBranchMenuItem(repo, refName, sourceElem),
         rebaseBranchItem
       ];
       const moreSubmenuItems: ContextMenuElement[] = [

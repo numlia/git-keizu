@@ -3,6 +3,14 @@ import { t } from "./i18n";
 import { escapeHtml, svgIcons } from "./utils";
 
 const BINARY_FILE_TITLE = ` title="${t("file.binaryTitle")}"`;
+/** Class of the button that opens a file's diff (the primary action of a file row). */
+const FILE_DIFF_BUTTON_CLASS = "gitFileDiff";
+/** Id prefix of a folder's contents list, referenced by the folder button's `aria-controls`. */
+const FOLDER_CONTENTS_ID_PREFIX = "gitFolderContents_";
+/** Dictionary key that joins an action title and its target into one accessible name. */
+const ACTION_FOR_KEY = "a11y.actionFor";
+/** A row whose only reachable control is the wrapper itself becomes a tab stop for its menu. */
+const MENU_STOP_TAB_INDEX = ' tabindex="0"';
 
 export function generateGitFileTree(gitFiles: GitFileChange[]) {
   let contents: GitFolderContents = {},
@@ -45,7 +53,9 @@ export function generateGitFileTree(gitFiles: GitFileChange[]) {
 export type FileHistoryActionPredicate = (gitFile: GitFileChange) => boolean;
 
 /**
- * Build the HTML for a single file item (used by both tree and list views).
+ * Build the HTML for a single file item (used by both tree and list views). The `li` is a
+ * non-operable wrapper: the diff button and the action buttons are siblings, never nested, and
+ * every button is named by the full new path so list and tree rows read the same.
  * @param gitFile - The file change data
  * @param displayName - Already-escaped display name (basename for tree view, full path for list view)
  * @param showFileHistoryAction - Whether the Highlight File History action is rendered for this row
@@ -65,19 +75,33 @@ function buildFileItemHtml(
     gitFile.type !== "A" && gitFile.type !== "D" && diffPossible
       ? `<span class="gitFileAddDel">(<span class="gitFileAdditions" title="${t(gitFile.additions === 1 ? "file.addition.one" : "file.addition.other", gitFile.additions ?? 0)}">+${gitFile.additions}</span>|<span class="gitFileDeletions" title="${t(gitFile.deletions === 1 ? "file.deletion.one" : "file.deletion.other", gitFile.deletions ?? 0)}">-${gitFile.deletions}</span>)</span>`
       : "";
+  const escapedNewPath = escapeHtml(gitFile.newFilePath);
+  const openFileTitle = t("context.openFile");
+  const fileHistoryTitle = t("context.highlightFileHistory");
   const openFileActionHtml =
     gitFile.type !== "D"
-      ? `<span class="gitFileAction openFile" title="${t("context.openFile")}">${svgIcons.goToFile}</span>`
+      ? `<button type="button" class="gitFileAction openFile" title="${openFileTitle}" aria-label="${t(ACTION_FOR_KEY, openFileTitle, escapedNewPath)}">${svgIcons.goToFile}</button>`
       : "";
   const fileHistoryActionHtml = showFileHistoryAction
-    ? `<span class="gitFileAction highlightFileHistory" title="${t("context.highlightFileHistory")}">${svgIcons.history}</span>`
+    ? `<button type="button" class="gitFileAction highlightFileHistory" title="${fileHistoryTitle}" aria-label="${t(ACTION_FOR_KEY, fileHistoryTitle, escapedNewPath)}">${svgIcons.history}</button>`
     : "";
   const actionsHtml = `${openFileActionHtml}${fileHistoryActionHtml}`;
   const fileActionsHtml =
     actionsHtml !== "" ? `<span class="gitFileActions">${actionsHtml}</span>` : "";
+  const diffButtonHtml = `<button type="button" class="${FILE_DIFF_BUTTON_CLASS}"${diffPossible ? "" : " disabled"} aria-label="${escapedNewPath}"><span class="gitFileIcon" aria-hidden="true">${svgIcons.file}</span>${displayName}</button>`;
+  const menuStopHtml = !diffPossible && actionsHtml === "" ? MENU_STOP_TAB_INDEX : "";
   const oldPath = encodeURIComponent(gitFile.oldFilePath);
   const newPath = encodeURIComponent(gitFile.newFilePath);
-  return `<li class="gitFile ${gitFile.type}${diffPossible ? " gitDiffPossible" : ""}" data-oldfilepath="${oldPath}" data-newfilepath="${newPath}" data-type="${gitFile.type}"${binaryTitle}><span class="gitFileIcon">${svgIcons.file}</span>${displayName}${renameHtml}${addDelHtml}${fileActionsHtml}</li>`;
+  return `<li class="gitFile ${gitFile.type}${diffPossible ? " gitDiffPossible" : ""}" data-oldfilepath="${oldPath}" data-newfilepath="${newPath}" data-type="${gitFile.type}"${binaryTitle}${menuStopHtml}>${diffButtonHtml}${renameHtml}${addDelHtml}${fileActionsHtml}</li>`;
+}
+
+/**
+ * A folder is a native button named by its path, with `aria-expanded` and `aria-controls`
+ * pointing at its contents list; a closed list is `hidden` so its children leave the tab order.
+ */
+function buildFolderHtml(folder: GitFolder, contentsId: string): string {
+  const icon = folder.open ? svgIcons.openFolder : svgIcons.closedFolder;
+  return `<button type="button" class="gitFolder" data-folderpath="${encodeURIComponent(folder.folderPath)}" aria-expanded="${folder.open}" aria-controls="${contentsId}" aria-label="${escapeHtml(folder.folderPath)}"><span class="gitFolderIcon" aria-hidden="true">${icon}</span><span class="gitFolderName">${escapeHtml(folder.name)}</span></button>`;
 }
 
 /**
@@ -88,10 +112,10 @@ export function generateGitFileTreeHtml(
   gitFiles: GitFileChange[],
   canHighlightFileHistory: FileHistoryActionPredicate
 ): string {
-  let html =
-      (folder.name !== ""
-        ? `<span class="gitFolder" data-folderpath="${encodeURIComponent(folder.folderPath)}"><span class="gitFolderIcon">${folder.open ? svgIcons.openFolder : svgIcons.closedFolder}</span><span class="gitFolderName">${escapeHtml(folder.name)}</span></span>`
-        : "") + `<ul class="gitFolderContents${!folder.open ? " hidden" : ""}">`,
+  const isRoot = folder.name === "";
+  const contentsId = `${FOLDER_CONTENTS_ID_PREFIX}${encodeURIComponent(folder.folderPath)}`;
+  const contentsAttributes = `${isRoot ? "" : ` id="${contentsId}"`}${!folder.open ? " hidden" : ""}`;
+  let html = `${isRoot ? "" : buildFolderHtml(folder, contentsId)}<ul class="gitFolderContents${!folder.open ? " hidden" : ""}"${contentsAttributes}>`,
     keys = Object.keys(folder.contents),
     i,
     gitFile,

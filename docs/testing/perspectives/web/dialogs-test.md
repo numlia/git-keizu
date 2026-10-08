@@ -9,7 +9,8 @@
 
 > Origin: Feature 003 (ux-fixes-and-enhancements) Task 5.2
 > Added: 2026-02-25
-> Status: active
+> Status: superseded
+> Superseded By: S9
 > Supersedes: -
 
 **シグネチャ**: `showFormDialog(title: string, inputs: DialogInput[], actionName: string, actioned: (values: string[]) => void, sourceElem: HTMLElement | null): void`
@@ -239,3 +240,84 @@ Test file: `tests/web/dialogs.test.ts`, describe `isErrorDialogActive` (`@see` t
 | `isErrorDialogActive` | TC-046  | keeps the error dialog DOM free of any state marker (TC-046)                                                                                                                     | pass (2026-09-29) |
 
 - GREEN (2026-09-29): `pnpm exec vitest run tests/web/dialogs.test.ts` gave `Tests 50 passed (50)`. The query does not exist at the base `1339842`, so these cases have no RED run of their own; the main regression RED is recorded in `web/main-test/08-request-queue-01.md` S67.
+
+## S9: モーダルのフォーカス・Tab 循環・Escape keydown・IME 保護・起点復元
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: S1
+> Signature: `showFormDialog(message, inputs, actionName, actioned, sourceElem, afterCreate?)` / `showConfirmationDialog(...)` / `showErrorDialog(message, reason, sourceElem, explanation?)` / `hideDialog(): void`（公開 signature は維持）/ `#dialog` の `role="dialog"`・`aria-modal`・名前 / 内部 `keydown`（`Enter` / `Escape` / `Tab`）/ `isKeyboardActionBlocked(event)` / `captureFocusOrigin` / `restoreFocus`
+> Target Path: `web/dialogs.ts:53-60, 136-262, 270-490`（`DialogSession` / `lastDialogFocus` / `inertBackground`、入力 HTML と `initialFormInput` / `showFormDialog`、`showErrorDialog`、`captureSession` / `focusOrigin` / `tabStops` / `focusInDialog` / `cycleFocus` / `handleEnter` / `handleDialogKeydown` / `handleDocumentFocusIn` / `excludeBackground` / `restoreBackground` / `closeSession` / `showDialog` / `hideDialog` / `isDialogActive` / `isErrorDialogActive`）
+> Test File: `tests/web/dialogs.test.ts`
+
+対応プラン §3.7.2 R4.6 と Task 6 の観点。S1（フォーカス優先順位）は入力なしのダイアログで「フォーカスなし」（TC-003）としていたが、入力がなければ取消 / 閉じる button へ初期フォーカスする契約へ変わるため置き換える。S1 の text-ref → text の優先（TC-001 / TC-002 / TC-004）は本節へ引き継ぐ。S2（Enter 確定）は有効 / 無効状態の意味が変わらないため active のまま additive（IME と二重発火は本節）。fixture は `#dialog` / `#dialogBacking` と背景の `#refreshBtn`、`sourceElem`（メニューの起点）を持つ jsdom で、`actioned` / `confirmed` は `vi.fn()`。
+
+| Case ID | Input / Precondition                                                                                                                                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                  | Notes                                                                                            |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| TC-047  | `sourceElem` に実フォーカスがある状態で、メニュー実行相当として `showFormDialog`（text-ref 入力 1 件 + text 入力 1 件）を呼ぶ                                                                      | Normal - dialog へフォーカス移譲（text-ref 優先）                          | `activeElement` が text-ref の `input`、`#dialog` が `active`。text-ref が無く text 入力だけなら最初の text `input`（S1 TC-001 / TC-002 / TC-004 の引き継ぎ）                                                                    | K32。select / checkbox だけの入力なら最初の `select` / `checkbox`                                |
+| TC-048  | text-ref 入力に不正値（`..`、空）を入れて `Enter`、続けて正しい値（`feature/x`）を入れて `Enter`（keydown → keyup）                                                                                | Normal / Validation - 入力検証を通した実行                                 | 不正値では `actioned` 0 回で `#dialog` が開いたまま（`inputInvalid` / `noInput` と action button の `disabled` が同期）、正しい値では `actioned` が `["feature/x", ...]` で 1 回、`#dialog` が閉じる。keyup で追加 0 回          | K32 / A8.1-6。S5 の検証ロジックを経由                                                            |
+| TC-049  | `showConfirmationDialog`（入力なし）と `showErrorDialog`（入力なし）を呼ぶ                                                                                                                         | Normal - 入力なしは取消 / 閉じるへ初期フォーカス                           | `activeElement` が取消（`dismiss`）button / 閉じる button で、`button` 要素・`type="button"`・名前（文言）を持つ                                                                                                                 | K33。S1 TC-003「フォーカスなし」の契約変更                                                       |
+| TC-050  | 入力 2 件 + action + dismiss の dialog で `Tab` を 5 回、末尾の dismiss で `Tab`、先頭の入力で Shift + `Tab`                                                                                       | Normal / Boundary - 内部循環                                               | 順に 入力 1 → 入力 2 → action → dismiss → 入力 1（循環）。末尾の `Tab` と先頭の Shift + `Tab` が消費され、`activeElement` が `#dialog` の外（`#refreshBtn`）へ出ない。無効化された action は飛ばす                               | K33 / A8.3-4。VS Code 下限環境向けに `inert` だけに依存しない Tab trap                           |
+| TC-051  | 入力に実フォーカスして `Escape` keydown → keyup。`sourceElem` を起点に開いた場合                                                                                                                   | Normal - Escape keydown で dialog だけ閉じ起点へ                           | keydown で `#dialog` の `active` が外れ `actioned` 0 回、`activeElement` が `sourceElem`（`restoreFocus(origin, "keyboard")`）。keydown が消費され上位の Escape 列へ流れない。keyup で変化なし                                   | K33 / A8.3-4                                                                                     |
+| TC-052  | dialog を開いた状態で `Escape` の `keyup` だけを送る                                                                                                                                               | Validation - keyup では閉じない                                            | `#dialog` が `active` のまま                                                                                                                                                                                                     | R4.6「Escapeの閉鎖はkeydownに統一し、keyupでは閉じない」                                         |
+| TC-053  | text 入力で `compositionstart` → `Enter` keydown（`isComposing: true`）→ `compositionend` → `Enter` keyup。続けて通常の `Enter`                                                                    | Validation - IME 変換中の Enter で実行しない                               | IME 中の Enter と対応 keyup で `actioned` 0 回、`#dialog` 開いたまま。通常の `Enter` で 1 回                                                                                                                                     | K34 / A8.3-2                                                                                     |
+| TC-054  | 有効な入力で `Enter` keydown（`repeat: true`）× 3                                                                                                                                                  | Validation - repeat で多重実行しない                                       | `actioned` 0 回（repeat は実行キーとして阻止）                                                                                                                                                                                   | A8.3-2                                                                                           |
+| TC-055  | `showFormDialog` の DOM 属性。`name` が空の入力を含む                                                                                                                                              | Normal - role / aria-modal / 名前 / label                                  | `#dialog` が `role="dialog"`、`aria-modal="true"`、`aria-labelledby`（または `aria-label`）が質問文を指す。各入力が `label` で関連付けられ（`for` / `id`）、`name` が空の入力は dialog の質問文を `aria-labelledby` で名前にする | R4.6 / A8.1-6                                                                                    |
+| TC-056  | dialog 表示中に背景の `#refreshBtn` と行 `M` の `tabindex` / `inert` 相当を調べ、`#refreshBtn` へ `focusin` を発火。別途 `document` へ Ctrl+F keydown                                              | Validation - 背景の停止点とショートカットを除外                            | 背景の操作が停止点から外れ（`tabindex="-1"` または `inert`）、`focusin` 後の `activeElement` が dialog 内へ戻る。Ctrl+F が `findWidget` を開かない（dialog が消費）                                                              | R4.6「ダイアログ表示中は背後へフォーカス・ショートカットを通さず」。閉鎖時に背景の元の状態を戻す |
+| TC-057  | action button に実フォーカスして `Enter` keydown → keyup（`click` リスナーも登録）                                                                                                                 | Validation - フォーム用 handler と click の二重発火なし                    | `actioned` が合計 1 回                                                                                                                                                                                                           | A8.3-2。ネイティブ click の生成は jsdom 外のため Task 12 の実 Webview 確認へ                     |
+| TC-058  | dialog A（`sourceElem` 起点）を開いたまま dialog B（確認）へ置換し、A の `hideDialog` 相当の閉鎖処理を呼ぶ。別途 B 表示中に非同期 error（`showErrorDialog`）が到着し、その後 error dialog を閉じる | Validation - 古い閉鎖は focus を戻さず、現在の所有者だけ復元               | A の閉鎖処理後も `activeElement` が B 内（`sourceElem` へ戻らない）。error dialog の閉鎖では、error dialog が現在の所有者である場合だけ起点へ復元し、そうでなければ `activeElement` を変えない                                   | K46 / A8.3-3                                                                                     |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S9）
+
+| 失敗源                                              | 対応ケースまたは除外理由                                    |
+| --------------------------------------------------- | ----------------------------------------------------------- |
+| 初期フォーカスの誤り（入力あり / なし）             | TC-047、TC-049                                              |
+| 不正値で実行、正しい値で実行しない                  | TC-048                                                      |
+| Tab が外へ出る、無効 button に止まる                | TC-050                                                      |
+| Escape で起点へ戻らない、keyup で閉じる、上位へ流す | TC-051、TC-052                                              |
+| IME / repeat / 二重発火                             | TC-053、TC-054、TC-057                                      |
+| role / 名前 / label の欠落                          | TC-055                                                      |
+| 背景の停止点・ショートカット                        | TC-056                                                      |
+| 古い閉鎖の復元、非同期 error の所有者判定           | TC-058                                                      |
+| 外部依存・例外                                      | excluded(callback は spy で外部依存と throw 経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S9
+
+- テスト: `tests/web/dialogs.test.ts` describe `modal focus, Tab cycle, Escape keydown, IME guard and origin restore (S9)`。fixture は `#refreshBtn`、行 `M` を持つ `#content`、メニュー起点の button を `beforeEach` で作り `afterEach` で除去する。`configureFocusContext` と `installKeyboardGuards` は登録せず、IME・repeat・keyup はイベント自身の値（`isComposing` / `repeat` / `type`）による判定で検証する（変換状態の追跡は `keyboardNavigation-test.md` S2 TC-013〜TC-024 が担う）。`activeElement()` で復元を判定
+- TC-047 2 `it`（text-ref 優先 / text のみ）/ TC-048 `runs the action only after a valid ref value and never on keyup` / TC-049 `it.each`（confirmation / error の初期フォーカス）＋ `renders the action button as a native type=button with its name` / TC-050 2 `it`（循環 / 無効 button を飛ばす）/ TC-051 2 `it`（Escape keydown / dismiss button）/ TC-052 2 `it`（keyup 単独 / repeat）/ TC-053 `does not run the action for Enter during IME composition` / TC-054 `does not run the action for repeated Enter keydown` / TC-055 2 `it` / TC-056 2 `it`（背景の除外と復元 / 既に `inert` の要素）/ TC-057 2 `it`（Enter 1 回で 1 回実行 + 遅延 click で追加 0 / 無効 button）/ TC-058 2 `it`（置換後の古い閉鎖 / 非同期 error の所有者）
+- 手動 Case（未実施）TC-053（IME）/ TC-056（`inert`、VS Code 1.74 以上）/ TC-057（native button の Enter → click 1 回）: 手順・期待・影響・代替確認は `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧（dialogs の行）。jsdom では TC-057 を keydown の `defaultPrevented === true` と、切り離した button への `click()` 追加実行 0 回で代替した
+- 実行結果（2026-10-07）: 20 件 pass
+
+## S10: 起点なしで開いたダイアログの閉鎖後復元（メニュー閉鎖後の merge ダイアログ）
+
+> Origin: Feature 061-05 (light-spec-plan) review fix
+> Added: 2026-10-07
+> Status: active
+> Supersedes: -
+> Signature: `captureSession(sourceElem: HTMLElement | null): DialogSession`（`sourceElem` なしで `activeElement` が `body` / なしのとき、`captureFocusOrigin(document.body)` から repo 付き・`keys: []`・`source: null` の origin を保持）/ `buildMergeMenuItem(repo, recentActionId, getMessage, buildRequest, sourceElem: HTMLElement)`（`web/mergeDialog.ts`。メニューの `sourceElem` を `showFormDialog` へ渡す）
+> Target Path: `web/dialogs.ts:293-312`（`captureSession`）、`web/dialogs.ts:315-322`（`focusOrigin`）、`web/mergeDialog.ts:13-23, 63-65`、`web/commitMenu.ts:302-312`、`web/refMenu.ts:80-96, 237, 438`
+> Test File: `tests/web/dialogs.test.ts`
+
+R4.7「キーボードによる閉鎖と処理完了は起動元に戻す」/ A8.1-6。メニュー項目の `onClick` は `activateItem` が先にメニューを隠した後に走るため、`sourceElem = null` で `showFormDialog` を呼んでいた merge ダイアログでは `captureSession(null)` が `activeElement === body` を見て `{ origin: null, source: null }` を保持し、Escape / Dismiss / 「Yes, merge」の後の `restoreFocus(null, "keyboard")` が `false` を返してフォーカスが `body` に落ちていた（レビュー指摘 round 2 G2。Task 6 handoff の「context chain へ fallback する」は実装されていなかった）。対策は (a) merge 項目へメニューの `sourceElem` を通す、(b) 起点なし・`body` のときも repo だけ持つ空キーの origin を保持して `restoreFocus` の context fallback（操作対象行 → `#commitTable` → repo button）へ落とす。`web/keyboardNavigation.ts` の公開 API は不変。fixture は `#commitTable` 内の行 `M` を `getActiveRow` とする `configureFocusContext` を `beforeEach` で登録し（`web/dialogs` と同じ module registry から import）、`activeElement` を `body` にしてから開く。
+
+| Case ID | Input / Precondition                                                                                                                                                                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                       | Notes                                       |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| TC-059  | `activeElement` が `body` の状態で `showFormDialog`（checkbox 3 件、`sourceElem = null`）→ 最初の入力で `Escape` keydown。別途 action button（`#dialogAction`）へフォーカスして `Enter`。別途 dismiss button へフォーカスして `Enter` | Normal - 起点なしは context fallback の操作対象行へ                        | いずれも `#dialog` の `active` が外れ、`activeElement` が行 `M`（`getActiveRow`）。`actioned` は action 経路だけ 1 回 | R4.7 / A8.1-6。対策 (b)                     |
+| TC-060  | 同じ条件で `sourceElem` を渡して開き、`Escape` keydown                                                                                                                                                                                | Normal - 起点ありは起点を優先                                              | `activeElement` が `sourceElem`（行 `M` ではない）                                                                    | 対策 (a) の dialog 側。S9 TC-051 と同じ復元 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 review fix round 2（S10）
+
+| 失敗源                                     | 対応ケースまたは除外理由                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| 起点なしで `body` に落ちたまま             | TC-059                                                                                                   |
+| 起点ありなのに context fallback へ奪われる | TC-060                                                                                                   |
+| 古い閉鎖・置換の復元                       | excluded(S9 TC-058 が不変のまま pass することで確認)                                                     |
+| FocusContext 未登録                        | excluded(`captureFocusOrigin` が `null` を返し従来どおり `false`。S9 の既存 Case が context なしで pass) |
+
+### レビュー修正 round 2 テスト対応（Feature 061-05）— S10
+
+- テスト: `tests/web/dialogs.test.ts` describe `origin restore for a dialog opened without a source after its menu closed (S10)`。TC-059 `falls back to the active row when no source is given and nothing is focused` / TC-060 `restores the given source element ahead of the context fallback`
+- RED: 旧実装（a0e8503）で TC-059 が fail（`activeElement` が `body`）→ GREEN。TC-060 は旧実装でも pass（`focusOrigin` が接続中の `source` を直接 focus）。S9 TC-047〜TC-058 は変更なしで pass
+- main 側: `web/main-test/13-keyboard-accessibility-02.md` S81 TC-752 / TC-753（キー起動のコミットメニュー → merge 項目 → 実 `showFormDialog`）
+- 実行結果（2026-10-07）: 2 件 pass

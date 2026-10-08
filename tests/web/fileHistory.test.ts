@@ -14,6 +14,7 @@ import {
   type FileHistoryCallbacks,
   FileHistoryController
 } from "../../web/fileHistory";
+import { configureFocusContext, markFocusTarget } from "../../web/keyboardNavigation";
 import { svgIcons, vscode } from "../../web/utils";
 
 /* ------------------------------------------------------------------ */
@@ -194,6 +195,13 @@ function expectNoCallbackCalled(h: Harness): void {
   }
 }
 
+/** Class list of the single icon element an `svgIcons` entry renders. */
+function iconClass(iconHtml: string): string {
+  const template = document.createElement("template");
+  template.innerHTML = iconHtml;
+  return template.content.firstElementChild!.className;
+}
+
 function postedMessages(): Record<string, unknown>[] {
   return vi.mocked(vscode.postMessage).mock.calls.map((call) => call[0] as Record<string, unknown>);
 }
@@ -319,11 +327,11 @@ describe("FileHistoryController constructor and bar DOM (S1)", () => {
     const next = document.getElementById(NEXT_ID)!;
     const exit = document.getElementById(EXIT_ID)!;
 
-    // When/Then: titles, svg icons, exit text and the roundedBtn class are set
+    // When/Then: titles, icons, exit text and the roundedBtn class are set
     expect(prev.title).toBe("Previous match");
     expect(next.title).toBe("Next match");
-    expect(prev.innerHTML).toBe(svgIcons.arrowUp);
-    expect(next.innerHTML).toBe(svgIcons.arrowDown);
+    expect(prev.firstElementChild!.className).toBe(iconClass(svgIcons.arrowUp));
+    expect(next.firstElementChild!.className).toBe(iconClass(svgIcons.arrowDown));
     expect(exit.textContent).toBe("Exit");
     for (const button of [prev, next, exit]) {
       expect(button.classList.contains("roundedBtn")).toBe(true);
@@ -1965,5 +1973,211 @@ describe("FileHistoryController getters (S9)", () => {
     // When/Then: no historical path and no current hash
     expect(h.controller.getHistoricalPathFor(ANCHOR)).toBeNull();
     expect(h.controller.getCurrentHash()).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S12: standard buttons, no details from the bar, exit focus, status */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/fileHistory-test.md
+describe("FileHistoryController bar buttons, exit focus and status (S12)", () => {
+  const TARGET_HASH = "x1";
+  const ORIGIN_HASH = "h1";
+  let disposeContext: () => void;
+
+  function rowOf(hash: string): HTMLElement {
+    return document.querySelector<HTMLElement>(`tr[data-hash="${hash}"]`)!;
+  }
+
+  function button(id: string): HTMLButtonElement {
+    return document.getElementById(id) as HTMLButtonElement;
+  }
+
+  /** Fixture A with programmatically focusable rows, like main renders them. */
+  function setupFocusable(): Harness {
+    const h = setup(FIXTURE_A_COMMITS);
+    h.callbacks.getExpandedCommit.mockReturnValue(null);
+    for (const row of document.querySelectorAll<HTMLElement>("tr[data-hash]")) {
+      row.tabIndex = -1;
+      markFocusTarget(row, { kind: "row", repo: REPO, hash: row.dataset.hash! });
+    }
+    return h;
+  }
+
+  beforeEach(() => {
+    disposeContext = configureFocusContext({
+      getRepo: () => REPO,
+      getActiveRow: () => rowOf(TARGET_HASH),
+      getTabStops: () => []
+    });
+  });
+
+  afterEach(() => {
+    disposeContext();
+  });
+
+  it("renders prev, next and exit as named standard buttons (TC-645)", () => {
+    // Case: TC-645 (K42 / A8.1-6)
+    // Given: the constructed bar
+    const h = setupFocusable();
+    const prev = button(PREV_ID);
+    const next = button(NEXT_ID);
+    const exit = button(EXIT_ID);
+
+    // Then: all three are type="button" buttons named by the action while no path is known
+    for (const elem of [prev, next, exit]) {
+      expect(elem.tagName).toBe("BUTTON");
+      expect(elem.type).toBe("button");
+    }
+    expect(prev.getAttribute("aria-label")).toBe("Previous match");
+    expect(next.getAttribute("aria-label")).toBe("Next match");
+    expect(exit.getAttribute("aria-label")).toBe("Exit");
+    expect(prev.firstElementChild!.getAttribute("aria-hidden")).toBe("true");
+    expect(next.firstElementChild!.getAttribute("aria-hidden")).toBe("true");
+
+    // When: a history for src/a.txt is accepted
+    activate(h);
+
+    // Then: the names carry the file path
+    expect(prev.getAttribute("aria-label")).toBe(`Previous match: ${FILE_PATH}`);
+    expect(next.getAttribute("aria-label")).toBe(`Next match: ${FILE_PATH}`);
+    expect(exit.getAttribute("aria-label")).toBe(`Exit: ${FILE_PATH}`);
+  });
+
+  it("moves without opening details from the next button, once per activation (TC-646)", () => {
+    // Case: TC-646 (K42 / A8.2-1)
+    // Given: fixture A accepted with current h0 (one hideCommitDetails from the acceptance)
+    const h = setupFocusable();
+    activate(h);
+    const next = button(NEXT_ID);
+    next.focus();
+    const postsBefore = postedMessages().length;
+
+    // When: next is clicked, then activated by Enter (jsdom has no key-to-click synthesis, so
+    // the keydown is dispatched and the click stands in for the native activation), then keyup
+    next.click();
+    const keydown = new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true });
+    next.dispatchEvent(keydown);
+    next.click();
+    next.dispatchEvent(
+      new KeyboardEvent("keyup", { key: "Enter", bubbles: true, cancelable: true })
+    );
+
+    // Then: current went h1 → h2 with one scroll each, no details were opened or requested
+    expect(h.controller.getCurrentHash()).toBe("h2");
+    expect(h.callbacks.scrollToCommit.mock.calls.slice(1)).toEqual([
+      ["h1", true],
+      ["h2", true]
+    ]);
+    expect(keydown.defaultPrevented).toBe(false);
+    expect(h.callbacks.hideCommitDetails).toHaveBeenCalledTimes(1);
+    expect(h.callbacks.restoreExpandedCommit).toHaveBeenCalledTimes(0);
+    expect(postedMessages()).toHaveLength(postsBefore);
+    expect(h.text(POSITION_ID)).toBe("3 of 3");
+  });
+
+  it("restores the snapshot and returns focus to the origin row on exit (TC-647)", () => {
+    // Case: TC-647 (K42 / A8.2-1)
+    // Given: a history started while an element of row h1 had focus, then focus on exit
+    const h = setupFocusable();
+    rowOf(ORIGIN_HASH).focus();
+    activate(h);
+    const exit = button(EXIT_ID);
+    exit.focus();
+    expect(document.activeElement).toBe(exit);
+
+    // When: exit is clicked (the Enter activation path)
+    exit.click();
+
+    // Then: the S8 snapshot restore (scrollTop) still runs and focus is on row h1
+    expect(h.controller.isActive()).toBe(false);
+    expect(h.callbacks.setScrollTop).toHaveBeenCalledTimes(1);
+    expect(h.callbacks.setScrollTop).toHaveBeenCalledWith(SCROLL_TOP);
+    expect(document.activeElement).toBe(rowOf(ORIGIN_HASH));
+    expect(rowOf(ORIGIN_HASH).isConnected).toBe(true);
+  });
+
+  it("moves focus off the disappearing bar on exit but not on a repo change (TC-648)", () => {
+    // Case: TC-648 (A8.3-5)
+    // Given: a history started with no focused origin and focus on the next button
+    const h = setupFocusable();
+    (document.activeElement as HTMLElement | null)?.blur();
+    activate(h);
+    button(NEXT_ID).focus();
+
+    // When: exit(true) hides the bar
+    h.controller.exit(true);
+
+    // Then: focus is on the row target rather than body
+    expect(document.activeElement).toBe(rowOf(TARGET_HASH));
+    expect(document.activeElement).not.toBe(document.body);
+
+    // Given: another active history with focus on the next button
+    const h2 = setupFocusable();
+    activate(h2);
+    const next = button(NEXT_ID);
+    next.focus();
+
+    // When: the repository changes
+    h2.controller.onRepositoryChanged();
+
+    // Then: the bar is gone but focus was not moved
+    expect(h2.controller.isActive()).toBe(false);
+    expect(h2.bar().classList.contains("active")).toBe(false);
+    expect(document.activeElement).toBe(next);
+  });
+
+  it("announces loading and the position through a polite status element (TC-649)", () => {
+    // Case: TC-649 (Task 10 implementation item 3)
+    // Given: fixture A
+    const h = setupFocusable();
+    const position = document.getElementById(POSITION_ID)!;
+
+    // When: a history is requested
+    h.controller.request(ANCHOR, FILE_PATH);
+
+    // Then: the position element is a polite status reading the loading text; prev / next
+    // are disabled while the request is pending and the bar itself is not live
+    expect(position.getAttribute("role")).toBe("status");
+    expect(position.getAttribute("aria-live")).toBe("polite");
+    expect(position.textContent).toBe(LOADING_TEXT);
+    expect(button(PREV_ID).disabled).toBe(true);
+    expect(button(NEXT_ID).disabled).toBe(true);
+    expect(h.bar().hasAttribute("aria-live")).toBe(false);
+
+    // When: the response is accepted
+    h.controller.handleResponse(response());
+
+    // Then: the same element reads the position and the buttons are enabled again
+    expect(position.textContent).toBe("1 of 3");
+    expect(button(PREV_ID).disabled).toBe(false);
+    expect(button(NEXT_ID).disabled).toBe(false);
+  });
+
+  it("keeps the navigate semantics for the button and key paths (TC-650)", () => {
+    // Case: TC-650 (A8.2-1 / R5)
+    // Given: fixture A with current h0 in two identical harnesses
+    const viaButtons = activateFixtureA();
+    const buttonResults = [
+      viaButtons.controller.navigate(DOWN),
+      viaButtons.controller.navigate(UP)
+    ];
+    const buttonCurrent = viaButtons.controller.getCurrentHash();
+    const viaKeys = activateFixtureA();
+
+    // When: the key path moves the same way
+    const keyResults = [
+      viaKeys.controller.navigate(DOWN, true),
+      viaKeys.controller.navigate(UP, true)
+    ];
+
+    // Then: both paths return h1 then h0 and end on h0, as S10 TC-058 / TC-059 define
+    expect(buttonResults).toEqual(["h1", "h0"]);
+    expect(keyResults).toEqual(buttonResults);
+    expect(buttonCurrent).toBe("h0");
+    expect(viaKeys.controller.getCurrentHash()).toBe(buttonCurrent);
+    expect(viaButtons.text(POSITION_ID)).toBe("1 of 3");
+    expect(viaKeys.text(POSITION_ID)).toBe("1 of 3");
   });
 });

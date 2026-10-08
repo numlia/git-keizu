@@ -50,3 +50,37 @@
 - Type: excluded(上表のとおり型分岐なし)
 
 **失敗系/正常系比（煙感知器）**: 正常系2件（TC-001、TC-003）、失敗系1件（TC-002）。差1のためインベントリを再導出したが、本ファイルが所有する静的契約は「1宣言の参照先」と「数値直書き不在」に限られ、値・順序・状態管理の失敗源は上表のとおり owner 責務の除外理由で充足されている。比率合わせのためのケース追加は行わない。
+
+## S2: 検索 button の表示・focus・押下状態の表示契約
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: -
+> Signature: `.findWidget button`（`#findCaseSensitive` / `#findRegex` / `#findOpenCdv` / `#findPrev` / `#findNext` / `#findClose`）の reset・`:focus-visible`・`[aria-pressed="true"]`（既存 `.active`）・`:disabled` の宣言
+> Target Path: `media/findwidget.css:37-61, 64-82, 96-131`（`#findInput:focus-visible` / `.findWidget button` の reset / `:focus-visible` / `:disabled` / `#findInput:disabled`、`.findModifier` と `.active` / `[aria-pressed="true"]`、action button と `#findPrev` / `#findNext` の `:disabled`、`#findOpenCdv[aria-pressed="true"]`）
+> Test File: `tests/web/keyboardStyles.test.ts`（TC-013〜TC-015）、実 VS Code Webview（TC-016。Task 12 時点で未実施）
+
+対応プラン Task 11 実装内容 2 の観点。S1 の z-index 契約は維持。
+
+| Case ID | Input / Precondition                                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                | Notes              |
+| ------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ------------------ |
+| TC-013  | `.findWidget button` 系ルール                                                                          | Normal - native button の表示を既存 span に合わせる                        | `font: inherit`、`background` / `border` / `padding` / `color` の宣言があり、既存 `.findModifier` の寸法と同じ                 | K45                |
+| TC-014  | `.findWidget button:focus-visible` のルール                                                            | Normal - focus 枠                                                          | `outline: 2px solid var(--vscode-focusBorder)`                                                                                 | K45                |
+| TC-015  | `.findModifier.active` と `.findModifier[aria-pressed="true"]`、`.findWidget button:disabled` のルール | Normal - 押下 / 無効の表示                                                 | 押下状態の表示宣言が `active` class と `aria-pressed` のどちらでも同じ値で、`:disabled` に無効表示（`opacity` または色）がある | K40 / K45          |
+| TC-016  | 実 VS Code Webview で検索を開き Tab で各 button を巡回し、Aa / .\* を Space で切り替える               | Normal - 検索 button の枠と押下表示（手動）                                | 各 button に枠が見え、押下状態が枠と別の表現で判別できる。記録: VS Code 版、OS、テーマ                                         | K45 / A8.3-6。手動 |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S2）
+
+| 失敗源                      | 対応ケースまたは除外理由 |
+| --------------------------- | ------------------------ |
+| button 化による見た目の崩れ | TC-013                   |
+| 枠の欠落                    | TC-014、TC-016           |
+| 押下 / 無効表示の欠落       | TC-015                   |
+| 外部依存・例外              | excluded(静的 CSS 契約)  |
+
+### Task 12 テスト対応（Feature 061-05）— S2
+
+- テスト: `tests/web/keyboardStyles.test.ts` describe `media/findwidget.css button look, focus and pressed / disabled states (S2)`。TC-013 `resets the native buttons to the former span look` / TC-014 `outlines every find button and the input with the focus frame` / TC-015 `shows pressed state from aria-pressed as from .active and dims disabled buttons`
+- 手動 Case TC-016: **未実施**（理由・影響・代替確認・残る手順は `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧。検索を開き Tab で各 button を巡回し Aa / .* を Space で切り替えて枠と押下表示を確認）
+- 実行結果（2026-10-07）: 3 件 pass

@@ -10,7 +10,8 @@
 
 > Origin: Feature 059-01 (stash-label-context-menu)
 > Added: 2026-09-25
-> Status: active
+> Status: superseded
+> Superseded By: S78（[13-keyboard-accessibility-02.md](13-keyboard-accessibility-02.md)）
 > Supersedes: -
 > Signature: `showRefBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void`（行内 `.gitRef` のcontextmenuと `RefOverflowOptions.onRefContextMenu` の共通入口。伝播停止直後のstash分岐）
 > Target Path: `web/main.ts:1079-1145`（`showRefBadgeContextMenu` のstash分岐 1079-1084 と `showStashBadgeContextMenu` 1127-1145。`renderTable()` 内の `.gitRef.stash` ラベル生成への `data-stash-hash` 属性付与は 912）

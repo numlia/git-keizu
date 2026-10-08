@@ -13,6 +13,7 @@ import { Dropdown } from "./dropdown";
 import {
   CLASS_FILE_HISTORY_CURRENT,
   CLASS_FILE_HISTORY_NOTE,
+  FILE_HISTORY_BAR_ID,
   FileHistoryController
 } from "./fileHistory";
 import {
@@ -30,12 +31,26 @@ import {
   generateGitFileTree,
   generateGitFileTreeHtml
 } from "./fileTree";
-import { findCommitElemWithId, FindWidget, getCommitElems } from "./findWidget";
+import { FindWidget } from "./findWidget";
 import { Graph } from "./graph";
 import { t } from "./i18n";
+import {
+  beginFocusUpdate,
+  captureFocusOrigin,
+  configureFocusContext,
+  finishFocusUpdate,
+  type FocusKey,
+  type FocusUpdate,
+  installKeyboardGuards,
+  isKeyboardActionBlocked,
+  markFocusTarget,
+  moveFocusPast,
+  reconcileRowTarget,
+  type RowTarget
+} from "./keyboardNavigation";
 import { handleMessage, type RefreshMode } from "./messageHandler";
 import type { BranchPathMode, PathHighlightSelection } from "./pathHighlight";
-import { PathHighlightController } from "./pathHighlightController";
+import { PATH_HIGHLIGHT_BAR_ID, PathHighlightController } from "./pathHighlightController";
 import { buildRefContextMenuItems, checkoutBranchAction, showDeleteBranchDialog } from "./refMenu";
 import { DESCRIPTION_MIN_WIDTH, RefOverflowController } from "./refOverflow";
 import { buildStashContextMenuItems } from "./stashMenu";
@@ -86,9 +101,17 @@ const GRAPH_AUTO_LAYOUT_MAX_RATIO = 0.4;
 const GRAPH_COL_MIN_WIDTH = 64;
 const DESCRIPTION_COLUMN_INDEX = 1;
 const TABLE_COLUMN_COUNT = 5;
-const COMBINED_REMOTE_SELECTOR = ".gitRefHeadRemote";
+const REF_BADGE_CLASS = "gitRef";
+const REF_BADGE_SELECTOR = `.${REF_BADGE_CLASS}`;
+// Each operable part of a badge is a native button inside the measured `.gitRef` wrapper.
+const REF_BUTTON_CLASS = "gitRefButton";
+const REF_BUTTON_SELECTOR = `.${REF_BUTTON_CLASS}`;
+const REF_BUTTON_OPEN_TAG = `<button type="button" class="${REF_BUTTON_CLASS}">`;
+const COMBINED_REMOTE_CLASS = "gitRefHeadRemote";
+const COMBINED_REMOTE_SELECTOR = `.${COMBINED_REMOTE_CLASS}`;
 const REF_CLASS_HEAD = "head";
 const REF_CLASS_REMOTE = "remote";
+const REF_CLASS_TAG = "tag";
 type BranchRefType = Extract<PathHighlightSelection, { kind: "branch" }>["refType"];
 const COMMIT_ORDERING_MENU_ITEMS: { label: string; value: GG.RepoCommitOrdering }[] = [
   { label: t("commitOrdering.default"), value: "default" },
@@ -101,6 +124,29 @@ const FILE_VIEW_TREE = "tree" as const;
 type FileViewType = typeof FILE_VIEW_LIST | typeof FILE_VIEW_TREE;
 const DEFAULT_FILE_VIEW_TYPE: FileViewType = FILE_VIEW_TREE;
 
+function buildDetailsCloseHtml(): string {
+  return `<button type="button" id="${COMMIT_DETAILS_CLOSE_ID}" ${ATTRIBUTE_ARIA_LABEL}="${escapeHtml(t("a11y.closeDetails"))}">${svgIcons.close}</button>`;
+}
+
+// A row is named by its short hash, subject, author and date; the working tree and stashes state
+// their kind (R4.8). The subject stays plain text: the caller escapes the result once as an
+// attribute value.
+function buildRowName(commit: GG.GitCommitNode, dateValue: string): string {
+  if (commit.hash === UNCOMMITTED_CHANGES_HASH) {
+    return [t(ROW_KIND_WORKING_TREE_KEY), commit.message, dateValue].join(ROW_NAME_SEPARATOR);
+  }
+  const kind = commit.stash !== null ? [t(ROW_KIND_STASH_KEY)] : [];
+  return [abbrevCommit(commit.hash), commit.message, commit.author, dateValue, ...kind].join(
+    ROW_NAME_SEPARATOR
+  );
+}
+
+// The visually hidden description a row's aria-describedby points at; its text lists the row's
+// simultaneous states and is refreshed in place without a re-render.
+function buildRowStateHtml(index: number): string {
+  return `<span id="${ROW_STATE_ID_PREFIX}${index}" class="${ROW_STATE_CLASS} ${CLASS_VISUALLY_HIDDEN}"></span>`;
+}
+
 function getFileViewToggle(mode: FileViewType): { icon: string; title: string } {
   return mode === FILE_VIEW_LIST
     ? { icon: svgIcons.treeView, title: t("toolbar.switchToTreeView") }
@@ -112,6 +158,15 @@ function resolveRefType(badge: HTMLElement, isRemoteCombined: boolean): BranchRe
   if (isRemoteCombined || badge.classList.contains(REF_CLASS_REMOTE)) return REF_CLASS_REMOTE;
   if (badge.classList.contains(REF_CLASS_HEAD)) return REF_CLASS_HEAD;
   return null;
+}
+
+// The part under the pointer or holding focus (also through a search mark) is the menu source;
+// a badge-level hit falls back to its first part, so the wrapper itself never takes focus.
+function resolveRefSource(event: ContextMenuTrigger, badge: HTMLElement): HTMLElement {
+  const part =
+    event.target instanceof Element ? event.target.closest<HTMLElement>(REF_BUTTON_SELECTOR) : null;
+  if (part !== null && badge.contains(part)) return part;
+  return badge.querySelector<HTMLElement>(REF_BUTTON_SELECTOR) ?? badge;
 }
 
 const EMPTY_WORKTREE_COLLECTION: GG.WorktreeCollection = { branches: {}, detached: [] };
@@ -127,11 +182,151 @@ type PendingCommitLoad = {
 
 const EDITABLE_TAG_NAMES = ["INPUT", "TEXTAREA", "SELECT"];
 
+const CONTENT_EDITABLE_ATTRIBUTE = "contenteditable";
+const CONTENT_EDITABLE_SELECTOR = `[${CONTENT_EDITABLE_ATTRIBUTE}]`;
+
 function isEditableEventTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
-  if (EDITABLE_TAG_NAMES.includes(target.tagName)) return true;
-  const contentEditable = target.getAttribute("contenteditable");
-  return target.isContentEditable || (contentEditable !== null && contentEditable !== "false");
+  if (EDITABLE_TAG_NAMES.includes(target.tagName) || target.isContentEditable) return true;
+  // jsdom and detached hosts do not propagate isContentEditable to descendants.
+  const host = target.closest(CONTENT_EDITABLE_SELECTOR);
+  return host !== null && host.getAttribute(CONTENT_EDITABLE_ATTRIBUTE) !== "false";
+}
+
+const KEY_CONTEXT_MENU = "ContextMenu";
+const KEY_F10 = "F10";
+const KEY_ARROW_UP = "ArrowUp";
+const KEY_ARROW_DOWN = "ArrowDown";
+const KEY_ENTER = "Enter";
+const KEY_SPACE = " ";
+const KEY_ESCAPE = "Escape";
+const KEY_TAB = "Tab";
+const TAB_INDEX_STOP = 0;
+const TAB_INDEX_PROGRAMMATIC = -1;
+const COMMIT_DETAILS_ID = "commitDetails";
+const COMMIT_DETAILS_CLOSE_ID = "commitDetailsClose";
+const COMMIT_DETAILS_FILES_ID = "commitDetailsFiles";
+const FILE_VIEW_TOGGLE_ID = "fileViewToggle";
+const FILE_ROW_SELECTOR = ".gitFile";
+const BUTTON_SELECTOR = "button";
+const FILE_DIFF_BUTTON_CLASS = "gitFileDiff";
+const FILE_OPEN_BUTTON_CLASS = "openFile";
+const FILE_HISTORY_BUTTON_CLASS = "highlightFileHistory";
+const FOLDER_BUTTON_CLASS = "gitFolder";
+const FOLDER_CONTENTS_SELECTOR = ":scope > .gitFolderContents";
+const FOLDER_ICON_SELECTOR = ".gitFolderIcon";
+const FOLDER_CLOSED_CLASS = "closed";
+const FOLDER_CONTENTS_HIDDEN_CLASS = "hidden";
+const PARENT_HASH_CLASS = "parentHash";
+// Parent links have no element id; their control key is derived from the hash they open.
+const PARENT_HASH_KEY_PREFIX = "parentHash:";
+const ATTRIBUTE_ARIA_EXPANDED = "aria-expanded";
+const ATTRIBUTE_ARIA_LABEL = "aria-label";
+type FileActionKind = Extract<FocusKey, { kind: "file" }>["action"];
+const FILE_ACTION_BUTTONS: readonly (readonly [string, FileActionKind])[] = [
+  [FILE_DIFF_BUTTON_CLASS, "diff"],
+  [FILE_OPEN_BUTTON_CLASS, "open"],
+  [FILE_HISTORY_BUTTON_CLASS, "history"]
+];
+const LOAD_MORE_BUTTON_ID = "loadMoreCommitsBtn";
+const TABLE_HEADERS_ID = "tableColHeaders";
+const COMMIT_ORDERING_BUTTON_ID = "commitOrderingBtn";
+const COMMIT_ORDERING_BUTTON_CLASS = "tableColHeaderMenuBtn";
+const COMMIT_ORDERING_BUTTON_GLYPH = "\u25BE";
+const STATUS_NOTICE_ID = "statusNotice";
+const STATUS_KEY_COMMITS_LOADED = "a11y.commitsLoaded";
+const STATUS_KEY_NO_COMMITS = "a11y.noCommits";
+const COMMIT_HISTORY_NAME_KEY = "a11y.commitHistory";
+const COMMIT_ORDERING_NAME_KEY = "a11y.commitOrdering";
+const ROW_KIND_WORKING_TREE_KEY = "a11y.workingTree";
+const ROW_KIND_STASH_KEY = "a11y.stash";
+const ROW_NAME_SEPARATOR = ", ";
+const ATTRIBUTE_ARIA_DESCRIBEDBY = "aria-describedby";
+const CLASS_VISUALLY_HIDDEN = "visuallyHidden";
+// The row that holds the navigation target carries this class for its row-head marker (R4.8).
+const ROW_TARGET_CLASS = "keyboardTarget";
+const ROW_STATE_CLASS = "commitRowState";
+const ROW_STATE_SELECTOR = `.${ROW_STATE_CLASS}`;
+// Row indices are unique per render, so the description ids are unique among coexisting rows.
+const ROW_STATE_ID_PREFIX = "commitRowState";
+const CLASS_DETAILS_OPEN = "commitDetailsOpen";
+const CLASS_COMPARE_TARGET = "compareTarget";
+// Order of the state description: target, details, compare base, compare target, HEAD (§3.6).
+const ROW_STATE_KEYS = {
+  target: "a11y.operationTarget",
+  detailsOpen: "a11y.detailsOpen",
+  compareBase: "a11y.compareBase",
+  compareTarget: "a11y.compareTarget",
+  head: "a11y.head"
+} as const;
+const BRANCH_CLEANUP_PANEL_ID = "branchCleanupPanel";
+const FIND_WIDGET_ACTIVE_SELECTOR = ".findWidget.active";
+const CLASS_ACTIVE = "active";
+const ROW_SELECTOR = "tr[data-hash]";
+const ROW_COUNTER_SELECTOR = ".refOverflowCounter";
+const ROW_LABEL_SELECTOR = `${REF_BADGE_SELECTOR} ${REF_BUTTON_SELECTOR}, ${ROW_COUNTER_SELECTOR}`;
+// Labels folded away by the layout keep tabindex -1 until the layout shows them again.
+const ROW_LABEL_STOP_SELECTOR = `${REF_BADGE_SELECTOR}:not(.refOverflowHidden) ${REF_BUTTON_SELECTOR}, ${ROW_COUNTER_SELECTOR}`;
+const TAB_STOP_SELECTOR = "button, input, select, textarea, summary, a[href], [tabindex]";
+const TAB_STOP_EXCLUDED_SELECTOR =
+  '[hidden], [disabled], [aria-hidden="true"], .refOverflowHidden, .refOverflowMeasure';
+const DISPLAY_NONE = "none";
+const VISIBILITY_HIDDEN = "hidden";
+// Toolbar order of plan R4.3: repo, branch, author, remote, cleanup, find, fetch, current, refresh.
+const TOOLBAR_STOP_SELECTORS: readonly string[] = [
+  "#repoSelect > .dropdownCurrentValue",
+  "#branchSelect > .dropdownCurrentValue",
+  "#authorSelect > .dropdownCurrentValue",
+  "#showRemoteBranchesCheckbox",
+  "#branchCleanupBtn",
+  "#searchBtn",
+  "#fetchBtn",
+  "#currentBtn",
+  "#refreshBtn"
+];
+
+function consumeKey(e: KeyboardEvent): void {
+  e.preventDefault();
+  e.stopPropagation();
+}
+
+function isDisplayed(element: HTMLElement): boolean {
+  if (getComputedStyle(element).visibility === VISIBILITY_HIDDEN) return false;
+  for (let node: HTMLElement | null = element; node !== null; node = node.parentElement) {
+    if (getComputedStyle(node).display === DISPLAY_NONE) return false;
+  }
+  return true;
+}
+
+// A normal tab stop: connected, tabbable, enabled and not inside a hidden or measuring subtree.
+function isTabStop(element: HTMLElement): boolean {
+  return (
+    element.isConnected &&
+    element.tabIndex >= TAB_INDEX_STOP &&
+    element.closest(TAB_STOP_EXCLUDED_SELECTOR) === null &&
+    isDisplayed(element)
+  );
+}
+
+function collectTabStops(container: Element | null): HTMLElement[] {
+  if (container === null) return [];
+  return Array.from(container.querySelectorAll<HTMLElement>(TAB_STOP_SELECTOR)).filter(isTabStop);
+}
+
+// The highlight bars and the find widget are shown by their "active" class, not by `hidden`.
+function activeContainer(element: Element | null): Element | null {
+  return element !== null && element.classList.contains(CLASS_ACTIVE) ? element : null;
+}
+
+// ContextMenu / Shift+F10 open the target's own menu; inputs keep the browser's edit menu and
+// repeat / keyup / IME presses never launch. A consumed launch stops at the innermost target.
+function consumeContextMenuLaunch(e: Event): e is KeyboardEvent {
+  if (!(e instanceof KeyboardEvent) || e.defaultPrevented) return false;
+  if (e.key !== KEY_CONTEXT_MENU && !(e.key === KEY_F10 && e.shiftKey)) return false;
+  if (isEditableEventTarget(e.target) || isKeyboardActionBlocked(e)) return false;
+  e.preventDefault();
+  e.stopPropagation();
+  return true;
 }
 
 function getHorizontalSum(style: CSSStyleDeclaration, left: string, right: string): number {
@@ -210,6 +405,10 @@ class GitKeizuView {
   private stashNavigationIndex: number = -1;
   private stashNavigationTimer: ReturnType<typeof setTimeout> | null = null;
   private isLoadingMoreCommits: boolean = false;
+  // The row the next key acts on: separate from the details, compare, HEAD and history states.
+  private rowTarget: RowTarget | null = null;
+  private readonly keydownListener = (e: KeyboardEvent) => this.handleKeyboardShortcut(e);
+  private readonly disposeFocusContext: () => void;
 
   constructor(
     repos: GG.GitRepoSet,
@@ -223,9 +422,18 @@ class GitKeizuView {
     this.maxCommits = config.initialLoadCommits;
     this.graph = new Graph("commitGraph", this.config);
     this.tableElem = document.getElementById("commitTable")!;
+    this.tableElem.setAttribute(ATTRIBUTE_ARIA_LABEL, t(COMMIT_HISTORY_NAME_KEY));
     this.footerElem = document.getElementById("footer")!;
     this.scrollContainerElem = document.getElementById("scrollContainer")!;
+    this.disposeFocusContext = configureFocusContext({
+      getRepo: () => this.currentRepo ?? null,
+      getActiveRow: () => this.getRowTargetElem(),
+      getTabStops: () => this.getTabStops()
+    });
+    this.tableElem.tabIndex = TAB_INDEX_PROGRAMMATIC;
+    this.tableElem.addEventListener("focusin", (e) => this.syncRowTargetFromFocus(e.target));
     this.repoDropdown = new Dropdown("repoSelect", true, t("toolbar.repos"), (value) => {
+      this.leaveRepository();
       this.refOverflow.detachTable();
       this.fileHistory.onRepositoryChanged();
       this.pathHighlight.onRepositoryChanged();
@@ -301,9 +509,24 @@ class GitKeizuView {
     searchBtnElem.addEventListener("click", () => {
       this.openFindWidget();
     });
+    // Fixed toolbar controls restore by id after the UI they launched closes from the keyboard.
+    for (const control of [
+      branchCleanupBtnElem,
+      searchBtnElem,
+      fetchBtnElem,
+      currentBtnElem,
+      refreshBtnElem
+    ]) {
+      if (control !== null) markFocusTarget(control, { kind: "control", id: control.id });
+    }
     this.refOverflow = new RefOverflowController({
       onMinimumWidth: (minimum) => this.applyDescriptionMinimumWidth(minimum),
-      onRefContextMenu: (event, badge) => this.showRefBadgeContextMenu(event, badge)
+      onRefContextMenu: (event, badge, focusOptions) =>
+        this.showRefBadgeContextMenu(event, badge, focusOptions),
+      onRefCloned: (original, clone) => {
+        const key = this.resolveRefKey(original);
+        if (key !== null) markFocusTarget(clone, key);
+      }
     });
     this.findWidget = new FindWidget({
       getCommits: () => this.commits,
@@ -345,7 +568,7 @@ class GitKeizuView {
         this.renderGraph();
       }
     });
-    document.addEventListener("keydown", (e) => this.handleKeyboardShortcut(e));
+    document.addEventListener("keydown", this.keydownListener);
     this.observeWindowSizeChanges();
     this.observeWebviewStyleChanges();
     this.observeWebviewScroll();
@@ -413,6 +636,7 @@ class GitKeizuView {
     let repoPaths = Object.keys(repos),
       changedRepo = false;
     if (repos[this.currentRepo] === undefined) {
+      this.leaveRepository();
       this.refOverflow.detachTable();
       this.fileHistory.onRepositoryChanged();
       this.pathHighlight.onRepositoryChanged();
@@ -449,7 +673,10 @@ class GitKeizuView {
 
     this.refOverflow.detachTable();
     this.fileHistory.onRepositoryChanged();
-    if (repo !== this.currentRepo) this.pathHighlight.onRepositoryChanged();
+    if (repo !== this.currentRepo) {
+      this.pathHighlight.onRepositoryChanged();
+      this.leaveRepository();
+    }
     this.currentRepo = repo;
     this.branchCleanupPanel.selectRepository(repo);
     const repoPaths = Object.keys(this.gitRepos);
@@ -600,6 +827,12 @@ class GitKeizuView {
       }
     }
 
+    this.rowTarget = reconcileRowTarget(
+      this.rowTarget,
+      this.currentRepo,
+      this.commits.map((commit) => commit.hash),
+      this.commitHead
+    );
     this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup);
 
     const expandedCommitVisible =
@@ -613,6 +846,11 @@ class GitKeizuView {
     }
     this.pathHighlight.onCommitsChanged();
     this.render();
+    this.announceStatus(
+      this.commits.length === 0
+        ? t(STATUS_KEY_NO_COMMITS)
+        : t(STATUS_KEY_COMMITS_LOADED, this.commits.length)
+    );
 
     const authorList =
       authors !== undefined ? authors : [...new Set(this.commits.map((c) => c.author))].sort();
@@ -874,10 +1112,12 @@ class GitKeizuView {
     this.graph.render(this.expandedCommit);
   }
   private renderTable() {
+    const focusUpdate = this.beginListFocusUpdate();
     // Close first: the ref listeners below are bound by class name across the whole document.
-    this.refOverflow.closePopup();
+    // The ticket above already captured focus inside the list, so the list restores nothing.
+    this.refOverflow.closePopup("replace");
     const savedScrollTop = this.scrollContainerElem.scrollTop;
-    let html = `<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader">${t("table.graph")}</th><th class="tableColHeader">${t("table.description")}</th><th class="tableColHeader">${t("table.date")}</th><th class="tableColHeader">${t("table.author")}</th><th class="tableColHeader">${t("table.commit")}</th></tr>`,
+    let html = `<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader">${t("table.graph")}</th><th class="tableColHeader">${t("table.description")}${this.buildCommitOrderingButtonHtml()}</th><th class="tableColHeader">${t("table.date")}</th><th class="tableColHeader">${t("table.author")}</th><th class="tableColHeader">${t("table.commit")}</th></tr>`,
       i,
       currentHash =
         this.commits.length > 0 && this.commits[0].hash === UNCOMMITTED_CHANGES_HASH
@@ -905,21 +1145,24 @@ class GitKeizuView {
         const wtAttr = isLinkedWorktree ? ` data-worktree-path="${escapeHtml(wtEntry.path)}"` : "";
         const wtTitle = isLinkedWorktree ? ` title="Worktree: ${escapeHtml(wtEntry.path)}"` : "";
         const branchIcon = isLinkedWorktree ? svgIcons.worktree : svgIcons.branch;
-        refHtml = `<span class="gitRef head${refActive ? " active" : ""}${wtClass}" data-name="${refName}"${remotesAttr}${wtAttr}${wtTitle}>${branchIcon}<span class="gitRefName">${refName}</span>`;
+        refHtml = `<span class="gitRef head${refActive ? " active" : ""}${wtClass}" data-name="${refName}"${remotesAttr}${wtAttr}${wtTitle}>${REF_BUTTON_OPEN_TAG}${branchIcon}<span class="gitRefName">${refName}</span></button>`;
         for (let k = 0; k < branchLabels.heads[j].remotes.length; k++) {
           let remoteName = escapeHtml(branchLabels.heads[j].remotes[k]);
-          refHtml += `<span class="gitRefHeadRemote" data-remote="${remoteName}" data-name="${escapeHtml(`${branchLabels.heads[j].remotes[k]}/${branchLabels.heads[j].name}`)}">${remoteName}</span>`;
+          const combinedName = escapeHtml(
+            `${branchLabels.heads[j].remotes[k]}/${branchLabels.heads[j].name}`
+          );
+          refHtml += `<button type="button" class="${REF_BUTTON_CLASS} ${COMBINED_REMOTE_CLASS}" data-remote="${remoteName}" data-name="${combinedName}" ${ATTRIBUTE_ARIA_LABEL}="${combinedName}">${remoteName}</button>`;
         }
         refHtml += "</span>";
         refs = refActive ? refHtml + refs : refs + refHtml;
       }
       for (j = 0; j < branchLabels.remotes.length; j++) {
         refName = escapeHtml(branchLabels.remotes[j].name);
-        refs += `<span class="gitRef remote" data-name="${refName}">${svgIcons.branch}${refName}</span>`;
+        refs += `<span class="gitRef remote" data-name="${refName}">${REF_BUTTON_OPEN_TAG}${svgIcons.branch}${refName}</button></span>`;
       }
       for (j = 0; j < branchLabels.tags.length; j++) {
         refName = escapeHtml(branchLabels.tags[j].name);
-        refs += `<span class="gitRef tag" data-name="${refName}">${svgIcons.tag}${refName}</span>`;
+        refs += `<span class="gitRef tag" data-name="${refName}">${REF_BUTTON_OPEN_TAG}${svgIcons.tag}${refName}</button></span>`;
       }
       const commitHash: string = this.commits[i].hash;
       const detachedWorktrees = this.worktrees.detached
@@ -928,20 +1171,20 @@ class GitKeizuView {
       for (const detachedWorktree of detachedWorktrees) {
         const worktreePath = escapeHtml(detachedWorktree.path);
         const worktreeName = escapeHtml(getWorktreeLabelName(detachedWorktree.path));
-        refs += `<span class="gitRef worktree ${DETACHED_WORKTREE_CLASS}" data-worktree-path="${worktreePath}" title="Worktree: ${worktreePath}">${svgIcons.worktree}${worktreeName}</span>`;
+        refs += `<span class="gitRef worktree ${DETACHED_WORKTREE_CLASS}" data-worktree-path="${worktreePath}" title="Worktree: ${worktreePath}">${REF_BUTTON_OPEN_TAG}${svgIcons.worktree}${worktreeName}</button></span>`;
       }
       if (this.commits[i].stash !== null) {
         let selectorDisplay = escapeHtml(
           buildStashSelectorDisplay(this.commits[i].stash!.selector)
         );
-        refs = `<span class="gitRef stash" ${STASH_HASH_ATTRIBUTE}="${escapeHtml(commitHash)}">${svgIcons.stash}${selectorDisplay}</span>${refs}`;
+        refs = `<span class="gitRef stash" ${STASH_HASH_ATTRIBUTE}="${escapeHtml(commitHash)}">${REF_BUTTON_OPEN_TAG}${svgIcons.stash}${selectorDisplay}</button></span>${refs}`;
       }
       let rowClass = buildCommitRowAttributes(
         this.commits[i].hash,
         this.commits[i].stash,
         muted[i]
       );
-      html += `<tr ${rowClass} data-id="${i}" data-color="${this.graph.getVertexColour(i)}"><td></td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}<span class="commitMessage">${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</span></td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${
+      html += `<tr ${rowClass} data-id="${i}" data-color="${this.graph.getVertexColour(i)}" ${ATTRIBUTE_ARIA_LABEL}="${escapeHtml(buildRowName(this.commits[i], date.value))}" ${ATTRIBUTE_ARIA_DESCRIBEDBY}="${ROW_STATE_ID_PREFIX}${i}"><td>${buildRowStateHtml(i)}</td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}<span class="commitMessage">${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</span></td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${
         this.config.fetchAvatars
           ? `<span class="avatar" data-email="${escapeHtml(this.commits[i].email)}">${
               typeof this.avatars[this.commits[i].email] === "string"
@@ -953,15 +1196,19 @@ class GitKeizuView {
     }
     this.tableElem.innerHTML = `<table>${html}</table>`;
     this.footerElem.innerHTML = this.moreCommitsAvailable
-      ? `<div id="loadMoreCommitsBtn" class="roundedBtn">${t("table.loadMoreCommits")}</div>`
+      ? `<button type="button" id="${LOAD_MORE_BUTTON_ID}" class="roundedBtn">${t("table.loadMoreCommits")}</button>`
       : "";
+    this.applyRowTargets();
     this.makeTableResizable();
     this.setupColumnHeaderContextMenu();
 
     if (this.moreCommitsAvailable) {
-      document.getElementById("loadMoreCommitsBtn")!.addEventListener("click", () => {
+      const loadMoreElem = document.getElementById(LOAD_MORE_BUTTON_ID)!;
+      markFocusTarget(loadMoreElem, { kind: "control", id: LOAD_MORE_BUTTON_ID });
+      loadMoreElem.addEventListener("click", () => {
+        const loadMoreFocusUpdate = beginFocusUpdate(this.footerElem);
         (<HTMLElement>(
-          document.getElementById("loadMoreCommitsBtn")!.parentNode!
+          document.getElementById(LOAD_MORE_BUTTON_ID)!.parentNode!
         )).innerHTML = `<h2 id="loadingHeader">${svgIcons.loading}${t("loading.label")}</h2>`;
         this.maxCommits = normalizeCommitLoadCount(
           this.maxCommits + this.config.loadMoreCommits,
@@ -970,6 +1217,7 @@ class GitKeizuView {
         this.hideCommitDetails();
         this.saveState();
         this.requestLoadCommits(true, () => {});
+        this.finishListFocusUpdate(loadMoreFocusUpdate);
       });
     }
 
@@ -1017,43 +1265,24 @@ class GitKeizuView {
         }
       }
     }
+    this.refreshRowStates();
 
     addListenerToClass("commit", "contextmenu", (e: Event) => {
       e.stopPropagation();
-      let sourceElem = <HTMLElement>(<Element>e.target).closest(".commit")!;
-      let hash = sourceElem.dataset.hash!;
-      let commit = this.commits[this.commitLookup[hash]];
-      if (commit.stash !== null) {
-        let selector = commit.stash.selector;
-        showContextMenu(
-          <MouseEvent>e,
-          buildStashContextMenuItems(this.currentRepo, hash, selector, sourceElem),
-          sourceElem,
-          this.getCurrentRepoRecentActions()
-        );
-        return;
-      }
-      const repo = this.currentRepo;
-      const subject = commit.message;
-      showContextMenu(
+      this.showCommitRowContextMenu(
         <MouseEvent>e,
-        buildCommitContextMenuItems(
-          repo,
-          hash,
-          commit.parentHashes,
-          this.commits,
-          this.commitLookup,
-          sourceElem,
-          (mode) => this.pathHighlight.select({ kind: "commit", repo, hash, name: subject, mode })
-        ),
-        sourceElem,
-        this.getCurrentRepoRecentActions()
+        <HTMLElement>(<Element>e.target).closest(".commit")!
       );
+    });
+    addListenerToClass("commit", "keydown", (e: Event) => {
+      if (!consumeContextMenuLaunch(e)) return;
+      this.showCommitRowContextMenu(e, <HTMLElement>e.currentTarget);
     });
     addListenerToClass("commit", "click", (e: Event) => {
       const mouseEvent = <MouseEvent>e;
       let sourceElem = <HTMLElement>(<Element>e.target).closest(".commit")!;
       const clickedHash = sourceElem.dataset.hash!;
+      this.setRowTarget(clickedHash);
       this.fileHistory.handleCommitRowClick(clickedHash);
       this.handleCommitRowActivation(
         clickedHash,
@@ -1064,6 +1293,7 @@ class GitKeizuView {
     addListenerToClass("unsavedChanges", "click", (e: Event) => {
       const mouseEvent = <MouseEvent>e;
       let sourceElem = <HTMLElement>(<Element>e.target).closest(".unsavedChanges")!;
+      this.setRowTarget(sourceElem.dataset.hash!);
       this.handleCommitRowActivation(
         sourceElem.dataset.hash!,
         sourceElem,
@@ -1072,16 +1302,31 @@ class GitKeizuView {
     });
     addListenerToClass("unsavedChanges", "contextmenu", (e: Event) => {
       e.stopPropagation();
-      let sourceElem = <HTMLElement>(<Element>e.target).closest(".unsavedChanges")!;
-      showContextMenu(
+      this.showUncommittedContextMenu(
         <MouseEvent>e,
-        buildUncommittedContextMenuItems(this.currentRepo, sourceElem),
-        sourceElem,
-        this.getCurrentRepoRecentActions()
+        <HTMLElement>(<Element>e.target).closest(".unsavedChanges")!
       );
+    });
+    addListenerToClass("unsavedChanges", "keydown", (e: Event) => {
+      if (!consumeContextMenuLaunch(e)) return;
+      this.showUncommittedContextMenu(e, <HTMLElement>e.currentTarget);
     });
     addListenerToClass("gitRef", "contextmenu", (e: Event) => {
       this.showRefBadgeContextMenu(<MouseEvent>e, <HTMLElement>e.currentTarget);
+    });
+    // Enter / Space open the part's menu like ContextMenu / Shift+F10; checkout stays on dblclick.
+    addListenerToClass("gitRef", "keydown", (e: Event) => {
+      if (consumeContextMenuLaunch(e)) {
+        this.showRefBadgeContextMenu(e, <HTMLElement>e.currentTarget);
+        return;
+      }
+      if (!(e instanceof KeyboardEvent) || e.defaultPrevented) return;
+      if (e.key !== KEY_ENTER && e.key !== KEY_SPACE) return;
+      if (isKeyboardActionBlocked(e)) return;
+      const part = e.target instanceof Element ? e.target.closest(REF_BUTTON_SELECTOR) : null;
+      if (part === null) return;
+      consumeKey(e);
+      this.showRefBadgeContextMenu(e, <HTMLElement>e.currentTarget);
     });
     addListenerToClass("gitRef", "click", (e: Event) => e.stopPropagation());
     addListenerToClass("gitRef", "dblclick", (e: Event) => {
@@ -1089,11 +1334,11 @@ class GitKeizuView {
       if (isDialogActive()) hideDialog();
       if (isContextMenuActive()) hideContextMenu();
       let target = <HTMLElement>e.target;
-      let sourceElem = <HTMLElement>target.closest(".gitRef")!;
+      let sourceElem = <HTMLElement>target.closest(REF_BADGE_SELECTOR)!;
       if (sourceElem.classList.contains(DETACHED_WORKTREE_CLASS)) return;
-      let isRemoteCombined = target.classList.contains("gitRefHeadRemote");
-      if (isRemoteCombined) {
-        checkoutBranchAction(this.currentRepo, sourceElem, target.dataset.name!, true);
+      const remoteElem = target.closest<HTMLElement>(COMBINED_REMOTE_SELECTOR);
+      if (remoteElem !== null && sourceElem.contains(remoteElem)) {
+        checkoutBranchAction(this.currentRepo, sourceElem, remoteElem.dataset.name!, true);
       } else {
         checkoutBranchAction(this.currentRepo, sourceElem, sourceElem.dataset.name!);
       }
@@ -1102,12 +1347,76 @@ class GitKeizuView {
     const tableElem = this.tableElem.querySelector("table");
     if (tableElem !== null) this.refOverflow.attachTable(tableElem);
 
+    this.finishListFocusUpdate(focusUpdate);
     this.scrollContainerElem.scrollTop = savedScrollTop;
   }
-  private showRefBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void {
+  // Pointer and keyboard launches share these builders, so a row's menu is the same either way.
+  private showCommitRowContextMenu(event: ContextMenuTrigger, sourceElem: HTMLElement): void {
+    let hash = sourceElem.dataset.hash!;
+    let commit = this.commits[this.commitLookup[hash]];
+    if (commit.stash !== null) {
+      let selector = commit.stash.selector;
+      showContextMenu(
+        event,
+        buildStashContextMenuItems(this.currentRepo, hash, selector, sourceElem),
+        sourceElem,
+        this.getCurrentRepoRecentActions()
+      );
+      return;
+    }
+    const repo = this.currentRepo;
+    const subject = commit.message;
+    showContextMenu(
+      event,
+      buildCommitContextMenuItems(
+        repo,
+        hash,
+        commit.parentHashes,
+        this.commits,
+        this.commitLookup,
+        sourceElem,
+        (mode) => this.pathHighlight.select({ kind: "commit", repo, hash, name: subject, mode })
+      ),
+      sourceElem,
+      this.getCurrentRepoRecentActions()
+    );
+  }
+  private showUncommittedContextMenu(event: ContextMenuTrigger, sourceElem: HTMLElement): void {
+    showContextMenu(
+      event,
+      buildUncommittedContextMenuItems(this.currentRepo, sourceElem),
+      sourceElem,
+      this.getCurrentRepoRecentActions()
+    );
+  }
+  private showFileRowContextMenu(event: ContextMenuTrigger): void {
+    if (!(event.target instanceof Element)) return;
+    const target = event.target;
+    const fileRow = resolveFileRow(target);
+    if (fileRow === null) return;
+    const items = buildFileContextMenuItems(
+      fileRow,
+      this.expandedCommit,
+      this.currentRepo,
+      this.buildFileHistoryMenuContext()
+    );
+    if (items.length === 0) return;
+    // The builder keeps the row (its dataset); the menu is anchored to and restores focus to the
+    // child button that launched it, or to the row when the row itself is the tab stop.
+    const source = target.closest<HTMLElement>("button") ?? fileRow;
+    showContextMenu(event, items, source, this.getCurrentRepoRecentActions());
+  }
+  private showRefBadgeContextMenu(
+    event: ContextMenuTrigger,
+    badge: HTMLElement,
+    focusOptions?: ContextMenuFocusOptions
+  ): void {
     event.stopPropagation();
+    // The builders keep the badge (its dataset and dialog / checkout marks); the menu itself is
+    // anchored to and restores focus to the operable part that launched it.
+    const source = resolveRefSource(event, badge);
     if (badge.classList.contains(STASH_BADGE_CLASS)) {
-      this.showStashBadgeContextMenu(event, badge);
+      this.showStashBadgeContextMenu(event, badge, source, focusOptions);
       return;
     }
     if (badge.classList.contains(DETACHED_WORKTREE_CLASS)) {
@@ -1116,18 +1425,14 @@ class GitKeizuView {
       showContextMenu(
         event,
         buildDetachedWorktreeContextMenuItems(this.currentRepo, worktreePath),
-        badge,
-        this.getCurrentRepoRecentActions()
+        source,
+        this.getCurrentRepoRecentActions(),
+        focusOptions
       );
       return;
     }
-    // A search highlight can wrap the remote label, so the remote is resolved from the nearest ancestor.
-    const remoteElem =
-      event.target instanceof Element
-        ? event.target.closest<HTMLElement>(COMBINED_REMOTE_SELECTOR)
-        : null;
-    const isRemoteCombined = remoteElem !== null && badge.contains(remoteElem);
-    const refName = isRemoteCombined ? remoteElem.dataset.name! : badge.dataset.name!;
+    const isRemoteCombined = source.classList.contains(COMBINED_REMOTE_CLASS);
+    const refName = isRemoteCombined ? source.dataset.name! : badge.dataset.name!;
     const remotes = badge.dataset.remotes ? badge.dataset.remotes.split(",") : undefined;
     let worktreeInfo: { path: string; isMainWorktree: boolean } | null = null;
     if (badge.classList.contains("head") && !isRemoteCombined) {
@@ -1155,8 +1460,9 @@ class GitKeizuView {
         worktreeInfo,
         ...highlightArgs
       ),
-      badge,
-      this.getCurrentRepoRecentActions()
+      source,
+      this.getCurrentRepoRecentActions(),
+      focusOptions
     );
   }
   // The target is bound at menu time by exact ref type and name, so listed clones and shared tips resolve the same way.
@@ -1179,7 +1485,12 @@ class GitKeizuView {
     return (mode) => this.pathHighlight.select({ ...selection, mode });
   }
   // A listed clone lives outside its row, so the stash is resolved from the badge's hash attribute.
-  private showStashBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void {
+  private showStashBadgeContextMenu(
+    event: ContextMenuTrigger,
+    badge: HTMLElement,
+    source: HTMLElement,
+    focusOptions?: ContextMenuFocusOptions
+  ): void {
     const hash = badge.getAttribute(STASH_HASH_ATTRIBUTE);
     if (hash === null || hash === "") return;
     const index = this.commitLookup[hash];
@@ -1194,23 +1505,32 @@ class GitKeizuView {
     showContextMenu(
       event,
       buildStashContextMenuItems(this.currentRepo, hash, commit.stash.selector, originalRow),
-      badge,
-      this.getCurrentRepoRecentActions()
+      source,
+      this.getCurrentRepoRecentActions(),
+      focusOptions
     );
   }
   private renderUncommitedChanges() {
     let date = getCommitDate(this.commits[0].date);
-    document.getElementsByClassName("unsavedChanges")[0].innerHTML =
-      `<td></td><td><b>${escapeHtml(this.commits[0].message)}</b></td><td title="${date.title}">${date.value}</td><td title="* <>">*</td><td title="*">*</td>`;
+    const rowElem = <HTMLElement>document.getElementsByClassName("unsavedChanges")[0];
+    const focusUpdate = beginFocusUpdate(rowElem);
+    const index = parseInt(rowElem.dataset.id ?? "0", 10);
+    rowElem.setAttribute(ATTRIBUTE_ARIA_LABEL, buildRowName(this.commits[0], date.value));
+    rowElem.innerHTML = `<td>${buildRowStateHtml(index)}</td><td><b>${escapeHtml(this.commits[0].message)}</b></td><td title="${date.title}">${date.value}</td><td title="* <>">*</td><td title="*">*</td>`;
+    this.refreshRowStates();
+    finishFocusUpdate(focusUpdate);
   }
+  // A same-repository loading view keeps the menu (its action context is captured at open time);
+  // repository changes close it explicitly in leaveRepository().
   private renderShowLoading() {
+    const focusUpdate = this.beginListFocusUpdate();
     this.refOverflow.detachTable();
     if (isDialogActive()) hideDialog();
-    if (isContextMenuActive()) hideContextMenu();
     this.graph.clear();
     this.tableElem.innerHTML = `<h2 id="loadingHeader">${svgIcons.loading}${t("loading.label")}</h2>`;
     this.footerElem.innerHTML = "";
     this.findWidget.setInputEnabled(false);
+    this.finishListFocusUpdate(focusUpdate);
   }
   private makeTableResizable() {
     const colHeadersElem = document.getElementById("tableColHeaders");
@@ -1324,26 +1644,60 @@ class GitKeizuView {
     colHeadersElem.addEventListener("contextmenu", (e: MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      const repoOrdering: GG.RepoCommitOrdering =
-        this.gitRepos[this.currentRepo]?.commitOrdering ?? "default";
-      const items: ContextMenuElement[] = COMMIT_ORDERING_MENU_ITEMS.map(({ label, value }) => ({
-        title: value === repoOrdering ? `\u2713 ${label}` : label,
-        onClick: () => {
-          const updatedRepo: GG.GitRepoState = {
-            ...this.gitRepos[this.currentRepo],
-            commitOrdering: value
-          };
-          this.gitRepos[this.currentRepo] = updatedRepo;
-          sendMessage({
-            command: "saveRepoState",
-            repo: this.currentRepo,
-            state: updatedRepo
-          });
-          this.requestLoadCommits(true, () => {});
-        }
-      }));
-      showContextMenu(e, items, colHeadersElem, this.getCurrentRepoRecentActions());
+      this.showCommitOrderingContextMenu(e, colHeadersElem);
     });
+    colHeadersElem.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (!consumeContextMenuLaunch(e)) return;
+      this.showCommitOrderingContextMenu(e, colHeadersElem);
+    });
+    this.bindCommitOrderingButton();
+  }
+  // Bound after makeTableResizable(), whose innerHTML append re-creates the header children.
+  // Enter / Space are handled on keydown so the menu is placed by the button and focuses its first
+  // item; the consumed keydown suppresses the native click that would otherwise open it twice.
+  private bindCommitOrderingButton() {
+    const button = document.getElementById(COMMIT_ORDERING_BUTTON_ID);
+    if (button === null) return;
+    markFocusTarget(button, { kind: "control", id: COMMIT_ORDERING_BUTTON_ID });
+    button.addEventListener("click", (e: MouseEvent) => {
+      e.stopPropagation();
+      this.showCommitOrderingContextMenu(e, button);
+    });
+    button.addEventListener("keydown", (e: KeyboardEvent) => {
+      if (e.defaultPrevented || (e.key !== KEY_ENTER && e.key !== KEY_SPACE)) return;
+      if (isKeyboardActionBlocked(e)) return;
+      consumeKey(e);
+      this.showCommitOrderingContextMenu(e, button);
+    });
+  }
+  private getRepoCommitOrdering(): GG.RepoCommitOrdering {
+    return this.gitRepos[this.currentRepo]?.commitOrdering ?? "default";
+  }
+  private buildCommitOrderingButtonHtml(): string {
+    const ordering = this.getRepoCommitOrdering();
+    const current = COMMIT_ORDERING_MENU_ITEMS.find((item) => item.value === ordering);
+    const title = escapeHtml(current === undefined ? "" : current.label);
+    return `<button type="button" id="${COMMIT_ORDERING_BUTTON_ID}" class="${COMMIT_ORDERING_BUTTON_CLASS}" aria-haspopup="menu" title="${title}" ${ATTRIBUTE_ARIA_LABEL}="${escapeHtml(t(COMMIT_ORDERING_NAME_KEY))}">${COMMIT_ORDERING_BUTTON_GLYPH}</button>`;
+  }
+  private showCommitOrderingContextMenu(event: ContextMenuTrigger, sourceElem: HTMLElement) {
+    const repoOrdering = this.getRepoCommitOrdering();
+    const items: ContextMenuElement[] = COMMIT_ORDERING_MENU_ITEMS.map(({ label, value }) => ({
+      title: value === repoOrdering ? `\u2713 ${label}` : label,
+      onClick: () => {
+        const updatedRepo: GG.GitRepoState = {
+          ...this.gitRepos[this.currentRepo],
+          commitOrdering: value
+        };
+        this.gitRepos[this.currentRepo] = updatedRepo;
+        sendMessage({
+          command: "saveRepoState",
+          repo: this.currentRepo,
+          state: updatedRepo
+        });
+        this.requestLoadCommits(true, () => {});
+      }
+    }));
+    showContextMenu(event, items, sourceElem, this.getCurrentRepoRecentActions());
   }
 
   /* Description Column Minimum Width */
@@ -1494,6 +1848,12 @@ class GitKeizuView {
     }
   }
 
+  // Polite notices live outside the graph, so a re-render never re-reads the whole list (R4.8).
+  private announceStatus(text: string) {
+    const notice = document.getElementById(STATUS_NOTICE_ID);
+    if (notice !== null) notice.textContent = text;
+  }
+
   private updateCurrentBtnState() {
     const currentBtn = document.getElementById("currentBtn");
     if (currentBtn === null) return;
@@ -1504,61 +1864,149 @@ class GitKeizuView {
     } else {
       currentBtn.classList.add("disabled");
     }
+    currentBtn.toggleAttribute("disabled", !isHeadVisible);
   }
 
   /* Keyboard Shortcuts */
+  // Local UIs (menu, dialog, dropdowns) stop their keys before they reach here; a consumed or
+  // composition-bound key is never handled twice (R4.6).
   private handleKeyboardShortcut(e: KeyboardEvent) {
-    if (e.isComposing) return;
-
-    if (this.handleFileHistoryArrowKey(e)) return;
-
-    // Arrow key navigation (REQ-2.1, REQ-2.2, REQ-2.3, REQ-2.4, REQ-2.5)
-    if (
-      this.expandedCommit !== null &&
-      (e.key === "ArrowUp" || e.key === "ArrowDown") &&
-      this.expandedCommit.compareWithHash === null
-    ) {
-      // Guard only this branch (not the whole handler) so global shortcuts
-      // such as Ctrl/Cmd+F keep working while typing in editable elements.
-      if (isEditableEventTarget(e.target)) return;
-
-      const curIndex = this.commitLookup[this.expandedCommit.hash];
-      if (typeof curIndex === "number") {
-        let newIndex = -1;
-
-        if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey) {
-          // Ctrl/Cmd+Shift: alternative branch navigation
-          newIndex =
-            e.key === "ArrowUp"
-              ? this.graph.getAlternativeChildIndex(curIndex)
-              : this.graph.getAlternativeParentIndex(curIndex);
-        } else if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
-          // Ctrl/Cmd: branch tracking navigation
-          newIndex =
-            e.key === "ArrowUp"
-              ? this.graph.getFirstChildIndex(curIndex)
-              : this.graph.getFirstParentIndex(curIndex);
-        } else if (!e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
-          // No modifier: table order navigation
-          if (e.key === "ArrowUp" && curIndex > 0) {
-            newIndex = curIndex - 1;
-          } else if (e.key === "ArrowDown" && curIndex < this.commits.length - 1) {
-            newIndex = curIndex + 1;
-          }
-        }
-        // Other modifier combinations: fall through to existing shortcuts
-
-        if (newIndex > -1) {
-          e.preventDefault();
-          e.stopPropagation();
-          const elem = findCommitElemWithId(getCommitElems(), newIndex);
-          if (elem !== null) this.loadCommitDetails(elem);
-          return;
-        }
-      }
+    if (e.defaultPrevented || isKeyboardActionBlocked(e)) return;
+    if (e.key === KEY_TAB) {
+      this.handleListTab(e);
+      return;
     }
+    const focused = this.resolveFocusedRow(e.target);
+    if (focused !== null && this.handleRowKey(e, focused.row, focused.onRow)) return;
+    this.handleConfiguredShortcut(e, focused !== null || this.isListScopeTarget(e.target));
+  }
 
-    if (!(e.ctrlKey || e.metaKey)) return;
+  // The list keys apply only to a row or to one of its ref labels; inputs, buttons, file actions
+  // and the details view keep their own keys (R4.2).
+  private resolveFocusedRow(
+    target: EventTarget | null
+  ): { row: HTMLElement; onRow: boolean } | null {
+    if (!(target instanceof HTMLElement) || !this.tableElem.contains(target)) return null;
+    if (isEditableEventTarget(target)) return null;
+    const row = target.closest<HTMLElement>(ROW_SELECTOR);
+    if (row === null) return null;
+    if (target === row) return { row, onRow: true };
+    const label = target.closest<HTMLElement>(ROW_LABEL_SELECTOR);
+    return label !== null && row.contains(label) ? { row, onRow: false } : null;
+  }
+
+  private isListScopeTarget(target: EventTarget | null): boolean {
+    return target === document.body || target === document || target === this.tableElem;
+  }
+
+  // Returns true when the key belonged to the list, whether or not it moved anything.
+  private handleRowKey(e: KeyboardEvent, row: HTMLElement, onRow: boolean): boolean {
+    if (e.altKey) return false;
+    const hash = row.dataset.hash;
+    const index = hash === undefined ? undefined : this.commitLookup[hash];
+    if (hash === undefined || typeof index !== "number") return false;
+    const ctrlOrCmd = e.ctrlKey || e.metaKey;
+    if (e.key === KEY_ENTER) {
+      // Ref labels and the overflow counter own their Enter; Shift / Alt + Enter are unassigned.
+      if (!onRow || e.shiftKey) return false;
+      consumeKey(e);
+      if (ctrlOrCmd) {
+        this.handleCommitRowActivation(hash, row, true);
+      } else {
+        this.openRowDetails(row, hash);
+      }
+      return true;
+    }
+    if (e.key !== KEY_ARROW_UP && e.key !== KEY_ARROW_DOWN) return false;
+    const delta: -1 | 1 = e.key === KEY_ARROW_UP ? -1 : 1;
+    if (this.isComparing()) {
+      if (ctrlOrCmd) return false;
+      return this.moveRowTarget(index + delta, e, false);
+    }
+    if (this.fileHistory.isActive() || this.fileHistory.isPending()) {
+      return this.handleFileHistoryArrowKey(e, delta, ctrlOrCmd);
+    }
+    if (!ctrlOrCmd) {
+      // Shift moves only the target, so the open details stay while a compare target is chosen.
+      return this.moveRowTarget(index + delta, e, !e.shiftKey && this.expandedCommit !== null);
+    }
+    const graphIndex = e.shiftKey
+      ? delta < 0
+        ? this.graph.getAlternativeChildIndex(index)
+        : this.graph.getAlternativeParentIndex(index)
+      : delta < 0
+        ? this.graph.getFirstChildIndex(index)
+        : this.graph.getFirstParentIndex(index);
+    return this.moveRowTarget(graphIndex, e, this.expandedCommit !== null);
+  }
+
+  // The history edge, a pending request and Ctrl/Cmd arrows are consumed without moving, so the
+  // key never falls through to the table order or the graph (A8.2-1).
+  private handleFileHistoryArrowKey(e: KeyboardEvent, delta: -1 | 1, ctrlOrCmd: boolean): boolean {
+    if (!ctrlOrCmd && e.shiftKey) return false;
+    consumeKey(e);
+    if (ctrlOrCmd || this.fileHistory.isPending()) return true;
+    const hash = this.fileHistory.navigate(delta, true);
+    if (hash === null) return true;
+    const destination = this.findRowByHash(hash);
+    if (destination === null) return true;
+    this.setRowTarget(hash);
+    destination.focus({ preventScroll: true });
+    this.loadCommitDetails(destination);
+    return true;
+  }
+
+  // Table-order and graph moves share this: the row gets real focus and the details follow only
+  // while a single details view is open. An out-of-range destination is left unconsumed, so the
+  // list never wraps and never fetches unloaded commits.
+  private moveRowTarget(index: number, e: KeyboardEvent, followDetails: boolean): boolean {
+    const commit = this.commits[index];
+    const row = commit === undefined ? null : this.findRowByHash(commit.hash);
+    if (commit === undefined || row === null) return false;
+    consumeKey(e);
+    this.setRowTarget(commit.hash);
+    row.focus({ preventScroll: true });
+    if (followDetails && !this.hasSingleDetailsFor(commit.hash)) {
+      this.loadCommitDetails(row);
+    } else {
+      this.scrollRowIntoView(row);
+    }
+    return true;
+  }
+
+  // Enter opens; unlike the click path it never closes the same single details (R4.2).
+  private openRowDetails(row: HTMLElement, hash: string): void {
+    if (this.hasSingleDetailsFor(hash)) return;
+    this.loadCommitDetails(row);
+  }
+
+  private isComparing(): boolean {
+    return this.expandedCommit !== null && this.expandedCommit.compareWithHash !== null;
+  }
+
+  private hasSingleDetailsFor(hash: string): boolean {
+    return (
+      this.expandedCommit !== null &&
+      this.expandedCommit.compareWithHash === null &&
+      this.expandedCommit.hash === hash
+    );
+  }
+
+  // Manual moves scroll by the smallest amount that shows the row below the sticky header.
+  private scrollRowIntoView(row: HTMLElement): void {
+    const container = this.scrollContainerElem;
+    const headerHeight = (document.getElementById(TABLE_HEADERS_ID)?.clientHeight ?? 0) + 1;
+    const rowTop = row.offsetTop;
+    const rowBottom = rowTop + row.offsetHeight;
+    if (rowTop < container.scrollTop + headerHeight + SCROLL_PADDING_TOP) {
+      container.scrollTop = Math.max(0, rowTop - headerHeight - SCROLL_PADDING_TOP);
+    } else if (rowBottom > container.scrollTop + container.clientHeight) {
+      container.scrollTop = rowBottom - container.clientHeight;
+    }
+  }
+
+  private handleConfiguredShortcut(e: KeyboardEvent, inListScope: boolean): void {
+    if (!(e.ctrlKey || e.metaKey) || !inListScope || isDialogActive()) return;
 
     const key = e.key.toLowerCase();
     const { keybindings } = this.config;
@@ -1580,28 +2028,194 @@ class GitKeizuView {
     }
   }
 
-  // Returns true when the file history mode consumed the arrow key.
-  private handleFileHistoryArrowKey(e: KeyboardEvent): boolean {
-    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return false;
-    if (!this.fileHistory.isActive() && !this.fileHistory.isPending()) return false;
-    if (this.expandedCommit !== null && this.expandedCommit.compareWithHash !== null) return false;
-    if (isEditableEventTarget(e.target)) return false;
+  /* Row Target and Tab Stops */
+  private leaveRepository(): void {
+    if (isContextMenuActive()) hideContextMenu("repository");
+    this.rowTarget = null;
+  }
 
-    const hasNoModifier = !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey;
-    const hasCtrlOrCmdWithoutAlt = (e.ctrlKey || e.metaKey) && !e.altKey;
-    if (!hasNoModifier && !hasCtrlOrCmdWithoutAlt) return false;
+  private beginListFocusUpdate(): FocusUpdate | null {
+    return beginFocusUpdate(this.tableElem) ?? beginFocusUpdate(this.footerElem);
+  }
 
-    // Consumed even when nothing moves, so the view does not scroll at an end and the key
-    // never reaches the table order or graph navigation.
-    e.preventDefault();
-    e.stopPropagation();
-    if (!hasNoModifier || this.fileHistory.isPending()) return true;
+  // Focus dropped by a replacement returns by key, else to the row target; while no row exists
+  // (loading view, repository change) it parks on the named list container instead of body.
+  // A webview that lost focus to VS Code is never pulled back (A8.2-4).
+  private finishListFocusUpdate(update: FocusUpdate | null): void {
+    if (update === null || finishFocusUpdate(update)) return;
+    const active = document.activeElement;
+    if ((active === null || active === document.body) && document.hasFocus()) {
+      this.tableElem.focus({ preventScroll: true });
+    }
+  }
 
-    const hash = this.fileHistory.navigate(e.key === "ArrowUp" ? -1 : 1, true);
-    if (hash === null) return true;
-    const sourceElem = this.findCommitRowByHash(hash);
-    if (sourceElem !== null) this.loadCommitDetails(sourceElem);
-    return true;
+  // Rows are re-marked on every render; only the target row and its labels are tab stops and
+  // the empty list exposes the container itself (R4.1).
+  private applyRowTargets(): void {
+    const rows = this.tableElem.querySelectorAll<HTMLElement>(ROW_SELECTOR);
+    const targetHash = this.rowTarget === null ? null : this.rowTarget.hash;
+    rows.forEach((row) => {
+      const hash = row.dataset.hash;
+      if (hash === undefined) return;
+      markFocusTarget(row, this.rowKey(hash));
+      row.querySelectorAll<HTMLElement>(REF_BUTTON_SELECTOR).forEach((part) => {
+        const key = this.resolveRefKey(part);
+        if (key !== null) markFocusTarget(part, key);
+      });
+      this.setRowTabIndex(row, hash === targetHash ? TAB_INDEX_STOP : TAB_INDEX_PROGRAMMATIC);
+    });
+    this.tableElem.tabIndex = rows.length === 0 ? TAB_INDEX_STOP : TAB_INDEX_PROGRAMMATIC;
+  }
+
+  private rowKey(hash: string): FocusKey {
+    return { kind: "row", repo: this.currentRepo, hash };
+  }
+
+  // A part is identified by its row and by the full name of what it operates on: the head or
+  // remote name, the tag, the stash hash or the worktree path (plan §3.4).
+  private resolveRefKey(part: HTMLElement): FocusKey | null {
+    const badge = part.closest<HTMLElement>(REF_BADGE_SELECTOR);
+    const hash = part.closest<HTMLElement>(ROW_SELECTOR)?.dataset.hash;
+    if (badge === null || hash === undefined) return null;
+    const base = { kind: "ref", repo: this.currentRepo, hash } as const;
+    if (badge.classList.contains(STASH_BADGE_CLASS)) {
+      const stashHash = badge.getAttribute(STASH_HASH_ATTRIBUTE);
+      return stashHash === null || stashHash === ""
+        ? null
+        : { ...base, refType: "stash", name: stashHash };
+    }
+    if (badge.classList.contains(DETACHED_WORKTREE_CLASS)) {
+      const path = badge.dataset.worktreePath;
+      return path === undefined ? null : { ...base, refType: "worktree", name: path };
+    }
+    if (part.classList.contains(COMBINED_REMOTE_CLASS)) {
+      const name = part.dataset.name;
+      return name === undefined ? null : { ...base, refType: REF_CLASS_REMOTE, name };
+    }
+    const name = badge.dataset.name;
+    if (name === undefined) return null;
+    if (badge.classList.contains(REF_CLASS_TAG)) return { ...base, refType: REF_CLASS_TAG, name };
+    const refType = badge.classList.contains(REF_CLASS_REMOTE) ? REF_CLASS_REMOTE : REF_CLASS_HEAD;
+    return { ...base, refType, name };
+  }
+
+  private setRowTabIndex(row: HTMLElement, tabIndex: number): void {
+    row.tabIndex = tabIndex;
+    row.classList.toggle(ROW_TARGET_CLASS, tabIndex === TAB_INDEX_STOP);
+    row.querySelectorAll<HTMLElement>(ROW_LABEL_STOP_SELECTOR).forEach((label) => {
+      label.tabIndex = tabIndex;
+    });
+  }
+
+  // Each row's description lists the states it holds at the same time (R4.8); the text is
+  // rewritten in place, so the graph and the rows are never re-rendered for it.
+  private refreshRowStates(): void {
+    const compareBaseHash =
+      this.expandedCommit !== null && this.expandedCommit.compareWithHash !== null
+        ? this.expandedCommit.hash
+        : null;
+    this.tableElem.querySelectorAll<HTMLElement>(ROW_SELECTOR).forEach((row) => {
+      const stateElem = row.querySelector<HTMLElement>(ROW_STATE_SELECTOR);
+      if (stateElem === null) return;
+      const hash = row.dataset.hash;
+      const states: readonly (readonly [boolean, string])[] = [
+        [row.classList.contains(ROW_TARGET_CLASS), ROW_STATE_KEYS.target],
+        [row.classList.contains(CLASS_DETAILS_OPEN), ROW_STATE_KEYS.detailsOpen],
+        [hash === compareBaseHash, ROW_STATE_KEYS.compareBase],
+        [row.classList.contains(CLASS_COMPARE_TARGET), ROW_STATE_KEYS.compareTarget],
+        [hash === this.commitHead, ROW_STATE_KEYS.head]
+      ];
+      stateElem.textContent = states
+        .filter(([active]) => active)
+        .map(([, key]) => t(key))
+        .join(ROW_NAME_SEPARATOR);
+    });
+  }
+
+  private setRowTarget(hash: string): void {
+    const index = this.commitLookup[hash];
+    if (typeof index !== "number") return;
+    const previous = this.rowTarget;
+    if (previous !== null && previous.hash === hash) return;
+    this.rowTarget = { repo: this.currentRepo, hash, index };
+    const previousRow = previous === null ? null : this.findRowByHash(previous.hash);
+    if (previousRow !== null) this.setRowTabIndex(previousRow, TAB_INDEX_PROGRAMMATIC);
+    const row = this.findRowByHash(hash);
+    if (row !== null) this.setRowTabIndex(row, TAB_INDEX_STOP);
+    this.refreshRowStates();
+  }
+
+  // Real focus on a row or one of its labels only syncs the target; it never requests anything.
+  private syncRowTargetFromFocus(target: EventTarget | null): void {
+    const row = target instanceof Element ? target.closest<HTMLElement>(ROW_SELECTOR) : null;
+    const hash = row === null ? undefined : row.dataset.hash;
+    if (hash !== undefined) this.setRowTarget(hash);
+  }
+
+  private findRowByHash(hash: string): HTMLElement | null {
+    const index = this.commitLookup[hash];
+    if (typeof index !== "number") return null;
+    const row = this.tableElem.querySelector<HTMLElement>(`${ROW_SELECTOR}[data-id="${index}"]`);
+    return row !== null && row.dataset.hash === hash ? row : null;
+  }
+
+  private getRowTargetElem(): HTMLElement | null {
+    return this.rowTarget === null || this.rowTarget.repo !== this.currentRepo
+      ? null
+      : this.findRowByHash(this.rowTarget.hash);
+  }
+
+  private getRowLabelStops(row: HTMLElement): HTMLElement[] {
+    return Array.from(row.querySelectorAll<HTMLElement>(ROW_LABEL_STOP_SELECTOR)).filter(isTabStop);
+  }
+
+  // Logical order of plan R4.3: toolbar, path bar, history bar, cleanup panel, column headers,
+  // the target row, its labels left to right, the open details, load more, find widget.
+  private getTabStops(): readonly HTMLElement[] {
+    const toolbar = TOOLBAR_STOP_SELECTORS.map((selector) =>
+      document.querySelector<HTMLElement>(selector)
+    ).filter((element): element is HTMLElement => element !== null && isTabStop(element));
+    const row = this.getRowTargetElem();
+    const listEntry =
+      row !== null ? [row, ...this.getRowLabelStops(row)] : [this.tableElem].filter(isTabStop);
+    return [
+      ...toolbar,
+      ...collectTabStops(activeContainer(document.getElementById(PATH_HIGHLIGHT_BAR_ID))),
+      ...collectTabStops(activeContainer(document.getElementById(FILE_HISTORY_BAR_ID))),
+      ...collectTabStops(document.getElementById(BRANCH_CLEANUP_PANEL_ID)),
+      ...collectTabStops(document.getElementById(TABLE_HEADERS_ID)),
+      ...listEntry,
+      ...collectTabStops(document.getElementById(COMMIT_DETAILS_ID)),
+      ...[document.getElementById(LOAD_MORE_BUTTON_ID)].filter(
+        (element): element is HTMLElement => element !== null && isTabStop(element)
+      ),
+      ...collectTabStops(document.querySelector(FIND_WIDGET_ACTIVE_SELECTOR))
+    ];
+  }
+
+  // Only the boundary between the target row's labels and a details view inserted at another
+  // row needs explicit moves; everything else follows the native Tab order (plan §3.6).
+  private handleListTab(e: KeyboardEvent): void {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    const target = e.target;
+    if (!(target instanceof HTMLElement) || !this.tableElem.contains(target)) return;
+    const row = this.getRowTargetElem();
+    const details = document.getElementById(COMMIT_DETAILS_ID);
+    if (row === null || details === null) return;
+    const rowStops = [row, ...this.getRowLabelStops(row)];
+    const detailStops = collectTabStops(details);
+    if (detailStops.length === 0) return;
+    const anchor = target.closest<HTMLElement>(ROW_LABEL_SELECTOR) ?? target;
+    const atBoundary = e.shiftKey
+      ? anchor === detailStops[0]
+      : anchor === rowStops[rowStops.length - 1];
+    if (!atBoundary) return;
+    if (moveFocusPast(captureFocusOrigin(anchor), e.shiftKey ? -1 : 1)) consumeKey(e);
+  }
+
+  public dispose(): void {
+    document.removeEventListener("keydown", this.keydownListener);
+    this.disposeFocusContext();
   }
 
   /* Stash Navigation */
@@ -1643,30 +2257,31 @@ class GitKeizuView {
   }
 
   /* Escape Chain */
+  // One layer per Escape keydown; dropdowns cancel (close() would apply the selection).
   public handleEscape() {
     if (isContextMenuActive()) {
-      hideContextMenu();
+      hideContextMenu("keyboard");
       return;
     }
     if (isDialogActive()) {
-      hideDialog();
+      hideDialog("keyboard");
       return;
     }
     if (this.repoDropdown.isOpen()) {
-      this.repoDropdown.close();
+      this.repoDropdown.cancelAndClose("keyboard");
       return;
     }
     if (this.branchDropdown.isOpen()) {
-      this.branchDropdown.close();
+      this.branchDropdown.cancelAndClose("keyboard");
       return;
     }
     if (this.authorDropdown.isOpen()) {
-      this.authorDropdown.close();
+      this.authorDropdown.cancelAndClose("keyboard");
       return;
     }
-    if (this.refOverflow.closePopup()) return;
+    if (this.refOverflow.closePopup("keyboard")) return;
     if (this.findWidget.isVisible()) {
-      this.findWidget.close();
+      this.findWidget.close("keyboard");
       return;
     }
     if (this.expandedCommit !== null) {
@@ -1688,13 +2303,13 @@ class GitKeizuView {
     if (isModifierClick && this.expandedCommit !== null) {
       // Compare mode: Ctrl/Cmd+click while a commit is expanded
       if (this.expandedCommit.compareWithHash === clickedHash) {
-        // Same compare target clicked again → cancel comparison
-        this.clearCompareTarget();
-        this.expandedCommit.compareWithHash = null;
-        this.expandedCommit.compareWithSrcElem = null;
-        this.saveState();
-        if (this.expandedCommit.commitDetails !== null && this.expandedCommit.fileTree !== null) {
-          this.showCommitDetails(this.expandedCommit.commitDetails, this.expandedCommit.fileTree);
+        // Same compare target clicked again → cancel comparison. The compare result replaced the
+        // stored details, so the origin's own details and files are requested again.
+        const originElem = this.expandedCommit.srcElem;
+        if (originElem === null) {
+          this.hideCommitDetails();
+        } else {
+          this.loadCommitDetails(originElem);
         }
       } else if (clickedHash !== this.expandedCommit.hash) {
         // Different commit → enter/change compare target
@@ -1703,6 +2318,7 @@ class GitKeizuView {
         this.expandedCommit.compareWithSrcElem = sourceElem;
         sourceElem.classList.add("compareTarget");
         this.saveState();
+        this.refreshRowStates();
         const order = this.getCommitOrder(this.expandedCommit.hash, clickedHash);
         sendMessage({
           command: "compareCommits",
@@ -1719,6 +2335,9 @@ class GitKeizuView {
   }
 
   private loadCommitDetails(sourceElem: HTMLElement) {
+    const previousDetails = document.getElementById(COMMIT_DETAILS_ID);
+    const focusWasInDetails =
+      previousDetails !== null && previousDetails.contains(document.activeElement);
     this.hideCommitDetails();
     const hash = sourceElem.dataset.hash!;
     const commit = this.commits[this.commitLookup[hash]];
@@ -1734,7 +2353,10 @@ class GitKeizuView {
     };
     sourceElem.classList.add("commitDetailsOpen");
     this.saveState();
+    this.refreshRowStates();
     this.renderCommitDetailsView();
+    // A switch started from inside the old details (parent link) lands on the new origin row.
+    if (focusWasInDetails) sourceElem.focus({ preventScroll: true });
     sendMessage({
       command: "commitDetails",
       repo: this.currentRepo!,
@@ -1746,12 +2368,15 @@ class GitKeizuView {
   private renderCommitDetailsView() {
     if (this.expandedCommit === null || this.expandedCommit.srcElem === null) return;
 
-    let elem = document.getElementById("commitDetails");
+    let elem = document.getElementById(COMMIT_DETAILS_ID);
+    const focusUpdate = elem === null ? null : beginFocusUpdate(elem);
     if (elem === null) {
       elem = document.createElement("tr");
-      elem.id = "commitDetails";
+      elem.id = COMMIT_DETAILS_ID;
       insertAfter(elem, this.expandedCommit.srcElem);
     }
+    // Focus lost inside the details resolves to the origin row (plan §3.4 restore order).
+    markFocusTarget(elem, this.rowKey(this.expandedCommit.hash));
 
     const cdvHeight = this.calculateCdvHeight();
     elem.style.height = `${cdvHeight}px`;
@@ -1764,15 +2389,14 @@ class GitKeizuView {
       elem.innerHTML =
         `<td></td><td colspan="${COMMIT_DETAILS_COLSPAN}">` +
         `<div id="cdvLoading">${svgIcons.loading} ${t("loading.commitDetails", loadingLabel)}</div>` +
-        `<div id="commitDetailsClose">${svgIcons.close}</div>` +
+        buildDetailsCloseHtml() +
         "</td>";
-      document.getElementById("commitDetailsClose")!.addEventListener("click", () => {
-        this.hideCommitDetails();
-      });
+      this.bindDetailsClose();
     }
 
     this.renderGraph();
     this.scrollToExpandedCommit(elem);
+    finishFocusUpdate(focusUpdate);
   }
   private getCommitOrder(hash1: string, hash2: string): { from: string; to: string } {
     // Backend expects UNCOMMITTED_CHANGES_HASH in fromHash to trigger working tree diff
@@ -1796,13 +2420,16 @@ class GitKeizuView {
   public hideCommitDetails() {
     if (this.expandedCommit !== null) {
       this.clearCompareTarget();
-      let elem = document.getElementById("commitDetails");
+      let elem = document.getElementById(COMMIT_DETAILS_ID);
+      const focusUpdate = elem === null ? null : beginFocusUpdate(elem);
       if (typeof elem === "object" && elem !== null) elem.remove();
       if (typeof this.expandedCommit.srcElem === "object" && this.expandedCommit.srcElem !== null)
         this.expandedCommit.srcElem.classList.remove("commitDetailsOpen");
       this.expandedCommit = null;
       this.saveState();
+      this.refreshRowStates();
       this.renderGraph();
+      finishFocusUpdate(focusUpdate);
     }
   }
   public showCommitDetails(commitDetails: GG.GitCommitDetails, fileTree: GitFolder) {
@@ -1819,6 +2446,7 @@ class GitKeizuView {
     this.expandedCommit.loading = false;
     this.expandedCommit.srcElem.classList.add("commitDetailsOpen");
     this.saveState();
+    this.refreshRowStates();
 
     const summaryHtml = isCompareMode
       ? this.buildCompareSummaryHtml(this.expandedCommit.compareWithHash!)
@@ -1837,18 +2465,20 @@ class GitKeizuView {
       `<td></td><td colspan="${COMMIT_DETAILS_COLSPAN}">` +
       `<div id="commitDetailsSummary">${summaryHtml}</div>` +
       filesSectionHtml +
-      `<div id="commitDetailsClose">${svgIcons.close}</div>` +
+      buildDetailsCloseHtml() +
       "</td>";
 
-    let elem = document.getElementById("commitDetails");
+    let elem = document.getElementById(COMMIT_DETAILS_ID);
+    const focusUpdate = elem === null ? null : beginFocusUpdate(elem);
     if (elem !== null) {
       elem.innerHTML = html;
     } else {
       elem = document.createElement("tr");
-      elem.id = "commitDetails";
+      elem.id = COMMIT_DETAILS_ID;
       elem.innerHTML = html;
       insertAfter(elem, this.expandedCommit.srcElem);
     }
+    markFocusTarget(elem, this.rowKey(this.expandedCommit.hash));
 
     const cdvHeight = this.calculateCdvHeight();
     elem.style.height = `${cdvHeight}px`;
@@ -1856,15 +2486,22 @@ class GitKeizuView {
     this.renderGraph();
     this.scrollToExpandedCommit(elem);
 
-    document.getElementById("commitDetailsClose")!.addEventListener("click", () => {
-      this.hideCommitDetails();
-    });
-    document.getElementById("fileViewToggle")?.addEventListener("click", () => {
-      this.handleFileViewToggle();
-    });
+    this.bindDetailsClose();
+    const toggleElem = document.getElementById(FILE_VIEW_TOGGLE_ID);
+    if (toggleElem !== null) {
+      markFocusTarget(toggleElem, { kind: "control", id: FILE_VIEW_TOGGLE_ID });
+      toggleElem.addEventListener("click", () => this.handleFileViewToggle());
+    }
     this.bindFileViewListeners();
     this.applyFileHistoryToFileRows();
     this.bindParentHashListeners();
+    finishFocusUpdate(focusUpdate);
+  }
+  private bindDetailsClose(): void {
+    const closeElem = document.getElementById(COMMIT_DETAILS_CLOSE_ID);
+    if (closeElem === null) return;
+    markFocusTarget(closeElem, { kind: "control", id: COMMIT_DETAILS_CLOSE_ID });
+    closeElem.addEventListener("click", () => this.hideCommitDetails());
   }
   private findCommitRowByHash(hash: string): HTMLElement | null {
     return document.querySelector<HTMLElement>(`.commit[data-hash="${hash}"]`);
@@ -1965,7 +2602,7 @@ class GitKeizuView {
       .map((hash) => {
         const escapedHash = escapeHtml(hash);
         return typeof this.commitLookup[hash] === "number"
-          ? `<span class="parentHash" data-hash="${escapedHash}">${escapedHash}</span>`
+          ? `<button type="button" class="${PARENT_HASH_CLASS}" data-hash="${escapedHash}">${escapedHash}</button>`
           : escapedHash;
       })
       .join(", ");
@@ -1985,7 +2622,7 @@ class GitKeizuView {
   ): string {
     const innerHtml = this.buildFilesSectionInnerHtml(fileViewType, fileChanges, fileTree);
     const { icon, title } = getFileViewToggle(fileViewType);
-    return `<div id="commitDetailsFiles">${innerHtml}</div><span id="fileViewToggle" class="fileViewToggleBtn" title="${title}">${icon}</span>`;
+    return `<div id="${COMMIT_DETAILS_FILES_ID}">${innerHtml}</div><button type="button" id="${FILE_VIEW_TOGGLE_ID}" class="fileViewToggleBtn" title="${title}" ${ATTRIBUTE_ARIA_LABEL}="${title}">${icon}</button>`;
   }
   private scrollToExpandedCommit(detailsElem: HTMLElement) {
     if (this.expandedCommit === null || this.expandedCommit.srcElem === null) return;
@@ -2002,8 +2639,16 @@ class GitKeizuView {
     }
   }
   private bindParentHashListeners() {
-    addListenerToClass("parentHash", "click", (e: Event) => {
-      const target = <HTMLElement>e.target;
+    document
+      .querySelectorAll<HTMLElement>(`#${COMMIT_DETAILS_ID} .${PARENT_HASH_CLASS}`)
+      .forEach((link) => {
+        const hash = link.dataset.hash;
+        if (hash !== undefined) {
+          markFocusTarget(link, { kind: "control", id: `${PARENT_HASH_KEY_PREFIX}${hash}` });
+        }
+      });
+    addListenerToClass(PARENT_HASH_CLASS, "click", (e: Event) => {
+      const target = <HTMLElement>e.currentTarget;
       const parentHash = target.dataset.hash;
       if (parentHash && typeof this.commitLookup[parentHash] === "number") {
         this.scrollToCommit(parentHash, true, true);
@@ -2024,21 +2669,24 @@ class GitKeizuView {
     const newMode: FileViewType = currentMode === FILE_VIEW_TREE ? FILE_VIEW_LIST : FILE_VIEW_TREE;
     const updatedRepo: GG.GitRepoState = { ...repo, fileViewType: newMode };
     this.gitRepos[this.currentRepo] = updatedRepo;
-    const filesDiv = document.getElementById("commitDetailsFiles");
+    const filesDiv = document.getElementById(COMMIT_DETAILS_FILES_ID);
     if (filesDiv !== null && this.expandedCommit.commitDetails !== null) {
+      const focusUpdate = beginFocusUpdate(filesDiv);
       filesDiv.innerHTML = this.buildFilesSectionInnerHtml(
         newMode,
         this.expandedCommit.commitDetails.fileChanges,
         this.expandedCommit.fileTree!
       );
-      const toggleElem = document.getElementById("fileViewToggle");
+      const toggleElem = document.getElementById(FILE_VIEW_TOGGLE_ID);
       if (toggleElem !== null) {
         const { icon, title } = getFileViewToggle(newMode);
         toggleElem.innerHTML = icon;
         toggleElem.title = title;
+        toggleElem.setAttribute(ATTRIBUTE_ARIA_LABEL, title);
       }
       this.bindFileViewListeners();
       this.applyFileHistoryToFileRows();
+      finishFocusUpdate(focusUpdate);
     }
     sendMessage({
       command: "saveRepoState",
@@ -2063,28 +2711,25 @@ class GitKeizuView {
       ? generateGitFileListHtml(fileChanges, canHighlight)
       : generateGitFileTreeHtml(fileTree, fileChanges, canHighlight);
   }
+  // Every control is a native button: Enter / Space run the same click handler as the mouse,
+  // and the child buttons stop propagation so neither the row wrapper nor the commit row acts.
+  // The row wrapper keeps the whole row as the mouse hit area for the diff; its click bubbles on
+  // so the document-level dismissal still closes an open menu.
   private bindFileViewListeners() {
-    addListenerToClass("gitFolder", "click", (e) => {
-      let sourceElem = <HTMLElement>(<Element>e.target!).closest(".gitFolder");
-      let parent = sourceElem.parentElement!;
-      parent.classList.toggle("closed");
-      let isOpen = !parent.classList.contains("closed");
-      parent.children[0].children[0].innerHTML = isOpen
-        ? svgIcons.openFolder
-        : svgIcons.closedFolder;
-      parent.children[1].classList.toggle("hidden");
-      alterGitFileTree(
-        this.expandedCommit!.fileTree!,
-        decodeURIComponent(sourceElem.dataset.folderpath!),
-        isOpen
-      );
-      this.saveState();
+    this.markFileViewTargets();
+    addListenerToClass(FOLDER_BUTTON_CLASS, "click", (e) => {
+      e.stopPropagation();
+      this.toggleFolder(<HTMLElement>e.currentTarget);
     });
-    addListenerToClass("openFile", "click", (e) => {
+    addListenerToClass(FILE_DIFF_BUTTON_CLASS, "click", (e) => {
+      e.stopPropagation();
+      this.sendViewDiffAction(resolveFileRow(<Element>e.currentTarget));
+    });
+    addListenerToClass(FILE_OPEN_BUTTON_CLASS, "click", (e) => {
       e.stopPropagation();
       sendOpenFileAction(resolveFileRow(<Element>e.target), this.expandedCommit, this.currentRepo);
     });
-    addListenerToClass("highlightFileHistory", "click", (e) => {
+    addListenerToClass(FILE_HISTORY_BUTTON_CLASS, "click", (e) => {
       e.stopPropagation();
       sendHighlightFileHistoryAction(
         resolveFileRow(<Element>e.target),
@@ -2093,41 +2738,120 @@ class GitKeizuView {
         this.buildFileHistoryMenuContext()
       );
     });
+    addListenerToClass("gitFile", "click", (e) => {
+      if (e.target instanceof Element && e.target.closest(BUTTON_SELECTOR) !== null) return;
+      this.sendViewDiffAction(<HTMLElement>e.currentTarget);
+    });
     addListenerToClass("gitFile", "contextmenu", (e: Event) => {
       e.preventDefault();
       e.stopPropagation();
-      const sourceElem = resolveFileRow(<Element>(<MouseEvent>e).target);
-      if (sourceElem === null) return;
-      const items = buildFileContextMenuItems(
-        sourceElem,
-        this.expandedCommit,
-        this.currentRepo,
-        this.buildFileHistoryMenuContext()
-      );
-      if (items.length === 0) return;
-      showContextMenu(<MouseEvent>e, items, sourceElem, this.getCurrentRepoRecentActions());
+      this.showFileRowContextMenu(<MouseEvent>e);
     });
-    addListenerToClass("gitFile", "click", (e) => {
-      let sourceElem = <HTMLElement>(<Element>e.target).closest(".gitFile")!;
-      if (this.expandedCommit === null || !sourceElem.classList.contains("gitDiffPossible")) return;
-      // When in comparison mode, normalize order so diff always shows old → new
-      let diffCommitHash = this.expandedCommit.hash;
-      let diffCompareWithHash = this.expandedCommit.compareWithHash;
-      if (diffCompareWithHash !== null) {
-        const order = this.getCommitOrder(diffCommitHash, diffCompareWithHash);
-        diffCommitHash = order.from;
-        diffCompareWithHash = order.to;
+    addListenerToClass("gitFile", "keydown", (e: Event) => {
+      if (consumeContextMenuLaunch(e)) {
+        this.showFileRowContextMenu(e);
+        return;
       }
-      sendMessage({
-        command: "viewDiff",
-        repo: this.currentRepo!,
-        commitHash: diffCommitHash,
-        oldFilePath: decodeURIComponent(sourceElem.dataset.oldfilepath!),
-        newFilePath: decodeURIComponent(sourceElem.dataset.newfilepath!),
-        type: <GG.GitFileChangeType>sourceElem.dataset.type,
-        ...(diffCompareWithHash !== null ? { compareWithHash: diffCompareWithHash } : {})
+      this.handleFileRowActivationKey(e);
+    });
+  }
+  // File and folder keys carry the details' displayed hashes (origin and compare target), which
+  // differ from the time-ordered from / to hashes of the requests (plan §3.4).
+  private markFileViewTargets(): void {
+    const filesElem = document.getElementById(COMMIT_DETAILS_FILES_ID);
+    if (filesElem === null || this.expandedCommit === null) return;
+    const base = {
+      repo: this.currentRepo,
+      hash: this.expandedCommit.hash,
+      compareWithHash: this.expandedCommit.compareWithHash
+    } as const;
+    filesElem.querySelectorAll<HTMLElement>(`.${FOLDER_BUTTON_CLASS}`).forEach((button) => {
+      const path = button.dataset.folderpath;
+      if (path !== undefined) {
+        markFocusTarget(button, { kind: "folder", ...base, path: decodeURIComponent(path) });
+      }
+    });
+    filesElem.querySelectorAll<HTMLElement>(FILE_ROW_SELECTOR).forEach((fileRow) => {
+      const oldPath = fileRow.dataset.oldfilepath;
+      const newPath = fileRow.dataset.newfilepath;
+      if (oldPath === undefined || newPath === undefined) return;
+      const fileBase = {
+        kind: "file",
+        ...base,
+        oldPath: decodeURIComponent(oldPath),
+        newPath: decodeURIComponent(newPath)
+      } as const;
+      // A row that is itself the tab stop (no enabled child button) stands for its diff target.
+      if (fileRow.hasAttribute("tabindex"))
+        markFocusTarget(fileRow, { ...fileBase, action: "diff" });
+      FILE_ACTION_BUTTONS.forEach(([className, action]) => {
+        fileRow.querySelectorAll<HTMLElement>(`.${className}`).forEach((button) => {
+          markFocusTarget(button, { ...fileBase, action });
+        });
       });
     });
+  }
+  private toggleFolder(button: HTMLElement): void {
+    const item = button.parentElement;
+    const contents = item?.querySelector<HTMLElement>(FOLDER_CONTENTS_SELECTOR) ?? null;
+    const folderPath = button.dataset.folderpath;
+    if (
+      item === null ||
+      contents === null ||
+      folderPath === undefined ||
+      this.expandedCommit === null ||
+      this.expandedCommit.fileTree === null
+    ) {
+      return;
+    }
+    const isOpen = !item.classList.toggle(FOLDER_CLOSED_CLASS);
+    const iconElem = button.querySelector<HTMLElement>(FOLDER_ICON_SELECTOR);
+    if (iconElem !== null)
+      iconElem.innerHTML = isOpen ? svgIcons.openFolder : svgIcons.closedFolder;
+    button.setAttribute(ATTRIBUTE_ARIA_EXPANDED, String(isOpen));
+    contents.classList.toggle(FOLDER_CONTENTS_HIDDEN_CLASS, !isOpen);
+    contents.hidden = !isOpen;
+    alterGitFileTree(this.expandedCommit.fileTree, decodeURIComponent(folderPath), isOpen);
+    this.saveState();
+  }
+  private sendViewDiffAction(fileRow: HTMLElement | null): void {
+    if (
+      fileRow === null ||
+      this.expandedCommit === null ||
+      !fileRow.classList.contains("gitDiffPossible")
+    ) {
+      return;
+    }
+    // When in comparison mode, normalize order so diff always shows old → new
+    let diffCommitHash = this.expandedCommit.hash;
+    let diffCompareWithHash = this.expandedCommit.compareWithHash;
+    if (diffCompareWithHash !== null) {
+      const order = this.getCommitOrder(diffCommitHash, diffCompareWithHash);
+      diffCommitHash = order.from;
+      diffCompareWithHash = order.to;
+    }
+    sendMessage({
+      command: "viewDiff",
+      repo: this.currentRepo,
+      commitHash: diffCommitHash,
+      oldFilePath: decodeURIComponent(fileRow.dataset.oldfilepath!),
+      newFilePath: decodeURIComponent(fileRow.dataset.newfilepath!),
+      type: <GG.GitFileChangeType>fileRow.dataset.type,
+      ...(diffCompareWithHash !== null ? { compareWithHash: diffCompareWithHash } : {})
+    });
+  }
+  // A row that is its own tab stop (no enabled child button) opens its menu on Enter / Space;
+  // keys bubbling up from a child button are that button's own.
+  private handleFileRowActivationKey(e: Event): void {
+    if (!(e instanceof KeyboardEvent) || e.defaultPrevented || e.target !== e.currentTarget) return;
+    if (e.key !== KEY_ENTER && e.key !== KEY_SPACE) return;
+    if (!(e.currentTarget instanceof HTMLElement) || !e.currentTarget.hasAttribute("tabindex")) {
+      return;
+    }
+    e.preventDefault();
+    if (isKeyboardActionBlocked(e)) return;
+    e.stopPropagation();
+    this.showFileRowContextMenu(e);
   }
   public showCompareResult(fileChanges: GG.GitFileChange[], fromHash: string, toHash: string) {
     if (this.expandedCommit === null || this.expandedCommit.compareWithHash === null) return;
@@ -2161,6 +2885,8 @@ class GitKeizuView {
 }
 
 /* Initialization */
+// Guards are installed before any other listener so composition and repeat state is tracked first.
+const disposeKeyboardGuards = installKeyboardGuards(document);
 let gitKeizu = new GitKeizuView(
   viewState.repos,
   viewState.lastActiveRepo,
@@ -2186,12 +2912,21 @@ const prevCleanup = _win[LISTENER_CLEANUP_KEY];
 if (typeof prevCleanup === "function") (prevCleanup as () => void)();
 const messageHandler = (event: MessageEvent) => handleMessage(event.data, gitKeizu);
 window.addEventListener("message", messageHandler);
-_win[LISTENER_CLEANUP_KEY] = () => window.removeEventListener("message", messageHandler);
+// Escape closes one layer per keydown in the bubble phase; a key a local UI already consumed, a
+// repeat or a composition-bound press never reaches the chain (R4.6).
+const escapeHandler = (e: KeyboardEvent) => {
+  if (e.key !== KEY_ESCAPE || e.defaultPrevented || isKeyboardActionBlocked(e)) return;
+  gitKeizu.handleEscape();
+};
+document.addEventListener("keydown", escapeHandler);
+_win[LISTENER_CLEANUP_KEY] = () => {
+  window.removeEventListener("message", messageHandler);
+  document.removeEventListener("keydown", escapeHandler);
+  gitKeizu.dispose();
+  disposeKeyboardGuards();
+};
 
 /* Global Listeners */
-document.addEventListener("keyup", (e) => {
-  if (e.key === "Escape") gitKeizu.handleEscape();
-});
 document.addEventListener("click", hideContextMenuListener);
 document.addEventListener("contextmenu", hideContextMenuListener);
 document.addEventListener("mouseleave", hideContextMenuListener);

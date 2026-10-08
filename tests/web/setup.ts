@@ -11,6 +11,19 @@ vi.stubGlobal(
 
 vi.stubGlobal("webviewLocale", "en");
 vi.stubGlobal("webviewMessages", {
+  "a11y.actionFor": "{0}: {1}",
+  "a11y.closeDetails": "Close commit details",
+  "a11y.commitHistory": "Commit history",
+  "a11y.commitOrdering": "Commit ordering",
+  "a11y.commitsLoaded": "{0} commits loaded",
+  "a11y.compareBase": "Comparison base",
+  "a11y.compareTarget": "Comparison target",
+  "a11y.detailsOpen": "Details open",
+  "a11y.head": "HEAD",
+  "a11y.noCommits": "No commits to display",
+  "a11y.operationTarget": "Navigation target",
+  "a11y.stash": "Stash",
+  "a11y.workingTree": "Working tree",
   "commitDetails.author": "Author:",
   "commitDetails.commit": "Commit:",
   "commitDetails.committer": "Committer:",

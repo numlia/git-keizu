@@ -56,3 +56,44 @@
 - Boundary: TC-001
 - Type: excluded(上表のとおり)
 - Normal: TC-002〜TC-005、TC-007、TC-010
+
+## S2: 経路バーの操作要素の到達・名前・解除時の復元と対象の不変
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: -
+> Signature: `constructor(callbacks: PathHighlightCallbacks)` の bar 生成（`label` 付き `select`、`Clear path highlight` の `button`、`details`）/ `select(selection)` / `onCommitsChanged()` / `clear()`（公開 signature と選択の意味は変更しない）
+> Target Path: `web/pathHighlightController.ts:132-177, 184-206, 221-291`（constructor の bar 生成、`onCommitsChanged` / `onRepositoryChanged` / `clear`、`render` / `renderEmpty` / `renderModeOptions` / `renderBoundaries`）
+> Test File: `tests/web/pathHighlightController.test.ts`
+
+対応プラン R4.3・R4.6・Task 10 実装内容 4 の観点。S1 の選択保持・状態バー・描画 callback は維持（R5）。fixture は S1 と同じで、`FocusContext` を登録し `document.activeElement` を観測する。
+
+| Case ID | Input / Precondition                                                                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                             | Notes                                                                          |
+| ------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| TC-019  | TC-002 の選択後、`getCommits` の並びを変えて `onCommitsChanged()`、さらに `M` を除いた配列で `onCommitsChanged()`         | Normal - 一覧の変化で対象 hash を変えない                                  | 名前 `"Merge branch"` と `title` `"M"` が不変、`select` と `button` が同じ DOM ノード（`toBe`）、不在時は `Target is outside loaded history` の表示を維持   | K43 / A8.2-2 / A8.3-5。S1 TC-005 の維持                                        |
+| TC-020  | `#pathHighlightMode`（`select`）に実フォーカスして `ArrowDown` keydown（`change` なし）、続けて値を変えて `change`        | Validation - select の keydown だけでは何も変えない                        | keydown では `setGraphHighlight` の call count 不変で `defaultPrevented === false`。`change` で S1 TC-008 のとおり再計算                                    | K43。行移動の抑止は `web/main-test/13-keyboard-accessibility-01.md` S72 TC-687 |
+| TC-021  | 解除 `button` に実フォーカスして `Enter` keydown → keyup（`click` 代替）。`FocusContext.getActiveRow()` が `M` の行を返す | Normal - 解除後の focus が有効な要素へ                                     | `setGraphHighlight(null)` 1 回、バーの `active` が外れ、`activeElement` が接続・有効な要素（操作対象行 `M`）で `body` ではない。keyup で 2 回目の解除なし   | K43 / A8.1-6                                                                   |
+| TC-022  | `select` に実フォーカスして `Escape` keydown → keyup                                                                      | Validation - Escape で解除しない                                           | `setGraphHighlight(null)` 0 回、バーが `active` のまま、選択不変                                                                                            | K43 / A8.2-2                                                                   |
+| TC-023  | bar の属性                                                                                                                | Normal - 名前と label                                                      | `label` の `for` が `select` の `id` と一致し文言が `Mode`、解除 `button` が `type="button"` で名前が `Clear path highlight`、`details` の `summary` に文言 | R4.3                                                                           |
+| TC-024  | 境界 0 件の選択（TC-002）と境界ありの選択（TC-010）での `details`                                                         | Boundary - 境界なしは停止点なし                                            | 境界なしでは `details` が描画されず停止点にならない。境界ありでは `summary` が到達可能で `Enter` で `open` が切り替わる                                     | A8.3-1                                                                         |
+| TC-025  | 境界ありの選択で `summary` に実フォーカス後、境界が消える `onCommitsChanged()`                                            | Normal - 境界一覧消失時の復元                                              | `activeElement` が bar 内の接続・有効な要素（`select`）で `body` ではない、選択不変                                                                         | A8.3-5。未読込対象の表示は S1 TC-005 のまま                                    |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S2）
+
+| 失敗源                                   | 対応ケースまたは除外理由                               |
+| ---------------------------------------- | ------------------------------------------------------ |
+| 一覧の変化で対象を追従させる             | TC-019                                                 |
+| select の keydown で再計算する           | TC-020                                                 |
+| 解除後に body へ落ちる、keyup で二重解除 | TC-021                                                 |
+| Escape で解除する                        | TC-022                                                 |
+| 名前 / label の欠落、境界の停止点        | TC-023、TC-024                                         |
+| 境界消失時の復元                         | TC-025                                                 |
+| 外部依存・例外                           | excluded(callbacks は同期の供給元で失敗経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S2
+
+- テスト: `tests/web/pathHighlightController.test.ts` describe `PathHighlightController bar controls and focus (S2)`。fixture は `configureFocusContext` を `beforeEach` で登録し `afterEach` で破棄。TC-019〜TC-025 を同番号の `it` で 1 件ずつ（加えて `keeps an inactive bar hidden so its controls are not tab stops` が非表示時の `hidden` を確認）
+- TC-021 の jsdom 代替（Task 10 handoff）: 解除 `button` の Enter は既定 click に委ねるため keydown の `defaultPrevented === false` を確認し、実行は `click()` で代替（keyup で 2 回目の解除なし）
+- main 側（矢印で追従しない、Escape で解除しない、select の keydown）は `web/main-test/13-keyboard-accessibility-01.md` S71 TC-683 / S72 TC-687 / TC-695
+- 実行結果（2026-10-07）: 7 件 pass

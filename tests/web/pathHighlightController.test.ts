@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GitCommitNode } from "../../src/types";
+import { configureFocusContext } from "../../web/keyboardNavigation";
 import { PathHighlightMode } from "../../web/pathHighlight";
 import {
   type PathHighlightCallbacks,
@@ -469,5 +470,225 @@ describe("PathHighlightController selection, bar and callback (S1)", () => {
 
     // Then: no details element
     expect(h.bar().querySelector("details")).toBeNull();
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S2: reachable controls, names, clear / boundary focus, fixed target */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/web/pathHighlightController-test.md
+describe("PathHighlightController bar controls and focus (S2)", () => {
+  const TARGET_HASH = "M";
+  let disposeContext: () => void;
+
+  function targetRow(): HTMLElement {
+    return document.querySelector<HTMLElement>(`tr[data-hash="${TARGET_HASH}"]`)!;
+  }
+
+  /** The S1 harness plus a commit table whose row target is M, as main keeps it. */
+  function setupWithList(): Harness {
+    const h = setup();
+    document.body.insertAdjacentHTML(
+      "beforeend",
+      `<table id="commitTable"><tbody><tr data-hash="${TARGET_HASH}" tabindex="0"><td>M</td></tr></tbody></table>`
+    );
+    return h;
+  }
+
+  function selectTopic(h: Harness): void {
+    h.controller.select({
+      kind: "branch",
+      refType: "head",
+      repo: REPO,
+      hash: "C3",
+      name: "topic",
+      mode: PathHighlightMode.AllAncestors
+    });
+  }
+
+  function key(target: HTMLElement, type: "keydown" | "keyup", keyName: string): KeyboardEvent {
+    const event = new KeyboardEvent(type, { key: keyName, bubbles: true, cancelable: true });
+    target.dispatchEvent(event);
+    return event;
+  }
+
+  beforeEach(() => {
+    disposeContext = configureFocusContext({
+      getRepo: () => REPO,
+      getActiveRow: () => targetRow(),
+      getTabStops: () => []
+    });
+  });
+
+  afterEach(() => {
+    disposeContext();
+  });
+
+  it("keeps the target hash and the control nodes when the list changes (TC-019)", () => {
+    // Case: TC-019 (K43 / A8.2-2 / A8.3-5)
+    // Given: M selected in Direct mode
+    const h = setupWithList();
+    selectMerge(h);
+    const select = h.select();
+    const button = h.button();
+
+    // When: the list is reordered, then M disappears from it
+    h.state.commits = standard().reverse();
+    h.controller.onCommitsChanged();
+    const afterReorder = { name: h.name().textContent, title: h.hash().title };
+    h.state.commits = standard().filter((commit) => commit.hash !== TARGET_HASH);
+    h.controller.onCommitsChanged();
+
+    // Then: the name and hash never changed, the controls are the same nodes, and the unloaded
+    // target is reported
+    expect(afterReorder).toEqual({ name: MERGE_SUBJECT, title: TARGET_HASH });
+    expect(h.name().textContent).toBe(MERGE_SUBJECT);
+    expect(h.hash().title).toBe(TARGET_HASH);
+    expect(h.select()).toBe(select);
+    expect(h.button()).toBe(button);
+    expect(h.bar().textContent).toContain(TARGET_OUTSIDE_TEXT);
+    expect(h.bar().classList.contains(CLASS_ACTIVE)).toBe(true);
+  });
+
+  it("recomputes only on change, never on a keydown of the select (TC-020)", () => {
+    // Case: TC-020 (K43)
+    // Given: M selected and the mode select focused
+    const h = setupWithList();
+    selectMerge(h);
+    const calls = h.setGraphHighlight.mock.calls.length;
+    h.select().focus();
+
+    // When: ArrowDown is pressed without a change event
+    const keydown = key(h.select(), "keydown", "ArrowDown");
+
+    // Then: nothing recomputed and the key keeps its default
+    expect(h.setGraphHighlight).toHaveBeenCalledTimes(calls);
+    expect(keydown.defaultPrevented).toBe(false);
+
+    // When: the value changes
+    changeMode(h, PathHighlightMode.FirstParent);
+
+    // Then: one recalculation with the new mode
+    expect(h.setGraphHighlight).toHaveBeenCalledTimes(calls + 1);
+    expect(h.select().value).toBe(PathHighlightMode.FirstParent);
+  });
+
+  it("clears once from the focused button and lands focus on the row target (TC-021)", () => {
+    // Case: TC-021 (K43 / A8.1-6)
+    // Given: M selected and the clear button focused
+    const h = setupWithList();
+    selectMerge(h);
+    h.button().focus();
+    expect(document.activeElement).toBe(h.button());
+
+    // When: Enter is pressed (keydown, the click standing in for the native activation, keyup)
+    key(h.button(), "keydown", "Enter");
+    h.button().click();
+    key(h.button(), "keyup", "Enter");
+
+    // Then: one clear, the bar inactive, focus on the connected row target rather than body
+    expect(h.setGraphHighlight).toHaveBeenCalledTimes(2);
+    expect(h.setGraphHighlight).toHaveBeenLastCalledWith(null);
+    expect(h.bar().classList.contains(CLASS_ACTIVE)).toBe(false);
+    expect(document.activeElement).toBe(targetRow());
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  it("does not clear on Escape (TC-022)", () => {
+    // Case: TC-022 (K43 / A8.2-2)
+    // Given: M selected and the select focused
+    const h = setupWithList();
+    selectMerge(h);
+    h.select().focus();
+
+    // When: Escape is pressed and released
+    key(h.select(), "keydown", "Escape");
+    key(h.select(), "keyup", "Escape");
+
+    // Then: no clear, the bar active, the selection unchanged
+    expect(h.setGraphHighlight).toHaveBeenCalledTimes(1);
+    expect(h.setGraphHighlight).not.toHaveBeenCalledWith(null);
+    expect(h.bar().classList.contains(CLASS_ACTIVE)).toBe(true);
+    expect(h.name().textContent).toBe(MERGE_SUBJECT);
+    expect(h.hash().title).toBe(TARGET_HASH);
+  });
+
+  it("names the select through its label and the clear button through its text (TC-023)", () => {
+    // Case: TC-023 (R4.3)
+    // Given: a boundary selection so the details element is rendered
+    const h = setupWithList();
+    h.state.commits = boundaryFixture();
+    selectTopic(h);
+
+    // Then: label / select association, a type="button" clear with its name, a summary text
+    const label = h.bar().querySelector("label")!;
+    expect(label.htmlFor).toBe(h.select().id);
+    expect(label.textContent).toBe("Mode");
+    expect(h.button().type).toBe("button");
+    expect(h.button().textContent).toBe("Clear path highlight");
+    expect(h.bar().querySelector("details summary")!.textContent).toBe("Outside loaded history");
+    expect(h.bar().hidden).toBe(false);
+  });
+
+  it("offers the boundary summary as a stop only when boundaries exist (TC-024)", () => {
+    // Case: TC-024 (A8.3-1)
+    // Given: M selected without boundaries
+    const h = setupWithList();
+    selectMerge(h);
+
+    // Then: no details element and the hidden inactive state is never a stop
+    expect(h.bar().querySelector("details")).toBeNull();
+
+    // When: a selection with boundaries is made
+    h.state.commits = boundaryFixture();
+    selectTopic(h);
+
+    // Then: the summary is reachable and its activation toggles the details
+    const details = h.bar().querySelector<HTMLDetailsElement>("details")!;
+    const summary = details.querySelector<HTMLElement>("summary")!;
+    summary.focus();
+    expect(document.activeElement).toBe(summary);
+    expect(details.open).toBe(false);
+    summary.click();
+    expect(details.open).toBe(true);
+    summary.click();
+    expect(details.open).toBe(false);
+  });
+
+  it("moves focus from a vanishing boundary list to the select (TC-025)", () => {
+    // Case: TC-025 (A8.3-5)
+    // Given: a boundary selection with focus on the summary
+    const h = setupWithList();
+    h.state.commits = boundaryFixture();
+    selectTopic(h);
+    const summary = h.bar().querySelector<HTMLElement>("summary")!;
+    summary.focus();
+    expect(document.activeElement).toBe(summary);
+
+    // When: the boundary parents get loaded so no boundary remains
+    h.state.commits = [...boundaryFixture(), node("g1", []), node("g2", [])];
+    h.controller.onCommitsChanged();
+
+    // Then: the details element is gone, focus is on the bar's select, selection unchanged
+    expect(h.bar().querySelector("details")).toBeNull();
+    expect(document.activeElement).toBe(h.select());
+    expect(h.select().isConnected).toBe(true);
+    expect(h.name().textContent).toBe("topic");
+    expect(h.hash().title).toBe("C3");
+    expect(h.bar().classList.contains(CLASS_ACTIVE)).toBe(true);
+  });
+
+  it("keeps an inactive bar hidden so its controls are not tab stops", () => {
+    // Case: TC-023 / TC-024 (hidden state of the bar; main's getTabStops reads `.active`)
+    // Given: a fresh controller
+    const h = setupWithList();
+
+    // Then: hidden while inactive, shown on select, hidden again after clear
+    expect(h.bar().hidden).toBe(true);
+    selectMerge(h);
+    expect(h.bar().hidden).toBe(false);
+    h.controller.clear();
+    expect(h.bar().hidden).toBe(true);
   });
 });

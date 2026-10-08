@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
@@ -1138,4 +1138,175 @@ describe("path highlight l10n keys (S3)", () => {
       expect(result).not.toBe(key);
     }
   );
+});
+
+describe("keyboard accessibility a11y keys (Feature 061-05)", () => {
+  const A11Y_KEYS = [
+    "a11y.commitHistory",
+    "a11y.operationTarget",
+    "a11y.detailsOpen",
+    "a11y.compareBase",
+    "a11y.compareTarget",
+    "a11y.head",
+    "a11y.workingTree",
+    "a11y.stash",
+    "a11y.actionFor",
+    "a11y.commitsLoaded",
+    "a11y.noCommits",
+    "a11y.commitOrdering"
+  ] as const;
+  type A11yKey = (typeof A11Y_KEYS)[number];
+  const ACTION_FOR_KEY: A11yKey = "a11y.actionFor";
+  const COMMITS_LOADED_KEY: A11yKey = "a11y.commitsLoaded";
+  const A11Y_PREFIX = "a11y.";
+  const ENGLISH_VALUES: Record<A11yKey, string> = {
+    "a11y.commitHistory": "Commit history",
+    "a11y.operationTarget": "Navigation target",
+    "a11y.detailsOpen": "Details open",
+    "a11y.compareBase": "Comparison base",
+    "a11y.compareTarget": "Comparison target",
+    "a11y.head": "HEAD",
+    "a11y.workingTree": "Working tree",
+    "a11y.stash": "Stash",
+    "a11y.actionFor": "{0}: {1}",
+    "a11y.commitsLoaded": "{0} commits loaded",
+    "a11y.noCommits": "No commits to display",
+    "a11y.commitOrdering": "Commit ordering"
+  };
+  const JAPANESE_VALUES: Record<A11yKey, string> = {
+    "a11y.commitHistory": "コミット履歴",
+    "a11y.operationTarget": "操作対象",
+    "a11y.detailsOpen": "詳細表示中",
+    "a11y.compareBase": "比較の起点",
+    "a11y.compareTarget": "比較対象",
+    "a11y.head": "HEAD",
+    "a11y.workingTree": "作業ツリー",
+    "a11y.stash": "スタッシュ",
+    "a11y.actionFor": "{0}: {1}",
+    "a11y.commitsLoaded": "{0}件のコミットを読み込みました",
+    "a11y.noCommits": "表示するコミットはありません",
+    "a11y.commitOrdering": "コミットの並び順"
+  };
+
+  function loadBundle(fileName: string): Record<string, string> {
+    const jsonPath = resolve(process.cwd(), "l10n/web", fileName);
+    return JSON.parse(readFileSync(jsonPath, "utf-8")) as Record<string, string>;
+  }
+
+  function placeholderSet(value: string): string[] {
+    return [...value.matchAll(/\{\d+\}/g)].map((match) => match[0]).sort();
+  }
+
+  function pick(bundle: Record<string, string>): Record<string, string | undefined> {
+    return Object.fromEntries(A11Y_KEYS.map((key) => [key, bundle[key]]));
+  }
+
+  function a11yKeys(bundle: Record<string, string>): string[] {
+    return Object.keys(bundle)
+      .filter((key) => key.startsWith(A11Y_PREFIX))
+      .sort();
+  }
+
+  /** Every `"a11y.<name>"` string literal in web/*.ts (keys may be held in constants). */
+  function referencedA11yKeys(): string[] {
+    const webDir = resolve(process.cwd(), "web");
+    const literals = readdirSync(webDir)
+      .filter((fileName) => fileName.endsWith(".ts"))
+      .flatMap((fileName) => [
+        ...readFileSync(resolve(webDir, fileName), "utf-8").matchAll(/"(a11y\.[A-Za-z]+)"/g)
+      ])
+      .map((match) => match[1]);
+    return [...new Set(literals)].sort();
+  }
+
+  it("English bundle holds the twelve keys with non-empty values (en l10n TC-101)", () => {
+    // Case: TC-101 (l10n/web/web.l10n.en.json-test.md S11, K45)
+    // Given: the English bundle on disk
+    const english = loadBundle("web.l10n.en.json");
+    // When: the twelve keys are read
+    // Then: each exists as a non-empty string
+    for (const key of A11Y_KEYS) {
+      expect(typeof english[key], key).toBe("string");
+      expect(english[key].length, key).toBeGreaterThan(0);
+    }
+  });
+
+  it("English bundle holds exactly the fixed values of the Task 11 table (en l10n TC-102)", () => {
+    // Case: TC-102 (l10n/web/web.l10n.en.json-test.md S11, K45)
+    // Given: the English bundle on disk
+    // When: the twelve values are compared with the table
+    // Then: they match exactly
+    expect(pick(loadBundle("web.l10n.en.json"))).toEqual(ENGLISH_VALUES);
+  });
+
+  it("English placeholders exist only on actionFor and commitsLoaded (en l10n TC-103)", () => {
+    // Case: TC-103 (l10n/web/web.l10n.en.json-test.md S11, K45)
+    // Given: the English bundle on disk
+    const english = loadBundle("web.l10n.en.json");
+    // When: the placeholder sets are extracted
+    // Then: actionFor has {0} and {1}, commitsLoaded has {0}, the other ten have none
+    expect(placeholderSet(english[ACTION_FOR_KEY])).toEqual(["{0}", "{1}"]);
+    expect(placeholderSet(english[COMMITS_LOADED_KEY])).toEqual(["{0}"]);
+    for (const key of A11Y_KEYS.filter((k) => k !== ACTION_FOR_KEY && k !== COMMITS_LOADED_KEY)) {
+      expect(placeholderSet(english[key]), key).toEqual([]);
+    }
+  });
+
+  it("keeps the a11y key sets of both locales in parity (en l10n TC-104 / ja l10n TC-104)", () => {
+    // Case: TC-104 (l10n/web/web.l10n.en.json-test.md S11 and web.l10n.ja.json-test.md S12)
+    // Given: both bundles on disk
+    const english = a11yKeys(loadBundle("web.l10n.en.json"));
+    const japanese = a11yKeys(loadBundle("web.l10n.ja.json"));
+    // When: the a11y.-prefixed key sets are compared in both directions
+    // Then: neither locale has a key the other lacks
+    expect(english.filter((key) => !japanese.includes(key))).toEqual([]);
+    expect(japanese.filter((key) => !english.includes(key))).toEqual([]);
+  });
+
+  it("references every a11y key from web/ and defines every referenced one (en l10n TC-105)", () => {
+    // Case: TC-105 (l10n/web/web.l10n.en.json-test.md S11, Task 11 completion condition)
+    // Given: the English bundle and the webview sources
+    const english = loadBundle("web.l10n.en.json");
+    // When: the "a11y.*" literals of web/*.ts are collected
+    const referenced = referencedA11yKeys();
+    // Then: the twelve keys are all referenced, and no referenced key is missing from the bundle
+    for (const key of A11Y_KEYS) expect(referenced, key).toContain(key);
+    expect(referenced.filter((key) => english[key] === undefined)).toEqual([]);
+    expect(a11yKeys(english).filter((key) => !referenced.includes(key))).toEqual([]);
+  });
+
+  it("Japanese bundle holds the twelve keys without raw key fallback (ja l10n TC-101)", () => {
+    // Case: TC-101 (l10n/web/web.l10n.ja.json-test.md S12, K45)
+    // Given: the Japanese bundle on disk
+    const japanese = loadBundle("web.l10n.ja.json");
+    // When: the twelve keys are read
+    // Then: each exists, is non-empty and is not the key string itself
+    for (const key of A11Y_KEYS) {
+      expect(typeof japanese[key], key).toBe("string");
+      expect(japanese[key].length, key).toBeGreaterThan(0);
+      expect(japanese[key], key).not.toBe(key);
+    }
+  });
+
+  it("Japanese bundle holds exactly the fixed values of the Task 11 table (ja l10n TC-102)", () => {
+    // Case: TC-102 (l10n/web/web.l10n.ja.json-test.md S12, K45; HEAD and {0}: {1} are shared)
+    // Given: the Japanese bundle on disk
+    // When: the twelve values are compared with the table
+    // Then: they match exactly
+    expect(pick(loadBundle("web.l10n.ja.json"))).toEqual(JAPANESE_VALUES);
+  });
+
+  it("Japanese placeholders match the English sets (ja l10n TC-103)", () => {
+    // Case: TC-103 (l10n/web/web.l10n.ja.json-test.md S12, K45)
+    // Given: both bundles on disk
+    const english = loadBundle("web.l10n.en.json");
+    const japanese = loadBundle("web.l10n.ja.json");
+    // When: the placeholder sets of each key are compared
+    // Then: every key carries the same placeholders in both locales
+    for (const key of A11Y_KEYS) {
+      expect(placeholderSet(japanese[key]), key).toEqual(placeholderSet(english[key]));
+    }
+    expect(placeholderSet(japanese[ACTION_FOR_KEY])).toEqual(["{0}", "{1}"]);
+    expect(placeholderSet(japanese[COMMITS_LOADED_KEY])).toEqual(["{0}"]);
+  });
 });

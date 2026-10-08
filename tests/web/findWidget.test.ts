@@ -10,6 +10,7 @@ import {
   FindWidget,
   SEARCH_DEBOUNCE_MS
 } from "../../web/findWidget";
+import { configureFocusContext, markFocusTarget } from "../../web/keyboardNavigation";
 
 /* === Mocks === */
 
@@ -1092,5 +1093,391 @@ describe("FindWidget ref overflow exclusion and highlight notification (S10)", (
 
     // Then: the existing option semantics decide the result
     expect(getPositionText()).toBe(entry.expected);
+  });
+});
+
+// S11: standard buttons, pressed / disabled state, Enter / Shift+Enter IME guard, span and focus
+// @see docs/testing/perspectives/web/findWidget-test.md
+describe("FindWidget standard controls, IME guard and focus survival (S11)", () => {
+  const HASHES = ["aaa1111100000000", "bbb2222200000000", "ccc3333300000000"];
+  const REF_NAME = "feature/keyboard";
+  let callbacks: FindWidgetCallbacks;
+  let widget: FindWidget;
+  let disposeContext: () => void;
+
+  function input(): HTMLInputElement {
+    return document.getElementById("findInput") as HTMLInputElement;
+  }
+
+  function button(id: string): HTMLButtonElement {
+    return document.getElementById(id) as HTMLButtonElement;
+  }
+
+  function key(type: string, init: KeyboardEventInit): KeyboardEvent {
+    const event = new KeyboardEvent(type, { bubbles: true, cancelable: true, ...init });
+    input().dispatchEvent(event);
+    return event;
+  }
+
+  function threeMatches(): void {
+    setupCommitsAndDom(
+      HASHES.map((hash) => makeCommit({ hash, message: "fix bug" })),
+      callbacks
+    );
+    triggerSearch(widget, "fix");
+    expect(getPositionText()).toBe("1 of 3");
+  }
+
+  /** A commit row whose description holds a marked ref button, as web/main.ts renders it. */
+  function rowWithRefButton(): HTMLButtonElement {
+    const commit = makeCommit({
+      hash: HASHES[0],
+      message: "plain",
+      refs: [{ hash: HASHES[0], name: REF_NAME, type: "head" }]
+    });
+    (callbacks.getCommits as Mock).mockReturnValue([commit]);
+    (getBranchLabels as Mock).mockReturnValue({
+      heads: [{ name: REF_NAME, remotes: [] }],
+      remotes: [],
+      tags: []
+    });
+    const row = document.createElement("tr");
+    row.className = "commit";
+    row.dataset.id = "0";
+    row.innerHTML = `<td></td><td><span class="gitRef head" data-name="${REF_NAME}"><button type="button" class="gitRefButton" tabindex="0" aria-label="Branch ${REF_NAME}" data-name="${REF_NAME}"><span class="codicon codicon-git-branch"></span><span class="gitRefName">${REF_NAME}</span></button></span><span class="commitMessage">plain</span></td><td>Author</td><td>${HASHES[0].substring(0, ABBREV_LENGTH)}</td>`;
+    document.body.appendChild(row);
+    const refButton = row.querySelector<HTMLButtonElement>("button.gitRefButton")!;
+    markFocusTarget(refButton, {
+      kind: "ref",
+      repo: "/repo",
+      hash: HASHES[0],
+      refType: "head",
+      name: REF_NAME
+    });
+    return refButton;
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    callbacks = createMockCallbacks();
+    widget = new FindWidget(callbacks);
+    disposeContext = configureFocusContext({
+      getRepo: () => "/repo",
+      getActiveRow: () => null,
+      getTabStops: () => []
+    });
+  });
+
+  afterEach(() => {
+    disposeContext();
+    (getBranchLabels as Mock).mockImplementation(() => ({ heads: [], remotes: [], tags: [] }));
+    document.body.innerHTML = "";
+    vi.restoreAllMocks();
+  });
+
+  it("renders every control as a named standard button and names the input (TC-493)", () => {
+    // Case: TC-493 (K40 / A8.1-6)
+    const expectedNames: Record<string, string> = {
+      findCaseSensitive: "Match Case",
+      findRegex: "Use Regular Expression",
+      findPrev: "Previous match (Shift+Enter)",
+      findNext: "Next match (Enter)",
+      findOpenCdv: "Open the Commit Details View for the current match",
+      findClose: "Close (Escape)"
+    };
+    for (const [id, name] of Object.entries(expectedNames)) {
+      const control = button(id);
+      expect(control.tagName).toBe("BUTTON");
+      expect(control.getAttribute("type")).toBe("button");
+      expect(control.getAttribute("aria-label")).toBe(name);
+      expect(control.getAttribute("title")).toBe(name);
+    }
+    expect(input().getAttribute("aria-label")).toBe("Find");
+  });
+
+  it("keeps aria-pressed in sync with the toggle state and the search (TC-494)", () => {
+    // Case: TC-494 (K40)
+    setupCommitsAndDom(
+      [
+        makeCommit({ hash: HASHES[0], message: "Fix bug" }),
+        makeCommit({ hash: HASHES[1], message: "fix bug" })
+      ],
+      callbacks
+    );
+    triggerSearch(widget, "Fix");
+    expect(getPositionText()).toBe("1 of 2");
+    for (const id of ["findCaseSensitive", "findRegex", "findOpenCdv"]) {
+      expect(button(id).getAttribute("aria-pressed")).toBe("false");
+      expect(button(id).classList.contains("active")).toBe(false);
+    }
+
+    button("findCaseSensitive").click();
+    expect(button("findCaseSensitive").getAttribute("aria-pressed")).toBe("true");
+    expect(button("findCaseSensitive").classList.contains("active")).toBe(true);
+    expect(getPositionText()).toBe("1 of 1");
+
+    button("findRegex").click();
+    expect(button("findRegex").getAttribute("aria-pressed")).toBe("true");
+    expect(widget.getState().regex).toBe(true);
+
+    button("findOpenCdv").click();
+    expect(button("findOpenCdv").getAttribute("aria-pressed")).toBe("true");
+    expect(widget.getState().openCdvEnabled).toBe(true);
+
+    button("findCaseSensitive").click();
+    expect(button("findCaseSensitive").getAttribute("aria-pressed")).toBe("false");
+    expect(getPositionText()).toBe("1 of 2");
+  });
+
+  it("disables previous / next without results or with a disabled input (TC-495)", () => {
+    // Case: TC-495 (K40 / A8.3-1)
+    widget.show(false);
+    expect(button("findPrev").disabled).toBe(true);
+    expect(button("findNext").disabled).toBe(true);
+    button("findNext").click();
+    key("keydown", { key: "Enter" });
+    expect(callbacks.scrollToCommit).not.toHaveBeenCalled();
+
+    threeMatches();
+    expect(button("findPrev").disabled).toBe(false);
+    expect(button("findNext").disabled).toBe(false);
+
+    widget.setInputEnabled(false);
+    expect(button("findPrev").disabled).toBe(true);
+    expect(button("findNext").disabled).toBe(true);
+    widget.setInputEnabled(true);
+    expect(button("findNext").disabled).toBe(false);
+  });
+
+  it("moves once per Enter keydown: next, and previous with Shift (TC-496)", () => {
+    // Case: TC-496 (K40 / A8.3-2)
+    threeMatches();
+    key("keydown", { key: "Enter" });
+    key("keyup", { key: "Enter" });
+    expect(getPositionText()).toBe("2 of 3");
+    expect(callbacks.scrollToCommit).toHaveBeenCalledTimes(1);
+
+    triggerSearch(widget, "fix");
+    expect(getPositionText()).toBe("1 of 3");
+    (callbacks.scrollToCommit as Mock).mockClear();
+    key("keydown", { key: "Enter", shiftKey: true });
+    key("keyup", { key: "Enter", shiftKey: true });
+    expect(getPositionText()).toBe("3 of 3");
+    expect(callbacks.scrollToCommit).toHaveBeenCalledTimes(1);
+  });
+
+  it("ignores the Enter of an IME commit and its keyup, then searches the committed text (TC-497)", () => {
+    // Case: TC-497 (K40 / A8.3-2)
+    vi.useFakeTimers();
+    try {
+      threeMatches();
+      (callbacks.getCommits as Mock).mockClear();
+      input().dispatchEvent(new CompositionEvent("compositionstart", { bubbles: true }));
+      key("keydown", { key: "Enter", isComposing: true });
+      input().value = "fix bug";
+      input().dispatchEvent(new CompositionEvent("compositionend", { bubbles: true }));
+      key("keyup", { key: "Enter" });
+
+      expect(getPositionText()).toBe("1 of 3");
+      expect(callbacks.scrollToCommit).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+      expect(callbacks.getCommits).toHaveBeenCalledTimes(1);
+      expect(widget.getState().text).toBe("fix bug");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not move on Enter repeat (TC-498)", () => {
+    // Case: TC-498 (A8.3-2)
+    threeMatches();
+    for (let i = 0; i < 3; i++) key("keydown", { key: "Enter", repeat: true });
+    expect(getPositionText()).toBe("1 of 3");
+    expect(callbacks.scrollToCommit).not.toHaveBeenCalled();
+  });
+
+  it("returns focus to the launcher on close and hides its buttons from the tab order (TC-499)", () => {
+    // Case: TC-499 (K40 / A8.1-6)
+    const refButton = rowWithRefButton();
+    const widgetElem = document.querySelector(".findWidget")!;
+    for (const control of Array.from(widgetElem.querySelectorAll("button"))) {
+      expect(control.getAttribute("tabindex")).toBe("-1");
+    }
+    expect(widgetElem.getAttribute("aria-hidden")).toBe("true");
+
+    refButton.focus();
+    widget.show(true);
+    expect(document.activeElement).toBe(input());
+    for (const control of Array.from(widgetElem.querySelectorAll("button"))) {
+      expect(control.getAttribute("tabindex")).toBe("0");
+    }
+    expect(widgetElem.hasAttribute("aria-hidden")).toBe(false);
+
+    button("findClose").click();
+    expect(widget.isVisible()).toBe(false);
+    expect(document.activeElement).toBe(refButton);
+
+    // Programmatic close leaves focus alone; the Escape chain's close restores like the button.
+    widget.show(false);
+    input().blur();
+    widget.close();
+    expect(document.activeElement).toBe(document.body);
+    refButton.focus();
+    widget.show(false);
+    widget.close("keyboard");
+    expect(document.activeElement).toBe(refButton);
+  });
+
+  it("keeps the ref button and its attributes across highlight insertion and removal (TC-500)", () => {
+    // Case: TC-500 (K40 / A8.3-3)
+    const refButton = rowWithRefButton();
+    const attributesBefore = {
+      label: refButton.getAttribute("aria-label"),
+      tabindex: refButton.getAttribute("tabindex"),
+      name: refButton.dataset.name
+    };
+    const textBefore = refButton.textContent;
+
+    triggerSearch(widget, "keyboard");
+    expect(getPositionText()).toBe("1 of 1");
+    expect(getMatchSpans().length).toBeGreaterThan(0);
+    const highlighted = document.querySelector<HTMLButtonElement>("button.gitRefButton")!;
+    expect(highlighted).toBe(refButton);
+    expect(refButton.getAttribute("aria-label")).toBe(attributesBefore.label);
+    expect(refButton.getAttribute("tabindex")).toBe(attributesBefore.tabindex);
+    expect(refButton.dataset.name).toBe(attributesBefore.name);
+    expect(refButton.querySelector(".codicon")).not.toBeNull();
+
+    widget.close();
+    expect(getMatchSpans()).toHaveLength(0);
+    expect(document.querySelector("button.gitRefButton")).toBe(refButton);
+    expect(refButton.textContent).toBe(textBefore);
+  });
+
+  it("searches once after the debounce and survives an invalid regex (TC-501)", () => {
+    // Case: TC-501 (A8.2-3)
+    vi.useFakeTimers();
+    try {
+      setupCommitsAndDom([makeCommit({ hash: HASHES[0], message: "fix bug" })], callbacks);
+      widget.show(false);
+      (callbacks.getCommits as Mock).mockClear();
+      input().value = "fi";
+      key("keyup", { key: "i" });
+      input().value = "fix";
+      key("keyup", { key: "x" });
+      vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS - 1);
+      expect(callbacks.getCommits).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(1);
+      expect(callbacks.getCommits).toHaveBeenCalledTimes(1);
+      expect(getPositionText()).toBe("1 of 1");
+
+      button("findRegex").click();
+      input().value = "[invalid";
+      key("keyup", { key: "d" });
+      vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+      expect(document.querySelector(".findWidget")!.hasAttribute("data-error")).toBe(true);
+      expect(getPositionText()).toBe("No Results");
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("leaves ArrowDown to the input caret (TC-502)", () => {
+    // Case: TC-502 (K19)
+    threeMatches();
+    (callbacks.scrollToCommit as Mock).mockClear();
+    const event = key("keydown", { key: "ArrowDown" });
+    expect(event.defaultPrevented).toBe(false);
+    expect(callbacks.scrollToCommit).not.toHaveBeenCalled();
+    expect(getPositionText()).toBe("1 of 3");
+  });
+});
+
+// S12: the origin of each search session, including one opened from the page body
+// @see docs/testing/perspectives/web/findWidget-test.md
+describe("FindWidget focus origin per search session (S12)", () => {
+  const REF_NAME = "feature/keyboard";
+  let widget: FindWidget;
+  let activeRow: HTMLTableRowElement;
+  let refButton: HTMLButtonElement;
+  let disposeContext: () => void;
+
+  function findInput(): HTMLInputElement {
+    return document.getElementById("findInput") as HTMLInputElement;
+  }
+
+  function closeButton(): HTMLButtonElement {
+    return document.getElementById("findClose") as HTMLButtonElement;
+  }
+
+  function focusBody(): void {
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    widget = new FindWidget(createMockCallbacks());
+    activeRow = document.createElement("tr");
+    activeRow.tabIndex = 0;
+    refButton = document.createElement("button");
+    refButton.type = "button";
+    markFocusTarget(refButton, {
+      kind: "ref",
+      repo: "/repo",
+      hash: "aaa1111100000000",
+      refType: "head",
+      name: REF_NAME
+    });
+    activeRow.appendChild(refButton);
+    document.body.appendChild(activeRow);
+    disposeContext = configureFocusContext({
+      getRepo: () => "/repo",
+      getActiveRow: () => activeRow,
+      getTabStops: () => []
+    });
+  });
+
+  afterEach(() => {
+    disposeContext();
+    document.body.innerHTML = "";
+  });
+
+  it("returns a body-opened session to the active row, not the hidden close button (TC-503)", () => {
+    // Case: TC-503
+    focusBody();
+    widget.show(true);
+    closeButton().focus();
+
+    closeButton().click();
+
+    expect(widget.isVisible()).toBe(false);
+    expect(document.activeElement).toBe(activeRow);
+  });
+
+  it("does not reuse the previous session's origin for a body-opened session (TC-504)", () => {
+    // Case: TC-504
+    refButton.focus();
+    widget.show(true);
+    widget.close("keyboard");
+    expect(document.activeElement).toBe(refButton);
+
+    focusBody();
+    widget.show(true);
+    widget.close("keyboard");
+
+    expect(document.activeElement).toBe(activeRow);
+  });
+
+  it("keeps the launcher when show() runs again with focus inside the widget (TC-505)", () => {
+    // Case: TC-505
+    refButton.focus();
+    widget.show(true);
+    expect(document.activeElement).toBe(findInput());
+
+    widget.show(true);
+    widget.close("keyboard");
+
+    expect(document.activeElement).toBe(refButton);
   });
 });

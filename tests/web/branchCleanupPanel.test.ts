@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../../web/utils", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../web/utils")>()),
@@ -13,6 +13,7 @@ vi.mock("../../web/dates", () => ({
 import type * as GG from "../../src/types";
 import { BranchCleanupPanel } from "../../web/branchCleanupPanel";
 import { getCommitDate } from "../../web/dates";
+import { configureFocusContext } from "../../web/keyboardNavigation";
 import { sendMessage } from "../../web/utils";
 
 const REPO = "/repo";
@@ -73,13 +74,15 @@ function bodyRows(): HTMLTableRowElement[] {
   return [...panelElem().querySelectorAll<HTMLTableRowElement>("tbody tr")];
 }
 
-function deleteButtons(scope: ParentNode = panelElem()): HTMLElement[] {
-  return [...scope.querySelectorAll<HTMLElement>(".branchCleanupDeleteBtn")];
+function deleteButtons(scope: ParentNode = panelElem()): HTMLButtonElement[] {
+  return [...scope.querySelectorAll<HTMLButtonElement>(".branchCleanupDeleteBtn")];
 }
 
-function showButtons(scope: ParentNode = panelElem()): HTMLElement[] {
+function showButtons(scope: ParentNode = panelElem()): HTMLButtonElement[] {
   return [
-    ...scope.querySelectorAll<HTMLElement>(".branchCleanupActionBtn:not(.branchCleanupDeleteBtn)")
+    ...scope.querySelectorAll<HTMLButtonElement>(
+      ".branchCleanupActionBtn:not(.branchCleanupDeleteBtn)"
+    )
   ];
 }
 
@@ -182,14 +185,14 @@ describe("BranchCleanupPanel lifecycle", () => {
     expect(bodyRows()).toHaveLength(1);
     const inFlightDeletes = deleteButtons();
     expect(inFlightDeletes).toHaveLength(1);
-    expect(inFlightDeletes[0].classList.contains("disabled")).toBe(true);
+    expect(inFlightDeletes[0].disabled).toBe(true);
     inFlightDeletes[0].click();
     expect(actions.showDeleteDialog).not.toHaveBeenCalled();
     expect(showButtons()).toHaveLength(1);
     panel.handleResponse(okResponse(2, [makeRow()]));
     const restoredDeletes = deleteButtons();
     expect(restoredDeletes).toHaveLength(1);
-    expect(restoredDeletes[0].classList.contains("disabled")).toBe(false);
+    expect(restoredDeletes[0].disabled).toBe(false);
   });
 
   it("sends nothing on a refresh while closed (TC-048)", () => {
@@ -272,7 +275,7 @@ describe("BranchCleanupPanel lifecycle", () => {
     expect(bodyRows()).toHaveLength(2);
     const inFlightDeletes = deleteButtons();
     expect(inFlightDeletes).toHaveLength(1);
-    expect(inFlightDeletes[0].classList.contains("disabled")).toBe(true);
+    expect(inFlightDeletes[0].disabled).toBe(true);
     inFlightDeletes[0].click();
     expect(actions.showDeleteDialog).not.toHaveBeenCalled();
     expect(sendMessage).toHaveBeenCalledTimes(1);
@@ -293,7 +296,7 @@ describe("BranchCleanupPanel lifecycle", () => {
     );
     const restoredDeletes = deleteButtons();
     expect(restoredDeletes).toHaveLength(1);
-    expect(restoredDeletes[0].classList.contains("disabled")).toBe(false);
+    expect(restoredDeletes[0].disabled).toBe(false);
   });
 
   it("renders loading for a comparison change without a loaded table (TC-053)", () => {
@@ -897,5 +900,249 @@ describe("BranchCleanupPanel comparison labels", () => {
     expect(bodyRows()).toHaveLength(1);
     expect(bodyRows()[0].cells[0].textContent).toBe("feature/b");
     expect(comparisonCurrentText()).toBe("Automatic (develop)");
+  });
+});
+
+// S7: 整理操作の標準 button・再要求中の無効化・再描画時のフォーカス復元
+// @see docs/testing/perspectives/web/branchCleanupPanel-test.md
+describe("BranchCleanupPanel keyboard buttons and focus restoration", () => {
+  const BRANCH = "feature/x";
+  const OTHER_BRANCH = "feature/y";
+  const TARGET_HASH = "M";
+  let contextRepo: string;
+  let disposeContext: () => void;
+
+  function comparisonTrigger(): HTMLButtonElement {
+    return panelElem().querySelector<HTMLButtonElement>(
+      "#branchCleanupComparisonSelect .dropdownCurrentValue"
+    )!;
+  }
+
+  function cleanupToolbarButton(): HTMLElement {
+    return document.getElementById("branchCleanupBtn")!;
+  }
+
+  function targetRow(): HTMLElement {
+    return document.querySelector<HTMLElement>(`tr[data-hash="${TARGET_HASH}"]`)!;
+  }
+
+  /** Opens the panel with the given rows accepted as request 1. */
+  function openWith(rows: GG.BranchCleanupRow[]): void {
+    panel.toggle(REPO);
+    panel.handleResponse(okResponse(1, rows));
+  }
+
+  /** A fresh toolbar, panel and list so request ids start again at 1. */
+  function mountPanel(): void {
+    document.body.innerHTML = [
+      '<button id="branchCleanupBtn" type="button"></button>',
+      '<button id="refreshBtn" type="button"></button>',
+      '<div id="branchCleanupPanel" hidden></div>',
+      `<table id="commitTable"><tbody><tr data-hash="${TARGET_HASH}" tabindex="0"><td>M</td></tr></tbody></table>`
+    ].join("");
+    panel = new BranchCleanupPanel(actions);
+  }
+
+  beforeEach(() => {
+    mountPanel();
+    contextRepo = REPO;
+    disposeContext = configureFocusContext({
+      getRepo: () => contextRepo,
+      getActiveRow: () => targetRow(),
+      getTabStops: () => []
+    });
+  });
+
+  afterEach(() => {
+    disposeContext();
+  });
+
+  it("renders show and delete as named standard buttons (TC-054)", () => {
+    // Case: TC-054 (K41 / A8.1-6)
+    // Given: an open panel with two eligible rows, one of them with a special name
+    openWith([makeRow({ branchName: BRANCH }), makeRow({ branchName: "a;b" })]);
+
+    // When: the row actions are inspected
+    const [showX, showAB] = showButtons();
+    const [deleteX, deleteAB] = deleteButtons();
+
+    // Then: both actions are type="button" buttons whose names include the branch name
+    for (const button of [showX, showAB, deleteX, deleteAB]) {
+      expect(button.tagName).toBe("BUTTON");
+      expect(button.type).toBe("button");
+      expect(button.disabled).toBe(false);
+    }
+    expect(showX.getAttribute("aria-label")).toBe(`Show in Graph: ${BRANCH}`);
+    expect(deleteX.getAttribute("aria-label")).toBe(`Delete...: ${BRANCH}`);
+    expect(showAB.getAttribute("aria-label")).toBe("Show in Graph: a;b");
+    expect(deleteAB.getAttribute("aria-label")).toBe("Delete...: a;b");
+    expect(showX.textContent).toBe("Show in Graph");
+    expect(deleteX.textContent).toBe("Delete...");
+  });
+
+  it("disables delete during a re-request and returns focus to it afterwards (TC-055)", () => {
+    // Case: TC-055 (K41 / A8.3-5)
+    // Given: focus on the delete button of feature/x
+    openWith([makeRow({ branchName: BRANCH })]);
+    deleteButtons()[0].focus();
+    expect(document.activeElement).toBe(deleteButtons()[0]);
+
+    // When: the panel is refreshed so the re-request is in flight
+    panel.refresh(REPO);
+
+    // Then: the re-rendered delete button carries the standard disabled attribute, a click
+    // runs nothing, and focus went to the comparison trigger (the disabled action is no stop)
+    const inFlightDelete = deleteButtons()[0];
+    expect(inFlightDelete.hasAttribute("disabled")).toBe(true);
+    inFlightDelete.click();
+    expect(actions.showDeleteDialog).toHaveBeenCalledTimes(0);
+    expect(document.activeElement).toBe(comparisonTrigger());
+    expect(comparisonTrigger().disabled).toBe(false);
+
+    // When: the response for the re-request keeps the row
+    panel.handleResponse(okResponse(2, [makeRow({ branchName: BRANCH })]));
+
+    // Then: focus is restored by key to the same branch's enabled delete button, which runs
+    const restoredDelete = deleteButtons()[0];
+    expect(restoredDelete.disabled).toBe(false);
+    expect(restoredDelete.dataset.branch).toBe(BRANCH);
+    expect(document.activeElement).toBe(restoredDelete);
+    restoredDelete.click();
+    expect(actions.showDeleteDialog).toHaveBeenCalledTimes(1);
+    expect(actions.showDeleteDialog).toHaveBeenCalledWith(REPO, BRANCH, ["origin"]);
+  });
+
+  it("moves focus to the comparison trigger when the focused row disappears (TC-056)", () => {
+    // Case: TC-056 (K41 / A8.3-5)
+    // Given: focus on the delete button of feature/x
+    openWith([makeRow({ branchName: BRANCH })]);
+    deleteButtons()[0].focus();
+
+    // When: the refreshed response no longer lists that row
+    panel.refresh(REPO);
+    panel.handleResponse(okResponse(2, [makeRow({ branchName: OTHER_BRANCH })]));
+
+    // Then: focus is on the connected, enabled comparison trigger and nothing was deleted
+    const trigger = comparisonTrigger();
+    expect(document.activeElement).toBe(trigger);
+    expect(trigger.isConnected).toBe(true);
+    expect(trigger.disabled).toBe(false);
+    expect(actions.showDeleteDialog).toHaveBeenCalledTimes(0);
+    expect(deleteButtons().map((button) => button.dataset.branch)).toEqual([OTHER_BRANCH]);
+  });
+
+  it("falls back to the toolbar cleanup button without a usable comparison trigger (TC-057)", () => {
+    // Case: TC-057 (K41 / A8.3-5)
+    // Given: focus on the delete button while the comparison control is unavailable (the panel
+    // always renders the header, so its trigger is hidden to stand in for the absent control)
+    openWith([makeRow({ branchName: BRANCH })]);
+    deleteButtons()[0].focus();
+    comparisonTrigger().hidden = true;
+
+    // When: the latest request fails, replacing the rows with the error view
+    panel.handleResponse({
+      command: "loadBranchCleanup",
+      repo: REPO,
+      requestId: 1,
+      result: { kind: "error", status: "fatal" }
+    });
+
+    // Then: focus is on the toolbar cleanup button
+    expect(deleteButtons()).toHaveLength(0);
+    expect(document.activeElement).toBe(cleanupToolbarButton());
+  });
+
+  it("keeps the open comparison dropdown and its focused option across a re-render (TC-058)", () => {
+    // Case: TC-058 (Task 10 implementation item 2)
+    // Given: the comparison dropdown is open with real focus on its tab-stop option
+    openWith([makeRow({ branchName: BRANCH }), makeRow({ branchName: "main" })]);
+    const dropdown = document.getElementById("branchCleanupComparisonSelect")!;
+    comparisonTrigger().click();
+    expect(dropdown.classList.contains("dropdownOpen")).toBe(true);
+    const option = dropdown.querySelector<HTMLElement>('.dropdownOption[tabindex="0"]')!;
+    option.focus();
+    expect(document.activeElement).toBe(option);
+    const optionText = option.textContent;
+    vi.mocked(sendMessage).mockClear();
+
+    // When: the panel re-renders for a refresh
+    panel.refresh(REPO);
+
+    // Then: the dropdown is still open, the selection callback did not change the comparison,
+    // and focus is on the re-rendered option with the same value inside the connected dropdown
+    expect(dropdown.classList.contains("dropdownOpen")).toBe(true);
+    expect(sentRequests().map((request) => request.compareBranch)).toEqual([null]);
+    const active = document.activeElement as HTMLElement;
+    expect(active.isConnected).toBe(true);
+    expect(active.classList.contains("dropdownOption")).toBe(true);
+    expect(active.textContent).toBe(optionText);
+    expect(dropdown.contains(active)).toBe(true);
+    expect(panelElem().contains(dropdown)).toBe(true);
+  });
+
+  it("does not pull focus back on a repo change, a stale response or after the user left (TC-059)", () => {
+    // Case: TC-059 (A8.3-5)
+    // Given: focus on the delete button and the webview switching to another repository
+    openWith([makeRow({ branchName: BRANCH })]);
+    deleteButtons()[0].focus();
+    contextRepo = OTHER_REPO;
+
+    // When: the panel follows the repository change
+    panel.selectRepository(OTHER_REPO);
+
+    // Then: focus is neither inside the panel nor on the row target
+    expect(panelElem().contains(document.activeElement)).toBe(false);
+    expect(document.activeElement).toBe(document.body);
+
+    // Given: a fresh panel with focus on the show button while a re-request is in flight
+    contextRepo = REPO;
+    mountPanel();
+    openWith([makeRow({ branchName: BRANCH })]);
+    panel.refresh(REPO);
+    const show = showButtons()[0];
+    show.focus();
+
+    // When: a response with a stale request id arrives
+    panel.handleResponse(okResponse(1, [makeRow({ branchName: OTHER_BRANCH })]));
+
+    // Then: nothing is re-rendered and the same element keeps focus
+    expect(document.activeElement).toBe(show);
+    expect(showButtons()[0]).toBe(show);
+
+    // Given: the user moved to the toolbar before the latest response
+    const refreshBtn = document.getElementById("refreshBtn")!;
+    refreshBtn.focus();
+
+    // When: the latest response re-renders the rows
+    panel.handleResponse(okResponse(2, [makeRow({ branchName: BRANCH })]));
+
+    // Then: focus stays where the user put it
+    expect(document.activeElement).toBe(refreshBtn);
+    expect(actions.showDeleteDialog).toHaveBeenCalledTimes(0);
+  });
+
+  it("runs show once and returns focus to the same show button after the re-render (TC-060)", () => {
+    // Case: TC-060 (K41)
+    // Given: focus on the show button of feature/x
+    openWith([makeRow({ branchName: BRANCH })]);
+    const show = showButtons()[0];
+    show.focus();
+
+    // When: it is activated (jsdom has no native key-to-click synthesis, so click stands in)
+    show.click();
+
+    // Then: the callback ran once with the branch name
+    expect(actions.showBranch).toHaveBeenCalledTimes(1);
+    expect(actions.showBranch).toHaveBeenCalledWith(BRANCH);
+
+    // When: the panel re-renders with the same row (re-request and its response)
+    panel.refresh(REPO);
+    panel.handleResponse(okResponse(2, [makeRow({ branchName: BRANCH })]));
+
+    // Then: focus is on the re-rendered show button of the same branch
+    const restored = showButtons()[0];
+    expect(restored).not.toBe(show);
+    expect(restored.dataset.branch).toBe(BRANCH);
+    expect(document.activeElement).toBe(restored);
   });
 });

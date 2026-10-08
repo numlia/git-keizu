@@ -11,10 +11,12 @@ const OFFSET = 2;
 
 let showContextMenu: typeof import("../../web/contextMenu").showContextMenu;
 let hideContextMenu: typeof import("../../web/contextMenu").hideContextMenu;
+let hideContextMenuListener: typeof import("../../web/contextMenu").hideContextMenuListener;
 let recordRecentAction: typeof import("../../web/contextMenu").recordRecentAction;
 let contextMenuEl: HTMLUListElement;
 
-import { vscode } from "../../web/utils";
+import { configureFocusContext, markFocusTarget } from "../../web/keyboardNavigation";
+import { svgIcons, vscode } from "../../web/utils";
 
 beforeAll(async () => {
   // Given: contextMenu and dialog DOM elements exist before any module that reads them loads
@@ -30,6 +32,7 @@ beforeAll(async () => {
   const mod = await import("../../web/contextMenu");
   showContextMenu = mod.showContextMenu;
   hideContextMenu = mod.hideContextMenu;
+  hideContextMenuListener = mod.hideContextMenuListener;
   recordRecentAction = mod.recordRecentAction;
 });
 
@@ -611,7 +614,7 @@ describe("showContextMenu recent actions (S3)", () => {
       {
         className: "contextMenuLabel",
         text: "Recent",
-        html: '<span class="codicon codicon-history"></span><span class="contextMenuLabelText">Recent</span>'
+        html: '<span class="codicon codicon-history" aria-hidden="true"></span><span class="contextMenuLabelText">Recent</span>'
       },
       { className: "contextMenuItem", text: "Merge", html: "Merge" },
       { className: "contextMenuItem", text: "Create Branch", html: "Create Branch" },
@@ -672,7 +675,7 @@ describe("showContextMenu recent actions (S3)", () => {
       {
         className: "contextMenuLabel",
         text: "Recent",
-        html: '<span class="codicon codicon-history"></span><span class="contextMenuLabelText">Recent</span>'
+        html: '<span class="codicon codicon-history" aria-hidden="true"></span><span class="contextMenuLabelText">Recent</span>'
       },
       { className: "contextMenuItem", text: "Add Tag", html: "Add Tag" },
       { className: "contextMenuItem", text: "Create Branch", html: "Create Branch" },
@@ -1514,5 +1517,966 @@ describe("Recent worktree removal integration", () => {
     expect(
       calls.filter((call) => call.message.command === SAVE_COMMAND).map((call) => call.message.repo)
     ).toStrictEqual([REPO]);
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S9 / S10: keyboard launch, movement, activation, closing, Tab exit */
+/* @see docs/testing/perspectives/web/contextMenu-test.md S9, S10     */
+/* ------------------------------------------------------------------ */
+
+const KEYBOARD_REPO = "/test/repo";
+const SOURCE_RECT = { left: 100, top: 200, right: 160, bottom: 220, width: 60, height: 20 };
+const SUBMENU_HIDE_WAIT_MS = 200;
+
+interface KeyboardFixture {
+  readonly sourceElem: HTMLElement;
+  readonly items: ContextMenuElement[];
+  readonly itemA: ReturnType<typeof vi.fn>;
+  readonly itemB: ReturnType<typeof vi.fn>;
+  readonly child1: ReturnType<typeof vi.fn>;
+  readonly child2: ReturnType<typeof vi.fn>;
+}
+
+function createFocusableElem(): HTMLButtonElement {
+  const el = document.createElement("button");
+  el.type = "button";
+  document.body.appendChild(el);
+  return el;
+}
+
+function createKeyboardSourceElem(): HTMLElement {
+  const el = createFocusableElem();
+  el.getBoundingClientRect = vi.fn(
+    () => ({ ...SOURCE_RECT, x: SOURCE_RECT.left, y: SOURCE_RECT.top, toJSON: () => {} }) as DOMRect
+  );
+  return el;
+}
+
+function createKeyboardFixture(): KeyboardFixture {
+  const itemA = vi.fn();
+  const itemB = vi.fn();
+  const child1 = vi.fn();
+  const child2 = vi.fn();
+  return {
+    sourceElem: createKeyboardSourceElem(),
+    items: [
+      { kind: "label", title: "Heading", icon: svgIcons.history },
+      { title: "Item A", onClick: itemA },
+      null,
+      {
+        title: "More",
+        submenu: [
+          { title: "Child 1", onClick: child1 },
+          { title: "Child 2", onClick: child2 }
+        ]
+      },
+      { title: "Item B", onClick: itemB }
+    ],
+    itemA,
+    itemB,
+    child1,
+    child2
+  };
+}
+
+function keyboardTrigger(): KeyboardEvent {
+  return new KeyboardEvent("keydown", {
+    key: "F10",
+    shiftKey: true,
+    bubbles: true,
+    cancelable: true
+  });
+}
+
+function press(target: Element, key: string, init: KeyboardEventInit = {}): KeyboardEvent {
+  const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true, ...init });
+  target.dispatchEvent(event);
+  return event;
+}
+
+function release(target: Element, key: string): KeyboardEvent {
+  const event = new KeyboardEvent("keyup", { key, bubbles: true, cancelable: true });
+  target.dispatchEvent(event);
+  return event;
+}
+
+function openByKeyboard(
+  fixture: KeyboardFixture,
+  focusOptions?: ContextMenuFocusOptions,
+  recentActions?: GG.RecentActionId[]
+): void {
+  fixture.sourceElem.focus();
+  showContextMenu(
+    keyboardTrigger(),
+    fixture.items,
+    fixture.sourceElem,
+    recentActions,
+    focusOptions
+  );
+}
+
+function rootItem(text: string): HTMLElement {
+  return Array.from(contextMenuEl.querySelectorAll<HTMLElement>("li.contextMenuItem")).find((li) =>
+    (li.textContent ?? "").startsWith(text)
+  )!;
+}
+
+function submenuItem(text: string): HTMLElement {
+  return Array.from(
+    document.querySelectorAll<HTMLElement>("ul.contextMenuSubmenu li.contextMenuItem")
+  ).find((li) => (li.textContent ?? "").startsWith(text))!;
+}
+
+function activeElem(): Element {
+  return document.activeElement!;
+}
+
+// Registers the focus context the restore / Tab chain reads; `tabStops` is mutated per test.
+function registerKeyboardContext(tabStops: { current: HTMLElement[] }): () => void {
+  return configureFocusContext({
+    getRepo: () => KEYBOARD_REPO,
+    getActiveRow: () => null,
+    getTabStops: () => tabStops.current
+  });
+}
+
+describe("S9: keyboard launch, item movement, activation and submenu expansion", () => {
+  const tabStops = { current: [] as HTMLElement[] };
+  let disposeContext: () => void;
+
+  beforeEach(() => {
+    tabStops.current = [];
+    disposeContext = registerKeyboardContext(tabStops);
+  });
+
+  afterEach(() => {
+    hideContextMenu();
+    disposeContext();
+    document.body.querySelectorAll("button").forEach((button) => button.remove());
+  });
+
+  it("opens from the source rectangle and focuses the first action item (TC-123)", () => {
+    // Case: TC-123
+    // Given: a focused source element with a known rectangle
+    const fixture = createKeyboardFixture();
+
+    // When: the menu is opened from a Shift+F10 keydown
+    openByKeyboard(fixture);
+
+    // Then: the position derives from the rectangle (left / bottom) with the existing clamp
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(contextMenuEl.style.left).toBe(`${SOURCE_RECT.left - OFFSET}px`);
+    expect(contextMenuEl.style.top).toBe(`${SOURCE_RECT.bottom - OFFSET}px`);
+    // Then: the heading is skipped and item A holds the real focus
+    expect(activeElem()).toBe(rootItem("Item A"));
+    expect(rootItem("Item A").getAttribute("role")).toBe("menuitem");
+  });
+
+  it("swallows only the contextmenu generated by the same key press (TC-124)", () => {
+    // Case: TC-124
+    // Given: the source has a right-click listener that would relaunch the menu (as main does)
+    const fixture = createKeyboardFixture();
+    const relaunch = vi.fn((e: Event) =>
+      showContextMenu(e as MouseEvent, fixture.items, fixture.sourceElem)
+    );
+    fixture.sourceElem.addEventListener("contextmenu", relaunch);
+    openByKeyboard(fixture);
+    const renderedBefore = Array.from(contextMenuEl.querySelectorAll("li"));
+
+    // When: the browser's contextmenu for the same press reaches the source
+    const native = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 300,
+      clientY: 300
+    });
+    fixture.sourceElem.dispatchEvent(native);
+
+    // Then: the menu is not rebuilt, the event is consumed and focus stays on item A
+    expect(relaunch).not.toHaveBeenCalled();
+    expect(native.defaultPrevented).toBe(true);
+    const renderedAfter = Array.from(contextMenuEl.querySelectorAll("li"));
+    expect(renderedAfter).toHaveLength(renderedBefore.length);
+    renderedAfter.forEach((li, index) => expect(li).toBe(renderedBefore[index]));
+    expect(activeElem()).toBe(rootItem("Item A"));
+    expect(contextMenuEl.style.left).toBe(`${SOURCE_RECT.left - OFFSET}px`);
+
+    // Given: a fresh keyboard launch whose keys were released before the browser's contextmenu
+    hideContextMenu();
+    openByKeyboard(fixture);
+    const renderedAfterKeyup = Array.from(contextMenuEl.querySelectorAll("li"));
+    release(fixture.sourceElem, "F10");
+    release(fixture.sourceElem, "Shift");
+
+    // When: the contextmenu of the same press arrives after the keyup
+    const afterKeyup = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    fixture.sourceElem.dispatchEvent(afterKeyup);
+
+    // Then: it is still swallowed once, the menu is not rebuilt and item A keeps focus
+    expect(relaunch).not.toHaveBeenCalled();
+    expect(afterKeyup.defaultPrevented).toBe(true);
+    const renderedFinal = Array.from(contextMenuEl.querySelectorAll("li"));
+    expect(renderedFinal).toHaveLength(renderedAfterKeyup.length);
+    renderedFinal.forEach((li, index) => expect(li).toBe(renderedAfterKeyup[index]));
+    expect(activeElem()).toBe(rootItem("Item A"));
+  });
+
+  it("does not suppress the next independent right-click (TC-125)", () => {
+    // Case: TC-125
+    // Given: a keyboard launch whose same-press contextmenu was already swallowed
+    const fixture = createKeyboardFixture();
+    const relaunch = vi.fn((e: Event) =>
+      showContextMenu(e as MouseEvent, fixture.items, fixture.sourceElem)
+    );
+    fixture.sourceElem.addEventListener("contextmenu", relaunch);
+    openByKeyboard(fixture);
+    fixture.sourceElem.dispatchEvent(
+      new MouseEvent("contextmenu", { bubbles: true, cancelable: true })
+    );
+    expect(relaunch).not.toHaveBeenCalled();
+
+    // When: an independent right-click arrives on the same source
+    const independent = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 400,
+      clientY: 300
+    });
+    fixture.sourceElem.dispatchEvent(independent);
+
+    // Then: it reaches the listener and opens with pointer coordinates (S1 rule)
+    expect(relaunch).toHaveBeenCalledTimes(1);
+    expect(independent.defaultPrevented).toBe(false);
+    expect(contextMenuEl.style.left).toBe(`${400 - OFFSET}px`);
+    expect(contextMenuEl.style.top).toBe(`${300 - OFFSET}px`);
+
+    // When: another element is right-clicked with a mouse event
+    showContextMenu(createMouseEvent(250, 150), createItems(), createSourceElem());
+
+    // Then: the new menu uses the pointer position
+    expect(contextMenuEl.style.left).toBe(`${250 - OFFSET}px`);
+    expect(contextMenuEl.style.top).toBe(`${150 - OFFSET}px`);
+
+    // Given: a keyboard launch whose keys were released without any contextmenu following
+    const other = createKeyboardSourceElem();
+    const relaunchOther = vi.fn((e: Event) =>
+      showContextMenu(e as MouseEvent, fixture.items, other)
+    );
+    other.addEventListener("contextmenu", relaunchOther);
+    openByKeyboard(fixture);
+    release(fixture.sourceElem, "F10");
+    release(fixture.sourceElem, "Shift");
+
+    // When: an independent right-click arrives on another element
+    const onOther = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      clientX: 320,
+      clientY: 240
+    });
+    other.dispatchEvent(onOther);
+
+    // Then: it opens normally at the pointer position
+    expect(relaunchOther).toHaveBeenCalledTimes(1);
+    expect(onOther.defaultPrevented).toBe(false);
+    expect(contextMenuEl.style.left).toBe(`${320 - OFFSET}px`);
+    expect(contextMenuEl.style.top).toBe(`${240 - OFFSET}px`);
+  });
+
+  it("moves over action items only and stops at both ends (TC-126)", () => {
+    // Case: TC-126
+    // Given: an open keyboard menu focused on item A
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+
+    // When / Then: ArrowDown walks A → More → B, skipping the heading and the divider
+    let down = press(activeElem(), "ArrowDown");
+    expect(down.defaultPrevented).toBe(true);
+    expect(activeElem()).toBe(rootItem("More"));
+    down = press(activeElem(), "ArrowDown");
+    expect(activeElem()).toBe(rootItem("Item B"));
+
+    // When / Then: ArrowDown at the end keeps item B (no wrap) and is consumed
+    down = press(activeElem(), "ArrowDown");
+    expect(down.defaultPrevented).toBe(true);
+    expect(activeElem()).toBe(rootItem("Item B"));
+
+    // When / Then: ArrowUp walks back and stops at item A
+    press(activeElem(), "ArrowUp");
+    press(activeElem(), "ArrowUp");
+    expect(activeElem()).toBe(rootItem("Item A"));
+    const up = press(activeElem(), "ArrowUp");
+    expect(up.defaultPrevented).toBe(true);
+    expect(activeElem()).toBe(rootItem("Item A"));
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+  });
+
+  it("jumps to the last and first action item with End and Home (TC-127)", () => {
+    // Case: TC-127
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+
+    // When: End then Home
+    press(activeElem(), "End");
+    expect(activeElem()).toBe(rootItem("Item B"));
+    press(activeElem(), "Home");
+
+    // Then: focus is back on item A
+    expect(activeElem()).toBe(rootItem("Item A"));
+  });
+
+  it("runs the item once on Enter, hiding first, and keeps the recent-action parity with click (TC-128)", () => {
+    // Case: TC-128
+    // Given: an open keyboard menu focused on item A
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+    fixture.itemA.mockImplementation(() => {
+      // Then (ordering): the menu is already hidden when the action runs
+      expect(contextMenuEl.classList.contains("active")).toBe(false);
+    });
+
+    // When: Enter keydown then keyup on item A
+    const down = press(activeElem(), "Enter");
+    release(fixture.sourceElem, "Enter");
+
+    // Then: the action ran exactly once and the menu is closed
+    expect(fixture.itemA).toHaveBeenCalledTimes(1);
+    expect(down.defaultPrevented).toBe(true);
+    expect(contextMenuEl.classList.contains("active")).toBe(false);
+
+    // Given: Recent actions are enabled and a recent-eligible item is listed
+    (globalThis as Record<string, unknown>).viewState = {
+      repos: { [KEYBOARD_REPO]: { columnWidths: null } },
+      showRecentActions: true
+    };
+    const merge = vi.fn();
+    const recentItems: ContextMenuElement[] = [
+      { title: "Create Branch", recentActionId: "commit.createBranch", onClick: vi.fn() },
+      { title: "Merge", recentActionId: "commit.merge", onClick: merge }
+    ];
+    const recentSource = createKeyboardSourceElem();
+    const recentActions: GG.RecentActionId[] = ["commit.merge", "commit.createBranch"];
+
+    // When: the lifted Recent entry is run by Enter, then by click on a fresh menu
+    recentSource.focus();
+    showContextMenu(keyboardTrigger(), recentItems, recentSource, recentActions);
+    expect(rootItem("Merge")).toBe(activeElem());
+    press(activeElem(), "Enter");
+    showContextMenu(createMouseEvent(100, 100), recentItems, recentSource, recentActions);
+    rootItem("Merge").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Then: both paths call the same onClick once each
+    expect(merge).toHaveBeenCalledTimes(2);
+  });
+
+  it("runs the item once on Space (TC-129)", () => {
+    // Case: TC-129
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+
+    // When: Space keydown then keyup on item A
+    press(activeElem(), " ");
+    release(fixture.sourceElem, " ");
+
+    // Then: one run and the menu is closed
+    expect(fixture.itemA).toHaveBeenCalledTimes(1);
+    expect(contextMenuEl.classList.contains("active")).toBe(false);
+  });
+
+  it("never runs on a repeated Enter, a lone keyup or an IME Enter (TC-130)", () => {
+    // Case: TC-130
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+    const itemA = rootItem("Item A");
+
+    // When: repeat keydown, keyup alone, and a composing keydown
+    press(itemA, "Enter", { repeat: true });
+    release(itemA, "Enter");
+    press(itemA, "Enter", { isComposing: true });
+
+    // Then: nothing ran and the menu is still open with focus on item A
+    expect(fixture.itemA).not.toHaveBeenCalled();
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(activeElem()).toBe(itemA);
+  });
+
+  it.each(["ArrowRight", "Enter", " "])(
+    "opens the submenu from the parent with %j and focuses its first child (TC-131)",
+    (key) => {
+      // Case: TC-131
+      const fixture = createKeyboardFixture();
+      openByKeyboard(fixture);
+      const more = rootItem("More");
+      more.focus();
+
+      // When: the key is pressed on the parent
+      const down = press(more, key);
+
+      // Then: the submenu is active, child 1 has focus and the parent reports expanded
+      expect(getSubmenuElement().classList.contains("active")).toBe(true);
+      expect(activeElem()).toBe(submenuItem("Child 1"));
+      expect(more.getAttribute("aria-expanded")).toBe("true");
+      expect(down.defaultPrevented).toBe(true);
+      expect(fixture.child1).not.toHaveBeenCalled();
+    }
+  );
+
+  it("exposes menu / menuitem roles, names and submenu ownership (TC-132)", () => {
+    // Case: TC-132
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+    const more = rootItem("More");
+    const submenuEl = getSubmenuElement();
+
+    // Then: roles and names
+    expect(contextMenuEl.getAttribute("role")).toBe("menu");
+    expect(rootItem("Item A").getAttribute("role")).toBe("menuitem");
+    expect(rootItem("Item A").getAttribute("aria-label")).toBe("Item A");
+    expect(rootItem("Item B").getAttribute("aria-label")).toBe("Item B");
+    expect(more.getAttribute("role")).toBe("menuitem");
+    expect(more.getAttribute("aria-label")).toBe("More");
+    expect(submenuItem("Child 1").getAttribute("role")).toBe("menuitem");
+    expect(submenuItem("Child 1").getAttribute("aria-label")).toBe("Child 1");
+    // Then: submenu ownership from the parent item
+    expect(more.getAttribute("aria-haspopup")).toBe("menu");
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    expect(more.getAttribute("aria-controls")).toBe(submenuEl.id);
+    expect(more.getAttribute("aria-owns")).toBe(submenuEl.id);
+    expect(submenuEl.getAttribute("role")).toBe("menu");
+    // Then: the heading and divider are not menu items and the heading icon is decorative
+    const label = contextMenuEl.querySelector("li.contextMenuLabel")!;
+    const divider = contextMenuEl.querySelector("li.contextMenuDivider")!;
+    expect(label.getAttribute("role")).toBeNull();
+    expect(divider.getAttribute("role")).toBeNull();
+    expect(label.querySelector(".codicon")!.getAttribute("aria-hidden")).toBe("true");
+  });
+
+  it("does not open a menu without action items and keeps focus on the origin (TC-133)", () => {
+    // Case: TC-133
+    // Given: only a heading and a divider
+    const sourceElem = createKeyboardSourceElem();
+    sourceElem.focus();
+    const items: ContextMenuElement[] = [{ kind: "label", title: "Heading" }, null];
+
+    // When: opened from the keyboard
+    showContextMenu(keyboardTrigger(), items, sourceElem);
+
+    // Then: no menu and the origin keeps focus
+    expect(contextMenuEl.classList.contains("active")).toBe(false);
+    expect(activeElem()).toBe(sourceElem);
+  });
+
+  it("ignores ArrowLeft on the root menu (TC-134)", () => {
+    // Case: TC-134
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+
+    // When: ArrowLeft on item A
+    press(activeElem(), "ArrowLeft");
+
+    // Then: nothing changes
+    expect(activeElem()).toBe(rootItem("Item A"));
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(fixture.itemA).not.toHaveBeenCalled();
+  });
+});
+
+describe("S10: closing, Tab exit, timers, repository switch, dialog hand-off and target capture", () => {
+  const tabStops = { current: [] as HTMLElement[] };
+  let disposeContext: () => void;
+
+  beforeEach(() => {
+    tabStops.current = [];
+    disposeContext = registerKeyboardContext(tabStops);
+  });
+
+  afterEach(() => {
+    hideContextMenu();
+    disposeContext();
+    document.body.querySelectorAll("button").forEach((button) => button.remove());
+    document.getElementById("dialog")!.innerHTML = "";
+  });
+
+  function openSubmenuByKeyboard(fixture: KeyboardFixture): HTMLElement {
+    openByKeyboard(fixture);
+    const more = rootItem("More");
+    more.focus();
+    press(more, "ArrowRight");
+    expect(activeElem()).toBe(submenuItem("Child 1"));
+    return more;
+  }
+
+  it("closes only the submenu on Escape and returns to the parent item (TC-135)", () => {
+    // Case: TC-135
+    const fixture = createKeyboardFixture();
+    const more = openSubmenuByKeyboard(fixture);
+
+    // When: Escape inside the submenu
+    const esc = press(activeElem(), "Escape");
+
+    // Then: submenu closed, root open, parent focused and collapsed, key consumed
+    expect(getSubmenuElement().classList.contains("active")).toBe(false);
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(activeElem()).toBe(more);
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+    expect(esc.defaultPrevented).toBe(true);
+  });
+
+  it("closes the root on Escape and restores the origin; keyup changes nothing (TC-136)", () => {
+    // Case: TC-136
+    const fixture = createKeyboardFixture();
+    const more = openSubmenuByKeyboard(fixture);
+    press(activeElem(), "Escape");
+    expect(activeElem()).toBe(more);
+
+    // When: Escape keydown on the root parent item, then its keyup
+    const esc = press(more, "Escape");
+
+    // Then: the menu is closed and the origin has focus
+    expect(contextMenuEl.classList.contains("active")).toBe(false);
+    expect(activeElem()).toBe(fixture.sourceElem);
+    expect(esc.defaultPrevented).toBe(true);
+    release(fixture.sourceElem, "Escape");
+    expect(contextMenuEl.classList.contains("active")).toBe(false);
+    expect(activeElem()).toBe(fixture.sourceElem);
+    expect(fixture.itemA).not.toHaveBeenCalled();
+  });
+
+  it("closes only the submenu on ArrowLeft (TC-137)", () => {
+    // Case: TC-137
+    const fixture = createKeyboardFixture();
+    const more = openSubmenuByKeyboard(fixture);
+
+    // When: ArrowLeft inside the submenu
+    press(activeElem(), "ArrowLeft");
+
+    // Then: same result as Escape in the submenu
+    expect(getSubmenuElement().classList.contains("active")).toBe(false);
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(activeElem()).toBe(more);
+    expect(more.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("closes every menu on Tab and moves past the origin, or past the counter for a list origin (TC-138)", () => {
+    // Case: TC-138
+    // Given: the source sits between two tab stops
+    const previous = createFocusableElem();
+    const fixture = createKeyboardFixture();
+    const next = createFocusableElem();
+    tabStops.current = [previous, fixture.sourceElem, next];
+
+    // When: Tab from item A
+    openByKeyboard(fixture);
+    press(rootItem("More"), "ArrowRight");
+    let tab = press(activeElem(), "Tab");
+
+    // Then: every menu is closed and the next stop has focus
+    expect(contextMenuEl.classList.contains("active")).toBe(false);
+    expect(document.querySelectorAll("ul.contextMenuSubmenu")).toHaveLength(0);
+    expect(activeElem()).toBe(next);
+    expect(tab.defaultPrevented).toBe(true);
+
+    // When: Shift+Tab from item A in a fresh menu
+    openByKeyboard(fixture);
+    tab = press(activeElem(), "Tab", { shiftKey: true });
+
+    // Then: the previous stop has focus
+    expect(activeElem()).toBe(previous);
+    expect(tab.defaultPrevented).toBe(true);
+
+    // Given: a list-origin menu whose clone is not a tab stop but its counter is
+    const counter = createFocusableElem();
+    const afterCounter = createFocusableElem();
+    tabStops.current = [previous, counter, afterCounter];
+    const onTabExit = vi.fn();
+    const listFixture = createKeyboardFixture();
+
+    // When: Tab from the list-origin menu
+    openByKeyboard(listFixture, { tabOrigin: counter, onTabExit });
+    tab = press(activeElem(), "Tab");
+
+    // Then: the list was told to close and focus moved past the counter
+    expect(onTabExit).toHaveBeenCalledTimes(1);
+    expect(contextMenuEl.classList.contains("active")).toBe(false);
+    expect(activeElem()).toBe(afterCounter);
+    expect(tab.defaultPrevented).toBe(true);
+  });
+
+  it("keeps a focused menu open when the pointer leaves the parent (TC-139)", () => {
+    // Case: TC-139
+    vi.useFakeTimers();
+    // Given: item A focused and the submenu shown by hover
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+    const more = rootItem("More");
+    more.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+    expect(getSubmenuElement().classList.contains("active")).toBe(true);
+
+    // When: the pointer leaves the parent and the delay passes; the root also sees mouseleave
+    more.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
+    vi.advanceTimersByTime(SUBMENU_HIDE_WAIT_MS);
+    contextMenuEl.dispatchEvent(new MouseEvent("mouseleave"));
+
+    // Then: both menus stay open
+    expect(getSubmenuElement().classList.contains("active")).toBe(true);
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+
+    // Given: focus outside the menu (S2 TC-013 conditions)
+    fixture.sourceElem.focus();
+    more.dispatchEvent(new MouseEvent("mouseenter", { bubbles: true }));
+    more.dispatchEvent(new MouseEvent("mouseleave", { bubbles: true }));
+    vi.advanceTimersByTime(SUBMENU_HIDE_WAIT_MS);
+
+    // Then: the hover timer closes the submenu as before
+    expect(getSubmenuElement().classList.contains("active")).toBe(false);
+  });
+
+  it("keeps a focused menu open when the pointer leaves the document (TC-140)", () => {
+    // Case: TC-140
+    // Given: main's document mouseleave listener and a focused menu
+    document.addEventListener("mouseleave", hideContextMenuListener);
+    try {
+      const fixture = createKeyboardFixture();
+      openByKeyboard(fixture);
+
+      // When: the pointer leaves the document
+      document.dispatchEvent(new MouseEvent("mouseleave"));
+
+      // Then: the menu stays open
+      expect(contextMenuEl.classList.contains("active")).toBe(true);
+
+      // When: focus is outside and the pointer leaves again
+      fixture.sourceElem.focus();
+      document.dispatchEvent(new MouseEvent("mouseleave"));
+
+      // Then: the legacy dismissal applies
+      expect(contextMenuEl.classList.contains("active")).toBe(false);
+    } finally {
+      document.removeEventListener("mouseleave", hideContextMenuListener);
+    }
+  });
+
+  it("runs nothing from a menu closed for a repository change (TC-141)", () => {
+    // Case: TC-141
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+    const itemA = rootItem("Item A");
+
+    // When: the repository changes, then the retained item DOM is clicked and Enter-ed
+    hideContextMenu("repository");
+    itemA.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    press(itemA, "Enter");
+
+    // Then: closed, no action, and focus was not pulled back to the origin
+    expect(contextMenuEl.classList.contains("active")).toBe(false);
+    expect(fixture.itemA).not.toHaveBeenCalled();
+    expect(activeElem()).toBe(document.body);
+  });
+
+  it("keeps the action target captured at open time across a source replacement (TC-142)", () => {
+    // Case: TC-142
+    // Given: a marked source whose menu item closes over its hash
+    const originalHash = "aaaaaaaa";
+    const seenHashes: string[] = [];
+    const sourceElem = createKeyboardSourceElem();
+    markFocusTarget(sourceElem, { kind: "row", repo: KEYBOARD_REPO, hash: originalHash });
+    const items: ContextMenuElement[] = [
+      { title: "Item A", onClick: () => seenHashes.push(originalHash) }
+    ];
+    sourceElem.focus();
+    showContextMenu(keyboardTrigger(), items, sourceElem);
+
+    // When: the source is replaced by an element for another hash, then Enter runs item A
+    sourceElem.remove();
+    const focusSpy = vi.spyOn(sourceElem, "focus");
+    const replacement = createKeyboardSourceElem();
+    markFocusTarget(replacement, { kind: "row", repo: KEYBOARD_REPO, hash: "bbbbbbbb" });
+    press(rootItem("Item A"), "Enter");
+
+    // Then: the action ran once with the opened hash and the detached element was never focused
+    expect(seenHashes).toEqual([originalHash]);
+    expect(focusSpy).not.toHaveBeenCalled();
+    expect(contextMenuEl.classList.contains("active")).toBe(false);
+  });
+
+  it("hands focus to a dialog opened by the action and does not take it back (TC-143)", () => {
+    // Case: TC-143
+    // Given: item A opens a dialog that focuses its own button
+    const fixture = createKeyboardFixture();
+    const dialogButton = document.createElement("button");
+    dialogButton.type = "button";
+    fixture.itemA.mockImplementation(() => {
+      document.getElementById("dialog")!.appendChild(dialogButton);
+      dialogButton.focus();
+    });
+    openByKeyboard(fixture);
+
+    // When: Enter on item A
+    press(activeElem(), "Enter");
+    release(dialogButton, "Enter");
+
+    // Then: the dialog keeps focus
+    expect(fixture.itemA).toHaveBeenCalledTimes(1);
+    expect(activeElem()).toBe(dialogButton);
+    expect(activeElem()).not.toBe(fixture.sourceElem);
+  });
+
+  it("leaves focus alone on a programmatic hide without a reason (TC-144)", () => {
+    // Case: TC-144
+    // Given: focus on a toolbar button while a mouse-opened menu is shown
+    const refreshBtn = createFocusableElem();
+    refreshBtn.id = "refreshBtn";
+    refreshBtn.focus();
+    const fixture = createKeyboardFixture();
+    showContextMenu(createMouseEvent(100, 100), fixture.items, fixture.sourceElem);
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+
+    // When: the legacy hide runs
+    hideContextMenu();
+
+    // Then: the menu is closed and the toolbar button still has focus
+    expect(contextMenuEl.classList.contains("active")).toBe(false);
+    expect(activeElem()).toBe(refreshBtn);
+  });
+
+  it("treats an outside click as a plain exit without restoring the origin (TC-145)", () => {
+    // Case: TC-145
+    // Given: main's document click listener and a focused menu
+    document.addEventListener("click", hideContextMenuListener);
+    try {
+      const fixture = createKeyboardFixture();
+      openByKeyboard(fixture);
+
+      // When: pointerdown then click on empty body space
+      document.body.dispatchEvent(new Event("pointerdown", { bubbles: true }));
+      document.body.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+      // Then: closed and the origin did not get focus back
+      expect(contextMenuEl.classList.contains("active")).toBe(false);
+      expect(activeElem()).not.toBe(fixture.sourceElem);
+      expect(fixture.itemA).not.toHaveBeenCalled();
+    } finally {
+      document.removeEventListener("click", hideContextMenuListener);
+    }
+  });
+});
+
+// @see docs/testing/perspectives/web/contextMenu-test.md
+describe("S11: focus after a completed action", () => {
+  const tabStops = { current: [] as HTMLElement[] };
+  let disposeContext: () => void;
+
+  beforeEach(() => {
+    tabStops.current = [];
+    disposeContext = registerKeyboardContext(tabStops);
+  });
+
+  afterEach(() => {
+    hideContextMenu();
+    disposeContext();
+    document.body.querySelectorAll("button").forEach((button) => button.remove());
+  });
+
+  it("returns focus to the origin when the action moved it nowhere else (TC-146)", () => {
+    // Case: TC-146
+    // Given: an open keyboard menu whose item A leaves focus alone
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+    expect(activeElem()).toBe(rootItem("Item A"));
+
+    // When: Enter runs item A (the focused li is removed with the menu)
+    press(activeElem(), "Enter");
+    release(fixture.sourceElem, "Enter");
+
+    // Then: the action ran once, the menu is closed and the origin holds focus again
+    expect(fixture.itemA).toHaveBeenCalledTimes(1);
+    expect(contextMenuEl.classList.contains("active")).toBe(false);
+    expect(activeElem()).toBe(fixture.sourceElem);
+
+    // When: the same through Space
+    openByKeyboard(fixture);
+    press(activeElem(), " ");
+    release(fixture.sourceElem, " ");
+
+    // Then: the origin holds focus again
+    expect(fixture.itemA).toHaveBeenCalledTimes(2);
+    expect(activeElem()).toBe(fixture.sourceElem);
+
+    // When: a mouse-opened menu whose li took focus from the press is clicked
+    showContextMenu(createMouseEvent(100, 100), fixture.items, fixture.sourceElem);
+    rootItem("Item B").focus();
+    expect(activeElem()).toBe(rootItem("Item B"));
+    rootItem("Item B").dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    // Then: focus does not stay on body either
+    expect(fixture.itemB).toHaveBeenCalledTimes(1);
+    expect(activeElem()).toBe(fixture.sourceElem);
+  });
+
+  it("leaves focus with the element the action focused (TC-147)", () => {
+    // Case: TC-147
+    // Given: item A hands focus to a toolbar button (as an action opening another UI does)
+    const fixture = createKeyboardFixture();
+    const refreshBtn = createFocusableElem();
+    refreshBtn.id = "refreshBtn";
+    fixture.itemA.mockImplementation(() => {
+      refreshBtn.focus();
+    });
+    openByKeyboard(fixture);
+    const originFocus = vi.spyOn(fixture.sourceElem, "focus");
+
+    // When: Enter runs item A
+    press(activeElem(), "Enter");
+    release(refreshBtn, "Enter");
+
+    // Then: the focused element keeps focus and the origin is not focused
+    expect(fixture.itemA).toHaveBeenCalledTimes(1);
+    expect(activeElem()).toBe(refreshBtn);
+    expect(originFocus).not.toHaveBeenCalled();
+  });
+});
+
+// @see docs/testing/perspectives/web/contextMenu-test.md
+describe("S12: contextmenu dispatched on the launching key's keyup", () => {
+  const tabStops = { current: [] as HTMLElement[] };
+  let disposeContext: () => void;
+
+  beforeEach(() => {
+    tabStops.current = [];
+    disposeContext = registerKeyboardContext(tabStops);
+    document.addEventListener("contextmenu", hideContextMenuListener);
+  });
+
+  afterEach(() => {
+    document.removeEventListener("contextmenu", hideContextMenuListener);
+    hideContextMenu();
+    disposeContext();
+    document.body.querySelectorAll("button").forEach((button) => button.remove());
+  });
+
+  function openByContextMenuKey(fixture: KeyboardFixture): void {
+    fixture.sourceElem.focus();
+    showContextMenu(
+      new KeyboardEvent("keydown", { key: "ContextMenu", bubbles: true, cancelable: true }),
+      fixture.items,
+      fixture.sourceElem
+    );
+  }
+
+  function contextMenuAt(target: Element): MouseEvent {
+    const event = new MouseEvent("contextmenu", { bubbles: true, cancelable: true });
+    target.dispatchEvent(event);
+    return event;
+  }
+
+  function rightClick(target: Element, clientX: number, clientY: number): MouseEvent {
+    target.dispatchEvent(new MouseEvent("pointerdown", { bubbles: true, button: 2 }));
+    const event = new MouseEvent("contextmenu", {
+      bubbles: true,
+      cancelable: true,
+      clientX,
+      clientY
+    });
+    target.dispatchEvent(event);
+    return event;
+  }
+
+  it("keeps the menu open when the keyup contextmenu targets the focused item (TC-148)", () => {
+    // Case: TC-148
+    // Given: a menu opened by the ContextMenu key, the document closing menus on contextmenu
+    const fixture = createKeyboardFixture();
+    openByContextMenuKey(fixture);
+    const focusedItem = activeElem();
+    expect(focusedItem).toBe(rootItem("Item A"));
+    const rendered = Array.from(contextMenuEl.querySelectorAll("li"));
+
+    // When: the key is released and the browser's contextmenu lands on the focused item
+    release(focusedItem, "ContextMenu");
+    const late = contextMenuAt(focusedItem);
+
+    // Then: the event is swallowed, the same li nodes stay and item A keeps focus
+    expect(late.defaultPrevented).toBe(true);
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    const after = Array.from(contextMenuEl.querySelectorAll("li"));
+    expect(after).toHaveLength(rendered.length);
+    after.forEach((li, index) => expect(li).toBe(rendered[index]));
+    expect(activeElem()).toBe(focusedItem);
+  });
+
+  it("cancels only the launching key's keyup, once (TC-149)", () => {
+    // Case: TC-149
+    // Given: a menu opened from Shift+F10
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+
+    // When: the launching key and then an unrelated key are released
+    const launchKeyup = release(activeElem(), "F10");
+    const shiftKeyup = release(activeElem(), "Shift");
+    const arrowKeyup = release(activeElem(), "ArrowDown");
+    const secondLaunchKeyup = release(activeElem(), "F10");
+
+    // Then: only the first F10 keyup is cancelled and the menu is untouched
+    expect(launchKeyup.defaultPrevented).toBe(true);
+    expect(shiftKeyup.defaultPrevented).toBe(false);
+    expect(arrowKeyup.defaultPrevented).toBe(false);
+    expect(secondLaunchKeyup.defaultPrevented).toBe(false);
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(activeElem()).toBe(rootItem("Item A"));
+  });
+
+  it("lets an independent right-click open another menu after the swallowed keyup (TC-150)", () => {
+    // Case: TC-150
+    // Given: the keyup contextmenu of a ContextMenu launch was swallowed on the focused item
+    const fixture = createKeyboardFixture();
+    openByContextMenuKey(fixture);
+    release(activeElem(), "ContextMenu");
+    contextMenuAt(activeElem());
+    const other = createSourceElem();
+    // As main's launchers do, the handler keeps the event from the document-level dismissal.
+    const relaunch = vi.fn((e: Event) => {
+      e.stopPropagation();
+      showContextMenu(e as MouseEvent, createItems(), other);
+    });
+    other.addEventListener("contextmenu", relaunch);
+
+    // When: another element is right-clicked (pointerdown, then contextmenu)
+    const independent = rightClick(other, 250, 150);
+
+    // Then: the click is not suppressed and the new menu opens at the pointer
+    expect(independent.defaultPrevented).toBe(false);
+    expect(relaunch).toHaveBeenCalledTimes(1);
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(contextMenuEl.style.left).toBe(`${250 - OFFSET}px`);
+    expect(contextMenuEl.style.top).toBe(`${150 - OFFSET}px`);
+  });
+
+  it("does not treat a right-click inside the menu or its submenu as an outside click (TC-151)", () => {
+    // Case: TC-151
+    // Given: an open keyboard menu whose same-press suppression is already spent
+    const fixture = createKeyboardFixture();
+    openByKeyboard(fixture);
+    release(activeElem(), "F10");
+    contextMenuAt(activeElem());
+
+    // When: item B is right-clicked independently
+    const onItem = rightClick(rootItem("Item B"), 120, 210);
+
+    // Then: the menu stays open and the event is left to the browser
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(onItem.defaultPrevented).toBe(false);
+    expect(fixture.itemB).not.toHaveBeenCalled();
+
+    // When: the submenu is opened and its child is right-clicked
+    rootItem("More").focus();
+    press(rootItem("More"), "ArrowRight");
+    expect(activeElem()).toBe(submenuItem("Child 1"));
+    rightClick(submenuItem("Child 1"), 200, 240);
+
+    // Then: root and submenu stay open with focus unchanged
+    expect(contextMenuEl.classList.contains("active")).toBe(true);
+    expect(document.querySelector("ul.contextMenuSubmenu.active")).not.toBeNull();
+    expect(activeElem()).toBe(submenuItem("Child 1"));
+    expect(fixture.child1).not.toHaveBeenCalled();
   });
 });

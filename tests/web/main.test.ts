@@ -103,6 +103,7 @@ const {
 vi.mock("../../web/fileHistory", () => ({
   CLASS_FILE_HISTORY_CURRENT: "fileHistoryCurrent",
   CLASS_FILE_HISTORY_NOTE: "fileHistoryNote",
+  FILE_HISTORY_BAR_ID: "fileHistoryBar",
   FileHistoryController: mockFileHistoryConstructor
 }));
 
@@ -181,19 +182,22 @@ const { mockRepoDropdownInstance, mockBranchDropdownInstance, mockAuthorDropdown
       setOptions: vi.fn(),
       refresh: vi.fn(),
       isOpen: vi.fn(() => false),
-      close: vi.fn()
+      close: vi.fn(),
+      cancelAndClose: vi.fn()
     },
     mockBranchDropdownInstance: {
       setOptions: vi.fn(),
       refresh: vi.fn(),
       isOpen: vi.fn(() => false),
-      close: vi.fn()
+      close: vi.fn(),
+      cancelAndClose: vi.fn()
     },
     mockAuthorDropdownInstance: {
       setOptions: vi.fn(),
       refresh: vi.fn(),
       isOpen: vi.fn(() => false),
-      close: vi.fn()
+      close: vi.fn(),
+      cancelAndClose: vi.fn()
     }
   }));
 
@@ -1532,9 +1536,9 @@ describe("GitKeizuView frontend integration", () => {
       // Given: compare mode active with file tree HTML containing a clickable file
       expandCommit(COMMIT_HASH_1);
 
-      // Override generateGitFileTreeHtml to return a clickable file element
+      // Override generateGitFileTreeHtml to return a file row with its diff button
       vi.mocked(generateGitFileTreeHtml).mockReturnValueOnce(
-        '<table><tr class="gitFile gitDiffPossible" data-oldfilepath="old.ts" data-newfilepath="new.ts" data-type="M"><td>new.ts</td></tr></table>'
+        '<table><tr class="gitFile gitDiffPossible" data-oldfilepath="old.ts" data-newfilepath="new.ts" data-type="M"><td><button type="button" class="gitFileDiff">new.ts</button></td></tr></table>'
       );
 
       // Ctrl+click commit 2 and receive compare result
@@ -1555,8 +1559,8 @@ describe("GitKeizuView frontend integration", () => {
       });
       vi.clearAllMocks();
 
-      // When: a file element in the commit details is clicked
-      const fileElem = document.querySelector(".gitFile.gitDiffPossible");
+      // When: the diff button of a file row in the commit details is clicked
+      const fileElem = document.querySelector(".gitFile.gitDiffPossible .gitFileDiff");
       expect(fileElem).not.toBeNull();
       fileElem!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
@@ -2566,12 +2570,30 @@ describe("GitKeizuView frontend integration", () => {
 
   /* ---------------------------------------------------------------- */
   /* handleKeyboardShortcut() Arrow key navigation (S29-S31, S46, S64) */
+  /* Superseded by 13-keyboard-accessibility-01.md S70 / S71: the keys  */
+  /* apply from the focused target row, and move the target even       */
+  /* without details or while comparing.                               */
   /* ---------------------------------------------------------------- */
 
   describe("handleKeyboardShortcut() Arrow key navigation", () => {
     interface ArrowKeySpies {
       preventDefault: ReturnType<typeof vi.spyOn>;
       stopPropagation: ReturnType<typeof vi.spyOn>;
+    }
+
+    /** The row that carries the list's tab stop (the row target), with real focus on it. */
+    function focusedTargetRow(): HTMLElement {
+      const target = document.querySelector<HTMLElement>(
+        '#commitTable tr[data-hash][tabindex="0"]'
+      );
+      if (target === null) throw new Error("No row target");
+      target.focus();
+      return target;
+    }
+
+    function targetHash(): string | undefined {
+      return document.querySelector<HTMLElement>('#commitTable tr[data-hash][tabindex="0"]')
+        ?.dataset.hash;
     }
 
     function dispatchArrowKey(
@@ -2599,7 +2621,7 @@ describe("GitKeizuView frontend integration", () => {
       }
       const preventDefaultSpy = vi.spyOn(event, "preventDefault");
       const stopPropagationSpy = vi.spyOn(event, "stopPropagation");
-      (options?.target ?? document).dispatchEvent(event);
+      (options?.target ?? focusedTargetRow()).dispatchEvent(event);
       return { preventDefault: preventDefaultSpy, stopPropagation: stopPropagationSpy };
     }
 
@@ -2776,33 +2798,48 @@ describe("GitKeizuView frontend integration", () => {
     // @see docs/testing/perspectives/web/main-test/04-keyboard-selection-02.md
 
     describe("normal mode precondition checks (S64)", () => {
-      it("expandedCommit null skips Arrow processing (TC-562)", () => {
-        // Case: TC-562
+      it("expandedCommit null moves only the row target (TC-562)", () => {
+        // Case: TC-562 (contract replaced by S70 TC-658: the target moves without details)
         // Given: normal mode and no commit is expanded (expandedCommit === null)
         resetCommitState();
+        expect(targetHash()).toBe(COMMIT_HASH_1);
 
-        // When: ArrowDown pressed
+        // When: ArrowDown pressed on the target row
         const spies = dispatchArrowKey("ArrowDown");
 
-        // Then: no details request, the event is not consumed and the history is not asked
+        // Then: the target moves, no details request, the event is consumed and the history is
+        // not asked
+        expect(targetHash()).toBe(COMMIT_HASH_2);
         expect(vscode.postMessage).not.toHaveBeenCalled();
-        expect(spies.preventDefault).not.toHaveBeenCalled();
-        expect(spies.stopPropagation).not.toHaveBeenCalled();
+        expect(spies.preventDefault).toHaveBeenCalledTimes(1);
         expect(mockFileHistoryInstance.navigate).not.toHaveBeenCalled();
+        expect(document.getElementById("commitDetails")).toBeNull();
       });
 
-      it("compareWithHash non-null skips Arrow processing (TC-563)", () => {
-        // Case: TC-563
-        // Given: normal mode and a commit is expanded in comparison mode
+      it("compareWithHash non-null moves only the row target (TC-563)", () => {
+        // Case: TC-563 (contract replaced by S70 TC-663: the target moves, the comparison stays)
+        // Given: normal mode and a commit is expanded in comparison mode; the Ctrl+click made
+        // the compare target the row target
         expandCommitWithCompare(COMMIT_HASH_2, COMMIT_HASH_3);
+        expect(targetHash()).toBe(COMMIT_HASH_3);
 
-        // When: ArrowDown pressed
-        const spies = dispatchArrowKey("ArrowDown");
+        // When: ArrowUp pressed on the target row
+        const spies = dispatchArrowKey("ArrowUp");
 
-        // Then: Arrow navigation is skipped (compare mode active) and the event is not consumed
+        // Then: only the target moves; no request, both compare rows unchanged, event consumed
+        expect(targetHash()).toBe(COMMIT_HASH_2);
         expect(vscode.postMessage).not.toHaveBeenCalled();
-        expect(spies.preventDefault).not.toHaveBeenCalled();
-        expect(spies.stopPropagation).not.toHaveBeenCalled();
+        expect(spies.preventDefault).toHaveBeenCalledTimes(1);
+        expect(
+          document
+            .querySelector(`.commit[data-hash="${COMMIT_HASH_2}"]`)!
+            .classList.contains("commitDetailsOpen")
+        ).toBe(true);
+        expect(
+          document
+            .querySelector(`.commit[data-hash="${COMMIT_HASH_3}"]`)!
+            .classList.contains("compareTarget")
+        ).toBe(true);
       });
 
       it("hash not in commitLookup skips navigation (TC-564)", () => {
@@ -2914,18 +2951,18 @@ describe("GitKeizuView frontend integration", () => {
         expect(vscode.postMessage).not.toHaveBeenCalled();
       });
 
-      it("Shift-only + ArrowUp skips Arrow processing (TC-569)", () => {
-        // Case: TC-569
+      it("Shift-only + ArrowUp moves only the target (TC-767)", () => {
+        // Case: TC-569 → TC-767
         // Given: normal mode and a commit is expanded
         expandCommit(COMMIT_HASH_2);
 
         // When: Shift+ArrowUp pressed (no Ctrl/Cmd)
         const spies = dispatchArrowKey("ArrowUp", { shiftKey: true });
 
-        // Then: Arrow processing is skipped (modifier pattern mismatch), event not consumed
+        // Then: the event is consumed and the details stay without a new request
         expect(vscode.postMessage).not.toHaveBeenCalled();
-        expect(spies.preventDefault).not.toHaveBeenCalled();
-        expect(spies.stopPropagation).not.toHaveBeenCalled();
+        expect(spies.preventDefault).toHaveBeenCalledTimes(1);
+        expect(spies.stopPropagation).toHaveBeenCalledTimes(1);
       });
 
       it("Alt + ArrowUp skips Arrow processing (TC-570)", () => {
@@ -3039,34 +3076,31 @@ describe("GitKeizuView frontend integration", () => {
         expect(spies.stopPropagation).not.toHaveBeenCalled();
       });
 
-      it("ArrowDown from a non-editable target keeps the existing navigation (TC-261)", () => {
-        // Case: TC-261
+      it("ArrowDown from document.body does not navigate (TC-261)", () => {
+        // Case: TC-261 (contract replaced by S70: list keys need real focus on a row or label)
         // Given: a commit with an adjacent commit is expanded and the target is document.body
         expandCommit(COMMIT_HASH_2);
 
         // When: ArrowDown keydown is dispatched with document.body as the event target
         const spies = dispatchKeyFromElement(document.body, "ArrowDown");
 
-        // Then: the next commit loads once and the event is consumed as before
-        expect(vscode.postMessage).toHaveBeenCalledTimes(1);
-        expect(vscode.postMessage).toHaveBeenCalledWith(
-          expect.objectContaining({ command: "commitDetails", commitHash: COMMIT_HASH_3 })
-        );
-        expect(spies.preventDefault).toHaveBeenCalledTimes(1);
-        expect(spies.stopPropagation).toHaveBeenCalledTimes(1);
+        // Then: nothing loads, the target stays and the event is not consumed
+        expect(vscode.postMessage).not.toHaveBeenCalled();
+        expect(targetHash()).toBe(COMMIT_HASH_2);
+        expect(spies.preventDefault).not.toHaveBeenCalled();
+        expect(spies.stopPropagation).not.toHaveBeenCalled();
       });
 
-      it("Ctrl+F from an input element still opens the find widget (TC-262)", () => {
-        // Case: TC-262
-        // Given: an input element is the event target (no blanket early return at function start)
+      it("Ctrl+F from an input element leaves the input its own keys (TC-262)", () => {
+        // Case: TC-262 (contract replaced by S72 TC-685: shortcuts apply from rows / labels)
+        // Given: an input element is the event target
         const input = appendTarget(document.createElement("input"));
 
         // When: Ctrl+F keydown is dispatched from the input element
         dispatchKeyFromElement(input, "f", { ctrlKey: true });
 
-        // Then: the global find shortcut still runs exactly once
-        expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(1);
-        expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
+        // Then: the find widget is not opened from the input
+        expect(mockFindWidgetInstance.show).not.toHaveBeenCalled();
       });
     });
 
@@ -3533,26 +3567,38 @@ describe("GitKeizuView frontend integration", () => {
 
       describe.each(HISTORY_MODES)("comparison mode while $name (TC-589)", (mode) => {
         it.each([
-          { modifierName: "no modifier", init: {} },
-          { modifierName: CTRL.name, init: CTRL.init }
-        ])("ArrowDown with $modifierName is left alone", ({ init }) => {
-          // Case: TC-589
-          // Given: the mode, the details of h1 compared with x2, a controller and a graph that
-          // would both resolve a destination
-          enterHistoryMode(mode);
-          expandCommitWithCompare(MIDDLE_MATCH, OTHER_NON_MATCH);
-          mockFileHistoryInstance.navigate.mockReturnValue(FIRST_MATCH);
-          resolveGraphMovesTo(LAST_MATCH_INDEX);
+          { modifierName: "no modifier", init: {}, consumed: true, destination: LAST_MATCH },
+          {
+            modifierName: CTRL.name,
+            init: CTRL.init,
+            consumed: false,
+            destination: OTHER_NON_MATCH
+          }
+        ])(
+          "ArrowDown with $modifierName bypasses the history",
+          ({ init, consumed, destination }) => {
+            // Case: TC-589 (contract replaced by S71 TC-680: the comparison wins over the history
+            // and a plain arrow moves only the row target)
+            // Given: the mode, the details of h1 compared with x2 (the compare target is the row
+            // target), a controller and a graph that would both resolve a destination
+            enterHistoryMode(mode);
+            expandCommitWithCompare(MIDDLE_MATCH, OTHER_NON_MATCH);
+            mockFileHistoryInstance.navigate.mockReturnValue(FIRST_MATCH);
+            resolveGraphMovesTo(LAST_MATCH_INDEX);
 
-          // When: ArrowDown is pressed
-          const spies = dispatchArrowKey("ArrowDown", init);
+            // When: ArrowDown is pressed on the target row
+            const spies = dispatchArrowKey("ArrowDown", init);
 
-          // Then: nothing moves and the event is not consumed
-          expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
-          expectNotConsumed(spies);
-          expect(commitDetailsRequests()).toEqual([]);
-          expectNoGraphMove();
-        });
+            // Then: the history and the graph are not asked, no request is sent, and only a plain
+            // arrow moves (and consumes) while the comparison stays
+            expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
+            expect(spies.preventDefault).toHaveBeenCalledTimes(consumed ? 1 : 0);
+            expect(targetHash()).toBe(destination);
+            expect(commitDetailsRequests()).toEqual([]);
+            expectNoGraphMove();
+            expect(detailsOwnerHash()).toBe(MIDDLE_MATCH);
+          }
+        );
       });
 
       it.each(HISTORY_MODES)(
@@ -3573,8 +3619,9 @@ describe("GitKeizuView frontend integration", () => {
         }
       );
 
-      it("Ctrl+F from an input still exits the mode and opens the find widget (TC-591)", () => {
-        // Case: TC-591
+      it("Ctrl+F from an input neither exits the mode nor opens the find widget (TC-591)", () => {
+        // Case: TC-591 (contract replaced by S72 TC-685: shortcuts apply from rows / labels; the
+        // exit-before-show order from a row is TC-324)
         // Given: highlighted only and an input target
         enterHistoryMode(HIGHLIGHTED_ONLY);
         const target = appendTarget(document.createElement("input"));
@@ -3582,14 +3629,9 @@ describe("GitKeizuView frontend integration", () => {
         // When: the configured find shortcut is dispatched from the input
         dispatchArrowKey("f", { ctrlKey: true, target });
 
-        // Then: exit(true) runs once before findWidget.show(true), without any history move
-        expect(mockFileHistoryInstance.exit).toHaveBeenCalledTimes(1);
-        expect(mockFileHistoryInstance.exit).toHaveBeenCalledWith(true);
-        expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(1);
-        expect(mockFindWidgetInstance.show).toHaveBeenCalledWith(true);
-        expect(mockFileHistoryInstance.exit.mock.invocationCallOrder[0]).toBeLessThan(
-          mockFindWidgetInstance.show.mock.invocationCallOrder[0]
-        );
+        // Then: the input keeps its key: no exit, no show, no history move
+        expect(mockFileHistoryInstance.exit).toHaveBeenCalledTimes(0);
+        expect(mockFindWidgetInstance.show).toHaveBeenCalledTimes(0);
         expect(mockFileHistoryInstance.navigate).toHaveBeenCalledTimes(0);
       });
 
@@ -3835,9 +3877,13 @@ describe("GitKeizuView frontend integration", () => {
   /* handleEscape() — progressive UI dismiss chain (S12)             */
   /* ---------------------------------------------------------------- */
 
+  // Superseded by 13-keyboard-accessibility-01.md S72: Escape closes on keydown and the dropdown
+  // stages cancel (cancelAndClose) instead of applying (close).
   describe("handleEscape()", () => {
     function pressEscape(): void {
-      document.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape", bubbles: true }));
+      document.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true })
+      );
     }
 
     function resetAllUIStates(): void {
@@ -3885,9 +3931,9 @@ describe("GitKeizuView frontend integration", () => {
       // When: Escape is pressed
       pressEscape();
 
-      // Then: only repoDropdown.close() is called
-      expect(mockRepoDropdownInstance.close).toHaveBeenCalledTimes(1);
-      expect(mockBranchDropdownInstance.close).not.toHaveBeenCalled();
+      // Then: only repoDropdown.cancelAndClose() is called
+      expect(mockRepoDropdownInstance.cancelAndClose).toHaveBeenCalledTimes(1);
+      expect(mockBranchDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
       expect(hideDialog).not.toHaveBeenCalled();
     });
 
@@ -3898,9 +3944,9 @@ describe("GitKeizuView frontend integration", () => {
       // When: Escape is pressed
       pressEscape();
 
-      // Then: only branchDropdown.close() is called
-      expect(mockBranchDropdownInstance.close).toHaveBeenCalledTimes(1);
-      expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
+      // Then: only branchDropdown.cancelAndClose() is called
+      expect(mockBranchDropdownInstance.cancelAndClose).toHaveBeenCalledTimes(1);
+      expect(mockRepoDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
     });
 
     it("closes repoDropdown first when both dropdowns are open (TC-087)", () => {
@@ -3911,9 +3957,9 @@ describe("GitKeizuView frontend integration", () => {
       // When: Escape is pressed
       pressEscape();
 
-      // Then: only repoDropdown.close() is called (repo priority over branch)
-      expect(mockRepoDropdownInstance.close).toHaveBeenCalledTimes(1);
-      expect(mockBranchDropdownInstance.close).not.toHaveBeenCalled();
+      // Then: only repoDropdown.cancelAndClose() is called (repo priority over branch)
+      expect(mockRepoDropdownInstance.cancelAndClose).toHaveBeenCalledTimes(1);
+      expect(mockBranchDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
     });
 
     it("closes FindWidget when no menu/dialog/dropdown active (TC-088)", () => {
@@ -3925,7 +3971,7 @@ describe("GitKeizuView frontend integration", () => {
 
       // Then: only findWidget.close() is called
       expect(mockFindWidgetInstance.close).toHaveBeenCalledTimes(1);
-      expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
+      expect(mockRepoDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
     });
 
     it("closes commit details when all other UI is closed (TC-089)", () => {
@@ -3952,8 +3998,8 @@ describe("GitKeizuView frontend integration", () => {
       // Then: no close/hide methods are called
       expect(hideContextMenu).not.toHaveBeenCalled();
       expect(hideDialog).not.toHaveBeenCalled();
-      expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
-      expect(mockBranchDropdownInstance.close).not.toHaveBeenCalled();
+      expect(mockRepoDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
+      expect(mockBranchDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
       expect(mockFindWidgetInstance.close).not.toHaveBeenCalled();
     });
 
@@ -3997,7 +4043,7 @@ describe("GitKeizuView frontend integration", () => {
       // Then: hideContextMenu is called exactly once and lower-priority handlers are untouched
       expect(hideContextMenu).toHaveBeenCalledTimes(1);
       expect(hideDialog).not.toHaveBeenCalled();
-      expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
+      expect(mockRepoDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
       expect(mockFindWidgetInstance.close).not.toHaveBeenCalled();
       expect(mockFileHistoryInstance.exit).not.toHaveBeenCalled();
     });
@@ -4013,12 +4059,12 @@ describe("GitKeizuView frontend integration", () => {
       // Then: hideDialog is called once and no dropdown/findWidget/history handler runs
       expect(hideDialog).toHaveBeenCalledTimes(1);
       expect(hideContextMenu).not.toHaveBeenCalled();
-      expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
+      expect(mockRepoDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
       expect(mockFindWidgetInstance.close).not.toHaveBeenCalled();
       expect(mockFileHistoryInstance.exit).not.toHaveBeenCalled();
     });
 
-    it("repoDropdown.close wins as the third priority (TC-596)", () => {
+    it("repoDropdown.cancelAndClose wins as the third priority (TC-596)", () => {
       // Case: TC-596
       // Given: not highlighted, and only the repo dropdown is open
       mockRepoDropdownInstance.isOpen.mockReturnValue(true);
@@ -4026,10 +4072,10 @@ describe("GitKeizuView frontend integration", () => {
       // When: Escape is pressed
       pressEscape();
 
-      // Then: only repoDropdown.close() is invoked
-      expect(mockRepoDropdownInstance.close).toHaveBeenCalledTimes(1);
-      expect(mockBranchDropdownInstance.close).not.toHaveBeenCalled();
-      expect(mockAuthorDropdownInstance.close).not.toHaveBeenCalled();
+      // Then: only repoDropdown.cancelAndClose() is invoked
+      expect(mockRepoDropdownInstance.cancelAndClose).toHaveBeenCalledTimes(1);
+      expect(mockBranchDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
+      expect(mockAuthorDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
       expect(mockFindWidgetInstance.close).not.toHaveBeenCalled();
       expect(mockFileHistoryInstance.exit).not.toHaveBeenCalled();
     });
@@ -4045,7 +4091,7 @@ describe("GitKeizuView frontend integration", () => {
 
       // Then: only findWidget.close() is invoked, the commit details stay open
       expect(mockFindWidgetInstance.close).toHaveBeenCalledTimes(1);
-      expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
+      expect(mockRepoDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
       expect(hideDialog).not.toHaveBeenCalled();
       expect(document.getElementById("commitDetails")).not.toBeNull();
       expect(mockFileHistoryInstance.exit).not.toHaveBeenCalled();
@@ -4079,9 +4125,9 @@ describe("GitKeizuView frontend integration", () => {
       // Then: every hide/close handler and the history exit are left untouched
       expect(hideContextMenu).not.toHaveBeenCalled();
       expect(hideDialog).not.toHaveBeenCalled();
-      expect(mockRepoDropdownInstance.close).not.toHaveBeenCalled();
-      expect(mockBranchDropdownInstance.close).not.toHaveBeenCalled();
-      expect(mockAuthorDropdownInstance.close).not.toHaveBeenCalled();
+      expect(mockRepoDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
+      expect(mockBranchDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
+      expect(mockAuthorDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
       expect(mockFindWidgetInstance.close).not.toHaveBeenCalled();
       expect(mockFileHistoryInstance.exit).not.toHaveBeenCalled();
     });
@@ -4109,9 +4155,9 @@ describe("GitKeizuView frontend integration", () => {
       // When: Escape is pressed
       pressEscape();
 
-      // Then: only repoDropdown.close() is invoked, branchDropdown.close is suppressed
-      expect(mockRepoDropdownInstance.close).toHaveBeenCalledTimes(1);
-      expect(mockBranchDropdownInstance.close).not.toHaveBeenCalled();
+      // Then: only repoDropdown.cancelAndClose() is invoked, branchDropdown.cancelAndClose is suppressed
+      expect(mockRepoDropdownInstance.cancelAndClose).toHaveBeenCalledTimes(1);
+      expect(mockBranchDropdownInstance.cancelAndClose).not.toHaveBeenCalled();
     });
 
     // @see docs/testing/perspectives/web/main-test/04-keyboard-selection-02.md
@@ -4184,9 +4230,9 @@ describe("GitKeizuView frontend integration", () => {
         return {
           contextMenu: vi.mocked(hideContextMenu).mock.calls.length,
           dialog: vi.mocked(hideDialog).mock.calls.length,
-          repoDropdown: mockRepoDropdownInstance.close.mock.calls.length,
-          branchDropdown: mockBranchDropdownInstance.close.mock.calls.length,
-          authorDropdown: mockAuthorDropdownInstance.close.mock.calls.length,
+          repoDropdown: mockRepoDropdownInstance.cancelAndClose.mock.calls.length,
+          branchDropdown: mockBranchDropdownInstance.cancelAndClose.mock.calls.length,
+          authorDropdown: mockAuthorDropdownInstance.cancelAndClose.mock.calls.length,
           refList: closePopupSpy.mock.results.filter((result) => result.value === true).length,
           findWidget: mockFindWidgetInstance.close.mock.calls.length,
           fileHistory: mockFileHistoryInstance.exit.mock.calls.length
@@ -6832,7 +6878,7 @@ describe("worktree label rendering (S55)", () => {
   });
 
   it("shows the detached worktree menu on a detached label (TC-412)", () => {
-    // Case: TC-412
+    // Case: TC-412 (menu source is the label's button: 13-keyboard-accessibility-02.md S78 TC-743)
     // Given: the current repo has a recent action and a detached label is rendered
     dispatchMessage({
       command: "loadRepos",
@@ -6858,7 +6904,8 @@ describe("worktree label rendering (S55)", () => {
     expect(showContextMenuArgs[1]).toBe(
       vi.mocked(buildDetachedWorktreeContextMenuItems).mock.results[0].value
     );
-    expect(showContextMenuArgs[2]).toBe(label);
+    // The menu is anchored to the label's operable button (061-05 Task 7), not to the wrapper.
+    expect(showContextMenuArgs[2]).toBe(label.querySelector("button.gitRefButton"));
     expect(showContextMenuArgs[3]).toEqual(["ref.openTerminal"]);
 
     dispatchMessage({
@@ -7061,7 +7108,7 @@ describe("worktree label rendering (S55)", () => {
   });
 
   it("resolves a contextmenu on the label icon to the detached label (TC-423)", () => {
-    // Case: TC-423
+    // Case: TC-423 (menu source is the label's button: 13-keyboard-accessibility-02.md S78 TC-743)
     // Given: a detached label with its worktree icon is rendered
     loadWithWorktrees({
       branches: {},
@@ -7075,11 +7122,13 @@ describe("worktree label rendering (S55)", () => {
       .querySelector(".detachedWorktree .codicon")!
       .dispatchEvent(new MouseEvent("contextmenu", { bubbles: true }));
 
-    // Then: the menu is built for the label path and anchored to the label element
+    // Then: the menu is built for the label path and anchored to the label's button
     expect(buildDetachedWorktreeContextMenuItems).toHaveBeenCalledTimes(1);
     expect(buildDetachedWorktreeContextMenuItems).toHaveBeenCalledWith(TEST_REPO, "/tmp/wt8");
     expect(showContextMenu).toHaveBeenCalledTimes(1);
-    expect(vi.mocked(showContextMenu).mock.calls[0][2]).toBe(label);
+    expect(vi.mocked(showContextMenu).mock.calls[0][2]).toBe(
+      label.querySelector("button.gitRefButton")
+    );
   });
 
   it("restores a path containing markup verbatim from the label attribute (TC-424)", () => {
@@ -7974,7 +8023,7 @@ describe("highlightFileHistory icon wiring and click handler (S54)", () => {
 
   it("requests again after the comparison is cancelled (TC-390)", () => {
     // Case: TC-390
-    // Given: the comparison of TC-389 is shown, then cancelled with the icon row re-rendered
+    // Given: the comparison of TC-389 is shown, then cancelled and the origin's details re-rendered
     expandWithTreeHtml(COMMIT_HASH_1, ICON_ROW_HTML);
     clickCommit(COMMIT_HASH_2, { ctrlKey: true });
     dispatchMessage({
@@ -7983,8 +8032,9 @@ describe("highlightFileHistory icon wiring and click handler (S54)", () => {
       fromHash: COMMIT_HASH_1,
       toHash: COMMIT_HASH_2
     });
-    vi.mocked(liveFileTreeHtml).mockReturnValueOnce(ICON_ROW_HTML);
     clickCommit(COMMIT_HASH_2, { ctrlKey: true });
+    vi.mocked(liveFileTreeHtml).mockReturnValueOnce(ICON_ROW_HTML);
+    respondCommitDetails(COMMIT_HASH_1);
     vi.clearAllMocks();
 
     // When: the history glyph is clicked
@@ -9272,7 +9322,6 @@ describe("File history integration (S50 / S63 / S66)", () => {
   let liveFileTreeHtml: typeof generateGitFileTreeHtml;
   let liveFileListHtml: typeof generateGitFileListHtml;
   let liveBuildFileContextMenuItems: ReturnType<typeof vi.fn>;
-  let liveKeydownHandler: (event: KeyboardEvent) => void;
   let constructorCallsDuringImport = 0;
 
   function callbacks(): Record<string, (...args: never[]) => unknown> {
@@ -9349,17 +9398,12 @@ describe("File history integration (S50 / S63 / S66)", () => {
       fileMenuMod.buildFileContextMenuItems
     ) as unknown as ReturnType<typeof vi.fn>;
 
-    // Earlier describes left their own keydown listeners on document; capture the one this
-    // import registers so TC-324 can drive only the current view instance.
-    const addListenerSpy = vi.spyOn(document, "addEventListener");
+    // The module's listener cleanup disposes the earlier views, so document events reach only
+    // the view this import constructs.
     const constructorCallsBefore = mockFileHistoryConstructor.mock.calls.length;
     await import("../../web/main");
     constructorCallsDuringImport =
       mockFileHistoryConstructor.mock.calls.length - constructorCallsBefore;
-    const keydownRegistration = addListenerSpy.mock.calls.find((call) => call[0] === "keydown");
-    addListenerSpy.mockRestore();
-    expect(keydownRegistration).toBeDefined();
-    liveKeydownHandler = keydownRegistration![1] as (event: KeyboardEvent) => void;
     loadTestCommits();
   });
 
@@ -9523,8 +9567,12 @@ describe("File history integration (S50 / S63 / S66)", () => {
       // Given: only a pending request
       mockFileHistoryInstance.isPending.mockReturnValue(true);
 
-      // When: the find keybinding reaches this view's keydown handler
-      liveKeydownHandler(new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true }));
+      // When: the find keybinding is pressed on the row target
+      const target = document.querySelector<HTMLElement>('#commitTable tr[tabindex="0"]')!;
+      target.focus();
+      target.dispatchEvent(
+        new KeyboardEvent("keydown", { key: "f", ctrlKey: true, bubbles: true })
+      );
 
       // Then: exit(true) once and show(true) once
       expect(mockFileHistoryInstance.exit).toHaveBeenCalledTimes(1);
@@ -10017,9 +10065,11 @@ describe("File history integration (S50 / S63 / S66)", () => {
       );
     }
 
-    // Only the view imported by this describe is driven; earlier views still listen on document.
+    // The list keys apply from the focused row target (13-keyboard-accessibility-01.md S71).
     function pressArrowDown(): void {
-      liveKeydownHandler(
+      const target = document.querySelector<HTMLElement>('#commitTable tr[tabindex="0"]')!;
+      target.focus();
+      target.dispatchEvent(
         new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true, cancelable: true })
       );
     }
@@ -10804,12 +10854,17 @@ describe("path highlight selection across view changes (S68)", () => {
       expect(liveVscode.setState).toHaveBeenCalledTimes(0);
       expect(liveVscode.postMessage).toHaveBeenCalledTimes(0);
       mockFindWidgetInstance.isVisible.mockReturnValue(false);
-      document.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape" }));
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
     }
   );
 
   it("leaves click, modifier click, dblclick, arrow keys and Escape unchanged (TC-643)", () => {
-    // Case: TC-643
+    // Case: TC-643 (arrows from the focused row target, Escape on keydown: S70 / S72)
+    const pressArrowOnTarget = (key: string): void => {
+      const target = document.querySelector<HTMLElement>('#commitTable tr[tabindex="0"]')!;
+      target.focus();
+      target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
+    };
     interface InteractionRecord {
       posts: unknown[];
       checkouts: unknown[];
@@ -10821,13 +10876,13 @@ describe("path highlight selection across view changes (S68)", () => {
       dispatchMessage({ command: "commitDetails", commitDetails: makeCommitDetails("A") });
       clickCommit("R", { ctrlKey: true });
       clickCommit("U", { metaKey: true });
-      document.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape" }));
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
       clickCommit("A");
       dispatchMessage({ command: "commitDetails", commitDetails: makeCommitDetails("A") });
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowDown", bubbles: true }));
-      document.dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowUp", bubbles: true }));
+      pressArrowOnTarget("ArrowDown");
+      pressArrowOnTarget("ArrowUp");
       badge("feature").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }));
-      document.dispatchEvent(new KeyboardEvent("keyup", { key: "Escape" }));
+      document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
       return {
         posts: vi.mocked(liveVscode.postMessage).mock.calls.map((call) => call[0]),
         checkouts: vi

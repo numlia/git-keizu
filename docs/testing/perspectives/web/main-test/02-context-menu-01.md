@@ -55,7 +55,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
-> Status: active
+> Status: superseded
+> Superseded By: S72（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
 
 **シグネチャ**: `handleEscape(): void`
@@ -135,7 +136,8 @@
 > Origin: Feature 059-02 (light-spec-plan)
 > Added: 2026-09-24
 > Updated: 2026-09-25
-> Status: active
+> Status: superseded
+> Superseded By: S78（[13-keyboard-accessibility-02.md](13-keyboard-accessibility-02.md)）
 > Supersedes: -
 > Signature: `showRefBadgeContextMenu(event: MouseEvent, badge: HTMLElement): void`（行内 `.gitRef` のcontextmenuと `RefOverflowOptions.onRefContextMenu` の共通処理）
 > Target Path: `web/main.ts`（`addListenerToClass("gitRef", "contextmenu", ...)` から切り出す共通処理とcontroller生成時の接続。実装後に行範囲へ更新）

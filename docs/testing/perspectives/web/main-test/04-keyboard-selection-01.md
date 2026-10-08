@@ -10,7 +10,8 @@
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
-> Status: active
+> Status: superseded
+> Superseded By: S72（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
 
 **シグネチャ**: `handleKeyboardShortcut(e: KeyboardEvent): void`
@@ -54,7 +55,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
-> Status: active
+> Status: superseded
+> Superseded By: S70（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
@@ -70,7 +72,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
-> Status: active
+> Status: superseded
+> Superseded By: S70（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
@@ -86,7 +89,8 @@
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
-> Status: active
+> Status: superseded
+> Superseded By: S70（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
 
 **テスト対象パス**: `web/main.ts`
@@ -159,7 +163,8 @@ Escape キー押下時の dismissal チェーン: `contextMenu → dialog → re
 
 > Origin: Feature 045 (defensive-fixes) (light-spec-plan)
 > Added: 2026-07-19
-> Status: active
+> Status: superseded
+> Superseded By: S70（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
 > Signature: `handleKeyboardShortcut(e: KeyboardEvent): void` の Arrow 分岐 + 入力可能要素判定 predicate
 > Target Path: `web/main.ts:1226-1263`
@@ -202,7 +207,8 @@ ArrowUp/ArrowDown のコミット移動分岐に、event target が入力可能�
 
 > Origin: Feature 059-02 (light-spec-plan)
 > Added: 2026-09-24
-> Status: active
+> Status: superseded
+> Superseded By: S72（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
 > Signature: `handleEscape(): void`（`RefOverflowController.closePopup(): boolean` の呼出しを既存ドロップダウンの後、findWidgetの前へ追加）
 > Target Path: `web/main.ts`（`handleEscape()`。実装後に行範囲へ更新）

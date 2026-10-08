@@ -235,3 +235,79 @@ stash の照合値を完全な `commit.stash.selector`（例 `stash@{0}`）か�
 - テストファイル: `tests/web/findWidget.test.ts` の describe `FindWidget ref overflow exclusion and highlight notification (S10)`。TC-040〜TC-049 を各 `it` で検証（TC-045 は4つの解除経路、TC-049 は2つの検索条件を `it.each`）。TC-043 は、行内の除外subtreeに既に複製された `span.findMatch` を置き、検索と解除の後も除外subtreeの `innerHTML` が検索前と一致することで、強調解除の走査除外も確認する
 - 変異確認: テキスト走査の除外を外すと TC-042/TC-043、強調解除の走査除外を外すと TC-043、`close()` 後の通知を外すと TC-045 が失敗することを確認した（変異は確認後に戻した）
 - 実FindWidgetとmainの配線は `web/main-test/01-rendering-03.md` TC-492 で確認。実ブラウザ（Chromium headless）では、隠れたref名だけの一致で `1 of 1`・counter強調（背景 rgba(234, 92, 0, 0.35)）・一覧は閉じたまま、説明文だけの一致で counter 強調なし、`+4` の検索で No Results かつ counter は BUTTON のまま、クリアと不正regex（`[inv`）で表のマーク0件
+
+## S11: 検索操作の標準 button・押下状態・Enter / Shift + Enter の IME 保護・検索 span と focus の維持
+
+> Origin: Feature 061-05 (light-spec-plan)
+> Added: 2026-10-07
+> Status: active
+> Supersedes: -
+> Signature: `new FindWidget(callbacks)`（公開 signature は維持。`#findCaseSensitive` / `#findRegex` / `#findOpenCdv` / `#findPrev` / `#findNext` / `#findClose` を `button type="button"` にし `aria-pressed` / `disabled` を同期）/ `#findInput` の `keydown`（`Enter` / Shift + `Enter` を `isKeyboardActionBlocked` 後に `next()` / `prev()` へ）/ `show(focus?: boolean)` / `close()` / `findMatches()` / `clearMatches()`
+> Target Path: `web/findWidget.ts:125-271, 302-471, 490-501, 524-563`（constructor の DOM 生成と input の keydown、`show` / `close` / `refresh` / `isVisible` / `setInputEnabled`、`findMatches` / `clearMatches`、`prev` / `next`、`buttonHtml` / `toggleClass` / `setPressed` / `syncNavigationState` / `setControlsReachable`）
+> Test File: `tests/web/findWidget.test.ts`
+
+対応プラン R4.3・R4.6 と Task 9 の観点。S1〜S10 の検索意味・debounce・regex 判定・走査除外は維持されるため active のまま additive（S1 TC-001 の構成要素は `button` 要素として存在する）。現行は `span` の修飾子と `keyup` の Enter 判定で、IME 確定の keyup で `next()` が走る。fixture は S1 と同じ callbacks（`vi.fn()`）と、`tr.commit` / 参照 `button` を含む `#commitTable` を持つ jsdom。
+
+| Case ID | Input / Precondition                                                                                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                           | Notes                                                          |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| TC-493  | constructor 実行後の各操作要素                                                                                                          | Normal - 全操作が名前付き button                                           | `#findCaseSensitive` / `#findRegex` / `#findOpenCdv` / `#findPrev` / `#findNext` / `#findClose` が `button` 要素で `type="button"`、名前（`aria-label`）が既存の `title` 文言（`find.matchCase` 等）と一致、`#findInput` に `aria-label`（`find.placeholder` 相当）がある | K40 / A8.1-6                                                   |
+| TC-494  | `#findCaseSensitive` / `#findRegex` / `#findOpenCdv` を `click` で切り替える                                                            | Normal - 押下状態の同期                                                    | 各 button の `aria-pressed` が `"true"` / `"false"` と `active` class に同期し、検索結果（`caseSensitive` / regex 判定）が S4 のとおり変わる                                                                                                                              | K40                                                            |
+| TC-495  | 一致 0 件の状態、および `setInputEnabled(false)` の状態                                                                                 | Boundary - 0 件・入力無効時の disabled                                     | `#findPrev` / `#findNext` が `disabled`、`click` / `Enter` で `scrollToCommit` 0 回。一致 3 件で `disabled` が外れる                                                                                                                                                      | K40 / A8.3-1                                                   |
+| TC-496  | 一致 3 件・位置 1 で `#findInput` に `Enter` keydown → keyup、別試行で Shift + `Enter` keydown → keyup                                  | Normal - Enter は次、Shift + Enter は前                                    | `Enter` で位置 2（`"2 of 3"`）、Shift + `Enter` で位置 3（循環）。各 1 回だけ移動し keyup で追加移動 0                                                                                                                                                                    | K40 / A8.3-2。S5 の意味を維持                                  |
+| TC-497  | `compositionstart` → `Enter` keydown（`isComposing: true`）→ `compositionend` → `Enter` keyup                                           | Validation - IME 確定の Enter / keyup で移動しない                         | 位置が不変（`next` 相当の `scrollToCommit` 0 回）。確定した文字は debounce 後に検索文字列へ反映（`findMatches` が呼ばれる）                                                                                                                                               | K40 / A8.3-2。現行の `keyup` 判定の契約変更                    |
+| TC-498  | `Enter` keydown（`repeat: true`）× 3                                                                                                    | Validation - repeat で連続移動しない                                       | 位置の変化が 0                                                                                                                                                                                                                                                            | A8.3-2                                                         |
+| TC-499  | 行 `M` の参照 button に実フォーカスした状態で `show(true)`、`#findClose` を `click` / `Enter`。別途 widget 非表示時の各 button の停止点 | Normal - close は起動元へ戻し、非表示は停止点から外す                      | `show(true)` で `activeElement` が `#findInput`。close 後は `activeElement` が元の参照 button（`restoreFocus(origin, "keyboard")`）。非表示時は `.findWidget` 内の全 button が停止点にならない（`hidden` または `tabindex="-1"`）                                         | K40 / A8.1-6                                                   |
+| TC-500  | 行 `M` の参照 button（FocusKey 付き、`aria-label` あり）に一致する文字列で `findMatches()` → `clearMatches()`                           | Validation - 検索 span の追加 / 除去で button と属性を壊さない             | span 挿入後も参照 `button` 要素が同一（`toBe`）で `aria-label` / `tabindex` / `data-name` が不変、`clearMatches()` 後に `span.findMatch` が 0 個で `textContent` が元どおり                                                                                               | K40 / A8.3-3。「マッチ文字の置換がbuttonやaria属性を壊さない」 |
+| TC-501  | 文字入力後の debounce（`SEARCH_DEBOUNCE_MS`）と無効な regex の入力                                                                      | Normal - 検索の意味の維持                                                  | debounce 後に 1 回だけ `findMatches`、無効 regex では一致 0 件で例外にならない（S3 / S7 と同じ）                                                                                                                                                                          | A8.2-3                                                         |
+| TC-502  | `#findInput` に実フォーカスして `ArrowDown` keydown                                                                                     | Validation - 入力中の矢印を奪わない                                        | `defaultPrevented === false`、`scrollToCommit` 0 回                                                                                                                                                                                                                       | K19 の部品側                                                   |
+
+### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S11）
+
+| 失敗源                                                      | 対応ケースまたは除外理由                                     |
+| ----------------------------------------------------------- | ------------------------------------------------------------ |
+| 操作が button でない・名前なし                              | TC-493                                                       |
+| 押下 / 無効状態の不一致                                     | TC-494、TC-495                                               |
+| Enter / Shift + Enter の意味、IME / repeat / keyup の誤移動 | TC-496〜TC-498                                               |
+| close の復元先、非表示の停止点                              | TC-499                                                       |
+| 検索 span が button / 属性を壊す                            | TC-500                                                       |
+| debounce / regex の退行、矢印の横取り                       | TC-501、TC-502                                               |
+| 外部依存・例外                                              | excluded(callbacks は spy で外部依存と throw 経路を持たない) |
+
+### Task 12 テスト対応（Feature 061-05）— S11
+
+- テスト: `tests/web/findWidget.test.ts` describe `FindWidget standard controls, IME guard and focus survival (S11)`。fixture は `configureFocusContext` を `beforeEach` で登録し `afterEach` で破棄する。`installKeyboardGuards` は登録せず、TC-497 / TC-498 はイベント自身の値（`isComposing` / `repeat`）による判定で検証する（変換状態の追跡は `keyboardNavigation-test.md` S2 TC-013〜TC-024 が担う）。TC-493〜TC-502 を同番号の `it` で 1 件ずつ
+- 手動 Case（未実施）TC-497（IME 確定直後の Enter / keyup）: `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧（IME の行）。jsdom では合成した `compositionstart → keydown → compositionend → keyup` 列で代替
+- 実行結果（2026-10-07）: 10 件 pass
+
+## S12: 検索セッションごとの起動元の記録（body から開いた場合を含む）
+
+> Origin: Feature 061-05 (PR #105 review)
+> Added: 2026-10-08
+> Status: active
+> Supersedes: -
+> Signature: `show(transition: boolean)` / `close(reason?: FocusCloseReason)`
+> Target Path: `web/findWidget.ts:212-245, 544-558`（`show` / `close`、`rememberOrigin`）
+> Test File: `tests/web/findWidget.test.ts`
+
+確定仕様 §4.7「キーボードによる閉鎖は起動元に戻す。復元順は…→操作対象行→空一覧コンテナー」の検索側。S11 TC-499 は参照 button から開いた場合だけを扱い、body から開いた場合は起動元が記録されず、閉じた後のフォーカスが画面外の `#findClose` に残るか、前回セッションの起動元へ戻っていた。新しいセッション（非表示からの `show`）では起動元を取り直し、body から開いた場合はリポジトリだけを残して文脈の復元順（操作対象行→`#commitTable`→リポジトリ button）へ委ねる。fixture は `getActiveRow` が `tr`（`tabindex="0"`）を返す `configureFocusContext` と、その行内の FocusKey 付き参照 button。S11 は維持されるため additive。
+
+| Case ID | Input / Precondition                                                                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                       | Notes                         |
+| ------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------- |
+| TC-503  | `activeElement` が body の状態で `show(true)`、`#findClose` にフォーカスして `click`                                        | Boundary - 起動元なし（body）からのセッション                              | widget が非表示になり、`activeElement` が操作対象行。画面外の `#findClose` に残らない | Devin 指摘。修正前は RED      |
+| TC-504  | 参照 button から `show(true)` → `close("keyboard")`（参照 button へ戻る）の後、body から `show(true)` → `close("keyboard")` | Validation - 前回セッションの起動元を再利用しない                          | 2 回目の閉鎖後の `activeElement` が操作対象行で、1 回目の参照 button ではない         | CodeRabbit 指摘。修正前は RED |
+| TC-505  | 参照 button から `show(true)` の後、`#findInput` にフォーカスがある状態で再度 `show(true)` → `close("keyboard")`            | Normal - 表示中の再 `show` は起動元を保つ                                  | `activeElement` が参照 button（widget 内からの再 `show` で起動元を上書きしない）      | 既存挙動の維持                |
+
+### 失敗源インベントリ（include-or-justify）— PR #105 review 追加分（S12）
+
+| 失敗源                                 | 対応ケースまたは除外理由                                     |
+| -------------------------------------- | ------------------------------------------------------------ |
+| body から開いたセッションの復元先なし  | TC-503                                                       |
+| 前回セッションの起動元の再利用         | TC-504                                                       |
+| 表示中の再 `show` による起動元の上書き | TC-505                                                       |
+| 外部依存・例外                         | excluded(callbacks は spy で外部依存と throw 経路を持たない) |
+
+### テスト対応（PR #105 review）— S12
+
+- テスト: `tests/web/findWidget.test.ts` describe `FindWidget focus origin per search session (S12)`。TC-503〜TC-505 を同番号の `it` で 1 件ずつ
+- RED → GREEN: 修正前の `show()` で TC-503（`activeElement` が `#findClose`）と TC-504（`activeElement` が 1 回目の参照 button）が fail、TC-505 は pass。修正後は 3 件 pass
+- 実行結果（2026-10-08）: `tests/web/findWidget.test.ts` 66 件 pass

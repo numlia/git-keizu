@@ -15,15 +15,22 @@
   display: inline-block;
 }
 
-/* Current value display */
+/* Current value display: a native button that keeps the block box of the former div */
 .dropdownCurrentValue {
+  display: block;
+  width: 100%;
+  appearance: none;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
   background-color: rgba(128, 128, 128, 0.1);
   border: 1px solid rgba(128, 128, 128, 0.5);
   border-radius: 6px;
   box-sizing: border-box;
   height: 26px;
   line-height: 24px;
-  padding-left: 10px;
+  padding: 0 0 0 10px;
   cursor: pointer;
   user-select: none;
   white-space: nowrap;
@@ -36,6 +43,17 @@ body.singleRepo .dropdownCurrentValue {
 }
 .dropdownCurrentValue:hover {
   background-color: rgba(128, 128, 128, 0.2);
+}
+.dropdownCurrentValue:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+.dropdownCurrentValue:disabled:hover {
+  background-color: rgba(128, 128, 128, 0.1);
+}
+.dropdownCurrentValue:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
 }
 .dropdownCurrentValue:after {
   position: absolute;
@@ -83,6 +101,11 @@ body.singleRepo .dropdownCurrentValue {
 .dropdownOption:hover {
   background-color: var(--vscode-menu-selectionBackground);
   color: var(--vscode-menu-selectionForeground);
+}
+/* The option clips its overflow, so the ring is drawn inside it */
+.dropdownOption:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -2px;
 }
 .dropdownOptionInfo {
   position: absolute;
@@ -142,6 +165,10 @@ body.singleRepo .dropdownCurrentValue {
   font-family: var(--vscode-editor-font-family);
   color: var(--vscode-menu-foreground);
 }
+.dropdownFilterInput:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
 
 /* Multi-select checkbox */
 .dropdownCheckbox {
@@ -171,6 +198,10 @@ body.singleRepo .dropdownCurrentValue {
   gap: 4px;
 }
 .dropdownHintBtn {
+  appearance: none;
+  margin: 0;
+  font: inherit;
+  color: inherit;
   cursor: pointer;
   padding: 2px 8px;
   border-radius: 3px;
@@ -179,6 +210,9 @@ body.singleRepo .dropdownCurrentValue {
 }
 .dropdownHintBtn:hover {
   background-color: rgba(128, 128, 128, 0.25);
+}
+.dropdownHintBtn:focus-visible {
+  outline: 2px solid var(--vscode-focusBorder);
 }
 .dropdownHintKey {
   background-color: rgba(128, 128, 128, 0.2);
