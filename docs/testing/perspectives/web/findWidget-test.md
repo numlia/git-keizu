@@ -278,3 +278,36 @@ stash の照合値を完全な `commit.stash.selector`（例 `stash@{0}`）か�
 - テスト: `tests/web/findWidget.test.ts` describe `FindWidget standard controls, IME guard and focus survival (S11)`。fixture は `configureFocusContext` を `beforeEach` で登録し `afterEach` で破棄する。`installKeyboardGuards` は登録せず、TC-497 / TC-498 はイベント自身の値（`isComposing` / `repeat`）による判定で検証する（変換状態の追跡は `keyboardNavigation-test.md` S2 TC-013〜TC-024 が担う）。TC-493〜TC-502 を同番号の `it` で 1 件ずつ
 - 手動 Case（未実施）TC-497（IME 確定直後の Enter / keyup）: `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧（IME の行）。jsdom では合成した `compositionstart → keydown → compositionend → keyup` 列で代替
 - 実行結果（2026-10-07）: 10 件 pass
+
+## S12: 検索セッションごとの起動元の記録（body から開いた場合を含む）
+
+> Origin: Feature 061-05 (PR #105 review)
+> Added: 2026-10-08
+> Status: active
+> Supersedes: -
+> Signature: `show(transition: boolean)` / `close(reason?: FocusCloseReason)`
+> Target Path: `web/findWidget.ts:212-245, 544-558`（`show` / `close`、`rememberOrigin`）
+> Test File: `tests/web/findWidget.test.ts`
+
+確定仕様 §4.7「キーボードによる閉鎖は起動元に戻す。復元順は…→操作対象行→空一覧コンテナー」の検索側。S11 TC-499 は参照 button から開いた場合だけを扱い、body から開いた場合は起動元が記録されず、閉じた後のフォーカスが画面外の `#findClose` に残るか、前回セッションの起動元へ戻っていた。新しいセッション（非表示からの `show`）では起動元を取り直し、body から開いた場合はリポジトリだけを残して文脈の復元順（操作対象行→`#commitTable`→リポジトリ button）へ委ねる。fixture は `getActiveRow` が `tr`（`tabindex="0"`）を返す `configureFocusContext` と、その行内の FocusKey 付き参照 button。S11 は維持されるため additive。
+
+| Case ID | Input / Precondition                                                                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                       | Notes                         |
+| ------- | --------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ----------------------------- |
+| TC-503  | `activeElement` が body の状態で `show(true)`、`#findClose` にフォーカスして `click`                                        | Boundary - 起動元なし（body）からのセッション                              | widget が非表示になり、`activeElement` が操作対象行。画面外の `#findClose` に残らない | Devin 指摘。修正前は RED      |
+| TC-504  | 参照 button から `show(true)` → `close("keyboard")`（参照 button へ戻る）の後、body から `show(true)` → `close("keyboard")` | Validation - 前回セッションの起動元を再利用しない                          | 2 回目の閉鎖後の `activeElement` が操作対象行で、1 回目の参照 button ではない         | CodeRabbit 指摘。修正前は RED |
+| TC-505  | 参照 button から `show(true)` の後、`#findInput` にフォーカスがある状態で再度 `show(true)` → `close("keyboard")`            | Normal - 表示中の再 `show` は起動元を保つ                                  | `activeElement` が参照 button（widget 内からの再 `show` で起動元を上書きしない）      | 既存挙動の維持                |
+
+### 失敗源インベントリ（include-or-justify）— PR #105 review 追加分（S12）
+
+| 失敗源                                 | 対応ケースまたは除外理由                                     |
+| -------------------------------------- | ------------------------------------------------------------ |
+| body から開いたセッションの復元先なし  | TC-503                                                       |
+| 前回セッションの起動元の再利用         | TC-504                                                       |
+| 表示中の再 `show` による起動元の上書き | TC-505                                                       |
+| 外部依存・例外                         | excluded(callbacks は spy で外部依存と throw 経路を持たない) |
+
+### テスト対応（PR #105 review）— S12
+
+- テスト: `tests/web/findWidget.test.ts` describe `FindWidget focus origin per search session (S12)`。TC-503〜TC-505 を同番号の `it` で 1 件ずつ
+- RED → GREEN: 修正前の `show()` で TC-503（`activeElement` が `#findClose`）と TC-504（`activeElement` が 1 回目の参照 button）が fail、TC-505 は pass。修正後は 3 件 pass
+- 実行結果（2026-10-08）: `tests/web/findWidget.test.ts` 66 件 pass

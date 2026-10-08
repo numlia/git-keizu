@@ -210,14 +210,7 @@ export class FindWidget {
   /* === Public Methods === */
 
   public show(transition: boolean) {
-    const active = document.activeElement;
-    if (
-      active instanceof HTMLElement &&
-      active !== document.body &&
-      !this.widgetElem.contains(active)
-    ) {
-      this.origin = captureFocusOrigin(active);
-    }
+    this.rememberOrigin();
     if (!this.visible) {
       this.visible = true;
       this.inputElem.value = this.text;
@@ -545,6 +538,22 @@ export class FindWidget {
     for (const elem of [this.prevElem, this.nextElem]) {
       this.toggleClass(elem, CLASS_DISABLED, disabled);
       elem.disabled = disabled;
+    }
+  }
+
+  // A new session never reuses an earlier origin. Opened from the page body, only the repository
+  // is kept, so a keyboard close falls through to the context chain (active row → list container).
+  private rememberOrigin() {
+    const active = document.activeElement;
+    if (
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      !this.widgetElem.contains(active)
+    ) {
+      this.origin = captureFocusOrigin(active);
+    } else if (!this.visible) {
+      const contextOrigin = captureFocusOrigin(document.body);
+      this.origin = contextOrigin === null ? null : { ...contextOrigin, source: null };
     }
   }
 

@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-10-08T08:15:35+09:00
+> Auto-generated: 2026-10-08T20:12:40+09:00
 > Total sources: 58
 > Total physical files: 104
-> Total sections: 614
-> Total cases: 3688
+> Total sections: 615
+> Total cases: 3691
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -51,7 +51,7 @@
 | `web/fileHistory.ts` | single-file | `web/fileHistory-test.md` | 1 | 11 | 100 | 2026-10-07 |
 | `web/fileMenu.ts` | single-file | `web/fileMenu-test.md` | 1 | 4 | 39 | 2026-09-13 |
 | `web/fileTree.ts` | single-file | `web/fileTree-test.md` | 1 | 5 | 44 | 2026-10-07 |
-| `web/findWidget.ts` | single-file | `web/findWidget-test.md` | 1 | 11 | 59 | 2026-10-07 |
+| `web/findWidget.ts` | single-file | `web/findWidget-test.md` | 1 | 12 | 62 | 2026-10-08 |
 | `web/graph.ts` | single-file | `web/graph-test.md` | 1 | 21 | 89 | 2026-10-03 |
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 3 | 11 | 2026-10-03 |
 | `web/keyboardNavigation.ts` | single-file | `web/keyboardNavigation-test.md` | 1 | 4 | 54 | 2026-10-07 |
@@ -147,6 +147,7 @@
 | Feature 060-03 (light-spec-plan) | `web/contextMenu-test.md`, `web/refMenu-test/INDEX.md`, `web/worktreeMenu-test.md` |
 | Feature 060-03 addendum (light-spec-plan) | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
 | Feature 061-01 (light-spec-plan) | `media/main-test.md`, `web/commitMenu-test.md`, `web/fileHistory-test.md`, `web/graph-test.md`, `web/i18n-test.md`, `web/main-test/INDEX.md`, `web/pathHighlight-test.md`, `web/pathHighlightController-test.md`, `web/refMenu-test/INDEX.md` |
+| Feature 061-05 (PR #105 review) | `web/findWidget-test.md` |
 | Feature 061-05 (light-spec-plan) | `l10n/bundle.l10n-test.md`, `l10n/bundle.l10n.ja-test.md`, `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/dropdown-test.md`, `media/findwidget-test.md`, `media/main-test.md`, `src/gitGraphView-test/INDEX.md`, `web/branchCleanupPanel-test.md`, `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/dropdown-test.md`, `web/fileHistory-test.md`, `web/fileTree-test.md`, `web/findWidget-test.md`, `web/keyboardNavigation-test.md`, `web/main-test/INDEX.md`, `web/pathHighlightController-test.md`, `web/refOverflow-test.md` |
 | Feature 061-05 (light-spec-plan) review fix | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md` |
 | Feature 061-05 (light-spec-plan) user follow-up | `web/main-test/INDEX.md` |

@@ -1392,3 +1392,92 @@ describe("FindWidget standard controls, IME guard and focus survival (S11)", () 
     expect(getPositionText()).toBe("1 of 3");
   });
 });
+
+// S12: the origin of each search session, including one opened from the page body
+// @see docs/testing/perspectives/web/findWidget-test.md
+describe("FindWidget focus origin per search session (S12)", () => {
+  const REF_NAME = "feature/keyboard";
+  let widget: FindWidget;
+  let activeRow: HTMLTableRowElement;
+  let refButton: HTMLButtonElement;
+  let disposeContext: () => void;
+
+  function findInput(): HTMLInputElement {
+    return document.getElementById("findInput") as HTMLInputElement;
+  }
+
+  function closeButton(): HTMLButtonElement {
+    return document.getElementById("findClose") as HTMLButtonElement;
+  }
+
+  function focusBody(): void {
+    (document.activeElement as HTMLElement | null)?.blur();
+    expect(document.activeElement).toBe(document.body);
+  }
+
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    widget = new FindWidget(createMockCallbacks());
+    activeRow = document.createElement("tr");
+    activeRow.tabIndex = 0;
+    refButton = document.createElement("button");
+    refButton.type = "button";
+    markFocusTarget(refButton, {
+      kind: "ref",
+      repo: "/repo",
+      hash: "aaa1111100000000",
+      refType: "head",
+      name: REF_NAME
+    });
+    activeRow.appendChild(refButton);
+    document.body.appendChild(activeRow);
+    disposeContext = configureFocusContext({
+      getRepo: () => "/repo",
+      getActiveRow: () => activeRow,
+      getTabStops: () => []
+    });
+  });
+
+  afterEach(() => {
+    disposeContext();
+    document.body.innerHTML = "";
+  });
+
+  it("returns a body-opened session to the active row, not the hidden close button (TC-503)", () => {
+    // Case: TC-503
+    focusBody();
+    widget.show(true);
+    closeButton().focus();
+
+    closeButton().click();
+
+    expect(widget.isVisible()).toBe(false);
+    expect(document.activeElement).toBe(activeRow);
+  });
+
+  it("does not reuse the previous session's origin for a body-opened session (TC-504)", () => {
+    // Case: TC-504
+    refButton.focus();
+    widget.show(true);
+    widget.close("keyboard");
+    expect(document.activeElement).toBe(refButton);
+
+    focusBody();
+    widget.show(true);
+    widget.close("keyboard");
+
+    expect(document.activeElement).toBe(activeRow);
+  });
+
+  it("keeps the launcher when show() runs again with focus inside the widget (TC-505)", () => {
+    // Case: TC-505
+    refButton.focus();
+    widget.show(true);
+    expect(document.activeElement).toBe(findInput());
+
+    widget.show(true);
+    widget.close("keyboard");
+
+    expect(document.activeElement).toBe(refButton);
+  });
+});
