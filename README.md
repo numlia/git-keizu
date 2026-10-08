@@ -72,7 +72,7 @@ Select a commit to inspect its files and diffs, or Ctrl/Cmd+click a second commi
 
 - Switch commit files between a folder tree and a flat list; long file rows scroll sideways, so change counts and row actions stay reachable.
 - Open working-tree files directly from commit details; renamed files are resolved through Git rename tracking.
-- Navigate commits with the keyboard, follow parent links, and keep comparison state when switching tabs.
+- Navigate commits with the keyboard without opening their details, start a comparison with `CTRL/CMD + ENTER`, follow parent links, and keep comparison state when switching tabs.
 - **Highlight File History**, started from the history icon on a file's row or from its context menu, follows a single file backwards from a commit — through renames and the merges that touched it — and highlights its commits on the graph without hiding anything else, with previous/next navigation and the file's row highlighted in each commit's details. While it is active, `↑` / `↓` step through the highlighted commits only and open their details, and `ESC` leaves the highlight once any open commit details are closed.
 
 ![Highlight File History following a file across a rename](./resources/screenshots/file-history.gif)
@@ -110,6 +110,7 @@ Create and manage Git worktrees without leaving the graph.
 - Recent context-menu actions are remembered per repository, making repeated workflows quicker.
 - Git operations refresh the graph in the background without blanking the view or discarding its state.
 - The view stays alive while its tab is in the background, so switching back to Git Keizu is immediate (`retainContextWhenHidden`, on by default).
+- Every action in the view can be reached from the keyboard: `TAB` reaches the toolbar, the commit table, commit details, and panels, `CONTEXT MENU` or `SHIFT + F10` opens a context menu, and focus returns to where you were when a menu or dialog closes.
 - Multiple repositories, configurable keyboard shortcuts, optional avatars, graph colours, date formats, and dialog defaults are supported.
 - A workspace folder that holds several repositories side by side works too: repositories one level below the folder are discovered automatically, and each Source Control button opens the graph on its own repository.
 
@@ -128,20 +129,28 @@ Create and manage Git worktrees without leaving the graph.
 
 ### Keyboard navigation
 
-The arrow keys and `ESC` are fixed. The shortcuts that can be changed are listed under Settings.
+The keys below are fixed. The shortcuts that can be changed are listed under Settings.
 
-| Key                                             | Normally                                | File history highlighted        |
-| ----------------------------------------------- | --------------------------------------- | ------------------------------- |
-| `↑` / `↓`                                       | Previous / next row of the commit table | Previous / next matching commit |
-| `CTRL/CMD + ↑` / `CTRL/CMD + ↓`                 | First child / first parent              | Disabled                        |
-| `CTRL/CMD + SHIFT + ↑` / `CTRL/CMD + SHIFT + ↓` | Alternative child / alternative parent  | Disabled                        |
+In the commit table, `TAB` stops only at the current row, marked with a ▸ at its start, followed by that row's labels and **+N** badge. Other rows are reached with the arrow keys. These keys work while a commit row or one of its labels has focus.
 
-- Normally, the arrow keys work only while commit details are open and two commits are not being compared.
+| Key                                             | Normally                                                    | Two commits compared                          | File history highlighted        |
+| ----------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------- | ------------------------------- |
+| `↑` / `↓`                                       | Previous / next row; open details follow                    | Previous / next row; details stay as is       | Previous / next matching commit |
+| `SHIFT + ↑` / `SHIFT + ↓`                       | Previous / next row; details stay as is                     | Previous / next row; details stay as is       | Not used                        |
+| `CTRL/CMD + ↑` / `CTRL/CMD + ↓`                 | First child / first parent; open details follow             | Not used                                      | Disabled                        |
+| `CTRL/CMD + SHIFT + ↑` / `CTRL/CMD + SHIFT + ↓` | Alternative child / alternative parent; open details follow | Not used                                      | Disabled                        |
+| `ENTER`                                         | Open the row's details                                      | End the comparison and open the row's details | Open the row's details          |
+| `CTRL/CMD + ENTER`                              | Same as `CTRL/CMD + click`                                  | Same as `CTRL/CMD + click`                    | Same as `CTRL/CMD + click`      |
+
+- The arrow keys move the current row and give it focus. Open details follow only when one commit's details are open, so `SHIFT + ↑` / `↓` followed by `CTRL/CMD + ENTER` starts a comparison without leaving the details. The keys stop at the first and last loaded rows and never load more commits.
 - While **Highlight File History** is active, `↑` / `↓` move only among the matching commits that are already loaded, and work even when no commit details are open. A move opens the commit details of its destination. The keys stop at the first and last of those commits instead of wrapping around.
 - The **Previous match** and **Next match** buttons on the file history bar stop at the same ends, but do not open commit details.
 - While a file history is loading, the arrow keys do not move between commits.
-- The arrow keys are ignored while the focus is in an editable element, while two commits are being compared, and during IME composition.
-- `ESC` closes one item per press, in this order: context menu, dialog, dropdown, **+N** label list, Find, commit details, file history. The file history ends — or, while it is still loading, is cancelled — with the same restore as its **Exit** button.
+- `CONTEXT MENU` or `SHIFT + F10` opens the same menu as a right-click on a commit, a label, a file, or the table header. `ENTER` or `SPACE` on a label also opens its menu, and on a **+N** badge opens its label list. In menus and lists, `↑` / `↓`, `HOME`, and `END` move, `ENTER` or `SPACE` runs a menu item or opens a listed label's menu, `→` opens a submenu, and `←` closes it.
+- Buttons and other controls are reached with `TAB` and activated with `ENTER` or `SPACE`. Dropdowns open with `ENTER`, `SPACE`, or `↓`, filter as you type, and apply with `ENTER`; dialogs keep `TAB` inside the dialog.
+- `ESC` closes one item per key press, in this order: context menu, dialog, dropdown, **+N** label list, Find, commit details, file history. Closing a menu, list, dropdown, Find, or dialog returns focus to the control that opened it. The file history ends — or, while it is still loading, is cancelled — with the same restore as its **Exit** button.
+- The commit table keys above are ignored while the focus is in an editable element, such as the Find input. In inputs, Find, dropdowns, and dialogs handle their own keys, including `ESC`.
+- Keys used during IME composition do not run actions, and held-down `ENTER`, `SPACE`, and `ESC` do not repeat their action.
 
 ### Settings
 
@@ -177,6 +186,8 @@ All settings are under the `git-keizu.*` namespace.
 | `...Refresh`       | `CTRL/CMD + R` | Keyboard shortcut for Refresh (`UNASSIGNED` to disable)         |
 | `...ScrollToHead`  | `CTRL/CMD + H` | Keyboard shortcut for Scroll to HEAD (`UNASSIGNED` to disable)  |
 | `...ScrollToStash` | `CTRL/CMD + S` | Keyboard shortcut for Scroll to Stash (`UNASSIGNED` to disable) |
+
+These shortcuts run while focus is on a commit row, a label, or the graph background. The toolbar, inputs, and panels keep the keys for their own use.
 
 #### Dialog Defaults (`dialog.*`)
 

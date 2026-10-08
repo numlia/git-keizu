@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-10-08
+
+This release makes the whole graph view usable from the keyboard: you can move through commits without opening their details, open any label's context menu, and reach every toolbar, Find, commit details, file, dialog, and panel control with `TAB`, `ENTER`, and `SPACE`. Focus returns to where you started after a menu, list, or dialog closes, and the focused control and the current row are always marked on screen.
+
+### Added
+
+- **Move through the commit table from the keyboard**: In the commit table, `TAB` now stops only at the current row, marked with a ▸ at the start of the row, followed by that row's labels and **+N** badge, and `TAB` returns to that row after you leave the table. `↑` / `↓` move the current row even when no commit details are open; while one commit's details are open, the details follow the move. `SHIFT + ↑` / `↓` move only the current row and leave the open details and any comparison unchanged, so you can move to a second commit and press `CTRL/CMD + ENTER` to compare it. `ENTER` opens the current row's details, ending a comparison if one is open, and `CTRL/CMD + ENTER` does the same as `CTRL/CMD + click`. `CTRL/CMD + ↑` / `↓` and `CTRL/CMD + SHIFT + ↑` / `↓` follow the first or alternative child and parent from the current row. While two commits are compared, `↑` / `↓` move only the current row. The keys never wrap at the ends or load more commits, and Highlight File History keeps its own `↑` / `↓` behavior.
+- **Open context menus and label lists from the keyboard**: Press `CONTEXT MENU` or `SHIFT + F10` on a commit, the uncommitted changes row, a branch, tag, stash, or worktree label, a file, or the table header to open the same menu as a right-click. On a label, `ENTER` or `SPACE` also opens its menu; double-click still checks out a branch. In a menu, `↑` / `↓` skip headings and separators, `HOME` / `END` jump to the first or last item, `ENTER` or `SPACE` runs an item once, `→` opens a submenu, and `←` or `ESC` closes only the submenu. A **+N** badge opens its label list with `ENTER` or `SPACE`, where `↑` / `↓`, `HOME`, and `END` move between labels and `ESC` returns to the badge.
+- **Every control is reachable with `TAB`**: The toolbar, Find, the commit details (parent links, close, file view toggle, folders, and each file's diff, **Open File**, and **Highlight File History** actions), Branch Cleanup, the file history and path highlight bars, and dialog buttons are now standard buttons that `ENTER` and `SPACE` activate. File actions that appeared only on hover are shown while a file row has focus. Dropdowns open with `ENTER`, `SPACE`, or `↓` and filter as you type; `↑` / `↓` move between options, `ENTER` selects or applies, `SPACE` toggles an option in a multi-select, and `ESC` cancels. Dialogs keep `TAB` inside the dialog, start on the first input or on the cancel button, and close with `ESC` without closing anything behind them.
+- **Focus is shown and returned**: The focused control has a 2px outline in the theme's focus color in light, dark, and high contrast themes. Closing a menu, list, dropdown, Find, or dialog from the keyboard, or finishing its action, returns focus to the control that opened it, or to its row when that control is gone; focus also survives graph refreshes and loading more commits. Controls and rows have names for screen readers in English and Japanese, including whether a row is the current row, has its details open, or is part of a comparison, and loading results and empty results are announced politely.
+
+### Changed
+
+- **Keyboard shortcuts apply where the graph has focus**: The configurable Find, Refresh, Scroll to HEAD, and Scroll to Stash shortcuts now run only while focus is on a commit row, a label, or the graph background, so the toolbar, inputs, and panels keep those keys for their own use.
+- **`ESC` closes on key press, one layer at a time**: `ESC` now acts when the key is pressed rather than released, and each press closes only one item in the existing order, so cancelling a dropdown no longer also closes Find or the commit details behind it. Keys used to confirm IME composition and held-down repeats no longer run `ENTER`, `SPACE`, or `ESC` actions.
+
+### Fixed
+
+- **Cancelling a comparison shows the original commit again**: Cancelling a comparison with `CTRL/CMD + click` or `CTRL/CMD + ENTER` on the compared commit left the commit details with an empty summary and the comparison's file list. The details of the commit you started from are now loaded again.
+
 ## [1.6.0] - 2026-10-03
 
 This release lets you follow how a commit or branch connects through the graph: **Highlight path** draws the chosen path with thicker lines and outlined commits while the rest of the graph fades, so a merge's parents or a branch's whole history stand out from the lines around them.
@@ -678,7 +698,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/numlia/git-keizu/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/numlia/git-keizu/compare/v1.5.1...v1.6.0
 [1.5.1]: https://github.com/numlia/git-keizu/compare/v1.5.0...v1.5.1
 [1.5.0]: https://github.com/numlia/git-keizu/compare/v1.4.0...v1.5.0
