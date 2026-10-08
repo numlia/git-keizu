@@ -45,11 +45,7 @@ function refKey(hash: string, name = SPECIAL_REF_NAME): FocusKey {
 }
 
 function renderShell(): void {
-  document.body.innerHTML =
-    '<div id="controls"><button id="refreshBtn">refresh</button>' +
-    '<div id="repoSelect"><button id="repoBtn">repo</button></div></div>' +
-    '<div id="commitTable" tabindex="-1"></div>' +
-    '<div id="contextMenu"></div><input id="findInput">';
+  document.body.innerHTML = `<div id="controls"><button id="refreshBtn">refresh</button><div id="repoSelect"><button id="repoBtn">repo</button></div></div><div id="commitTable" tabindex="-1"></div><div id="contextMenu"></div><input id="findInput">`;
 }
 
 function table(): HTMLElement {
