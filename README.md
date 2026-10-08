@@ -131,7 +131,7 @@ Create and manage Git worktrees without leaving the graph.
 
 The keys below are fixed. The shortcuts that can be changed are listed under Settings.
 
-The commit table has one `TAB` stop: the current row, marked with a ▸ at its start. These keys work while a commit row or one of its labels has focus.
+In the commit table, `TAB` stops only at the current row, marked with a ▸ at its start, followed by that row's labels and **+N** badge. Other rows are reached with the arrow keys. These keys work while a commit row or one of its labels has focus.
 
 | Key                                             | Normally                                                    | Two commits compared                          | File history highlighted        |
 | ----------------------------------------------- | ----------------------------------------------------------- | --------------------------------------------- | ------------------------------- |
@@ -149,7 +149,8 @@ The commit table has one `TAB` stop: the current row, marked with a ▸ at its s
 - `CONTEXT MENU` or `SHIFT + F10` opens the same menu as a right-click on a commit, a label, a file, or the table header. `ENTER` or `SPACE` on a label also opens its menu, and on a **+N** badge opens its label list. In menus and lists, `↑` / `↓`, `HOME`, and `END` move, `ENTER` or `SPACE` runs a menu item or opens a listed label's menu, `→` opens a submenu, and `←` closes it.
 - Buttons and other controls are reached with `TAB` and activated with `ENTER` or `SPACE`. Dropdowns open with `ENTER`, `SPACE`, or `↓`, filter as you type, and apply with `ENTER`; dialogs keep `TAB` inside the dialog.
 - `ESC` closes one item per key press, in this order: context menu, dialog, dropdown, **+N** label list, Find, commit details, file history. Closing a menu, list, dropdown, Find, or dialog returns focus to the control that opened it. The file history ends — or, while it is still loading, is cancelled — with the same restore as its **Exit** button.
-- Keys are ignored while the focus is in an editable element and during IME composition, and held-down `ENTER`, `SPACE`, and `ESC` do not repeat their action.
+- The commit table keys above are ignored while the focus is in an editable element, such as the Find input. In inputs, Find, dropdowns, and dialogs handle their own keys, including `ESC`.
+- Keys used during IME composition do not run actions, and held-down `ENTER`, `SPACE`, and `ESC` do not repeat their action.
 
 ### Settings
 
