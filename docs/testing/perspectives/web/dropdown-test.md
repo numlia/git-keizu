@@ -261,7 +261,7 @@
 
 ### Task 12 テスト対応（Feature 061-05）— S12
 
-- テスト: `tests/web/dropdown.test.ts` describe `S12: Apply / cancel, input guards and the close / cancelAndClose contract`。TC-053〜TC-066 を同番号の `it` で 1 件ずつ。fixture は `installKeyboardGuards(document)` を `beforeEach` で登録し各 `it` 後に破棄
+- テスト: `tests/web/dropdown.test.ts` describe `S12: Apply / cancel, input guards and the close / cancelAndClose contract`。TC-053〜TC-066 を同番号の `it` で 1 件ずつ。fixture は `installKeyboardGuards` を登録せず、IME・repeat・keyup はイベント自身の値（`isComposing` / `repeat` / `type`）による判定で検証する（変換状態の追跡は `keyboardNavigation-test.md` S2 TC-013〜TC-024 が担う）
 - RED → GREEN: 実装前実測「`isComposing: true` の Enter で閉じて callback 1 回」は TC-061、「keyup で背後の詳細が閉じる」は TC-054（本表）と `web/main-test/13-keyboard-accessibility-01.md` S72 TC-690（main）で GREEN
 - TC-063 の未自動化部分: 標準 button（候補は `div[role=option]` のため対象外、Apply / Cancel の `button.dropdownHintBtn` と起動 button）の既定 click は jsdom が生成しない。手動 Case（未実施）: 実 Webview で branch 複数選択を Tab / Enter で開き、候補で Space → Enter、別試行で Apply button 上の Enter / Space を 1 回・repeat・IME 確定直後に押す。期待: 適用が合計 1 回（`loadCommits` 要求 1 件）。影響: 二重適用で要求 2 件。代替確認: TC-062 / TC-063 の callback 回数（jsdom）。実 Webview の手動 Case は `web/main-test/13-keyboard-accessibility-01.md` 冒頭「Task 12 実 Webview 手動確認（未実施一覧）」の様式で記録し、自動テストの pass に含めない
 - 実行結果（2026-10-07）: 14 件 pass

@@ -275,6 +275,6 @@ stash の照合値を完全な `commit.stash.selector`（例 `stash@{0}`）か�
 
 ### Task 12 テスト対応（Feature 061-05）— S11
 
-- テスト: `tests/web/findWidget.test.ts` describe `FindWidget standard controls, IME guard and focus survival (S11)`。fixture は `configureFocusContext` と `installKeyboardGuards` を `beforeEach` で登録し `afterEach` で破棄。TC-493〜TC-502 を同番号の `it` で 1 件ずつ
+- テスト: `tests/web/findWidget.test.ts` describe `FindWidget standard controls, IME guard and focus survival (S11)`。fixture は `configureFocusContext` を `beforeEach` で登録し `afterEach` で破棄する。`installKeyboardGuards` は登録せず、TC-497 / TC-498 はイベント自身の値（`isComposing` / `repeat`）による判定で検証する（変換状態の追跡は `keyboardNavigation-test.md` S2 TC-013〜TC-024 が担う）。TC-493〜TC-502 を同番号の `it` で 1 件ずつ
 - 手動 Case（未実施）TC-497（IME 確定直後の Enter / keyup）: `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧（IME の行）。jsdom では合成した `compositionstart → keydown → compositionend → keyup` 列で代替
 - 実行結果（2026-10-07）: 10 件 pass
