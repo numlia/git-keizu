@@ -51,7 +51,12 @@ import {
 import { handleMessage, type RefreshMode } from "./messageHandler";
 import type { BranchPathMode, PathHighlightSelection } from "./pathHighlight";
 import { PATH_HIGHLIGHT_BAR_ID, PathHighlightController } from "./pathHighlightController";
-import { buildRefContextMenuItems, checkoutBranchAction, showDeleteBranchDialog } from "./refMenu";
+import {
+  buildRefContextMenuItems,
+  checkoutBranchAction,
+  showCreateWorktreeDialog,
+  showDeleteBranchDialog
+} from "./refMenu";
 import { DESCRIPTION_MIN_WIDTH, RefOverflowController } from "./refOverflow";
 import { buildStashContextMenuItems } from "./stashMenu";
 import { buildUncommittedContextMenuItems } from "./uncommittedMenu";
@@ -71,6 +76,7 @@ import {
   worktreeCollectionsEqual
 } from "./utils";
 import { buildDetachedWorktreeContextMenuItems, getWorktreeLabelName } from "./worktreeMenu";
+import { mainWorktreePath } from "./worktreeSuggestion";
 
 const FLASH_ANIMATION_DURATION_MS = 850;
 export const MIN_COMMIT_LOAD_COUNT = 1;
@@ -481,6 +487,8 @@ class GitKeizuView {
     });
     this.branchCleanupPanel = new BranchCleanupPanel({
       showBranch: (branchName) => this.showBranchInGraph(branchName),
+      showCreateWorktreeDialog: (repo, branchName, sourceElem) =>
+        showCreateWorktreeDialog(repo, branchName, sourceElem),
       showDeleteDialog: (repo, branchName, remotes) =>
         showDeleteBranchDialog(repo, branchName, remotes)
     });
@@ -799,6 +807,7 @@ class GitKeizuView {
         this.saveState();
         this.renderUncommitedChanges();
       }
+      this.rememberMainWorktree();
       this.triggerLoadCommitsCallback(false);
       this.updateCurrentBtnState();
       return;
@@ -808,6 +817,7 @@ class GitKeizuView {
     this.commits = commits;
     this.commitHead = commitHead;
     this.worktrees = worktrees ?? EMPTY_WORKTREE_COLLECTION;
+    this.rememberMainWorktree();
     this.commitLookup = {};
     this.saveState();
 
@@ -885,6 +895,10 @@ class GitKeizuView {
 
   public setShowRecentActions(showRecentActions: boolean) {
     viewState.showRecentActions = showRecentActions;
+  }
+
+  public setWorktreePath(worktreePath: GG.WorktreePathViewState) {
+    viewState.worktreePath = worktreePath;
   }
 
   public loadBranchCleanup(response: GG.ResponseLoadBranchCleanup) {
@@ -1041,6 +1055,19 @@ class GitKeizuView {
         commits: avatars[emails[i]]
       });
     }
+  }
+
+  /** `${repoPath}` is the main worktree, so a linked checkout does not nest another worktree inside itself. */
+  private rememberMainWorktree() {
+    const repo = this.currentRepo;
+    if (repo === undefined || repo === "") {
+      return;
+    }
+    const main = mainWorktreePath(this.worktrees) ?? repo;
+    if (viewState.mainWorktreePaths?.[repo] === main) {
+      return;
+    }
+    viewState.mainWorktreePaths = { ...viewState.mainWorktreePaths, [repo]: main };
   }
 
   /* State */

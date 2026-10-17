@@ -8,6 +8,7 @@ import {
   GraphStyle,
   TabIconColourTheme
 } from "./types";
+import { DEFAULT_WORKTREE_PATH_TEMPLATE } from "./worktreePath";
 
 const KEYBINDING_PATTERN = /^CTRL\/CMD \+ [A-Z]$/;
 const UNASSIGNED = "UNASSIGNED";
@@ -220,6 +221,10 @@ class Config {
       "repository.commits.mute.commitsThatAreNotAncestorsOfHead",
       false
     );
+  }
+
+  public worktreePathTemplate(): string {
+    return this.workspaceConfiguration.get("worktreePathTemplate", DEFAULT_WORKTREE_PATH_TEMPLATE);
   }
 
   public openNewTabEditorGroup(): vscode.ViewColumn {

@@ -27,6 +27,7 @@ export const svgIcons = {
   search: '<span class="codicon codicon-search" aria-hidden="true"></span>',
   stash: '<span class="codicon codicon-git-stash" aria-hidden="true"></span>',
   tag: '<span class="codicon codicon-tag" aria-hidden="true"></span>',
+  trash: '<span class="codicon codicon-trash" aria-hidden="true"></span>',
   treeView: '<span class="codicon codicon-list-tree" aria-hidden="true"></span>',
   worktree: '<span class="codicon codicon-worktree-small" aria-hidden="true"></span>'
 };
@@ -39,8 +40,6 @@ const htmlEscapes: { [key: string]: string } = {
   "/": "&#x2F;"
 };
 const htmlEscaper = /[&<>"'/]/g;
-const pathUnsafeChars = /[\\/:*?"<>| ]+/g;
-const pathUnsafeCharReplacement = "-";
 export const refInvalid = /^[-/].*|[\\" ><~^:?*[]|\.\.|\/\/|\/\.|@{|[./]$|\.lock$|^@$/;
 export const ELLIPSIS = "&#8230;";
 
@@ -81,10 +80,6 @@ export function pad2(i: number) {
 
 export function escapeHtml(str: string) {
   return str.replace(htmlEscaper, (match) => htmlEscapes[match]);
-}
-
-export function sanitizeBranchNameForPath(branchName: string) {
-  return branchName.replace(pathUnsafeChars, pathUnsafeCharReplacement);
 }
 
 export function addListenerToClass(className: string, event: string, eventListener: EventListener) {

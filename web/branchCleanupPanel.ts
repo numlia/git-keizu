@@ -9,7 +9,7 @@ import {
   type FocusUpdate,
   markFocusTarget
 } from "./keyboardNavigation";
-import { sendMessage } from "./utils";
+import { sendMessage, svgIcons } from "./utils";
 
 /* === Constants === */
 
@@ -22,12 +22,14 @@ const CLASS_COMPARISON = "branchCleanupComparison";
 const CLASS_MESSAGE = "branchCleanupMessage";
 const CLASS_ACTION_CELL = "branchCleanupActionCell";
 const CLASS_ACTION_BTN = "roundedBtn branchCleanupActionBtn";
+const CLASS_CREATE_BTN = "roundedBtn branchCleanupActionBtn branchCleanupCreateBtn";
 const CLASS_DELETE_BTN = "roundedBtn branchCleanupActionBtn branchCleanupDeleteBtn";
 const ACTION_BUTTON_SELECTOR = "button.branchCleanupActionBtn";
 const ATTR_ARIA_LABEL = "aria-label";
 /** Dictionary key that joins an action label and the branch name into one accessible name. */
 const ACTION_FOR_KEY = "a11y.actionFor";
 const ACTION_SHOW: CleanupAction = "show";
+const ACTION_CREATE: CleanupAction = "createWorktree";
 const ACTION_DELETE: CleanupAction = "delete";
 const FIRST_REQUEST_ID = 1;
 const COMPARISON_AUTO_VALUE = "";
@@ -49,6 +51,7 @@ const TREE_DIFFERENCE_VALUES: ReadonlySet<string> = new Set([
 
 export interface BranchCleanupPanelActions {
   showBranch(branchName: string): void;
+  showCreateWorktreeDialog(repo: string, branchName: string, sourceElem: HTMLElement): void;
   showDeleteDialog(repo: string, branchName: string, remotes: string[]): void;
 }
 
@@ -230,8 +233,8 @@ export class BranchCleanupPanel {
   }
 
   // Same enabled action → comparison trigger → toolbar cleanup button (the cleanup key's own
-  // fallback). While a re-request disables the delete buttons the ticket is parked, so the
-  // response render returns to that button unless the user moved meanwhile.
+  // fallback). While a re-request disables the delete and create-worktree buttons the ticket
+  // is parked, so the response render returns to that button unless the user moved meanwhile.
   private restoreFocus(update: FocusUpdate | null): void {
     this.parkedUpdate = null;
     if (update === null) return;
@@ -364,6 +367,7 @@ export class BranchCleanupPanel {
     const actionCell = document.createElement("td");
     actionCell.className = CLASS_ACTION_CELL;
     actionCell.appendChild(this.buildShowButton(repo, row.branchName));
+    actionCell.appendChild(this.buildCreateWorktreeButton(repo, row));
     if (row.remotes !== null && isDeleteEligible(row, compareBranch)) {
       actionCell.appendChild(this.buildDeleteButton(repo, row.branchName, row.remotes));
     }
@@ -374,6 +378,24 @@ export class BranchCleanupPanel {
   private buildShowButton(repo: string, branchName: string): HTMLButtonElement {
     const btn = buildActionButton(repo, branchName, ACTION_SHOW, CLASS_ACTION_BTN);
     btn.addEventListener("click", () => this.actions.showBranch(branchName));
+    return btn;
+  }
+
+  private buildCreateWorktreeButton(repo: string, row: GG.BranchCleanupRow): HTMLButtonElement {
+    const btn = buildActionButton(repo, row.branchName, ACTION_CREATE, CLASS_CREATE_BTN);
+    const checkedOut = row.worktree.kind === "used";
+    if (checkedOut || this.requestInFlight) {
+      // A branch already checked out in a worktree cannot be added again. A re-request also
+      // disables the button: the shown row may be stale, and the button stays in its box.
+      btn.disabled = true;
+      if (checkedOut) {
+        btn.title = `${actionLabel(ACTION_CREATE)} (${worktreeText(row.worktree)})`;
+      }
+    } else {
+      btn.addEventListener("click", () =>
+        this.actions.showCreateWorktreeDialog(repo, row.branchName, btn)
+      );
+    }
     return btn;
   }
 
@@ -495,17 +517,40 @@ function buildMessage(text: string): HTMLElement {
   return message;
 }
 
+function actionLabel(action: CleanupAction): string {
+  switch (action) {
+    case "show":
+      return t("cleanup.action.show");
+    case "createWorktree":
+      return t("cleanup.action.createWorktree");
+    case "delete":
+      return t("cleanup.action.delete");
+  }
+}
+
+function actionIcon(action: CleanupAction): string {
+  switch (action) {
+    case "show":
+      return svgIcons.cdv;
+    case "createWorktree":
+      return svgIcons.worktree;
+    case "delete":
+      return svgIcons.trash;
+  }
+}
+
 function buildActionButton(
   repo: string,
   branchName: string,
   action: CleanupAction,
   className: string
 ): HTMLButtonElement {
-  const label = action === ACTION_SHOW ? t("cleanup.action.show") : t("cleanup.action.delete");
+  const label = actionLabel(action);
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = className;
-  btn.textContent = label;
+  btn.innerHTML = actionIcon(action);
+  btn.title = label;
   btn.setAttribute(ATTR_ARIA_LABEL, t(ACTION_FOR_KEY, label, branchName));
   btn.dataset.branch = branchName;
   btn.dataset.action = action;

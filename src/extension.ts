@@ -66,6 +66,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (e.affectsConfiguration("git-keizu.menu.showRecentActions")) {
         GitKeizuView.currentPanel?.notifyShowRecentActionsChanged();
       }
+      if (e.affectsConfiguration("git-keizu.worktreePathTemplate")) {
+        GitKeizuView.currentPanel?.notifyWorktreePathChanged();
+      }
     }),
     avatarManager,
     repoManager

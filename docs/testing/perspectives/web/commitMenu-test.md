@@ -71,15 +71,15 @@
 
 **テスト対象パス**: `web/commitMenu.ts`
 
-| Case ID | Input / Precondition                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                             | Notes             |
-| ------- | ------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------- |
-| TC-022  | Create Worktree Here メニュー項目選択 | Normal - standard                                                          | showFormDialog が Branch Name (text-ref) + Path (text) + Open Terminal (checkbox) の 3 フィールドで呼ばれる | REQ-3.1, REQ-3.3  |
-| TC-023  | Branch Name フィールドが空            | Boundary - empty name                                                      | text-ref バリデーションにより送信ボタンが無効化される                                                       | REQ-3.1-TC3       |
-| TC-024  | Path デフォルト値                     | Normal - standard                                                          | `../<repoName>-` 形式（ブランチ名入力前）                                                                   | REQ-3.3           |
-| TC-025  | Open Terminal デフォルト値            | Normal - standard                                                          | dialogDefaults.createWorktree.openTerminal を反映（S5 TC-029 で詳細検証）                                   | REQ-3.3-TC4, → S5 |
-| TC-026  | 有効入力で送信                        | Normal - standard                                                          | RequestCreateWorktree に repo, path, branchName, commitHash, openTerminal が含まれる                        | REQ-3.1           |
-| TC-027  | Branch Name 入力時の Path 動的更新    | Normal - dynamic                                                           | Branch Name 入力に連動して Path が `../<repoName>-<branchName>` に更新される                                | REQ-3.3           |
-| TC-028  | Path 手動編集後に Branch Name を変更  | Boundary - manual edit                                                     | ユーザーが Path を手動編集した後は Branch Name 変更時に Path が自動更新されない                             | UX: 手動編集優先  |
+| Case ID | Input / Precondition                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                     | Notes             |
+| ------- | ------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| TC-022  | Create Worktree Here メニュー項目選択 | Normal - standard                                                          | showFormDialog が Branch Name (text-ref) + Path (text) + Open Terminal (checkbox) の 3 フィールドで呼ばれる         | REQ-3.1, REQ-3.3  |
+| TC-023  | Branch Name フィールドが空            | Boundary - empty name                                                      | text-ref バリデーションにより送信ボタンが無効化される                                                               | REQ-3.1-TC3       |
+| TC-024  | Path デフォルト値                     | Normal - standard                                                          | 空のブランチ名は `worktree` になり、既定テンプレートの解決結果は `/test/repo-worktree`                              | REQ-3.3           |
+| TC-025  | Open Terminal デフォルト値            | Normal - standard                                                          | dialogDefaults.createWorktree.openTerminal を反映（S5 TC-029 で詳細検証）                                           | REQ-3.3-TC4, → S5 |
+| TC-026  | 有効入力で送信                        | Normal - standard                                                          | RequestCreateWorktree に repo, path, branchName, commitHash, openTerminal が含まれる                                | REQ-3.1           |
+| TC-027  | Branch Name 入力時の Path 動的更新    | Normal - dynamic                                                           | Branch Name 入力に連動して Path が既定テンプレートの解決結果（`my-branch` なら `/test/repo-my-branch`）に更新される | REQ-3.3           |
+| TC-028  | Path 手動編集後に Branch Name を変更  | Boundary - manual edit                                                     | ユーザーが Path を手動編集した後は Branch Name 変更時に Path が自動更新されない                                     | UX: 手動編集優先  |
 
 ## S5: Create Worktree Here openTerminal 設定参照（commit 起点）
 
@@ -107,12 +107,12 @@
 
 **テスト対象パス**: `web/commitMenu.ts:106-113`
 
-| Case ID | Input / Precondition                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                  | Notes                                |
-| ------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------ |
-| TC-031  | Branch Name 入力 "feature/x"、Path 未編集                            | Normal - standard                                                          | Path が `../<repoName>-feature-x` に更新される                                                   | REQ-9.3: 正規化適用                  |
-| TC-032  | Branch Name 入力 "a/b/c"、Path 未編集                                | Normal - standard                                                          | Path が `../<repoName>-a-b-c` に更新される                                                       | REQ-9.3: 複数スラッシュの正規化      |
-| TC-033  | Branch Name 変更 "a/b" → "c/d"、Path 未編集                          | Normal - dynamic                                                           | expectedPath が sanitize("a/b") = "a-b" で計算され一致、Path が `../<repoName>-c-d` に更新される | REQ-9.3: lastBranchName は生の値保持 |
-| TC-034  | Branch Name "feature/x" 入力後、Path 手動編集、再度 Branch Name 変更 | Boundary - manual edit                                                     | 手動編集後の Path が保持される（自動更新されない）                                               | REQ-9.3: 正規化下での手動編集検出    |
+| Case ID | Input / Precondition                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                        | Notes                                |
+| ------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------------ |
+| TC-031  | Branch Name 入力 "feature/x"、Path 未編集                            | Normal - standard                                                          | Path が `/test/repo-feature-x` に更新される                            | REQ-9.3: 正規化適用                  |
+| TC-032  | Branch Name 入力 "a/b/c"、Path 未編集                                | Normal - standard                                                          | Path が `/test/repo-a-b-c` に更新される                                | REQ-9.3: 複数スラッシュの正規化      |
+| TC-033  | Branch Name 変更 "a/b" → "c/d"、Path 未編集                          | Normal - dynamic                                                           | 直前の提案パスと一致しているため Path が `/test/repo-c-d` に更新される | REQ-9.3: lastBranchName は生の値保持 |
+| TC-034  | Branch Name "feature/x" 入力後、Path 手動編集、再度 Branch Name 変更 | Boundary - manual edit                                                     | 手動編集後の Path が保持される（自動更新されない）                     | REQ-9.3: 正規化下での手動編集検出    |
 
 > **境界値候補の省略理由**: パス入力フィールドの値は文字列結合で構成され、正規化チェーン中に null / undefined は発生しない。手動編集検出（TC-034）が正規化下での主要な境界ケースである。
 

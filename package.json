@@ -319,6 +319,11 @@
           "default": true,
           "description": "%config.dialog.removeWorktree.deleteBranch.description%"
         },
+        "git-keizu.worktreePathTemplate": {
+          "type": "string",
+          "default": "${repoPath}/../${repoName}-${branch}",
+          "description": "%config.worktreePathTemplate.description%"
+        },
         "git-keizu.repository.commits.order": {
           "type": "string",
           "enum": [

@@ -86,7 +86,7 @@ Right-click commits, branches, tags, stash entries, or uncommitted changes to ac
 - Checkout, cherry-pick, merge, rebase, create branches, manage tags, and apply or pop stashes.
 - Pull and push the current branch, including choosing an upstream when one has not been configured. Fetch automatically prunes stale remote-tracking references.
 - Common actions appear first, while less-used and destructive actions are grouped under **More…**. Confirmation dialogs expose relevant Git options before execution.
-- **Branch Cleanup** collects every local branch into one panel with the facts needed to decide whether it can be deleted — ancestry against a comparison branch, ahead/behind counts, tree differences, upstream state, worktree usage, and last commit date — then lets you show a branch in the graph or open its delete dialog. It gives no safe-or-unsafe verdict and deletes nothing on its own.
+- **Branch Cleanup** collects every local branch into one panel with the facts needed to decide whether it can be deleted — ancestry against a comparison branch, ahead/behind counts, tree differences, upstream state, worktree usage, and last commit date — then lets you show a branch in the graph, create a worktree for a branch that is not already checked out in one, or open its delete dialog. Those three actions are icons, and the name appears when you hover. It gives no safe-or-unsafe verdict and deletes nothing on its own.
 - When a branch deletion is rejected because Git could not confirm the branch is fully merged, the error dialog explains why — including after squash merges and rebases — and what to check before using Force Delete, with the original Git output preserved in a collapsible section.
 
 ![Branch Cleanup panel listing local branches](./resources/screenshots/branch-cleanup.png)
@@ -99,7 +99,7 @@ Create and manage Git worktrees without leaving the graph.
 
 ![Worktree actions on a branch label, with a detached-HEAD worktree visible below](./resources/screenshots/worktree-menu.png)
 
-- Create a worktree from a branch or any commit, with a suggested path derived from the branch name.
+- Create a worktree from a branch or any commit. The suggested path comes from `worktreePathTemplate` (beside the repository, unless you change it) and can be edited before it is created.
 - Open a worktree in VS Code or a terminal, reveal it in the file manager, copy its path, or remove it — from the label of a branch-based or a detached-HEAD worktree alike.
 - Linked and detached-HEAD worktrees remain visible in the graph, including detached commits outside the loaded history.
 - Removal never forces: a worktree with modified or untracked files is left in place and Git's reason is shown.
@@ -201,6 +201,28 @@ These shortcuts run while focus is on a commit row, a label, or the graph backgr
 | `dialog.stashUncommittedChanges.includeUntracked` | `false` | Default state of "Include Untracked" checkbox (Stash Uncommitted Changes)       |
 | `dialog.createWorktree.openTerminal`              | `true`  | Default state of "Open Terminal" checkbox (Create Worktree)                     |
 | `dialog.removeWorktree.deleteBranch`              | `true`  | Default state of "Also delete branch" checkbox (Remove Worktree)                |
+
+#### Worktrees (`worktreePathTemplate`)
+
+| Setting                | Default                                | Description                                    |
+| ---------------------- | -------------------------------------- | ---------------------------------------------- |
+| `worktreePathTemplate` | `${repoPath}/../${repoName}-${branch}` | Suggested path for a new worktree (see below). |
+
+`worktreePathTemplate` accepts three placeholders:
+
+| Placeholder   | Expands to                                                                   |
+| ------------- | ---------------------------------------------------------------------------- |
+| `${repoPath}` | Absolute path of the main worktree                                           |
+| `${repoName}` | The main worktree's directory name                                           |
+| `${branch}`   | The branch, with slashes flattened to hyphens so it stays a single directory |
+
+`${repoPath}` is the main checkout, including when the graph is open on a linked worktree. A template such as `${repoPath}/.worktrees/${branch}` therefore stays beside the main repository instead of nesting another `.worktrees` directory inside the worktree you have open. A leading `~` expands to the home directory, and a relative template resolves against the main worktree. On Windows, a path that names a drive without a root, such as `D:worktrees`, becomes an absolute path using that drive's working directory, or the drive root when the drive has none. The default places each worktree beside the main checkout. To collect them under one directory instead:
+
+```json
+"git-keizu.worktreePathTemplate": "~/.worktrees/${repoName}/${branch}"
+```
+
+The suggestion is shown in the Create Worktree dialog and can be edited before anything is created. Changing the setting updates an open graph, so the next dialog uses the new template. Create Worktree Here keeps the path in step with the branch name until you edit the path. Characters that are awkward in a directory name (`/ \ : * ? " < > |`, whitespace, and control characters) become `-`. Runs of `-`, `_`, and `.` collapse, and a name with nothing left becomes `worktree`. An unknown placeholder is left as written.
 
 #### Commit Ordering (`repository.commits.order`)
 

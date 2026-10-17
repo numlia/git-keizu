@@ -22,6 +22,7 @@ const COMPARE_BRANCH = "main";
 
 interface MockActions {
   showBranch: ReturnType<typeof vi.fn>;
+  showCreateWorktreeDialog: ReturnType<typeof vi.fn>;
   showDeleteDialog: ReturnType<typeof vi.fn>;
 }
 
@@ -81,9 +82,13 @@ function deleteButtons(scope: ParentNode = panelElem()): HTMLButtonElement[] {
 function showButtons(scope: ParentNode = panelElem()): HTMLButtonElement[] {
   return [
     ...scope.querySelectorAll<HTMLButtonElement>(
-      ".branchCleanupActionBtn:not(.branchCleanupDeleteBtn)"
+      ".branchCleanupActionBtn:not(.branchCleanupDeleteBtn):not(.branchCleanupCreateBtn)"
     )
   ];
+}
+
+function createWorktreeButtons(scope: ParentNode = panelElem()): HTMLButtonElement[] {
+  return [...scope.querySelectorAll<HTMLButtonElement>(".branchCleanupCreateBtn")];
 }
 
 function selectComparison(branchName: string): void {
@@ -106,7 +111,7 @@ function autoOptionText(): string | null {
 beforeEach(() => {
   document.body.innerHTML = '<div id="branchCleanupPanel" hidden></div>';
   vi.clearAllMocks();
-  actions = { showBranch: vi.fn(), showDeleteDialog: vi.fn() };
+  actions = { showBranch: vi.fn(), showCreateWorktreeDialog: vi.fn(), showDeleteDialog: vi.fn() };
   panel = new BranchCleanupPanel(actions);
 });
 
@@ -161,6 +166,7 @@ describe("BranchCleanupPanel lifecycle", () => {
     expect(panelElem().childElementCount).toBe(0);
     expect(deleteButtons()).toHaveLength(0);
     expect(showButtons()).toHaveLength(0);
+    expect(createWorktreeButtons()).toHaveLength(0);
   });
 
   it("re-requests with a fresh id while open (TC-047)", () => {
@@ -735,9 +741,10 @@ describe("BranchCleanupPanel row actions", () => {
     // Given: a panel that just sent its request
     panel.toggle(REPO);
 
-    // Then: the loading view carries no delete or show button
+    // Then: the loading view carries no delete, show, or create-worktree button
     expect(deleteButtons()).toHaveLength(0);
     expect(showButtons()).toHaveLength(0);
+    expect(createWorktreeButtons()).toHaveLength(0);
   });
 
   it("forwards the raw branch name to the show callback (TC-035)", () => {
@@ -754,6 +761,65 @@ describe("BranchCleanupPanel row actions", () => {
     // Then: the callback receives the unmodified name exactly once
     expect(actions.showBranch).toHaveBeenCalledTimes(1);
     expect(actions.showBranch).toHaveBeenCalledWith("a;b");
+  });
+
+  it("offers Create Worktree on every row and disables a branch already in a worktree", () => {
+    panel.toggle(REPO);
+    panel.handleResponse(
+      okResponse(1, [
+        makeRow({ branchName: "feature/x" }),
+        makeRow({ branchName: "orphan", worktree: { kind: "unknown" } }),
+        makeRow({
+          branchName: "main",
+          isCurrent: true,
+          worktree: { kind: "used", path: "/repo", isMain: true }
+        }),
+        makeRow({
+          branchName: "linked",
+          worktree: { kind: "used", path: "/repo/.worktrees/linked", isMain: false }
+        })
+      ])
+    );
+
+    const buttons = createWorktreeButtons();
+    expect(buttons.map((button) => button.title)).toEqual([
+      "Create Worktree...",
+      "Create Worktree...",
+      "Create Worktree... (In use: /repo)",
+      "Create Worktree... (In use: /repo/.worktrees/linked)"
+    ]);
+    expect(
+      buttons.every((button) => button.querySelector(".codicon-worktree-small") !== null)
+    ).toBe(true);
+    expect(buttons.every((button) => button.textContent === "")).toBe(true);
+    expect(buttons.map((button) => button.disabled)).toEqual([false, false, true, true]);
+    expect(buttons[0].getAttribute("aria-label")).toBe("Create Worktree...: feature/x");
+
+    buttons[0].click();
+    expect(actions.showCreateWorktreeDialog).toHaveBeenCalledTimes(1);
+    expect(actions.showCreateWorktreeDialog).toHaveBeenCalledWith(REPO, "feature/x", buttons[0]);
+
+    buttons[2].click();
+    buttons[3].click();
+    expect(actions.showCreateWorktreeDialog).toHaveBeenCalledTimes(1);
+  });
+
+  it("disables Create Worktree while a refresh is in flight", () => {
+    panel.toggle(REPO);
+    panel.handleResponse(okResponse(1, [makeRow()]));
+    panel.refresh(REPO);
+
+    const inFlight = createWorktreeButtons()[0];
+    expect(inFlight.disabled).toBe(true);
+    inFlight.click();
+    expect(actions.showCreateWorktreeDialog).not.toHaveBeenCalled();
+
+    panel.handleResponse(okResponse(2, [makeRow()]));
+    const restored = createWorktreeButtons()[0];
+    expect(restored.disabled).toBe(false);
+    restored.click();
+    expect(actions.showCreateWorktreeDialog).toHaveBeenCalledTimes(1);
+    expect(actions.showCreateWorktreeDialog).toHaveBeenCalledWith(REPO, "feature/x", restored);
   });
 });
 
@@ -976,8 +1042,12 @@ describe("BranchCleanupPanel keyboard buttons and focus restoration", () => {
     expect(deleteX.getAttribute("aria-label")).toBe(`Delete...: ${BRANCH}`);
     expect(showAB.getAttribute("aria-label")).toBe("Show in Graph: a;b");
     expect(deleteAB.getAttribute("aria-label")).toBe("Delete...: a;b");
-    expect(showX.textContent).toBe("Show in Graph");
-    expect(deleteX.textContent).toBe("Delete...");
+    expect(showX.title).toBe("Show in Graph");
+    expect(deleteX.title).toBe("Delete...");
+    expect(showX.querySelector(".codicon-eye")).not.toBeNull();
+    expect(deleteX.querySelector(".codicon-trash")).not.toBeNull();
+    expect(showX.textContent).toBe("");
+    expect(deleteX.textContent).toBe("");
   });
 
   it("disables delete during a re-request and returns focus to it afterwards (TC-055)", () => {

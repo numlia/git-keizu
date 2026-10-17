@@ -6,7 +6,8 @@ import type {
   ResponseFileHistory,
   ResponseLoadBranchCleanup,
   ResponseMessage,
-  WorktreeCollection
+  WorktreeCollection,
+  WorktreePathViewState
 } from "../src/types";
 import { hideDialog, showErrorDialog } from "./dialogs";
 import { generateGitFileTree } from "./fileTree";
@@ -36,6 +37,7 @@ export interface GitKeizuViewAPI {
   refresh(mode: RefreshMode): void;
   selectRepo(repo: string): void;
   setShowRecentActions(showRecentActions: boolean): void;
+  setWorktreePath(worktreePath: WorktreePathViewState): void;
 }
 
 export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void {
@@ -250,6 +252,9 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       break;
     case "setShowRecentActions":
       gitKeizu.setShowRecentActions(msg.showRecentActions);
+      break;
+    case "setWorktreePath":
+      gitKeizu.setWorktreePath(msg.worktreePath);
       break;
     case "viewDiff":
       if (msg.success === false) showErrorDialog(t("error.viewDiff"), null, null);

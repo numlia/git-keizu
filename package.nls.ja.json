@@ -43,6 +43,7 @@
   "config.dialog.stashUncommittedChanges.includeUntracked.description": "Stash Uncommitted Changes ダイアログの \"Include Untracked\" チェックボックスの既定状態です。",
   "config.dialog.createWorktree.openTerminal.description": "Create Worktree ダイアログの \"Open Terminal\" チェックボックスの既定状態です。",
   "config.dialog.removeWorktree.deleteBranch.description": "Remove Worktree ダイアログの \"Also delete branch\" チェックボックスの既定状態です。",
+  "config.worktreePathTemplate.description": "新しい worktree の提案パスです。${repoPath} はメインワークツリーの絶対パスです（リンクされた worktree でグラフを開いていても同じです）。${repoName} はそのディレクトリ名、${branch} はスラッシュをハイフンに畳んだ単一ディレクトリとしてのブランチ名です。先頭の ~ はホームディレクトリに展開されます。相対パスはメインワークツリーを基準に解決されます。未知のプレースホルダはそのまま残り、空欄はメインワークツリーの隣に作る既定値になります。",
   "config.repository.commits.order.enum.date": "committer date でコミットを並べ替えます (タイムスタンプ降順、親は常に子の後)",
   "config.repository.commits.order.enum.topo": "トポロジカル順でコミットを並べ替えます (同じブランチ上のコミットが連続して表示されます)",
   "config.repository.commits.order.enum.authorDate": "author date でコミットを並べ替えます (author タイムスタンプ降順、親は常に子の後)",

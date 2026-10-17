@@ -15,19 +15,9 @@ vi.mock("../../web/contextMenu", () => ({
 }));
 
 vi.mock("../../web/utils", () => {
-  const pathUnsafeChars = /[\\/:*?"<>| ]+/g;
-  const pathUnsafeCharReplacement = "-";
-
   return {
     escapeHtml: vi.fn((str: string) => str),
     sendMessage: vi.fn(),
-    getRepoName: vi.fn((repoPath: string) => {
-      const sep = Math.max(repoPath.lastIndexOf("/"), repoPath.lastIndexOf("\\"));
-      return sep >= 0 ? repoPath.substring(sep + 1) : repoPath;
-    }),
-    sanitizeBranchNameForPath: vi.fn((branchName: string) =>
-      branchName.replace(pathUnsafeChars, pathUnsafeCharReplacement)
-    ),
     svgIcons: { alert: "<svg>alert</svg>" },
     ELLIPSIS: "&#8230;"
   };
@@ -50,7 +40,7 @@ import {
   showDeleteBranchDialog,
   showPushRemoteDialog
 } from "../../web/refMenu";
-import { escapeHtml, getRepoName, sanitizeBranchNameForPath, sendMessage } from "../../web/utils";
+import { escapeHtml, sendMessage } from "../../web/utils";
 
 function createMockElement(classes: string[]): HTMLElement {
   const classList = {
@@ -887,12 +877,82 @@ describe("buildRefContextMenuItems worktree menu items (S23)", () => {
     const createItem = findMenuItem(menu, "Create Worktree&#8230;");
     createItem!.onClick();
 
-    // Then: Path default uses the normalized branch name "../repo-feature-x"
+    // Then: Path default is the default template resolved beside the repository
     const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
     const pathInput = inputs[0] as DialogTextInput;
-    expect(pathInput.default).toBe("../repo-feature-x");
-    expect(getRepoName).toHaveBeenCalledWith(REPO);
-    expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("feature/x");
+    expect(pathInput.default).toBe("/test/repo-feature-x");
+  });
+
+  it("uses worktreePathTemplate from viewState for the suggested path", () => {
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      },
+      worktreePath: {
+        template: `~/.worktrees/${"$"}{repoName}/${"$"}{branch}`,
+        homeDir: "/home/dev",
+        platform: "posix"
+      }
+    };
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      null
+    );
+
+    const createItem = findMenuItem(menu, "Create Worktree&#8230;");
+    createItem!.onClick();
+
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const pathInput = inputs[0] as DialogTextInput;
+    expect(pathInput.default).toBe("/home/dev/.worktrees/repo/feature-x");
+  });
+
+  it("uses the main worktree as repoPath when the graph is a linked worktree", () => {
+    const linked = "/test/repo/.worktrees/feat-slot-candidate-band";
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      },
+      worktreePath: {
+        template: `${"$"}{repoPath}/.worktrees/${"$"}{branch}`,
+        homeDir: "/home/dev",
+        platform: "posix"
+      },
+      mainWorktreePaths: {
+        [linked]: "/test/repo"
+      }
+    };
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(
+      linked,
+      "main",
+      sourceElem,
+      false,
+      "feat/slot-candidate-band",
+      undefined,
+      null
+    );
+
+    const createItem = findMenuItem(menu, "Create Worktree&#8230;");
+    createItem!.onClick();
+
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const pathInput = inputs[0] as DialogTextInput;
+    expect(pathInput.default).toBe("/test/repo/.worktrees/main");
   });
 
   it("Open Terminal Here sends openTerminal message (TC-114)", () => {

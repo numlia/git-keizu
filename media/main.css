@@ -938,6 +938,7 @@ li.gitFile[tabindex]:focus-visible {
   opacity: 0.7;
 }
 #branchCleanupPanel table {
+  width: 100%;
   border-collapse: collapse;
 }
 #branchCleanupPanel th,
@@ -953,18 +954,35 @@ li.gitFile[tabindex]:focus-visible {
   background-color: var(--vscode-editor-background);
   border-bottom: 1px solid rgba(128, 128, 128, 0.5);
 }
+#branchCleanupPanel th:not(.branchCleanupActionCell),
+#branchCleanupPanel td:not(.branchCleanupActionCell) {
+  width: 0;
+}
 #branchCleanupPanel th.branchCleanupActionCell,
 #branchCleanupPanel td.branchCleanupActionCell {
   position: sticky;
   right: 0;
+  width: 100%;
+  white-space: nowrap;
+  text-align: right;
   background-color: var(--vscode-editor-background);
 }
-.branchCleanupActionBtn {
-  display: inline-block;
-  line-height: 18px;
-  padding: 0 8px;
-  margin: 1px 2px;
-  border-radius: 9px;
+/* Beats the later `.roundedBtn { display: block }`, which would stack these icons. */
+button.branchCleanupActionBtn {
+  display: inline-flex;
+  vertical-align: middle;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 22px;
+  height: 22px;
+  line-height: 0;
+  padding: 0;
+  margin: 1px;
+  border-radius: 4px;
+}
+.branchCleanupActionBtn .codicon {
+  font-size: 14px;
 }
 .branchCleanupActionBtn:disabled {
   opacity: 0.4;

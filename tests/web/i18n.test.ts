@@ -578,6 +578,7 @@ describe("branch cleanup panel l10n keys (Feature 055-03)", () => {
     "cleanup.error",
     "cleanup.empty",
     "cleanup.action.show",
+    "cleanup.action.createWorktree",
     "cleanup.action.delete"
   ];
   const UNKNOWN_KEY = "cleanup.state.unknown";

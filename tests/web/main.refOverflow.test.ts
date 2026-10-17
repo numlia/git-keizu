@@ -127,6 +127,7 @@ vi.mock("../../web/fileTree", () => ({
 vi.mock("../../web/refMenu", () => ({
   buildRefContextMenuItems: vi.fn(() => MENU_ITEMS),
   checkoutBranchAction: vi.fn(),
+  showCreateWorktreeDialog: vi.fn(),
   showDeleteBranchDialog: vi.fn()
 }));
 
