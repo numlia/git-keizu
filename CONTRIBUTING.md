@@ -8,7 +8,7 @@ For anything larger than a small fix, opening an issue first helps us agree on t
 
 Supported build environments are Linux, macOS, and WSL. The build scripts use Unix shell commands such as `rm` and `cp`, so on Windows please develop inside WSL.
 
-1. Install Node.js 22 (the version CI uses).
+1. Install Node.js 22.22.2 or a later 22.x release. CI uses the latest 22.x, and the test dependencies (jsdom) do not support older 22.x releases.
 2. Enable Corepack so the pinned pnpm version is used, then install dependencies:
 
    ```bash
