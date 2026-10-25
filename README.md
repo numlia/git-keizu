@@ -251,6 +251,6 @@ Thanks also to [asispts](https://github.com/asispts) for carrying the project fo
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Bundled third-party material and its licenses are listed in [ThirdPartyNotices.txt](ThirdPartyNotices.txt).
 
 > Not affiliated with or endorsed by the original Git Graph or neo-git-graph projects.
