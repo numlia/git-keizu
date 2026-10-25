@@ -15,6 +15,7 @@ output-language: en
 ## Testing
 
 - Test supplement (project-specific rules): [`docs/test-supplement.md`](docs/test-supplement.md)
+- Test perspective documents under `docs/testing/perspectives/` are written in English, like the rest of the repository. Older sections still in Japanese stay as they are unless you rewrite that section.
 
 ## Settings namespace
 
