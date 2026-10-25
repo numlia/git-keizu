@@ -17,6 +17,10 @@ The icons and the icon font are licensed under the Creative Commons
 Attribution 4.0 International License (CC BY 4.0):
 https://creativecommons.org/licenses/by/4.0/
 
+Exception: the Git logo, by Jason Long, is licensed under the Creative
+Commons Attribution 3.0 Unported License (CC BY 3.0):
+https://creativecommons.org/licenses/by/3.0/
+
 The CSS is licensed under the MIT License:
 
 MIT License
