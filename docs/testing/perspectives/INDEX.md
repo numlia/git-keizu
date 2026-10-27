@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-10-28T01:22:35+09:00
+> Auto-generated: 2026-10-28T01:52:05+09:00
 > Total sources: 59
 > Total physical files: 105
-> Total sections: 624
-> Total cases: 3761
+> Total sections: 626
+> Total cases: 3768
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -57,7 +57,7 @@
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 3 | 11 | 2026-10-03 |
 | `web/keyboardNavigation.ts` | single-file | `web/keyboardNavigation-test.md` | 1 | 4 | 54 | 2026-10-07 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 19 | 61 | 450 | 2026-10-17 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 19 | 63 | 457 | 2026-10-27 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
 | `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 17 | 67 | 2026-09-29 |
 | `web/pathHighlight.ts` | single-file | `web/pathHighlight-test.md` | 1 | 3 | 21 | 2026-10-03 |
@@ -154,7 +154,7 @@
 | Feature 061-05 (light-spec-plan) review fix | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md` |
 | Feature 061-05 (light-spec-plan) user follow-up | `web/main-test/INDEX.md` |
 | Feature 061-06 (light-spec-plan) | `web/main-test/INDEX.md`, `web/refOverflow-test.md` |
-| Feature 062-01 (PR #114 follow-up) | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/gitGraphView-test/INDEX.md`, `src/worktreePath-test.md` |
+| Feature 062-01 (PR #114 follow-up) | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/gitGraphView-test/INDEX.md`, `src/worktreePath-test.md`, `web/main-test/INDEX.md` |
 | K2 demo-repository-config (light-spec-plan) | `scripts/readme-media/make-demo-repo-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
