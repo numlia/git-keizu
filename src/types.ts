@@ -151,7 +151,11 @@ export interface GitKeizuViewState {
   showCurrentBranchByDefault: boolean;
   showRecentActions: boolean;
   worktreePath: WorktreePathViewState;
-  /** Checkout path to the main worktree path, filled once `git worktree list` is known. */
+  /**
+   * Main worktree path per repository path the graph opens (the key may be a linked worktree).
+   * Set on each commit load; falls back to the repository path itself when `git worktree list`
+   * has no main entry.
+   */
   mainWorktreePaths?: Readonly<Record<string, string>>;
 }
 

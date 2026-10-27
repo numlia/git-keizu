@@ -210,19 +210,19 @@ These shortcuts run while focus is on a commit row, a label, or the graph backgr
 
 `worktreePathTemplate` accepts three placeholders:
 
-| Placeholder   | Expands to                                                                   |
-| ------------- | ---------------------------------------------------------------------------- |
-| `${repoPath}` | Absolute path of the main worktree                                           |
-| `${repoName}` | The main worktree's directory name                                           |
-| `${branch}`   | The branch, with slashes flattened to hyphens so it stays a single directory |
+| Placeholder   | Expands to                                                                                                 |
+| ------------- | ---------------------------------------------------------------------------------------------------------- |
+| `${repoPath}` | Absolute path of the main worktree                                                                         |
+| `${repoName}` | The main worktree's directory name                                                                         |
+| `${branch}`   | The branch as one directory: slashes become hyphens, and leading or trailing `-`, `_`, and `.` are dropped |
 
-`${repoPath}` is the main checkout, including when the graph is open on a linked worktree. A template such as `${repoPath}/.worktrees/${branch}` therefore stays beside the main repository instead of nesting another `.worktrees` directory inside the worktree you have open. A leading `~` expands to the home directory, and a relative template resolves against the main worktree. On Windows, a path that names a drive without a root, such as `D:worktrees`, becomes an absolute path using that drive's working directory, or the drive root when the drive has none. The default places each worktree beside the main checkout. To collect them under one directory instead:
+`${repoPath}` is the main checkout, including when the graph is open on a linked worktree. A template such as `${repoPath}/.worktrees/${branch}` therefore stays under the main worktree instead of nesting another `.worktrees` directory inside the linked worktree you have open. A leading `~` expands to the home directory, and a relative template resolves against the main worktree. On Windows, a path that names a drive without a root, such as `D:worktrees`, becomes an absolute path using that drive's working directory, or the drive root when the drive has none. The default places each worktree beside the main checkout. To collect them under one directory instead:
 
 ```json
 "git-keizu.worktreePathTemplate": "~/.worktrees/${repoName}/${branch}"
 ```
 
-The suggestion is shown in the Create Worktree dialog and can be edited before anything is created. Changing the setting updates an open graph, so the next dialog uses the new template. Create Worktree Here keeps the path in step with the branch name until you edit the path. Characters that are awkward in a directory name (`/ \ : * ? " < > |`, whitespace, and control characters) become `-`. Runs of `-`, `_`, and `.` collapse, and a name with nothing left becomes `worktree`. An unknown placeholder is left as written.
+The suggestion is shown in the Create Worktree dialog and can be edited before anything is created. Changing the setting updates an open graph, so the next dialog uses the new template. Create Worktree Here keeps the path in step with the branch name until you edit the path. Characters that are awkward in a directory name (`/ \ : * ? " < > |`, whitespace, and control characters) become `-`. Runs of `-`, `_`, and `.` collapse, leading and trailing `-`, `_`, and `.` are dropped (`-wip-` becomes `wip`), and a name with nothing left becomes `worktree`. An unknown placeholder is left as written.
 
 #### Commit Ordering (`repository.commits.order`)
 

@@ -4,13 +4,17 @@
  * The template language matches Better Worktrees
  * (https://github.com/shivanshthapliyal/vscode-better-worktrees, MIT,
  * Shivansh Thapliyal): `${repoPath}`, `${repoName}`, and `${branch}`; a
- * leading `~`; relative templates resolved against the repository; unknown
+ * leading `~`; relative templates resolved against the main worktree; unknown
  * placeholders left as written; a blank template falling back to the default.
- * The resolved path is only a starting point. The create dialog shows it and
- * the user can edit it before anything is written.
+ * `${repoPath}` is the main worktree even when the graph is open on a linked
+ * worktree. That is the one deliberate difference from Better Worktrees, which
+ * uses the checkout that is open. The resolved path is only a starting point.
+ * The create dialog shows it and the user can edit it before anything is written.
  *
- * Path joining follows the host platform the same way Node's `path` module
- * does. The webview has no Node `path`, so the rules live here.
+ * `normalizeString`, the posix and win32 `resolve`, `join`, and `basename`
+ * methods, and `normalizePosix` / `normalizeWin32` are adapted from Node.js
+ * `lib/path.js`. The copyright and permission notice is in ThirdPartyNotices.txt.
+ * The webview has no Node `path`, so those rules live here.
  */
 
 export const DEFAULT_WORKTREE_PATH_TEMPLATE = `${"$"}{repoPath}/../${"$"}{repoName}-${"$"}{branch}`;
@@ -50,7 +54,7 @@ export function sanitizeBranchForPath(branch: string): string {
 
 /**
  * Expands a path template to an absolute path. Relative templates resolve
- * against the repository rather than the process working directory.
+ * against the main worktree rather than the process working directory.
  */
 export function resolveWorktreePath(template: string, vars: WorktreePathVars): string {
   const pathApi = vars.platform === "win32" || inferWin32(vars) ? win32 : posix;
@@ -115,6 +119,7 @@ const CHAR_DOT = 46;
 const CHAR_FORWARD_SLASH = 47;
 const CHAR_BACKWARD_SLASH = 92;
 const CHAR_COLON = 58;
+const CHAR_EQUALS = 61;
 
 function isWindowsDeviceRoot(code: number): boolean {
   return (
@@ -131,7 +136,7 @@ export function windowsDriveDirectories(
   for (const [key, value] of Object.entries(env)) {
     if (
       key.length === 3 &&
-      key.charCodeAt(0) === 61 &&
+      key.charCodeAt(0) === CHAR_EQUALS &&
       key.charCodeAt(2) === CHAR_COLON &&
       isWindowsDeviceRoot(key.charCodeAt(1)) &&
       value
