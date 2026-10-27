@@ -1,13 +1,13 @@
-# テスト観点表マニフェスト: web/main.ts
+# Test Perspectives Manifest: web/main.ts
 
 > Source: `web/main.ts`
 > Storage Mode: sharded
-> Generated: 2026-10-17T00:00:00Z
+> Generated: 2026-10-27T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 19
-> Total Sections: 61
-> Total Cases: 450
+> Total Sections: 63
+> Total Cases: 457
 
 ## Shards
 
@@ -22,11 +22,11 @@
 | 04-keyboard-selection-01.md     | keyboard-selection     | 1        | 8     | 2026-02-27   |
 | 04-keyboard-selection-02.md     | keyboard-selection     | 0        | 0     | 2026-09-28   |
 | 05-state-response-01.md         | state-response         | 10       | 38    | 2026-05-10   |
-| 05-state-response-02.md         | state-response         | 5        | 33    | 2026-09-24   |
+| 05-state-response-02.md         | state-response         | 6        | 39    | 2026-10-27   |
 | 06-file-actions-01.md           | file-actions           | 3        | 34    | 2026-09-13   |
 | 07-load-count-01.md             | load-count             | 1        | 5     | 2026-05-17   |
 | 08-request-queue-01.md          | request-queue          | 3        | 21    | 2026-09-29   |
-| 09-branch-cleanup-01.md         | branch-cleanup         | 1        | 11    | 2026-08-25   |
+| 09-branch-cleanup-01.md         | branch-cleanup         | 2        | 12    | 2026-10-27   |
 | 10-file-history-01.md           | file-history           | 3        | 34    | 2026-09-28   |
 | 11-state-persistence-01.md      | state-persistence      | 1        | 3     | 2026-09-12   |
 | 12-path-highlight-01.md         | path-highlight         | 1        | 15    | 2026-10-03   |
@@ -67,6 +67,7 @@
 | Feature 061-01 (light-spec-plan)                                     | 12-path-highlight-01.md                                            |
 | Feature 061-05 (light-spec-plan)                                     | 13-keyboard-accessibility-01.md, 13-keyboard-accessibility-02.md   |
 | Feature 061-06 (light-spec-plan)                                     | 01-rendering-03.md                                                 |
+| Feature 062-01 (PR #114 follow-up)                                   | 05-state-response-02.md, 09-branch-cleanup-01.md                   |
 | フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                            |
 | フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                            |
 | フェーズ3 修正 L15 (avatar-raw-email-compare)                        | 05-state-response-02.md                                            |

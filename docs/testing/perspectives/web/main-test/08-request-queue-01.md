@@ -1,4 +1,4 @@
-# テスト観点表: web/main.ts
+# Test Perspectives: web/main.ts
 
 > Source: `web/main.ts`
 > Generated: 2026-05-22T00:00:00Z
@@ -6,7 +6,7 @@
 > Test Framework: Vitest
 > Responsibility: request-queue
 
-## S40: ロード要求の保留と再送 (Feature 041)
+## S40: Holding and resending load requests (Feature 041)
 
 > Origin: Feature 041 (refresh-contention-and-dialog-escape) (light-spec-plan)
 > Added: 2026-05-22
@@ -16,19 +16,19 @@
 > Target Path: `web/main.ts`
 > Test File: `tests/web/main.test.ts`
 
-`loadBranches` / `loadCommits` の応答待ち中に発生した後続要求を保留し、現在処理中の応答 callback 完了後に最新 state で再送する挙動を検証する。`loadBranchesCallback` / `loadCommitsCallback` は callback 実行前に null 化されるため、callback 内および flush 内の再送判定で stale な in-flight 状態に阻害されない。
+Verifies that later requests made while waiting for a `loadBranches` / `loadCommits` response are held and resent with the latest state after the callback of the response being processed completes. `loadBranchesCallback` / `loadCommitsCallback` are set to null before the callback runs, so the resend decision inside the callback and inside the flush is not blocked by a stale in-flight state.
 
-| Case ID | Input / Precondition                                                                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                    | Notes                   |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----------------------- |
-| TC-221  | `loadBranches` in-flight 中に `refresh("hard")` を呼び、その後 `loadBranches` レスポンスが届く                                     | Normal - refresh during loadBranches                                       | 現在の `loadBranches` 応答処理後に `loadBranches` を再送する `sendMessage` が呼ばれる                                              | forceRender=true の再送 |
-| TC-222  | `loadCommits` in-flight 中に branch filter を `["main"]` に変更し、その後 `loadCommits` レスポンスが届く                           | Normal - filter change during loadCommits                                  | 現在の `loadCommits` 応答処理後に `loadCommits` を再送し、payload の `branches` が最新 `["main"]` を使う                           | 最新 state で再送       |
-| TC-223  | 自動 Load More が in-flight 中に filter 変更で再送が queue され、最終的に再送応答 callback が完了する                              | Normal - auto Load More callback queue                                     | queue された Load More callback が再送応答時に実行され `isLoadingMoreCommits` が `false` に戻り、次の自動 Load More が再度発火可能 | callback 喪失なし       |
-| TC-224  | `loadCommits` in-flight 中に `requestLoadCommits(false, cb1)`、続けて `requestLoadCommits(true, cb2)` を queue する                | Boundary - forceRender OR 合成                                             | 再送時の `loadCommits` payload で `hard=true` が使われ、`cb1` と `cb2` の両方が一度ずつ呼ばれる                                    | OR 合成と callback 集約 |
-| TC-225  | `loadCommits` in-flight 中に branch filter を `["a"]` → `["b"]` に連続で変更し、その後 `loadCommits` レスポンスが届く              | Boundary - latest state at resend                                          | 再送 payload の `branches` が最後の `["b"]` を使い、`["a"]` の payload は送信されない                                              | 中間 state は破棄       |
-| TC-226  | `pendingLoadCommits === null` の状態で `triggerLoadCommitsCallback` を呼ぶ                                                         | Boundary - empty queue flush                                               | 追加の `sendMessage` 呼び出しが発生せず、`pendingLoadCommits` は `null` のまま                                                     | no-op                   |
-| TC-227  | `loadCommitsCallback` 内から再度 `requestLoadCommits(true, cb)` を呼ぶ（callback 実行時点で `loadCommitsCallback` は null になる） | Boundary - re-entrant request                                              | 再 entry 時に in-flight 判定で queue されず、新規 `loadCommits` `sendMessage` が即時送信される                                     | null 化のタイミング     |
+| Case ID | Input / Precondition                                                                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                       | Notes                             |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
+| TC-221  | Call `refresh("hard")` while `loadBranches` is in flight, then the `loadBranches` response arrives                                    | Normal - refresh during loadBranches                                       | After the current `loadBranches` response is processed, `sendMessage` is called to resend `loadBranches`                                              | Resent with forceRender=true      |
+| TC-222  | Change the branch filter to `["main"]` while `loadCommits` is in flight, then the `loadCommits` response arrives                      | Normal - filter change during loadCommits                                  | After the current `loadCommits` response is processed, `loadCommits` is resent and the payload's `branches` uses the latest `["main"]`                | Resent with the latest state      |
+| TC-223  | While an automatic Load More is in flight, a filter change queues a resend, and finally the callback of the resent response completes | Normal - auto Load More callback queue                                     | The queued Load More callback runs on the resent response, `isLoadingMoreCommits` returns to `false`, and the next automatic Load More can fire again | No callback lost                  |
+| TC-224  | While `loadCommits` is in flight, queue `requestLoadCommits(false, cb1)` and then `requestLoadCommits(true, cb2)`                     | Boundary - forceRender OR merge                                            | The resent `loadCommits` payload uses `hard=true`, and both `cb1` and `cb2` are called once each                                                      | OR merge and callback aggregation |
+| TC-225  | While `loadCommits` is in flight, change the branch filter `["a"]` → `["b"]` in a row, then the `loadCommits` response arrives        | Boundary - latest state at resend                                          | The resent payload's `branches` uses the last `["b"]`, and no payload with `["a"]` is sent                                                            | Intermediate state discarded      |
+| TC-226  | Call `triggerLoadCommitsCallback` with `pendingLoadCommits === null`                                                                  | Boundary - empty queue flush                                               | No additional `sendMessage` call occurs, and `pendingLoadCommits` stays `null`                                                                        | no-op                             |
+| TC-227  | Call `requestLoadCommits(true, cb)` again from inside `loadCommitsCallback` (`loadCommitsCallback` is null when the callback runs)    | Boundary - re-entrant request                                              | On re-entry it is not queued by the in-flight check, and a new `loadCommits` `sendMessage` is sent immediately                                        | Timing of setting to null         |
 
-## S47: checkout 成功後の active branch 強制再描画
+## S47: Forced re-render of the active branch after a successful checkout
 
 > Origin: 回帰修正 (checkout-active-branch-force-render)
 > Added: 2026-08-04
@@ -38,31 +38,31 @@
 > Target Path: `web/main.ts`
 > Test File: `tests/web/main.test.ts`
 
-checkout 成功時は `forceRender` により、ブランチ・コミットの取得結果と内部キャッシュが一致する場合でもグラフを再描画し、切替先ブランチへ `.active` を付け直す。一方で hard refresh 固有のローディング表示と展開状態の即時リセットは行わない。soft refresh の応答待ち中に checkout が完了した場合も、キューの `forceRender` が OR 合成で保持されることを保証する。ホスト通信の `hard` は互換性のため強制再描画フラグとして維持する。
+On a successful checkout, `forceRender` re-renders the graph even when the fetched branches and commits match the internal cache, and re-applies `.active` to the checked-out branch. The loading view and the immediate reset of the expanded state, which are specific to a hard refresh, are not done. Even when a checkout completes while waiting for a soft refresh response, the queued `forceRender` is guaranteed to be kept by OR merge. `hard` in host communication is kept as the forced re-render flag for compatibility.
 
-| Case ID | Input / Precondition                                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                  | Notes                           |
-| ------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| TC-270  | 内部キャッシュの HEAD は `feature/checkout`、DOM の `.active` だけが `main` の状態で checkout 成功応答を受信 | Normal - stale DOM recovery                                                | 現在のグラフを表示したまま `hard=true` で取得し、手動リロードなしで `.active` が `feature/checkout` へ更新される | loading 非表示も検証            |
-| TC-271  | soft `loadBranches` の応答待ち中に checkout 成功応答を受信                                                   | Boundary - checkout during in-flight load                                  | checkout の後続要求が強制再描画のままキュー・再送され、最終応答後に `.active` が `feature/checkout` へ更新される | forceRender の競合時保持        |
-| TC-272  | checkout 後のグラフに残るコミットを展開している                                                              | Normal - expanded commit preservation                                      | ローディングを表示せず、展開中のコミット詳細を保持する                                                           | 対象が新グラフに存在            |
-| TC-273  | checkout 後のグラフから消えるコミットを展開している                                                          | Boundary - missing expanded commit                                         | 参照できない展開状態を閉じる                                                                                     | stale 詳細を残さない            |
-| TC-274  | checkout 後のグラフに残る 2 コミットを比較している                                                           | Normal - comparison preservation                                           | 比較元と比較先の両方が存在するため、比較詳細を保持する                                                           | 2 コミットの存在を検証          |
-| TC-275  | 比較元または比較先が checkout 後のグラフから消える                                                           | Boundary - missing comparison commit                                       | 比較詳細全体を閉じる                                                                                             | 一部だけの stale 表示を残さない |
-| TC-276  | コミット展開中に手動リフレッシュを実行                                                                       | Normal - hard refresh compatibility                                        | 従来どおり展開状態を即時に閉じ、ローディングを表示し、`hard=true` で取得する                                     | hard refresh 固有動作の保護     |
+| Case ID | Input / Precondition                                                                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                   | Notes                                   |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| TC-270  | Receive a successful checkout response while the internal cache's HEAD is `feature/checkout` and only the DOM's `.active` is on `main` | Normal - stale DOM recovery                                                | Fetches with `hard=true` while keeping the current graph displayed, and `.active` moves to `feature/checkout` without a manual reload             | Also verifies no loading view           |
+| TC-271  | Receive a successful checkout response while waiting for a soft `loadBranches` response                                                | Boundary - checkout during in-flight load                                  | The request following the checkout is queued and resent as a forced re-render, and after the final response `.active` moves to `feature/checkout` | forceRender kept under contention       |
+| TC-272  | A commit that remains in the graph after the checkout is expanded                                                                      | Normal - expanded commit preservation                                      | No loading view is shown, and the expanded commit details are kept                                                                                | The target exists in the new graph      |
+| TC-273  | A commit that disappears from the graph after the checkout is expanded                                                                 | Boundary - missing expanded commit                                         | The expanded state that can no longer be referenced is closed                                                                                     | No stale details left                   |
+| TC-274  | Comparing 2 commits that remain in the graph after the checkout                                                                        | Normal - comparison preservation                                           | Both the comparison base and target exist, so the comparison details are kept                                                                     | Verifies both commits exist             |
+| TC-275  | The comparison base or target disappears from the graph after the checkout                                                             | Boundary - missing comparison commit                                       | The whole comparison details are closed                                                                                                           | No partially stale display left         |
+| TC-276  | Run a manual refresh while a commit is expanded                                                                                        | Normal - hard refresh compatibility                                        | As before, the expanded state closes immediately, the loading view is shown, and it fetches with `hard=true`                                      | Protects hard-refresh-specific behavior |
 
-### 失敗源インベントリ（include-or-justify）
+### Failure-source inventory (include-or-justify)
 
-| 失敗源                                                  | 対応ケースまたは除外理由                                                                   |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| 同一ブランチ・コミットデータによる再描画省略            | TC-270                                                                                     |
-| in-flight 中のキュー格納で forceRender が失われる       | TC-271                                                                                     |
-| forceRender でローディングが表示される                  | TC-270、TC-272                                                                             |
-| 展開コミットが不必要に閉じる、または stale な状態で残る | TC-272、TC-273                                                                             |
-| 比較元・比較先の存在判定が片側だけになる                | TC-274、TC-275                                                                             |
-| hard refresh のローディング・展開リセットが回帰する     | TC-276                                                                                     |
-| checkout 失敗時にも forceRender が実行される            | `web/messageHandler-test.md` S14 TC-049 で refresh 未実行を担保                            |
-| checkout 拒否時にも forceRender が実行される            | `web/messageHandler-test.md` S14 TC-046 / TC-047 で refresh 未実行を担保                   |
-| ブランチごとに異なるコミット列での描画                  | excluded(同一データ時が早期 return の厳しい境界であり、異なるデータは既存描画テストで担保) |
+| Failure source                                                          | Case or reason for exclusion                                                                                                        |
+| ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Re-render skipped because the branch and commit data are the same       | TC-270                                                                                                                              |
+| forceRender lost when queued while a load is in flight                  | TC-271                                                                                                                              |
+| forceRender shows the loading view                                      | TC-270, TC-272                                                                                                                      |
+| Expanded commit closed unnecessarily, or left in a stale state          | TC-272, TC-273                                                                                                                      |
+| Existence check of the comparison base and target done on one side only | TC-274, TC-275                                                                                                                      |
+| Regression of the hard refresh loading view and expanded-state reset    | TC-276                                                                                                                              |
+| forceRender runs even when the checkout fails                           | `web/messageHandler-test.md` S14 TC-049 ensures no refresh runs                                                                     |
+| forceRender runs even when the checkout is rejected                     | `web/messageHandler-test.md` S14 TC-046 / TC-047 ensure no refresh runs                                                             |
+| Rendering with different commit lists per branch                        | excluded(identical data is the strict boundary for the early return, and different data is covered by the existing rendering tests) |
 
 ## S67: Refresh-driven closing keeps error dialogs open
 

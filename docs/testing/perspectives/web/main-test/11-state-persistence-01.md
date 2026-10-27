@@ -1,4 +1,4 @@
-# テスト観点表: web/main.ts
+# Test Perspectives: web/main.ts
 
 > Source: `web/main.ts`
 > Generated: 2026-09-12T00:00:00Z
@@ -6,43 +6,43 @@
 > Test Framework: Vitest
 > Responsibility: state-persistence
 
-## S53: saveState() の worktrees 保存と復元後の soft refresh 再描画抑止
+## S53: Saving worktrees in saveState() and suppressing redraw on soft refresh after restore
 
 > Origin: Feature 056 (retain-context-when-hidden) issue #48
 > Added: 2026-09-12
 > Status: active
 > Supersedes: -
-> Signature: private `saveState(): void` / constructor の `prevState` 復元（`loadCommits(..., prevState.worktrees)`） / `public loadCommits()` の変更判定
-> Target Path: `web/main.ts`（constructor の `prevState` 復元・`saveState()`）、`web/global.d.ts`（`WebViewState.worktrees?`）
+> Signature: private `saveState(): void` / restoring `prevState` in the constructor (`loadCommits(..., prevState.worktrees)`) / the change check in `public loadCommits()`
+> Target Path: `web/main.ts` (restoring `prevState` in the constructor, `saveState()`), `web/global.d.ts` (`WebViewState.worktrees?`)
 > Test File: `tests/web/main.test.ts`
 
-`loadCommits` response で受け取った `worktrees` を `vscode.setState` に含め、状態復元時に `loadCommits` へ渡す観点。復元直後の `this.worktrees` が空のままだと、soft refresh の応答（main worktree を含む）と `worktreeCollectionsEqual` が false になり毎回フル再描画していた（Feature 056 計測で確認）。`WebViewState.worktrees` は省略可能とし、旧ビルドが保存した状態は従来どおり空扱いで復元する。再描画の有無は `Graph.render` の call count で観測する。
+Perspectives for including the `worktrees` received in the `loadCommits` response in `vscode.setState` and passing them to `loadCommits` when the state is restored. When `this.worktrees` stayed empty right after restore, `worktreeCollectionsEqual` with the soft refresh response (which includes the main worktree) was false and caused a full redraw every time (confirmed by the Feature 056 measurements). `WebViewState.worktrees` is optional, and a state saved by an old build is restored as empty, as before. Whether a redraw happens is observed through the call count of `Graph.render`.
 
-| Case ID | Input / Precondition                                                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                         | Notes                                 |
-| ------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ------------------------------------- |
-| TC-369  | `prevState = null` で初期化後、`loadBranches` と `worktrees` 付き `loadCommits` response を受ける                    | Normal - worktrees の保存                                                  | 最後の `setState` 引数の `worktrees` が response の collection と `toEqual` で一致する  | main worktree 1 件の collection       |
-| TC-370  | `worktrees` を含む `prevState` で初期化（復元描画 1 回）後、同一 commits・同一 `worktrees` の soft response を受ける | Normal - 復元後の再描画抑止                                                | `Graph.render` の call count が 1 のまま（soft response で再描画しない）                | 変更判定が `worktrees` 一致を認識する |
-| TC-371  | `worktrees: undefined` の `prevState`（旧ビルド保存）で初期化後、main worktree を含む soft response を受ける         | Boundary - 旧状態からの復元                                                | `Graph.render` の call count が 2 になる（従来どおり 1 回だけ再描画し、以後は一致する） | 後方互換。空扱いで復元                |
+| Case ID | Input / Precondition                                                                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                               | Notes                                              |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| TC-369  | After initializing with `prevState = null`, receive `loadBranches` and a `loadCommits` response with `worktrees`                                           | Normal - saving worktrees                                                  | The `worktrees` in the last `setState` argument equals the response's collection by `toEqual` | A collection with 1 main worktree                  |
+| TC-370  | After initializing with a `prevState` that includes `worktrees` (1 restore render), receive a soft response with the same commits and the same `worktrees` | Normal - suppressing redraw after restore                                  | The `Graph.render` call count stays 1 (no redraw on the soft response)                        | The change check recognizes that `worktrees` match |
+| TC-371  | After initializing with a `prevState` with `worktrees: undefined` (saved by an old build), receive a soft response that includes the main worktree         | Boundary - restore from an old state                                       | The `Graph.render` call count becomes 2 (redraws only once as before, and matches afterwards) | Backward compatible. Restored as empty             |
 
-### 失敗源インベントリ（include-or-justify）— Feature 056 追加分（S53）
+### Failure-source inventory (include-or-justify) — added by Feature 056 (S53)
 
-| 失敗源                                                     | 対応ケースまたは除外理由                                                                                        |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| `saveState()` が `worktrees` を落とす                      | TC-369                                                                                                          |
-| 復元時に保存済み `worktrees` を `loadCommits` へ渡さない   | TC-370（渡さなければ空と比較され call count が 2 になる）                                                       |
-| 旧状態（`worktrees` 欠落）の復元で例外・空以外の扱いになる | TC-371                                                                                                          |
-| 復元後の一致判定が worktrees 以外の差分を見落とす          | excluded(`loadCommits` の commits / head / moreAvailable 比較は S24・S28 と既存の request-queue 表で担保)       |
-| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）      | empty: TC-371（空 collection 扱い）。NULL: excluded(`WebViewState.worktrees` は `undefined` か collection のみ) |
-| 外部依存×失敗モード                                        | excluded(`vscode.setState` / `getState` は mock で、失敗経路を追加しない)                                       |
-| 例外・エラー経路                                           | excluded(復元と保存に throw 分岐なし)                                                                           |
+| Failure source                                                                                  | Covering case or exclusion reason                                                                                                       |
+| ----------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `saveState()` drops `worktrees`                                                                 | TC-369                                                                                                                                  |
+| The saved `worktrees` are not passed to `loadCommits` on restore                                | TC-370 (if not passed, it is compared with empty and the call count becomes 2)                                                          |
+| Restoring an old state (missing `worktrees`) throws or is treated as something other than empty | TC-371                                                                                                                                  |
+| The match check after restore misses differences other than worktrees                           | excluded(the comparison of commits / head / moreAvailable in `loadCommits` is covered by S24, S28 and the existing request-queue table) |
+| Boundary values (0 / minimum / maximum / +/-1 / empty / NULL)                                   | empty: TC-371 (treated as an empty collection). NULL: excluded(`WebViewState.worktrees` is only `undefined` or a collection)            |
+| External dependency x failure mode                                                              | excluded(`vscode.setState` / `getState` are mocks, and no failure path is added)                                                        |
+| Exception / error paths                                                                         | excluded(restore and save have no throw branch)                                                                                         |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(state の型検証は既存 S24 の後方互換マイグレーションが担う)
-- Exception: excluded(上表のとおり)
-- External: excluded(上表のとおり)
+- Validation: excluded(type validation of the state is handled by the backward-compatible migration in the existing S24)
+- Exception: excluded(as in the table above)
+- External: excluded(as in the table above)
 - Boundary: TC-371
-- Type: excluded(上表のとおり)
-- Normal: TC-369、TC-370
+- Type: excluded(as in the table above)
+- Normal: TC-369, TC-370
 
-**失敗系/正常系比（煙感知器）**: 正常系2件、失敗系1件。保存・復元・後方互換の 3 経路で失敗源は上表で網羅済みであることを確認した。比率合わせのためのケース追加は行わない。
+**Failure/normal ratio (smoke detector)**: 2 normal cases, 1 failure case. It was confirmed that the table above covers the failure sources on the 3 paths of save, restore and backward compatibility. No cases are added just to adjust the ratio.
