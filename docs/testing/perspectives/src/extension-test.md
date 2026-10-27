@@ -223,3 +223,32 @@
 - Normal: TC-038
 
 **失敗系/正常系比（煙感知器）**: 正常系1件（TC-038）、失敗系1件（TC-039）。本変更はハンドラの戻り値契約の追加のみで、失敗源は上表で網羅済みであることを確認した。
+
+## S11: Configuration change for `worktreePathTemplate`
+
+> Origin: Feature 062-01 (PR #114 follow-up)
+> Added: 2026-10-27
+> Status: active
+> Supersedes: -
+> Signature: the `onDidChangeConfiguration` handler registered by `activate()`
+> Target Path: `src/extension.ts` (the `git-keizu.worktreePathTemplate` branch of the configuration change handler)
+> Test File: `tests/src/extension.test.ts`
+
+Extends the routing of S4. A change to `git-keizu.worktreePathTemplate` reaches only the open panel's `notifyWorktreePathChanged()` (`src/gitGraphView-test/03-worktree-actions-01.md` S44); it must not touch the status bar item or Recent actions. Fixture: S4's captured handler and `createConfigurationChangeEvent`, with `GitKeizuView.currentPanel` replaced by a mock that has `notifyWorktreePathChanged`.
+
+| Case ID | Input / Precondition                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                          | Notes                                    |
+| ------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------- |
+| TC-040  | `affectsConfiguration` is `true` only for `git-keizu.worktreePathTemplate`, panel open | Normal - routed to the panel only                                          | `notifyWorktreePathChanged` is called once; `notifyShowRecentActionsChanged` and the status bar `refresh` are not called | No-panel case shares S4 TC-023's pattern |
+
+### Failure-source inventory (include-or-justify) — S11
+
+| Failure source                                 | Case or reason for exclusion                                                                             |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Setting change not forwarded                   | TC-040                                                                                                   |
+| Unrelated refresh (status bar, Recent actions) | TC-040                                                                                                   |
+| No panel open                                  | not covered for this key (the same optional-chaining call is fixed for `showRecentActions` by S4 TC-023) |
+| Exception / External / Type                    | excluded (the handler only calls into the panel)                                                         |
+
+### Test mapping — S11
+
+`tests/src/extension.test.ts`: TC-040 `TC-040: notifies the open panel when worktreePathTemplate changes`, next to S4's TC-021 to TC-023.

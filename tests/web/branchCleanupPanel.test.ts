@@ -763,7 +763,10 @@ describe("BranchCleanupPanel row actions", () => {
     expect(actions.showBranch).toHaveBeenCalledWith("a;b");
   });
 
-  it("offers Create Worktree on every row and disables a branch already in a worktree", () => {
+  // S8: Create Worktree row action
+  // @see docs/testing/perspectives/web/branchCleanupPanel-test.md
+  it("offers Create Worktree on every row and disables a branch already in a worktree (TC-061)", () => {
+    // Case: TC-061
     panel.toggle(REPO);
     panel.handleResponse(
       okResponse(1, [
@@ -804,7 +807,8 @@ describe("BranchCleanupPanel row actions", () => {
     expect(actions.showCreateWorktreeDialog).toHaveBeenCalledTimes(1);
   });
 
-  it("disables Create Worktree while a refresh is in flight", () => {
+  it("disables Create Worktree while a refresh is in flight (TC-062)", () => {
+    // Case: TC-062
     panel.toggle(REPO);
     panel.handleResponse(okResponse(1, [makeRow()]));
     panel.refresh(REPO);

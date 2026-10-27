@@ -226,3 +226,35 @@ Test file: `tests/web/refMenu.test.ts`. The existing S8 and S12 tests were renam
 
 - RED before implementation (2026-09-29): the base commit `2a3cc5f` was extracted with `git archive` into a temporary directory outside the checkout, the updated test files and the `src/types.ts` union were copied in, and `web/refMenu.ts` stayed at the base. `pnpm exec vitest run tests/web/refMenu.test.ts -t 'TC-(121|122|125)'` gave `Tests 3 failed | 100 skipped (103)`; TC-121 and TC-122 failed with `AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times` (no record on confirmation; TC-125 is in `03-context-menu-recent-actions-01.md` S25). No failure came from dependency resolution, DOM setup or types. The temporary copy was removed afterwards.
 - GREEN after implementation (2026-09-29): the same command in the checkout gave `Tests 3 passed | 100 skipped (103)`.
+
+## S27: Create Worktree suggested path from `worktreePathTemplate` and the main worktree
+
+> Origin: Feature 062-01 (PR #114 follow-up)
+> Added: 2026-10-27
+> Status: active
+> Supersedes: -
+> Signature: `buildRefContextMenuItems(repo, refName, sourceElem, isRemoteCombined, gitBranchHead, remotes?, worktreeInfo?)` with `viewState.worktreePath` and `viewState.mainWorktreePaths`
+> Target Path: `web/refMenu.ts` (`showCreateWorktreeDialog`), `web/worktreeSuggestion.ts` (`suggestedWorktreePath`)
+> Test File: `tests/web/refMenu.test.ts`
+
+The Create Worktree dialog fills its Path input from `viewState.worktreePath` (template, home directory and platform from the extension host), resolved by `src/worktreePath.ts` (`src/worktreePath-test.md` S2 / S3). `${repoPath}` is the main worktree recorded in `viewState.mainWorktreePaths` for the open repository, so a graph opened on a linked worktree does not nest new worktrees inside it. The default template case is S23 TC-113. Fixture: S23's `viewState.dialogDefaults`, `homeDir = "/home/dev"`, `platform: "posix"`, branch `createMockElement(["head"])`, `worktreeInfo = null`; select `Create Worktree&#8230;` and read the `default` of the first `showFormDialog` input.
+
+| Case ID | Input / Precondition                                                                                                                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                             | Notes                                       |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------- |
+| TC-133  | `repo = "/test/repo"`, `refName = "feature/x"`, template `~/.worktrees/${repoName}/${branch}`                                                                                                | Normal - template from viewState                                           | Path default is `/home/dev/.worktrees/repo/feature-x`                       | -                                           |
+| TC-134  | `repo` is the linked worktree `/test/repo/.worktrees/feat-slot-candidate-band`, `mainWorktreePaths` maps it to `/test/repo`, `refName = "main"`, template `${repoPath}/.worktrees/${branch}` | Normal - linked worktree uses the main worktree                            | Path default is `/test/repo/.worktrees/main`, not under the linked worktree | Deliberate difference from Better Worktrees |
+
+### Failure-source inventory (include-or-justify) — S27
+
+| Failure source                                            | Case or reason for exclusion                                                                                   |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Setting ignored (default template used)                   | TC-133                                                                                                         |
+| `${repoPath}` taken from the linked worktree that is open | TC-134                                                                                                         |
+| No main worktree recorded for the repository              | excluded (`web/main-test/05-state-response-02.md` S86 TC-787 records the open checkout itself as the fallback) |
+| Template expansion rules                                  | excluded (`src/worktreePath-test.md` S1 to S3)                                                                 |
+| Create Worktree Here (commit menu)                        | excluded (`web/commitMenu-test.md` S4 TC-024 / TC-027 and S6 follow the resolved default template)             |
+| Exception / External / Type                               | excluded (dialogs are mocked; `viewState` shape is typed by `GitKeizuViewState`)                               |
+
+### Test mapping — S27
+
+`tests/web/refMenu.test.ts` describe `buildRefContextMenuItems worktree menu items (S23)`: TC-133 `uses worktreePathTemplate from viewState for the suggested path (TC-133)`, TC-134 `uses the main worktree as repoPath when the graph is a linked worktree (TC-134)`.

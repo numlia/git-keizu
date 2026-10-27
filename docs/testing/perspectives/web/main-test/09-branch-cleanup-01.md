@@ -61,3 +61,32 @@ panel を constructor で 1 回生成して graph callback・delete dialog callb
 - Normal: TC-305、TC-306、TC-308〜TC-311、TC-315
 
 **失敗系/正常系比（煙感知器）**: 正常系7件（TC-305、TC-306、TC-308〜TC-311、TC-315）、失敗系4件（TC-307、TC-312〜TC-314）。配線 section のため正常系（接続の存在検証）が並ぶ構造で、失敗源は close 中誘発・selector 連結・不一致 scroll に限られることをインベントリで確認した。
+
+## S87: Branch Cleanup Create Worktree callback wiring
+
+> Origin: Feature 062-01 (PR #114 follow-up)
+> Added: 2026-10-27
+> Status: active
+> Supersedes: -
+> Signature: the `showCreateWorktreeDialog` action injected into `BranchCleanupPanel` by the `GitKeizuView` constructor
+> Target Path: `web/main.ts` (panel actions passed to `new BranchCleanupPanel(...)`)
+> Test File: `tests/web/main.test.ts`
+
+The panel's Create Worktree button (`web/branchCleanupPanel-test.md` S8) calls this action, which must open the same dialog as the branch context menu (`web/refMenu-test/02-worktree-actions-01.md` S23 / S27). Fixture: S49's `capturedPanelActions` and the mocked export `showCreateWorktreeDialog` of `web/refMenu.ts` (`freshShowCreateWorktreeDialog`).
+
+| Case ID | Input / Precondition                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                 | Notes                    |
+| ------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------ |
+| TC-788  | The injected action fires with `("/repo", "feature/x", <button>)` | Normal - callback forwarded unchanged                                      | The exported dialog runs once with exactly `("/repo", "feature/x", <button>)`, the same element | Same shape as S49 TC-315 |
+
+### Failure-source inventory (include-or-justify) — S87
+
+| Failure source                        | Case or reason for exclusion                                                        |
+| ------------------------------------- | ----------------------------------------------------------------------------------- |
+| Action not wired or arguments changed | TC-788                                                                              |
+| Source element lost (dialog position) | TC-788 (the same element is passed through)                                         |
+| Dialog contents                       | excluded (`web/refMenu-test/02-worktree-actions-01.md` S23 / S27)                   |
+| Exception / External / Type           | excluded (the dialog is mocked; arguments are typed by `BranchCleanupPanelActions`) |
+
+### Test mapping — S87
+
+`tests/web/main.test.ts` describe `Branch cleanup panel wiring (S49)`: TC-788 `forwards the create-worktree callback to the exported dialog unchanged (TC-788)`.

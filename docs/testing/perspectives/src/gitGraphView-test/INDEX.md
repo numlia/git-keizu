@@ -2,12 +2,12 @@
 
 > Source: `src/gitGraphView.ts`
 > Storage Mode: sharded
-> Generated: 2026-10-07T00:00:00Z
+> Generated: 2026-10-27T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 11
-> Total Sections: 37
-> Total Cases: 181
+> Total Sections: 38
+> Total Cases: 183
 
 ## Shards
 
@@ -18,7 +18,7 @@
 | 01-message-routing-03.md             | message-routing             | 3        | 26    | 2026-08-06   |
 | 02-state-lifecycle-01.md             | state-lifecycle             | 12       | 47    | 2026-09-12   |
 | 02-state-lifecycle-02.md             | state-lifecycle             | 1        | 1     | 2026-09-12   |
-| 03-worktree-actions-01.md            | worktree-actions            | 5        | 34    | 2026-09-13   |
+| 03-worktree-actions-01.md            | worktree-actions            | 6        | 36    | 2026-10-27   |
 | 04-context-menu-recent-actions-01.md | context-menu-recent-actions | 2        | 3     | 2026-05-10   |
 | 05-branch-cleanup-01.md              | branch-cleanup              | 1        | 15    | 2026-08-25   |
 | 06-file-history-01.md                | file-history                | 1        | 12    | 2026-09-08   |
@@ -54,6 +54,7 @@
 | Feature 057 (multi-repo-single-folder-workspace) issue #49                     | 02-state-lifecycle-01.md                            |
 | Feature 057 (multi-repo-single-folder-workspace) issue #49 PR #60 レビュー指摘 | 02-state-lifecycle-01.md, 02-state-lifecycle-02.md  |
 | Feature 061-05 (light-spec-plan)                                               | 08-keyboard-accessibility-01.md                     |
+| Feature 062-01 (PR #114 follow-up)                                             | 03-worktree-actions-01.md                           |
 | test-plan (既存コード網羅)                                                     | 01-message-routing-01.md                            |
 | フェーズ2 修正 M5 (message-handler-try-finally-unmute)                         | 02-state-lifecycle-01.md                            |
 | フェーズ2 修正 M9/M10 (view-diff-resolve-head)                                 | 01-message-routing-02.md                            |

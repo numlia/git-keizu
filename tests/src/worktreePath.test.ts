@@ -48,42 +48,55 @@ function expandHome(target: string, homeDir: string, pathApi: typeof nodePath.po
   return target;
 }
 
+// S1: sanitizeBranchForPath() branch name as one directory
+// @see docs/testing/perspectives/src/worktreePath-test.md
 describe("sanitizeBranchForPath", () => {
-  it("keeps a plain branch name unchanged", () => {
+  it("keeps a plain branch name unchanged (TC-001)", () => {
+    // Case: TC-001
     expect(sanitizeBranchForPath("hotfix")).toBe("hotfix");
   });
 
-  it("flattens slashes so a namespaced branch stays one directory", () => {
+  it("flattens slashes so a namespaced branch stays one directory (TC-002)", () => {
+    // Case: TC-002
     expect(sanitizeBranchForPath("feat/DATA-123-add-page")).toBe("feat-DATA-123-add-page");
   });
 
-  it("flattens backslashes too", () => {
+  it("flattens backslashes too (TC-003)", () => {
+    // Case: TC-003
     expect(sanitizeBranchForPath("feat\\win")).toBe("feat-win");
   });
 
-  it("collapses runs of separators into one", () => {
+  it("collapses runs of separators into one (TC-004)", () => {
+    // Case: TC-004
     expect(sanitizeBranchForPath("feat//a___b")).toBe("feat-a_b");
   });
 
-  it("strips leading and trailing separators and dots", () => {
+  it("strips leading and trailing separators and dots (TC-005)", () => {
+    // Case: TC-005
     expect(sanitizeBranchForPath("/feat/x/")).toBe("feat-x");
     expect(sanitizeBranchForPath(".hidden.")).toBe("hidden");
   });
 
-  it("replaces characters that are hostile in a path", () => {
+  it("replaces characters that are hostile in a path (TC-006)", () => {
+    // Case: TC-006
     expect(sanitizeBranchForPath("feat:a*b?c")).toBe("feat-a-b-c");
   });
 
-  it("never returns a name that starts with a dash", () => {
+  it("never returns a name that starts with a dash (TC-007)", () => {
+    // Case: TC-007
     expect(sanitizeBranchForPath("--force")).toBe("force");
   });
 
-  it("falls back to a placeholder when nothing usable is left", () => {
+  it("falls back to a placeholder when nothing usable is left (TC-008)", () => {
+    // Case: TC-008
     expect(sanitizeBranchForPath("///")).toBe("worktree");
     expect(sanitizeBranchForPath("")).toBe("worktree");
   });
 });
 
+// S2: resolveWorktreePath() template expansion with POSIX paths (TC-009 to TC-017)
+// S3: resolveWorktreePath() Windows paths and platform inference (TC-018 to TC-025)
+// @see docs/testing/perspectives/src/worktreePath-test.md
 describe("resolveWorktreePath", () => {
   const HOME = "/home/dev";
   const REPO = "/home/dev/repos/api";
@@ -96,11 +109,13 @@ describe("resolveWorktreePath", () => {
     );
   }
 
-  it("places a worktree beside the repo with the default template", () => {
+  it("places a worktree beside the repo with the default template (TC-009)", () => {
+    // Case: TC-009
     expectTemplate(DEFAULT_WORKTREE_PATH_TEMPLATE, "hotfix", "/home/dev/repos/api-hotfix");
   });
 
-  it("sanitizes the branch when expanding it into a path", () => {
+  it("sanitizes the branch when expanding it into a path (TC-010)", () => {
+    // Case: TC-010
     expectTemplate(
       DEFAULT_WORKTREE_PATH_TEMPLATE,
       "feat/DATA-123",
@@ -108,7 +123,8 @@ describe("resolveWorktreePath", () => {
     );
   });
 
-  it("expands a leading tilde against the home directory", () => {
+  it("expands a leading tilde against the home directory (TC-011)", () => {
+    // Case: TC-011
     expectTemplate(
       `~/.worktrees/${placeholder("repoName")}/${placeholder("branch")}`,
       "feat/x",
@@ -116,7 +132,8 @@ describe("resolveWorktreePath", () => {
     );
   });
 
-  it("supports the repoPath placeholder for a nested layout", () => {
+  it("supports the repoPath placeholder for a nested layout (TC-012)", () => {
+    // Case: TC-012
     expectTemplate(
       `${placeholder("repoPath")}/.worktrees/${placeholder("branch")}`,
       "hotfix",
@@ -124,11 +141,13 @@ describe("resolveWorktreePath", () => {
     );
   });
 
-  it("resolves a relative template against the repo, not the process cwd", () => {
+  it("resolves a relative template against the repo, not the process cwd (TC-013)", () => {
+    // Case: TC-013
     expectTemplate(`../side/${placeholder("branch")}`, "hotfix", "/home/dev/repos/side/hotfix");
   });
 
-  it("normalizes away traversal segments", () => {
+  it("normalizes away traversal segments (TC-014)", () => {
+    // Case: TC-014
     expectTemplate(
       `${placeholder("repoPath")}/../../${placeholder("branch")}`,
       "hotfix",
@@ -136,7 +155,8 @@ describe("resolveWorktreePath", () => {
     );
   });
 
-  it("leaves an unknown placeholder alone rather than emptying it", () => {
+  it("leaves an unknown placeholder alone rather than emptying it (TC-015)", () => {
+    // Case: TC-015
     expectTemplate(
       `${placeholder("repoPath")}/${placeholder("nope")}`,
       "hotfix",
@@ -144,7 +164,8 @@ describe("resolveWorktreePath", () => {
     );
   });
 
-  it("leaves prototype names such as constructor written out", () => {
+  it("leaves prototype names such as constructor written out (TC-016)", () => {
+    // Case: TC-016
     expectTemplate(
       `${placeholder("repoPath")}/${placeholder("constructor")}/${placeholder("toString")}`,
       "hotfix",
@@ -152,11 +173,13 @@ describe("resolveWorktreePath", () => {
     );
   });
 
-  it("falls back to the default template when the setting is blank", () => {
+  it("falls back to the default template when the setting is blank (TC-017)", () => {
+    // Case: TC-017
     expectTemplate("   ", "hotfix", "/home/dev/repos/api-hotfix");
   });
 
-  it("matches Node's win32 path module for the same templates", () => {
+  it("matches Node's win32 path module for the same templates (TC-018)", () => {
+    // Case: TC-018
     const repo = "C:\\src\\api";
     const home = "C:\\Users\\dev";
     const cases: Array<[string, string, string]> = [
@@ -188,7 +211,8 @@ describe("resolveWorktreePath", () => {
     }
   });
 
-  it("resolves a drive-relative template on another drive the way Node does", () => {
+  it("resolves a drive-relative template on another drive the way Node does (TC-019)", () => {
+    // Case: TC-019
     const template = `D:worktrees\\${placeholder("branch")}`;
     const vars: WorktreePathVars = {
       repoPath: "C:\\src\\repo",
@@ -203,7 +227,8 @@ describe("resolveWorktreePath", () => {
     expect(resolved.startsWith("D:\\")).toBe(true);
   });
 
-  it("uses a drive working directory for a drive-relative template", () => {
+  it("uses a drive working directory for a drive-relative template (TC-020)", () => {
+    // Case: TC-020
     expect(
       resolveWorktreePath(`D:worktrees\\${placeholder("branch")}`, {
         repoPath: "C:\\src\\repo",
@@ -216,7 +241,8 @@ describe("resolveWorktreePath", () => {
     ).toBe("D:\\work\\current\\worktrees\\feature");
   });
 
-  it("uses the drive root when that drive has no working directory", () => {
+  it("uses the drive root when that drive has no working directory (TC-021)", () => {
+    // Case: TC-021
     expect(
       resolveWorktreePath(`D:worktrees\\${placeholder("branch")}`, {
         repoPath: "C:\\src\\repo",
@@ -228,7 +254,8 @@ describe("resolveWorktreePath", () => {
     ).toBe("D:\\worktrees\\feature");
   });
 
-  it("keeps a same-drive relative template under the repository", () => {
+  it("keeps a same-drive relative template under the repository (TC-022)", () => {
+    // Case: TC-022
     expect(
       resolveWorktreePath(`C:worktrees\\${placeholder("branch")}`, {
         repoPath: "C:\\src\\repo",
@@ -240,7 +267,8 @@ describe("resolveWorktreePath", () => {
     ).toBe("C:\\src\\repo\\worktrees\\feature");
   });
 
-  it("matches a drive working directory without regard to letter case", () => {
+  it("matches a drive working directory without regard to letter case (TC-023)", () => {
+    // Case: TC-023
     expect(
       resolveWorktreePath(`d:worktrees\\${placeholder("branch")}`, {
         repoPath: "C:\\src\\repo",
@@ -253,7 +281,8 @@ describe("resolveWorktreePath", () => {
     ).toBe("d:\\work\\current\\worktrees\\feature");
   });
 
-  it("uses win32 rules when the repository path is a drive path and platform is omitted", () => {
+  it("uses win32 rules when the repository path is a drive path and platform is omitted (TC-024)", () => {
+    // Case: TC-024
     expect(
       resolveWorktreePath(DEFAULT_WORKTREE_PATH_TEMPLATE, {
         repoPath: "C:\\src\\api",
@@ -264,8 +293,9 @@ describe("resolveWorktreePath", () => {
   });
 
   it.each(["posix", "win32"] as WorktreePathPlatform[])(
-    "agrees with Node %s path for a mixed-separator default expansion",
+    "agrees with Node %s path for a mixed-separator default expansion (TC-025)",
     (platform) => {
+      // Case: TC-025
       const pathApi = platform === "win32" ? nodePath.win32 : nodePath.posix;
       const vars: WorktreePathVars = {
         repoPath: platform === "win32" ? "C:/src/api" : "/src/api",

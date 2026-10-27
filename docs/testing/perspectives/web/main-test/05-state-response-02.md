@@ -136,3 +136,37 @@
 
 - テストファイル: `tests/web/main.refOverflow.test.ts` の describe `ref list lifecycle on replacement, switching and scrolling (S59)`。TC-464〜TC-474 を各 `it` で検証（TC-467 は送信のたびに一覧数と `#content` の `min-width` を記録、TC-472 は Ctrl+R のハードリフレッシュで検証しクリックによる外側閉鎖と区別）
 - 実ブラウザ確認（Chromium headless）: 無変更 `loadCommits` で一覧維持・`min-width` 不変、コミット追加の `loadCommits` で一覧が閉じ counter 再描画、`selectRepo` で一覧が閉じ loading 表示・`#content` の `min-width` 解除、同リポジトリへ戻すと再計測（M=81）。表の縦スクロールで一覧が閉じる（CDPの縦ホイールは headless でスクロールを起こさなかったため `scrollBy` による実スクロールイベントで確認）。一覧内の縦横ホイールでは一覧維持
+
+## S86: Worktree path state (`setWorktreePath` and the main worktree per repository)
+
+> Origin: Feature 062-01 (PR #114 follow-up)
+> Added: 2026-10-27
+> Status: active
+> Supersedes: -
+> Signature: `GitKeizuView.setWorktreePath(worktreePath: GG.WorktreePathViewState): void` / `loadCommits(...)` recording `viewState.mainWorktreePaths[currentRepo]` (`rememberMainWorktree`)
+> Target Path: `web/main.ts` (`setWorktreePath`, `rememberMainWorktree` and its two calls in `loadCommits`)
+> Test File: `tests/web/main.test.ts`
+
+The extension host sends `setWorktreePath` when `git-keizu.worktreePathTemplate` changes, so the next Create Worktree dialog uses the new template without reloading the graph (the host side is `src/gitGraphView-test/03-worktree-actions-01.md` S44, the routing `web/messageHandler-test/02-worktree-and-details-01.md` S22). On each commit load the webview records the main worktree of the open repository, which the dialog uses as `${repoPath}` (`web/refMenu-test/02-worktree-actions-01.md` S27). Like S29 (`setShowRecentActions`), the update is in memory only. Fixture: the shared `GitKeizuView` of this file, `TEST_REPO = "/test/repo"` as the open repository, and `loadCommits` dispatched with `hard: true`.
+
+| Case ID | Input / Precondition                                                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                       | Notes                      |
+| ------- | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| TC-784  | `setWorktreePath` with `{ template: "~/.worktrees/${repoName}/${branch}", homeDir: "/home/dev", platform: "posix" }` | Normal - runtime update                                                    | `viewState.worktreePath` equals the payload, `viewState.repos` is the same object, no `setState` and no `postMessage` | Same shape as S29 TC-214   |
+| TC-785  | `loadCommits` whose worktrees list `main` at `/test/main-checkout` (main) and `feat/slot` at `/test/repo` (linked)   | Normal - linked checkout open                                              | `viewState.mainWorktreePaths["/test/repo"]` is `/test/main-checkout`                                                  | -                          |
+| TC-786  | `loadCommits` whose only main worktree is detached at `/test/main-checkout`                                          | Normal - detached main worktree                                            | `viewState.mainWorktreePaths["/test/repo"]` is `/test/main-checkout`                                                  | -                          |
+| TC-787  | `loadCommits` whose worktrees have no main entry (`feature` at `/elsewhere`, linked)                                 | Boundary - no main worktree listed                                         | `viewState.mainWorktreePaths["/test/repo"]` is `/test/repo` (the open checkout)                                       | Fallback for `${repoPath}` |
+
+### Failure-source inventory (include-or-justify) — S86
+
+| Failure source                                             | Case or reason for exclusion                                                                                                                    |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| Template change not applied until reload                   | TC-784                                                                                                                                          |
+| Template update reloading or persisting state              | TC-784                                                                                                                                          |
+| Main worktree missed when it is a branch or detached       | TC-785, TC-786                                                                                                                                  |
+| No main worktree in the list                               | TC-787                                                                                                                                          |
+| Unchanged `loadCommits` (early return) skipping the record | excluded (the early return also records, but a list that changes the main worktree changes the worktree collection and does not take that path) |
+| Exception / External / Type                                | excluded (in-memory assignment; the message shape is typed by `ResponseSetWorktreePath`)                                                        |
+
+### Test mapping — S86
+
+`tests/web/main.test.ts`: describe `setWorktreePath()` holds TC-784 `replaces viewState.worktreePath without disturbing other state (TC-784)`; describe `main worktree path` holds TC-785 `records the main worktree for the open checkout (TC-785)`, TC-786 `records a detached main worktree (TC-786)` and TC-787 `keeps the open checkout when the list has no main worktree (TC-787)`.

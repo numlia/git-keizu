@@ -196,3 +196,31 @@ Test file: `tests/web/main.refOverflow.test.ts`, describe `branch deletion error
 | S20     | TC-088  | keeps the branch deletion error open across a queued refresh (TC-088)     | pass (2026-09-29); RED before the fix |
 
 - RED and GREEN (2026-09-29): recorded with the main regression in `web/main-test/08-request-queue-01.md` S67. At the base `web/main.ts`, both cases failed with `expected false to be true` on the dialog `active` class right after the first commit load response with changes.
+
+## S22: handleMessage() setWorktreePath routing
+
+> Origin: Feature 062-01 (PR #114 follow-up)
+> Added: 2026-10-27
+> Status: active
+> Supersedes: -
+> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void` for `ResponseSetWorktreePath`
+> Target Path: `web/messageHandler.ts` (`case "setWorktreePath"`)
+> Test File: `tests/web/messageHandler.test.ts`
+
+Routes the host's `setWorktreePath` (`src/gitGraphView-test/03-worktree-actions-01.md` S44) to `GitKeizuView.setWorktreePath` (`web/main-test/05-state-response-02.md` S86), the same way S9 routes `setShowRecentActions`. Fixture: `createMockGitKeizuView()` of the test file.
+
+| Case ID | Input / Precondition                                                                                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                 | Notes |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----- |
+| TC-090  | `{ command: "setWorktreePath", worktreePath: { template: "~/.worktrees/${repoName}/${branch}", homeDir: "/home/dev", platform: "posix" } }` | Normal - routed without refresh                                            | `gitKeizu.setWorktreePath` is called once with the same `worktreePath`; `refresh` is not called | -     |
+
+### Failure-source inventory (include-or-justify) — S22
+
+| Failure source                     | Case or reason for exclusion                                            |
+| ---------------------------------- | ----------------------------------------------------------------------- |
+| Message not routed or payload lost | TC-090                                                                  |
+| Unneeded refresh                   | TC-090                                                                  |
+| Exception / External / Type        | excluded (a single delegating call; the message type is a union member) |
+
+### Test mapping — S22
+
+`tests/web/messageHandler.test.ts` describe `handleMessage setShowRecentActions response (S9)`: TC-090 `routes a worktree path template update to gitKeizu.setWorktreePath (TC-090)`.

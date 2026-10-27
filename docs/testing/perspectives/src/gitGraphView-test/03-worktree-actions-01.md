@@ -163,3 +163,34 @@ S15 TC-051、S16 TC-053〜TC-058は維持する。`mockDataSource`は`removeWork
 - External: TC-409
 - Boundary: TC-402
 - Type: TC-401、TC-403〜TC-407
+
+## S44: Worktree path settings sent to the webview
+
+> Origin: Feature 062-01 (PR #114 follow-up)
+> Added: 2026-10-27
+> Status: active
+> Supersedes: -
+> Signature: `viewState.worktreePath` in `getHtmlForWebview()` / `public notifyWorktreePathChanged(): void`, both built by `currentWorktreePathViewState()`
+> Target Path: `src/gitGraphView.ts` (`currentWorktreePathViewState`, `notifyWorktreePathChanged`, the `viewState` object of `getHtmlForWebview`)
+> Test File: `tests/src/gitGraphView.test.ts`
+
+The webview has no Node `os` / `process`, so the host sends what the path resolver needs: the template from `git-keizu.worktreePathTemplate`, the home directory, the platform, the process working directory and the Windows per-drive working directories (`src/worktreePath-test.md` S3). The same value goes into the initial `viewState` and into the `setWorktreePath` message sent when the setting changes (`src/extension-test.md` S11), and the message does not rebuild the HTML. The setting count and the `worktreePath` key are also fixed by `08-keyboard-accessibility-01.md` S42 TC-417. Fixture: the shared panel mocks of this file with the default `worktreePathTemplate`.
+
+| Case ID | Input / Precondition                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                    | Notes                                  |
+| ------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| TC-419  | Create the panel and parse `viewState` from the HTML                  | Normal - initial value                                                     | `viewState.worktreePath` equals `{ template: "${repoPath}/../${repoName}-${branch}", homeDir: homedir(), platform: "win32" or "posix" from process.platform, cwd: process.cwd(), driveCwd: windowsDriveDirectories(process.env) }` | -                                      |
+| TC-420  | Open panel, `postMessage` cleared, then `notifyWorktreePathChanged()` | Normal - runtime update without reload                                     | `postMessage` is called once with `{ command: "setWorktreePath", worktreePath: <same value as TC-419> }` and `webview.html` is unchanged                                                                                           | Same pattern as S20 for Recent actions |
+
+### Failure-source inventory (include-or-justify) — S44
+
+| Failure source                                 | Case or reason for exclusion                                                                         |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| A field the resolver needs is missing or wrong | TC-419, TC-420                                                                                       |
+| Setting change regenerates the webview HTML    | TC-420                                                                                               |
+| No panel open when the setting changes         | excluded (`src/extension.ts` calls it with optional chaining; see `src/extension-test.md` S4 TC-023) |
+| Windows values on a Windows host               | excluded (CI runs on Linux; the resolver side is `src/worktreePath-test.md` S3)                      |
+| Exception / External / Type                    | excluded (no throw path; `WorktreePathViewState` is checked by `pnpm run typecheck`)                 |
+
+### Test mapping — S44
+
+`tests/src/gitGraphView.test.ts`: TC-419 `includes the worktree path template in viewState (TC-419)` in describe `GitKeizuView merge/cherry-pick handler and viewState dialogDefaults (S13)`; TC-420 `posts setWorktreePath with the current template without regenerating HTML (TC-420)` in describe `GitKeizuView notifyShowRecentActionsChanged runtime sync`.
