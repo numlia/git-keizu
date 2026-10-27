@@ -7,11 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2026-10-28
+
+This release lets you choose where new worktrees go with `git-keizu.worktreePathTemplate` and adds Create Worktree to Branch Cleanup. It also fixes Highlight File History on Git 2.56, where a file's commits from before a rename could be missing.
+
 ### Added
 
 - **Branch Cleanup can create a worktree**: Each row's actions include Create Worktree, which opens the same dialog as the branch menu. The button stays visible and is disabled when that branch is already checked out in a worktree, including the main checkout. Show in Graph, Create Worktree, and Delete are icons on one line; the action name appears on hover.
 
 - **Suggested worktree path follows `worktreePathTemplate`**: Create Worktree and Create Worktree Here fill in the path from `git-keizu.worktreePathTemplate`. The default `${repoPath}/../${repoName}-${branch}` still places the worktree beside the repository. `${repoPath}` and `${repoName}` are the main worktree, including when the graph is open on a linked worktree, so `${repoPath}/.worktrees/${branch}` does not nest another worktree directory inside the checkout you have open. The remaining expansion matches [Better Worktrees](https://github.com/shivanshthapliyal/vscode-better-worktrees): `${branch}` is one directory, a leading `~` is the home directory, a relative template resolves against the main worktree, an unknown placeholder is left as written, including names such as `constructor`, and a blank setting uses the default. The suggestion stays editable. Changing the setting updates an open graph, and Create Worktree Here keeps updating the path as the branch name is typed until the path is edited. On Windows, a drive path without a root is resolved to an absolute path.
+
+### Fixed
+
+- **Highlight File History keeps the commits from before a rename on Git 2.56**: With Git 2.56, when a file was renamed on a branch that was then merged without Git detecting the rename, Highlight File History stopped at the rename and left out every earlier commit of the file. It now follows the file to its earlier path on every Git version, through any number of renames.
 
 ## [1.7.1] - 2026-10-17
 
@@ -712,7 +720,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.7.1...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.8.0...HEAD
+[1.8.0]: https://github.com/numlia/git-keizu/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/numlia/git-keizu/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/numlia/git-keizu/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/numlia/git-keizu/compare/v1.5.1...v1.6.0
