@@ -2353,12 +2353,15 @@ describe("GitKeizuView frontend integration", () => {
     });
   });
 
+  // S86: Worktree path state (setWorktreePath and the main worktree per repository)
+  // @see docs/testing/perspectives/web/main-test/05-state-response-02.md
   describe("setWorktreePath()", () => {
     function getViewState(): Record<string, unknown> {
       return (globalThis as Record<string, unknown>).viewState as Record<string, unknown>;
     }
 
-    it("replaces viewState.worktreePath without disturbing other state", () => {
+    it("replaces viewState.worktreePath without disturbing other state (TC-784)", () => {
+      // Case: TC-784
       const viewState = getViewState();
       const reposBefore = viewState.repos;
       const worktreePath = {
@@ -2377,6 +2380,8 @@ describe("GitKeizuView frontend integration", () => {
     });
   });
 
+  // S86: Worktree path state (setWorktreePath and the main worktree per repository)
+  // @see docs/testing/perspectives/web/main-test/05-state-response-02.md
   describe("main worktree path", () => {
     function getViewState(): { mainWorktreePaths?: Record<string, string> } {
       return (globalThis as Record<string, unknown>).viewState as {
@@ -2384,7 +2389,8 @@ describe("GitKeizuView frontend integration", () => {
       };
     }
 
-    it("records the main worktree for the open checkout", () => {
+    it("records the main worktree for the open checkout (TC-785)", () => {
+      // Case: TC-785
       dispatchMessage({
         command: "loadCommits",
         commits: MOCK_COMMITS,
@@ -2403,7 +2409,8 @@ describe("GitKeizuView frontend integration", () => {
       expect(getViewState().mainWorktreePaths?.[TEST_REPO]).toBe("/test/main-checkout");
     });
 
-    it("records a detached main worktree", () => {
+    it("records a detached main worktree (TC-786)", () => {
+      // Case: TC-786
       dispatchMessage({
         command: "loadCommits",
         commits: MOCK_COMMITS,
@@ -2419,7 +2426,8 @@ describe("GitKeizuView frontend integration", () => {
       expect(getViewState().mainWorktreePaths?.[TEST_REPO]).toBe("/test/main-checkout");
     });
 
-    it("keeps the open checkout when the list has no main worktree", () => {
+    it("keeps the open checkout when the list has no main worktree (TC-787)", () => {
+      // Case: TC-787
       dispatchMessage({
         command: "loadCommits",
         commits: MOCK_COMMITS,
@@ -2433,6 +2441,31 @@ describe("GitKeizuView frontend integration", () => {
       });
 
       expect(getViewState().mainWorktreePaths?.[TEST_REPO]).toBe(TEST_REPO);
+    });
+
+    it("keeps the entries recorded for other repositories (TC-789)", () => {
+      // Case: TC-789
+      // Given: another repository already has its main worktree recorded
+      getViewState().mainWorktreePaths = { "/other/repo": "/other/main-checkout" };
+
+      // When: the open repository loads a list with a different main worktree
+      dispatchMessage({
+        command: "loadCommits",
+        commits: MOCK_COMMITS,
+        head: COMMIT_HASH_1,
+        moreCommitsAvailable: false,
+        hard: true,
+        worktrees: {
+          branches: { main: { path: "/test/main-checkout-2", isMain: true } },
+          detached: []
+        }
+      });
+
+      // Then: both repositories keep their own entry
+      expect(getViewState().mainWorktreePaths).toEqual({
+        "/other/repo": "/other/main-checkout",
+        [TEST_REPO]: "/test/main-checkout-2"
+      });
     });
   });
 
@@ -4651,6 +4684,48 @@ describe("GitKeizuView findWidgetState backward compatibility", () => {
 
     // Then: FindWidget.restoreState was NOT called
     expect(mockFindWidgetInstance.restoreState).not.toHaveBeenCalled();
+  });
+});
+
+// S86: Worktree path state (setWorktreePath and the main worktree per repository)
+// @see docs/testing/perspectives/web/main-test/05-state-response-02.md
+describe("main worktree path after the webview is restored", () => {
+  it("records the main worktree when the host resends the restored list unchanged (TC-790)", async () => {
+    // Case: TC-790
+    // Given: a restored state whose worktree list has a main worktree elsewhere.
+    // mainWorktreePaths is not part of the saved state, so the new viewState starts without it.
+    vi.resetModules();
+    setupTestDOM();
+    setupViewState();
+    const restoredWorktrees = {
+      branches: {
+        main: { path: "/test/main-checkout", isMain: true },
+        "feat/slot": { path: TEST_REPO, isMain: false }
+      },
+      detached: []
+    };
+    const { vscode: freshVscode } = await import("../../web/utils");
+    vi.mocked(freshVscode.getState).mockReturnValueOnce({
+      ...MOCK_PREV_STATE,
+      worktrees: restoredWorktrees
+    } as unknown as ReturnType<typeof freshVscode.getState>);
+    await import("../../web/main");
+
+    // When: the host answers with the same commits, head and worktrees
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: false,
+      worktrees: restoredWorktrees
+    });
+
+    // Then: the main worktree is recorded for the open checkout
+    const viewState = (globalThis as Record<string, unknown>).viewState as {
+      mainWorktreePaths?: Record<string, string>;
+    };
+    expect(viewState.mainWorktreePaths).toEqual({ [TEST_REPO]: "/test/main-checkout" });
   });
 });
 
@@ -9355,7 +9430,8 @@ describe("Branch cleanup panel wiring (S49)", () => {
     expect(freshShowDeleteBranchDialog).toHaveBeenCalledWith("/repo", "feature/x", ["origin"]);
   });
 
-  it("forwards the create-worktree callback to the exported dialog unchanged", () => {
+  it("forwards the create-worktree callback to the exported dialog unchanged (TC-788)", () => {
+    // Case: TC-788 (S87, docs/testing/perspectives/web/main-test/09-branch-cleanup-01.md)
     const source = document.createElement("button");
     capturedPanelActions.ref!.showCreateWorktreeDialog("/repo", "feature/x", source);
 
