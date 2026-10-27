@@ -1,4 +1,4 @@
-# テスト観点表: src/gitGraphView.ts
+# Test Perspectives: src/gitGraphView.ts
 
 > Source: `src/gitGraphView.ts`
 > Generated: 2026-05-02T01:45:44Z
@@ -6,160 +6,191 @@
 > Test Framework: Vitest
 > Responsibility: worktree-actions
 
-## S13: merge/cherry-pick ハンドラ拡張 + viewState dialogDefaults
+## S13: merge/cherry-pick handler extension + viewState dialogDefaults
 
 > Origin: Feature 014 (dialog-defaults) (aidd-spec-tasks-test)
 > Added: 2026-03-09
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `src/gitGraphView.ts`
+**Target path**: `src/gitGraphView.ts`
 
-| Case ID | Input / Precondition                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                  | Notes            |
-| ------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------- |
-| TC-039  | getHtmlForWebview() 呼び出し                                 | Normal - standard                                                          | viewState に dialogDefaults が含まれ、Config.dialogDefaults() の返却値と一致する | 設定パイプライン |
-| TC-040  | RequestMergeBranch (squash=true, noCommit=false)             | Normal - standard                                                          | DataSource.mergeBranch に squash=true, noCommit=false が渡される                 | -                |
-| TC-041  | RequestMergeCommit (squash=false, noCommit=true)             | Normal - standard                                                          | DataSource.mergeCommit に squash=false, noCommit=true が渡される                 | -                |
-| TC-042  | RequestCherrypickCommit (recordOrigin=true, noCommit=true)   | Normal - standard                                                          | DataSource.cherrypickCommit に recordOrigin=true, noCommit=true が渡される       | -                |
-| TC-043  | RequestCherrypickCommit (recordOrigin=false, noCommit=false) | Normal - standard                                                          | DataSource.cherrypickCommit に recordOrigin=false, noCommit=false が渡される     | 従来互換         |
+| Case ID | Input / Precondition                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                         | Notes                             |
+| ------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | --------------------------------- |
+| TC-039  | getHtmlForWebview() call                                     | Normal - standard                                                          | viewState includes dialogDefaults, matching the return value of Config.dialogDefaults() | Settings pipeline                 |
+| TC-040  | RequestMergeBranch (squash=true, noCommit=false)             | Normal - standard                                                          | squash=true, noCommit=false are passed to DataSource.mergeBranch                        | -                                 |
+| TC-041  | RequestMergeCommit (squash=false, noCommit=true)             | Normal - standard                                                          | squash=false, noCommit=true are passed to DataSource.mergeCommit                        | -                                 |
+| TC-042  | RequestCherrypickCommit (recordOrigin=true, noCommit=true)   | Normal - standard                                                          | recordOrigin=true, noCommit=true are passed to DataSource.cherrypickCommit              | -                                 |
+| TC-043  | RequestCherrypickCommit (recordOrigin=false, noCommit=false) | Normal - standard                                                          | recordOrigin=false, noCommit=false are passed to DataSource.cherrypickCommit            | Compatible with previous behavior |
 
-## S15: createWorktree/removeWorktree/openTerminal メッセージハンドラ
+## S15: createWorktree/removeWorktree/openTerminal message handlers
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `src/gitGraphView.ts`
+**Target path**: `src/gitGraphView.ts`
 
-| Case ID | Input / Precondition                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                      | Notes                |
-| ------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------- |
-| TC-048  | RequestCreateWorktree（commitHash なし, openTerminal=false）                  | Normal - standard                                                          | DataSource.addWorktree が正しい引数で呼ばれ、ResponseCreateWorktree が送信される。ターミナル起動なし | REQ-3.2              |
-| TC-049  | RequestCreateWorktree（commitHash あり, openTerminal=true）、addWorktree 成功 | Normal - with terminal                                                     | addWorktree 呼出後、createTerminal が name + cwd 付きで呼ばれ、terminal.show() 実行                  | REQ-3.1, REQ-3.1-TC6 |
-| TC-050  | RequestCreateWorktree、addWorktree 失敗（エラー文字列返却）                   | Exception - handled error                                                  | ResponseCreateWorktree に status（エラー文字列）が含まれ、ターミナル起動なし                         | -                    |
-| TC-051  | RequestRemoveWorktree                                                         | Normal - standard                                                          | DataSource.removeWorktree が呼ばれ、ResponseRemoveWorktree が送信される                              | REQ-4.1              |
-| TC-052  | RequestOpenTerminal                                                           | Normal - standard                                                          | createTerminal が name + cwd 付きで呼ばれ、terminal.show() 実行。ResponseOpenTerminal 送信           | REQ-9.1              |
+| Case ID | Input / Precondition                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                       | Notes                |
+| ------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | -------------------- |
+| TC-048  | RequestCreateWorktree (no commitHash, openTerminal=false)                        | Normal - standard                                                          | DataSource.addWorktree is called with the correct arguments and ResponseCreateWorktree is sent. No terminal is opened | REQ-3.2              |
+| TC-049  | RequestCreateWorktree (with commitHash, openTerminal=true), addWorktree succeeds | Normal - with terminal                                                     | After addWorktree, createTerminal is called with name + cwd and terminal.show() runs                                  | REQ-3.1, REQ-3.1-TC6 |
+| TC-050  | RequestCreateWorktree, addWorktree fails (returns an error string)               | Exception - handled error                                                  | ResponseCreateWorktree contains status (the error string), and no terminal is opened                                  | -                    |
+| TC-051  | RequestRemoveWorktree                                                            | Normal - standard                                                          | DataSource.removeWorktree is called and ResponseRemoveWorktree is sent                                                | REQ-4.1              |
+| TC-052  | RequestOpenTerminal                                                              | Normal - standard                                                          | createTerminal is called with name + cwd and terminal.show() runs. ResponseOpenTerminal is sent                       | REQ-9.1              |
 
-## S16: removeWorktree ハンドラ ブランチ同時削除
+## S16: removeWorktree handler deleting the branch at the same time
 
 > Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-15
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `src/gitGraphView.ts`
+**Target path**: `src/gitGraphView.ts`
 
-| Case ID | Input / Precondition                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                  | Notes            |
-| ------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------- |
-| TC-053  | deleteBranch=true, worktree 削除成功(null), branch 削除成功(null)    | Normal - standard                                                          | ResponseRemoveWorktree: status=null, branchStatus=null                           | REQ-4.2-TC1      |
-| TC-054  | deleteBranch=true, worktree 削除成功(null), branch 削除失敗("error") | Normal - partial success                                                   | ResponseRemoveWorktree: status=null, branchStatus="error message"                | REQ-4.2-TC2      |
-| TC-055  | deleteBranch=true, worktree 削除失敗("error")                        | Exception - handled error                                                  | ResponseRemoveWorktree: status="error", branchStatus 未設定。deleteBranch 未呼出 | REQ-4.2-TC5      |
-| TC-056  | deleteBranch=false, worktree 削除成功(null)                          | Normal - standard                                                          | ResponseRemoveWorktree: status=null, branchStatus 未設定。deleteBranch 未呼出    | REQ-4.2-TC3      |
-| TC-057  | deleteBranch=undefined (旧 webview 互換)                             | Boundary - legacy compat                                                   | deleteBranch 未呼出、false としてフォールバック                                  | REQ-4.2 後方互換 |
-| TC-058  | deleteBranch=true 時の forceDelete パラメータ検証                    | Normal - constraint                                                        | dataSource.deleteBranch の第3引数が false（安全な削除）固定                      | REQ-4.2-TC4      |
+| Case ID | Input / Precondition                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                       | Notes                          |
+| ------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------ |
+| TC-053  | deleteBranch=true, worktree removal succeeds (null), branch deletion succeeds (null) | Normal - standard                                                          | ResponseRemoveWorktree: status=null, branchStatus=null                                | REQ-4.2-TC1                    |
+| TC-054  | deleteBranch=true, worktree removal succeeds (null), branch deletion fails ("error") | Normal - partial success                                                   | ResponseRemoveWorktree: status=null, branchStatus="error message"                     | REQ-4.2-TC2                    |
+| TC-055  | deleteBranch=true, worktree removal fails ("error")                                  | Exception - handled error                                                  | ResponseRemoveWorktree: status="error", branchStatus not set. deleteBranch not called | REQ-4.2-TC5                    |
+| TC-056  | deleteBranch=false, worktree removal succeeds (null)                                 | Normal - standard                                                          | ResponseRemoveWorktree: status=null, branchStatus not set. deleteBranch not called    | REQ-4.2-TC3                    |
+| TC-057  | deleteBranch=undefined (compatibility with older webviews)                           | Boundary - legacy compat                                                   | deleteBranch not called, falls back to false                                          | REQ-4.2 backward compatibility |
+| TC-058  | Checking the forceDelete parameter when deleteBranch=true                            | Normal - constraint                                                        | The 3rd argument of dataSource.deleteBranch is fixed to false (safe delete)           | REQ-4.2-TC4                    |
 
-## S22: openWorktreeInNewWindow / revealWorktreeInOS の個別 try/catch と status 応答
+## S22: Separate try/catch and status response for openWorktreeInNewWindow / revealWorktreeInOS
 
 > Origin: フェーズ2 修正 M5 (worktree-command-error-response)
 > Added: 2026-07-04T02:44:58Z
 > Status: superseded
 > Superseded By: S26
 > Supersedes: -
-> Signature: `case "openWorktreeInNewWindow"` / `case "revealWorktreeInOS"`（`onDidReceiveMessage`）
+> Signature: `case "openWorktreeInNewWindow"` / `case "revealWorktreeInOS"` (`onDidReceiveMessage`)
 > Target Path: `src/gitGraphView.ts:638-665`
 
-`openWorktreeInNewWindow`（`vscode.openFolder`）と `revealWorktreeInOS`（`revealFileInOS`）の `executeCommand` を個別の `try/catch` で包む修正。成功時は `sendMessage({ command })`（status なし）、失敗時は `sendMessage({ command, status: error instanceof Error ? error.message : String(error) })` を返す。`types.ts` の両レスポンスに optional `status?` を追加済み。
+A fix that wraps the `executeCommand` calls of `openWorktreeInNewWindow` (`vscode.openFolder`) and `revealWorktreeInOS` (`revealFileInOS`) in separate `try/catch` blocks. On success it sends `sendMessage({ command })` (no status), and on failure it sends `sendMessage({ command, status: error instanceof Error ? error.message : String(error) })`. An optional `status?` has been added to both responses in `types.ts`.
 
-| Case ID | Input / Precondition                                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                 | Notes                         |
-| ------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------- |
-| TC-080  | `openWorktreeInNewWindow`、`executeCommand("vscode.openFolder", ...)` が成功    | Normal - open success                                                      | `sendMessage({ command: "openWorktreeInNewWindow" })` が呼ばれる（`status` フィールド無し）     | 成功時は status 無し          |
-| TC-081  | `openWorktreeInNewWindow`、`executeCommand` が `Error("boom")` で reject        | Exception - open command failure                                           | `sendMessage({ command: "openWorktreeInNewWindow", status: "boom" })` が呼ばれる                | Error インスタンス時 message  |
-| TC-082  | `openWorktreeInNewWindow`、`executeCommand` が非 Error（文字列 `"x"`）で reject | Type - non-Error rejection                                                 | `sendMessage({ command: "openWorktreeInNewWindow", status: "x" })`（`String(error)`）が呼ばれる | 非 Error 時は `String(error)` |
-| TC-083  | `revealWorktreeInOS`、`executeCommand("revealFileInOS", ...)` が成功            | Normal - reveal success                                                    | `sendMessage({ command: "revealWorktreeInOS" })` が呼ばれる（`status` フィールド無し）          | 成功時は status 無し          |
-| TC-084  | `revealWorktreeInOS`、`executeCommand` が `Error("no")` で reject               | Exception - reveal command failure                                         | `sendMessage({ command: "revealWorktreeInOS", status: "no" })` が呼ばれる                       | Error インスタンス時 message  |
-| TC-085  | `revealWorktreeInOS`、`executeCommand` が非 Error（文字列 `"y"`）で reject      | Type - non-Error rejection                                                 | `sendMessage({ command: "revealWorktreeInOS", status: "y" })`（`String(error)`）が呼ばれる      | 非 Error 時は `String(error)` |
+| Case ID | Input / Precondition                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                | Notes                           |
+| ------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------------- |
+| TC-080  | `openWorktreeInNewWindow`, `executeCommand("vscode.openFolder", ...)` succeeds      | Normal - open success                                                      | `sendMessage({ command: "openWorktreeInNewWindow" })` is called (no `status` field)            | No status on success            |
+| TC-081  | `openWorktreeInNewWindow`, `executeCommand` rejects with `Error("boom")`            | Exception - open command failure                                           | `sendMessage({ command: "openWorktreeInNewWindow", status: "boom" })` is called                | message for an Error instance   |
+| TC-082  | `openWorktreeInNewWindow`, `executeCommand` rejects with a non-Error (string `"x"`) | Type - non-Error rejection                                                 | `sendMessage({ command: "openWorktreeInNewWindow", status: "x" })` (`String(error)`) is called | `String(error)` for a non-Error |
+| TC-083  | `revealWorktreeInOS`, `executeCommand("revealFileInOS", ...)` succeeds              | Normal - reveal success                                                    | `sendMessage({ command: "revealWorktreeInOS" })` is called (no `status` field)                 | No status on success            |
+| TC-084  | `revealWorktreeInOS`, `executeCommand` rejects with `Error("no")`                   | Exception - reveal command failure                                         | `sendMessage({ command: "revealWorktreeInOS", status: "no" })` is called                       | message for an Error instance   |
+| TC-085  | `revealWorktreeInOS`, `executeCommand` rejects with a non-Error (string `"y"`)      | Type - non-Error rejection                                                 | `sendMessage({ command: "revealWorktreeInOS", status: "y" })` (`String(error)`) is called      | `String(error)` for a non-Error |
 
-## S26: openWorktreeInNewWindow / revealWorktreeInOS の status 必須送出（成功時 null）
+## S26: Required status for openWorktreeInNewWindow / revealWorktreeInOS (null on success)
 
 > Origin: Feature 045 (defensive-fixes) (light-spec-plan)
 > Added: 2026-07-19
 > Status: active
 > Supersedes: S22
-> Signature: `case "openWorktreeInNewWindow"` / `case "revealWorktreeInOS"`（`onDidReceiveMessage`）
+> Signature: `case "openWorktreeInNewWindow"` / `case "revealWorktreeInOS"` (`onDidReceiveMessage`)
 > Target Path: `src/gitGraphView.ts:495-522`
 
-両 command の `ResponseMessage` を必須 `status: GitCommandStatus` 契約へ変更する修正。成功時は `status: null` を必ず送出し、失敗時は従来どおり error message 文字列を送る。S22 の「成功時は status フィールド無し」（TC-080/TC-083）を置き換える（[2] の host 側。型の必須化は `src/types-test.md` S2、webview 側の表示は `web/messageHandler-test.md` S11 の責務）。
+A fix that changes the `ResponseMessage` of both commands to a contract with a required `status: GitCommandStatus`. On success it always sends `status: null`, and on failure it sends the error message string as before. This replaces "no status field on success" of S22 (TC-080/TC-083) (the host side of [2]. Making the type required belongs to `src/types-test.md` S2, and the webview-side display to `web/messageHandler-test.md` S11).
 
-| Case ID | Input / Precondition                                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                        | Notes                          |
-| ------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| TC-100  | `openWorktreeInNewWindow`、`executeCommand("vscode.openFolder", ...)` が成功    | Normal - open 成功時の null 必須送出                                       | `sendMessage({ command: "openWorktreeInNewWindow", status: null })` が厳密一致で1回呼ばれる（field 省略でなく `null`） | S22 TC-080 の置換              |
-| TC-101  | `openWorktreeInNewWindow`、`executeCommand` が `Error("boom")` で reject        | External - open コマンド失敗                                               | `sendMessage({ command: "openWorktreeInNewWindow", status: "boom" })` が1回呼ばれる                                    | Error インスタンス時は message |
-| TC-102  | `openWorktreeInNewWindow`、`executeCommand` が非 Error（文字列 `"x"`）で reject | Type - 非 Error reject（open）                                             | `sendMessage({ command: "openWorktreeInNewWindow", status: "x" })`（`String(error)`）が1回呼ばれる                     | 非 Error 時は `String(error)`  |
-| TC-103  | `revealWorktreeInOS`、`executeCommand("revealFileInOS", ...)` が成功            | Normal - reveal 成功時の null 必須送出                                     | `sendMessage({ command: "revealWorktreeInOS", status: null })` が厳密一致で1回呼ばれる                                 | S22 TC-083 の置換              |
-| TC-104  | `revealWorktreeInOS`、`executeCommand` が `Error("no")` で reject               | External - reveal コマンド失敗                                             | `sendMessage({ command: "revealWorktreeInOS", status: "no" })` が1回呼ばれる                                           | -                              |
-| TC-105  | `revealWorktreeInOS`、`executeCommand` が非 Error（文字列 `"y"`）で reject      | Type - 非 Error reject（reveal）                                           | `sendMessage({ command: "revealWorktreeInOS", status: "y" })`（`String(error)`）が1回呼ばれる                          | -                              |
+| Case ID | Input / Precondition                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                       | Notes                           |
+| ------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
+| TC-100  | `openWorktreeInNewWindow`, `executeCommand("vscode.openFolder", ...)` succeeds      | Normal - null always sent on open success                                  | `sendMessage({ command: "openWorktreeInNewWindow", status: null })` is called once with an exact match (`null`, not an omitted field) | Replaces S22 TC-080             |
+| TC-101  | `openWorktreeInNewWindow`, `executeCommand` rejects with `Error("boom")`            | External - open command failure                                            | `sendMessage({ command: "openWorktreeInNewWindow", status: "boom" })` is called once                                                  | message for an Error instance   |
+| TC-102  | `openWorktreeInNewWindow`, `executeCommand` rejects with a non-Error (string `"x"`) | Type - non-Error reject (open)                                             | `sendMessage({ command: "openWorktreeInNewWindow", status: "x" })` (`String(error)`) is called once                                   | `String(error)` for a non-Error |
+| TC-103  | `revealWorktreeInOS`, `executeCommand("revealFileInOS", ...)` succeeds              | Normal - null always sent on reveal success                                | `sendMessage({ command: "revealWorktreeInOS", status: null })` is called once with an exact match                                     | Replaces S22 TC-083             |
+| TC-104  | `revealWorktreeInOS`, `executeCommand` rejects with `Error("no")`                   | External - reveal command failure                                          | `sendMessage({ command: "revealWorktreeInOS", status: "no" })` is called once                                                         | -                               |
+| TC-105  | `revealWorktreeInOS`, `executeCommand` rejects with a non-Error (string `"y"`)      | Type - non-Error reject (reveal)                                           | `sendMessage({ command: "revealWorktreeInOS", status: "y" })` (`String(error)`) is called once                                        | -                               |
 
-### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S26）
+### Failure-source inventory (include-or-justify) — added by Feature 045 (S26)
 
-| 失敗源                                                  | 対応ケースまたは除外理由                                                              |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| 成功時の status 省略（webview 側で `undefined` 誤判定） | TC-100、TC-103（`status: null` の厳密一致で検出）                                     |
-| `executeCommand` の失敗（Error reject）                 | TC-101、TC-104                                                                        |
-| 非 Error 値での reject                                  | TC-102、TC-105                                                                        |
-| 片方の command だけの契約変更                           | open（TC-100〜TC-102）と reveal（TC-103〜TC-105）を個別に検証                         |
-| status 欠落 object の送出                               | excluded(型の必須化により typecheck で防止。`src/types-test.md` TC-008/TC-009 で担保) |
+| Failure source                                                         | Covering case or reason for exclusion                                                                       |
+| ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| status omitted on success (misread as `undefined` on the webview side) | TC-100, TC-103 (detected by an exact match on `status: null`)                                               |
+| `executeCommand` failure (Error reject)                                | TC-101, TC-104                                                                                              |
+| Reject with a non-Error value                                          | TC-102, TC-105                                                                                              |
+| Contract changed for only one of the commands                          | open (TC-100 to TC-102) and reveal (TC-103 to TC-105) are verified separately                               |
+| Sending an object without status                                       | excluded(prevented by typecheck because the type is required. Covered by `src/types-test.md` TC-008/TC-009) |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(handler に入力検証分岐が存在しない。未登録 repo の早期 return は既存 S21 TC-079 で担保済み)
-- Exception: excluded(reject は catch で status 応答へ変換され throw しない。External として検証)
-- External: TC-101、TC-104
-- Boundary: excluded(数値・空値境界が仕様上存在しない。`null` は成功契約値として TC-100/TC-103 で検証)
-- Type: TC-102、TC-105
+- Validation: excluded(the handler has no input validation branch. The early return for an unregistered repo is already covered by S21 TC-079)
+- Exception: excluded(a reject is converted to a status response in catch and does not throw. Verified as External)
+- External: TC-101, TC-104
+- Boundary: excluded(the spec has no numeric or empty-value boundaries. `null` is the success contract value and is verified in TC-100/TC-103)
+- Type: TC-102, TC-105
 
-**失敗系/正常系比（煙感知器）**: 正常系2件（TC-100、TC-103）、失敗系4件（TC-101、TC-102、TC-104、TC-105）、比2.0。
+**Failure/normal ratio (smoke detector)**: 2 normal cases (TC-100, TC-103), 4 failure cases (TC-101, TC-102, TC-104, TC-105), ratio 2.0.
 
-## S41: removeWorktree ハンドラの detached 削除と削除前入力検証
+## S41: Detached removal and pre-removal input validation in the removeWorktree handler
 
 > Origin: Feature 053 (detached-worktree-menu) (light-spec-plan)
 > Added: 2026-09-13
 > Status: active
 > Supersedes: -
-> Signature: `case "removeWorktree"`（`onDidReceiveMessage`）
+> Signature: `case "removeWorktree"` (`onDidReceiveMessage`)
 > Target Path: `src/gitGraphView.ts:585-610`
 > Test File: `tests/src/gitGraphView.test.ts`
 
-S15 TC-051、S16 TC-053〜TC-058は維持する。`mockDataSource`は`removeWorktree`と`deleteBranch`だけを持ち、他のadapter呼び出しは`TypeError`で失敗する。応答は`mocks.postMessage.mock.calls[0][0]`を`toStrictEqual`で見る。`TEST_REPO = "/test/repo"`、`MISSING = "Branch name is required to delete the branch."`。TC-399〜TC-405は各入力が識別できる`it.each`でよい。
+S15 TC-051 and S16 TC-053 to TC-058 are kept. `mockDataSource` has only `removeWorktree` and `deleteBranch`, so any other adapter call fails with `TypeError`. The response is checked with `toStrictEqual` on `mocks.postMessage.mock.calls[0][0]`. `TEST_REPO = "/test/repo"`, `MISSING = "Branch name is required to delete the branch."`. TC-399 to TC-405 may be an `it.each` where each input is identifiable.
 
-| Case ID | Input / Precondition                                                                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                              | Notes |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| TC-398  | `{ command: "removeWorktree", repo: TEST_REPO, worktreePath: "/tmp/wt8", deleteBranch: false }`（`branchName`なし）、`removeWorktree`が`null`を返す | Normal - detached removal                                                  | `removeWorktree`が1回`(TEST_REPO, "/tmp/wt8")`、`deleteBranch`が0回、`postMessage`が1回`{ command: "removeWorktree", status: null }`                                         | -     |
-| TC-399  | `deleteBranch: true`、`branchName`キーなし                                                                                                          | Validation - missing branch name                                           | `removeWorktree`0回、`deleteBranch`0回、`postMessage`1回`{ command: "removeWorktree", status: MISSING }`（`branchStatus`キーなし）                                           | -     |
-| TC-400  | `deleteBranch: true, branchName: undefined`                                                                                                         | Validation - undefined branch name                                         | TC-399と同じ                                                                                                                                                                 | -     |
-| TC-401  | `deleteBranch: true, branchName: null`                                                                                                              | Type - null branch name                                                    | TC-399と同じ                                                                                                                                                                 | -     |
-| TC-402  | `deleteBranch: true, branchName: ""`                                                                                                                | Boundary - empty branch name                                               | TC-399と同じ                                                                                                                                                                 | -     |
-| TC-403  | `deleteBranch: true, branchName: 42`                                                                                                                | Type - numeric branch name                                                 | TC-399と同じ                                                                                                                                                                 | -     |
-| TC-404  | `deleteBranch: true, branchName: []`                                                                                                                | Type - array branch name                                                   | TC-399と同じ                                                                                                                                                                 | -     |
-| TC-405  | `deleteBranch: true, branchName: {}`                                                                                                                | Type - object branch name                                                  | TC-399と同じ                                                                                                                                                                 | -     |
-| TC-406  | `deleteBranch: "true", branchName: "feature/x"`、`removeWorktree`が`null`                                                                           | Type - string "true" is not true                                           | `removeWorktree`1回、`deleteBranch`0回、`postMessage`1回`{ command: "removeWorktree", status: null }`                                                                        | -     |
-| TC-407  | `deleteBranch: 1, branchName: "feature/x"`                                                                                                          | Type - numeric 1 is not true                                               | TC-406と同じ                                                                                                                                                                 | -     |
-| TC-408  | TC-398のrequestで、`removeWorktree`が`null`（ignoredファイルのみ／隠れた未追跡ファイル／欠落pathでGitが成功した場合のモデル）                       | Normal - Git success passed through                                        | `removeWorktree`が1回、`postMessage`が1回`{ command: "removeWorktree", status: null }`。`mockDataSource`の他メソッドは存在せず呼ばれない（事前検査なし）                     | -     |
-| TC-409  | TC-398のrequestで、`removeWorktree`が`"fatal: '/tmp/wt8' is locked"`を返す                                                                          | External - Git refusal passed through                                      | `removeWorktree`が1回（再試行なし）、`deleteBranch`が0回、`postMessage`が1回`{ command: "removeWorktree", status: "fatal: '/tmp/wt8' is locked" }`（`branchStatus`キーなし） | -     |
+| Case ID | Input / Precondition                                                                                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                  | Notes |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| TC-398  | `{ command: "removeWorktree", repo: TEST_REPO, worktreePath: "/tmp/wt8", deleteBranch: false }` (no `branchName`), `removeWorktree` returns `null` | Normal - detached removal                                                  | `removeWorktree` called once with `(TEST_REPO, "/tmp/wt8")`, `deleteBranch` 0 times, `postMessage` once with `{ command: "removeWorktree", status: null }`                       | -     |
+| TC-399  | `deleteBranch: true`, no `branchName` key                                                                                                          | Validation - missing branch name                                           | `removeWorktree` 0 times, `deleteBranch` 0 times, `postMessage` once with `{ command: "removeWorktree", status: MISSING }` (no `branchStatus` key)                               | -     |
+| TC-400  | `deleteBranch: true, branchName: undefined`                                                                                                        | Validation - undefined branch name                                         | Same as TC-399                                                                                                                                                                   | -     |
+| TC-401  | `deleteBranch: true, branchName: null`                                                                                                             | Type - null branch name                                                    | Same as TC-399                                                                                                                                                                   | -     |
+| TC-402  | `deleteBranch: true, branchName: ""`                                                                                                               | Boundary - empty branch name                                               | Same as TC-399                                                                                                                                                                   | -     |
+| TC-403  | `deleteBranch: true, branchName: 42`                                                                                                               | Type - numeric branch name                                                 | Same as TC-399                                                                                                                                                                   | -     |
+| TC-404  | `deleteBranch: true, branchName: []`                                                                                                               | Type - array branch name                                                   | Same as TC-399                                                                                                                                                                   | -     |
+| TC-405  | `deleteBranch: true, branchName: {}`                                                                                                               | Type - object branch name                                                  | Same as TC-399                                                                                                                                                                   | -     |
+| TC-406  | `deleteBranch: "true", branchName: "feature/x"`, `removeWorktree` returns `null`                                                                   | Type - string "true" is not true                                           | `removeWorktree` once, `deleteBranch` 0 times, `postMessage` once with `{ command: "removeWorktree", status: null }`                                                             | -     |
+| TC-407  | `deleteBranch: 1, branchName: "feature/x"`                                                                                                         | Type - numeric 1 is not true                                               | Same as TC-406                                                                                                                                                                   | -     |
+| TC-408  | The TC-398 request, `removeWorktree` returns `null` (models Git succeeding with only ignored files / hidden untracked files / a missing path)      | Normal - Git success passed through                                        | `removeWorktree` once, `postMessage` once with `{ command: "removeWorktree", status: null }`. Other methods of `mockDataSource` do not exist and are not called (no pre-check)   | -     |
+| TC-409  | The TC-398 request, `removeWorktree` returns `"fatal: '/tmp/wt8' is locked"`                                                                       | External - Git refusal passed through                                      | `removeWorktree` once (no retry), `deleteBranch` 0 times, `postMessage` once with `{ command: "removeWorktree", status: "fatal: '/tmp/wt8' is locked" }` (no `branchStatus` key) | -     |
 
-### 失敗源インベントリ（include-or-justify）— Feature 053 追加分（S41）
+### Failure-source inventory (include-or-justify) — added by Feature 053 (S41)
 
-| 失敗源                       | 対応ケースまたは除外理由 |
-| ---------------------------- | ------------------------ |
-| 削除前拒否の欠落             | TC-399〜TC-405           |
-| truthy変換                   | TC-406、TC-407           |
-| 成功の失敗化・事前検査       | TC-408                   |
-| 失敗時の再試行・ブランチ削除 | TC-409                   |
-| detached形の互換             | TC-398                   |
+| Failure source                         | Covering case or reason for exclusion |
+| -------------------------------------- | ------------------------------------- |
+| Missing rejection before removal       | TC-399 to TC-405                      |
+| Truthy conversion                      | TC-406, TC-407                        |
+| Success turned into failure, pre-check | TC-408                                |
+| Retry or branch deletion on failure    | TC-409                                |
+| Compatibility of the detached shape    | TC-398                                |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: TC-399、TC-400
-- Exception: excluded(handlerはthrowしない。DataSourceの失敗は戻り値で表す)
+- Validation: TC-399, TC-400
+- Exception: excluded(the handler does not throw. DataSource failures are expressed as return values)
 - External: TC-409
 - Boundary: TC-402
-- Type: TC-401、TC-403〜TC-407
+- Type: TC-401, TC-403 to TC-407
+
+## S44: Worktree path settings sent to the webview
+
+> Origin: Feature 062-01 (PR #114 follow-up)
+> Added: 2026-10-27
+> Status: active
+> Supersedes: -
+> Signature: `viewState.worktreePath` in `getHtmlForWebview()` / `public notifyWorktreePathChanged(): void`, both built by `currentWorktreePathViewState()`
+> Target Path: `src/gitGraphView.ts` (`currentWorktreePathViewState`, `notifyWorktreePathChanged`, the `viewState` object of `getHtmlForWebview`)
+> Test File: `tests/src/gitGraphView.test.ts`
+
+The webview has no Node `os` / `process`, so the host sends what the path resolver needs: the template from `git-keizu.worktreePathTemplate`, the home directory, the platform, the process working directory and the Windows per-drive working directories (`src/worktreePath-test.md` S3). The same value goes into the initial `viewState` and into the `setWorktreePath` message sent when the setting changes (`src/extension-test.md` S11), and the message does not rebuild the HTML. The setting count and the `worktreePath` key are also fixed by `08-keyboard-accessibility-01.md` S42 TC-417. Fixture: the shared panel mocks of this file with the default `worktreePathTemplate`.
+
+| Case ID | Input / Precondition                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                    | Notes                                  |
+| ------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| TC-419  | Create the panel and parse `viewState` from the HTML                  | Normal - initial value                                                     | `viewState.worktreePath` equals `{ template: "${repoPath}/../${repoName}-${branch}", homeDir: homedir(), platform: "win32" or "posix" from process.platform, cwd: process.cwd(), driveCwd: windowsDriveDirectories(process.env) }` | -                                      |
+| TC-420  | Open panel, `postMessage` cleared, then `notifyWorktreePathChanged()` | Normal - runtime update without reload                                     | `postMessage` is called once with `{ command: "setWorktreePath", worktreePath: <same value as TC-419> }` and `webview.html` is unchanged                                                                                           | Same pattern as S20 for Recent actions |
+
+### Failure-source inventory (include-or-justify) — S44
+
+| Failure source                                 | Case or reason for exclusion                                                                         |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| A field the resolver needs is missing or wrong | TC-419, TC-420                                                                                       |
+| Setting change regenerates the webview HTML    | TC-420                                                                                               |
+| No panel open when the setting changes         | excluded (`src/extension.ts` calls it with optional chaining; see `src/extension-test.md` S4 TC-023) |
+| Windows values on a Windows host               | excluded (CI runs on Linux; the resolver side is `src/worktreePath-test.md` S3)                      |
+| Exception / External / Type                    | excluded (no throw path; `WorktreePathViewState` is checked by `pnpm run typecheck`)                 |
+
+### Test mapping — S44
+
+`tests/src/gitGraphView.test.ts`: TC-419 `includes the worktree path template in viewState (TC-419)` in describe `GitKeizuView merge/cherry-pick handler and viewState dialogDefaults (S13)`; TC-420 `posts setWorktreePath with the current template without regenerating HTML (TC-420)` in describe `GitKeizuView notifyShowRecentActionsChanged runtime sync`.

@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-10-28T01:15:12+09:00
+> Auto-generated: 2026-10-28T01:22:35+09:00
 > Total sources: 59
 > Total physical files: 105
-> Total sections: 623
-> Total cases: 3759
+> Total sections: 624
+> Total cases: 3761
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -32,7 +32,7 @@
 | `src/fileHistory.ts` | single-file | `src/fileHistory-test.md` | 1 | 9 | 87 | 2026-10-28 |
 | `src/gitExecutable.ts` | single-file | `src/gitExecutable-test.md` | 1 | 1 | 6 | 2026-07-19 |
 | `src/gitGraphView.ts` | single-file | `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md` | 1 | 17 | 60 | 2026-03-20 |
-| `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 11 | 37 | 181 | 2026-10-07 |
+| `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 11 | 38 | 183 | 2026-10-27 |
 | `src/i18n.ts` | single-file | `src/i18n-test.md` | 1 | 2 | 11 | 2026-08-25 |
 | `src/refValidation.ts` | single-file | `src/refValidation-test.md` | 1 | 1 | 19 | 2026-08-03 |
 | `src/repoFileWatcher.ts` | single-file | `src/repoFileWatcher-test.md` | 1 | 10 | 74 | 2026-08-08 |
@@ -154,7 +154,7 @@
 | Feature 061-05 (light-spec-plan) review fix | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md` |
 | Feature 061-05 (light-spec-plan) user follow-up | `web/main-test/INDEX.md` |
 | Feature 061-06 (light-spec-plan) | `web/main-test/INDEX.md`, `web/refOverflow-test.md` |
-| Feature 062-01 (PR #114 follow-up) | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/worktreePath-test.md` |
+| Feature 062-01 (PR #114 follow-up) | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/gitGraphView-test/INDEX.md`, `src/worktreePath-test.md` |
 | K2 demo-repository-config (light-spec-plan) | `scripts/readme-media/make-demo-repo-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |

@@ -2824,7 +2824,10 @@ describe("GitKeizuView merge/cherry-pick handler and viewState dialogDefaults (S
     });
   });
 
-  it("includes the worktree path template in viewState", async () => {
+  // S44: Worktree path settings sent to the webview
+  // @see docs/testing/perspectives/src/gitGraphView-test/03-worktree-actions-01.md
+  it("includes the worktree path template in viewState (TC-419)", async () => {
+    // Case: TC-419
     createPanel();
     await new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -4190,7 +4193,10 @@ describe("GitKeizuView notifyShowRecentActionsChanged runtime sync", () => {
     );
   });
 
-  it("posts setWorktreePath with the current template without regenerating HTML", async () => {
+  // S44: Worktree path settings sent to the webview
+  // @see docs/testing/perspectives/src/gitGraphView-test/03-worktree-actions-01.md
+  it("posts setWorktreePath with the current template without regenerating HTML (TC-420)", async () => {
+    // Case: TC-420
     createPanel();
     await new Promise((resolve) => setTimeout(resolve, 0));
     mocks.postMessage.mockClear();
