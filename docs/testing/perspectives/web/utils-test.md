@@ -56,7 +56,7 @@
 > Added: 2026-03-27
 > Status: superseded
 > Supersedes: -
-> Create Worktree now suggests paths with `sanitizeBranchForPath` in `src/worktreePath.ts` (`tests/src/worktreePath.test.ts`). `sanitizeBranchNameForPath` has been removed.
+> Superseded By: S1（[../src/worktreePath-test.md](../src/worktreePath-test.md)）
 
 **シグネチャ**: `sanitizeBranchNameForPath(branchName: string): string`
 **テスト対象パス**: `web/utils.ts`
