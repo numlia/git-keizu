@@ -400,7 +400,7 @@ function openCleanupPanel(rows: BranchCleanupRow[]): void {
     result: { kind: "ok", compareBranch: COMPARE_BRANCH, rows }
   });
   expect(document.querySelectorAll("#branchCleanupPanel .branchCleanupActionBtn")).toHaveLength(
-    rows.length * 2
+    rows.length * 3
   );
 }
 

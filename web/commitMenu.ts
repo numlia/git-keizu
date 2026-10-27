@@ -4,13 +4,8 @@ import { showConfirmationDialog, showFormDialog, showSelectDialog } from "./dial
 import { t } from "./i18n";
 import { buildMergeMenuItem } from "./mergeDialog";
 import { type CommitPathMode, PathHighlightMode } from "./pathHighlight";
-import {
-  abbrevCommit,
-  ELLIPSIS,
-  getRepoName,
-  sanitizeBranchNameForPath,
-  sendMessage
-} from "./utils";
+import { abbrevCommit, ELLIPSIS, sendMessage } from "./utils";
+import { suggestedWorktreePath } from "./worktreeSuggestion";
 
 /** Submenu order for a commit target. */
 const COMMIT_PATH_MODES: readonly CommitPathMode[] = [
@@ -123,13 +118,12 @@ export function buildCommitContextMenuItems(
     title: `${t("Create Worktree Here")}${ELLIPSIS}`,
     recentActionId: "commit.createWorktree",
     onClick: () => {
-      const repoName = getRepoName(repo);
-      const pathPrefix = `../${repoName}-`;
+      const suggest = (branchName: string) => suggestedWorktreePath(repo, branchName);
       showFormDialog(
         t("Create worktree at commit {0}:", `<b><i>${abbrevCommit(hash)}</i></b>`),
         [
           { type: "text-ref" as const, name: t("Branch Name: "), default: "" },
-          { type: "text" as const, name: t("Path: "), default: pathPrefix, placeholder: null },
+          { type: "text" as const, name: t("Path: "), default: suggest(""), placeholder: null },
           {
             type: "checkbox" as const,
             name: t("Open Terminal"),
@@ -154,10 +148,8 @@ export function buildCommitContextMenuItems(
           const pathInput = dialogEl.querySelector("#dialogInput1") as HTMLInputElement;
           let lastBranchName = "";
           branchInput.addEventListener("input", () => {
-            const currentPath = pathInput.value;
-            const expectedPath = `${pathPrefix}${sanitizeBranchNameForPath(lastBranchName)}`;
-            if (currentPath === expectedPath || currentPath === pathPrefix) {
-              pathInput.value = `${pathPrefix}${sanitizeBranchNameForPath(branchInput.value)}`;
+            if (pathInput.value === suggest(lastBranchName)) {
+              pathInput.value = suggest(branchInput.value);
             }
             lastBranchName = branchInput.value;
           });

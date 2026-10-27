@@ -105,11 +105,15 @@ const mocks = vi.hoisted(() => {
   );
   const createOrShow = vi.fn();
   const notifyShowRecentActionsChanged = vi.fn();
+  const notifyWorktreePathChanged = vi.fn();
   const gitKeizuViewModule = {
     GitKeizuView: {
       createOrShow,
       currentPanel: undefined as
-        | { notifyShowRecentActionsChanged: typeof notifyShowRecentActionsChanged }
+        | {
+            notifyShowRecentActionsChanged?: typeof notifyShowRecentActionsChanged;
+            notifyWorktreePathChanged?: typeof notifyWorktreePathChanged;
+          }
         | undefined
     }
   };
@@ -179,6 +183,7 @@ const mocks = vi.hoisted(() => {
     extensionStateInstance,
     gitKeizuViewModule,
     notifyShowRecentActionsChanged,
+    notifyWorktreePathChanged,
     onDidChangeConfiguration,
     outputChannel,
     registerCommand,
@@ -243,6 +248,7 @@ const DATE_TYPE_SETTING = "git-keizu.dateType";
 const MAX_DEPTH_OF_REPO_SEARCH_SETTING = "git-keizu.maxDepthOfRepoSearch";
 const GIT_PATH_SETTING = "git.path";
 const SHOW_RECENT_ACTIONS_SETTING = "git-keizu.menu.showRecentActions";
+const WORKTREE_PATH_TEMPLATE_SETTING = "git-keizu.worktreePathTemplate";
 const DIFF_DOC_PROVIDER_SCHEME = mocks.diffDocProviderScheme;
 const DEFAULT_EXTENSION_PATH = "/test/extension";
 const DEFAULT_REPO_PATH = "/repo";
@@ -415,6 +421,7 @@ function resetMockState(): void {
   mocks.diffDocProviderDispose.mockReset();
   mocks.createOrShow.mockReset();
   mocks.notifyShowRecentActionsChanged.mockReset();
+  mocks.notifyWorktreePathChanged.mockReset();
   mocks.gitKeizuViewModule.GitKeizuView.currentPanel = undefined;
   mocks.createOutputChannel.mockReset();
   mocks.createOutputChannel.mockReturnValue(mocks.outputChannel);
@@ -1119,6 +1126,21 @@ describe("extension", () => {
         // Then: optional chaining short-circuits and no error or side-effect occurs
         expect(configurationAction).not.toThrow();
         expect(mocks.notifyShowRecentActionsChanged).not.toHaveBeenCalled();
+      });
+
+      it("notifies the open panel when worktreePathTemplate changes", async () => {
+        await activateExtension();
+        const configHandler = getConfigurationChangeHandler();
+        mocks.gitKeizuViewModule.GitKeizuView.currentPanel = {
+          notifyWorktreePathChanged: mocks.notifyWorktreePathChanged
+        };
+        const event = createConfigurationChangeEvent([WORKTREE_PATH_TEMPLATE_SETTING]);
+
+        configHandler(event);
+
+        expect(mocks.notifyWorktreePathChanged).toHaveBeenCalledTimes(ONE_CALL);
+        expect(mocks.notifyShowRecentActionsChanged).not.toHaveBeenCalled();
+        expect(mocks.statusBarItemInstance.refresh).not.toHaveBeenCalled();
       });
     });
   });

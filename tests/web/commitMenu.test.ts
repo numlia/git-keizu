@@ -15,20 +15,10 @@ vi.mock("../../web/contextMenu", () => ({
 }));
 
 vi.mock("../../web/utils", () => {
-  const pathUnsafeChars = /[\\/:*?"<>| ]+/g;
-  const pathUnsafeCharReplacement = "-";
-
   return {
     abbrevCommit: vi.fn((h: string) => h.substring(0, 8)),
     escapeHtml: vi.fn((str: string) => str),
     sendMessage: vi.fn(),
-    getRepoName: vi.fn((repoPath: string) => {
-      const i = Math.max(repoPath.lastIndexOf("/"), repoPath.lastIndexOf("\\"));
-      return i >= 0 ? repoPath.substring(i + 1) : repoPath;
-    }),
-    sanitizeBranchNameForPath: vi.fn((branchName: string) =>
-      branchName.replace(pathUnsafeChars, pathUnsafeCharReplacement)
-    ),
     ELLIPSIS: "&#8230;"
   };
 });
@@ -37,7 +27,7 @@ import { buildCommitContextMenuItems } from "../../web/commitMenu";
 import { recordRecentAction } from "../../web/contextMenu";
 import { showConfirmationDialog, showFormDialog, showSelectDialog } from "../../web/dialogs";
 import { PathHighlightMode } from "../../web/pathHighlight";
-import { sanitizeBranchNameForPath, sendMessage } from "../../web/utils";
+import { sendMessage } from "../../web/utils";
 
 const REPO = "/test/repo";
 const HASH = "abc1234567890def";
@@ -601,16 +591,17 @@ describe("Create Worktree Here dialog (S4)", () => {
     expect(inputs[0].default).toBe("");
   });
 
-  it("Path defaults to '../<repoName>-' format (TC-024)", () => {
-    // Given: repo is "/test/repo" → repoName = "repo"
+  it("Path defaults to the resolved worktreePathTemplate (TC-024)", () => {
+    // Given: repo is "/test/repo" and the branch name is still empty
     const item = getCreateWorktreeItem();
 
     // When: onClick is triggered
     item.onClick();
 
-    // Then: Path field default is "../repo-"
+    // Then: the default template places the worktree beside the repo.
+    // An empty branch sanitizes to "worktree".
     const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
-    expect(inputs[1].default).toBe("../repo-");
+    expect(inputs[1].default).toBe("/test/repo-worktree");
   });
 
   it("Open Terminal checkbox reflects dialogDefaults.createWorktree.openTerminal=true (TC-025/TC-029)", () => {
@@ -668,9 +659,12 @@ describe("Create Worktree Here dialog (S4)", () => {
     const afterCreate = vi.mocked(showFormDialog).mock.calls[0][5];
     expect(afterCreate).toBeDefined();
 
-    // Set up mock dialog elements
+    // Set up mock dialog elements at the suggested path, which has not been edited yet
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
     const mockBranchInput = { value: "", addEventListener: vi.fn() } as unknown as HTMLInputElement;
-    const mockPathInput = { value: "../repo-" } as unknown as HTMLInputElement;
+    const mockPathInput = {
+      value: (inputs[1] as { default: string }).default
+    } as unknown as HTMLInputElement;
     const mockDialogEl = {
       querySelector: vi.fn((selector: string) => {
         if (selector === "#dialogInput0") return mockBranchInput;
@@ -688,8 +682,8 @@ describe("Create Worktree Here dialog (S4)", () => {
     (mockBranchInput as { value: string }).value = "my-branch";
     inputHandler();
 
-    // Then: Path is updated to "../repo-my-branch"
-    expect(mockPathInput.value).toBe("../repo-my-branch");
+    // Then: Path is updated to the resolved default for that branch
+    expect(mockPathInput.value).toBe("/test/repo-my-branch");
   });
 
   it("afterCreate callback stops Path updates after manual Path edit (TC-028)", () => {
@@ -700,8 +694,11 @@ describe("Create Worktree Here dialog (S4)", () => {
     const afterCreate = vi.mocked(showFormDialog).mock.calls[0][5];
     expect(afterCreate).toBeDefined();
 
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
     const mockBranchInput = { value: "", addEventListener: vi.fn() } as unknown as HTMLInputElement;
-    const mockPathInput = { value: "../repo-" } as unknown as HTMLInputElement;
+    const mockPathInput = {
+      value: (inputs[1] as { default: string }).default
+    } as unknown as HTMLInputElement;
     const mockDialogEl = {
       querySelector: vi.fn((selector: string) => {
         if (selector === "#dialogInput0") return mockBranchInput;
@@ -761,11 +758,14 @@ describe("Create Worktree Here path normalization (S6)", () => {
     expect(afterCreate).toBeDefined();
 
     const addEventListener = vi.fn();
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
     const mockBranchInput = {
       value: "",
       addEventListener
     } as unknown as HTMLInputElement & { value: string };
-    const mockPathInput = { value: "../repo-" } as unknown as HTMLInputElement & {
+    const mockPathInput = {
+      value: (inputs[1] as { default: string }).default
+    } as unknown as HTMLInputElement & {
       value: string;
     };
     const mockDialogEl = {
@@ -801,9 +801,8 @@ describe("Create Worktree Here path normalization (S6)", () => {
     mockBranchInput.value = "feature/x";
     inputHandler();
 
-    // Then: Path is updated to the normalized default path
-    expect(mockPathInput.value).toBe("../repo-feature-x");
-    expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("feature/x");
+    // Then: Path is the default template resolved beside the repository
+    expect(mockPathInput.value).toBe("/test/repo-feature-x");
   });
 
   it("updates Path with normalized nested segments for a/b/c (TC-032)", () => {
@@ -814,9 +813,8 @@ describe("Create Worktree Here path normalization (S6)", () => {
     mockBranchInput.value = "a/b/c";
     inputHandler();
 
-    // Then: Path is updated using the normalized nested branch name
-    expect(mockPathInput.value).toBe("../repo-a-b-c");
-    expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("a/b/c");
+    // Then: Path is updated using the branch as a single directory
+    expect(mockPathInput.value).toBe("/test/repo-a-b-c");
   });
 
   it("uses the normalized previous branch name when deciding whether Path was manually edited (TC-033)", () => {
@@ -829,11 +827,8 @@ describe("Create Worktree Here path normalization (S6)", () => {
     mockBranchInput.value = "c/d";
     inputHandler();
 
-    // Then: Path continues to auto-update because the previous normalized path matched
-    expect(mockPathInput.value).toBe("../repo-c-d");
-    expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("");
-    expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("a/b");
-    expect(vi.mocked(sanitizeBranchNameForPath)).toHaveBeenCalledWith("c/d");
+    // Then: Path continues to auto-update because it still matches the previous suggestion
+    expect(mockPathInput.value).toBe("/test/repo-c-d");
   });
 
   it("preserves a manually edited Path after normalization has already run (TC-034)", () => {

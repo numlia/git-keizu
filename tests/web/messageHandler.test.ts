@@ -32,7 +32,8 @@ function createMockGitKeizuView(): GitKeizuViewAPI {
     loadRepos: vi.fn(),
     refresh: vi.fn(),
     selectRepo: vi.fn(),
-    setShowRecentActions: vi.fn()
+    setShowRecentActions: vi.fn(),
+    setWorktreePath: vi.fn()
   };
 }
 
@@ -952,6 +953,25 @@ describe("handleMessage setShowRecentActions response (S9)", () => {
     expect(gitKeizu.setShowRecentActions).toHaveBeenCalledWith(false);
     expect(gitKeizu.refresh).not.toHaveBeenCalled();
     expect(showErrorDialog).not.toHaveBeenCalled();
+  });
+
+  it("routes a worktree path template update to gitKeizu.setWorktreePath", () => {
+    const worktreePath = {
+      template: `~/.worktrees/${"$"}{repoName}/${"$"}{branch}`,
+      homeDir: "/home/dev",
+      platform: "posix" as const
+    };
+    handleMessage(
+      {
+        command: "setWorktreePath",
+        worktreePath
+      },
+      gitKeizu
+    );
+
+    expect(gitKeizu.setWorktreePath).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.setWorktreePath).toHaveBeenCalledWith(worktreePath);
+    expect(gitKeizu.refresh).not.toHaveBeenCalled();
   });
 });
 

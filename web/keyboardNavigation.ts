@@ -41,7 +41,7 @@ export type FocusKey =
       readonly kind: "cleanup";
       readonly repo: string;
       readonly branch: string;
-      readonly action: "show" | "delete";
+      readonly action: "show" | "createWorktree" | "delete";
     }
   | { readonly kind: "control"; readonly id: string };
 

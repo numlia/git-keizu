@@ -43,6 +43,7 @@
   "config.dialog.stashUncommittedChanges.includeUntracked.description": "Default state of \"Include Untracked\" checkbox in the Stash Uncommitted Changes dialog.",
   "config.dialog.createWorktree.openTerminal.description": "Default state of \"Open Terminal\" checkbox in the Create Worktree dialog.",
   "config.dialog.removeWorktree.deleteBranch.description": "Default state of \"Also delete branch\" checkbox in the Remove Worktree dialog.",
+  "config.worktreePathTemplate.description": "Suggested path for a new worktree. ${repoPath} is the main worktree's absolute path, including when this graph is a linked worktree, ${repoName} is that directory's name, and ${branch} is the branch as a single directory, with slashes flattened to hyphens. A leading ~ expands to the home directory. A relative value resolves against the main worktree. Unknown placeholders are left as written. A blank value uses the default, which places the worktree beside the main worktree.",
   "config.repository.commits.order.enum.date": "Sort commits by committer date (timestamp descending, parents always after children)",
   "config.repository.commits.order.enum.topo": "Sort commits topologically (commits on the same branch appear consecutively)",
   "config.repository.commits.order.enum.authorDate": "Sort commits by author date (author timestamp descending, parents always after children)",

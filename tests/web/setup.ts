@@ -66,6 +66,7 @@ vi.stubGlobal("webviewMessages", {
   "cleanup.error": "Unable to load branch information",
   "cleanup.empty": "No local branches",
   "cleanup.action.show": "Show in Graph",
+  "cleanup.action.createWorktree": "Create Worktree...",
   "cleanup.action.delete": "Delete...",
   "context.copyCommitHash": "Copy Commit Hash to Clipboard",
   "context.copyToClipboard": "Copy {0} to Clipboard",

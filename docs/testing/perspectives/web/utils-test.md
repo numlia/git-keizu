@@ -54,8 +54,9 @@
 
 > Origin: Feature 024 (worktree-path-normalize) (aidd-spec-tasks-test)
 > Added: 2026-03-27
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Create Worktree now suggests paths with `sanitizeBranchForPath` in `src/worktreePath.ts` (`tests/src/worktreePath.test.ts`). `sanitizeBranchNameForPath` has been removed.
 
 **シグネチャ**: `sanitizeBranchNameForPath(branchName: string): string`
 **テスト対象パス**: `web/utils.ts`

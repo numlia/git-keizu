@@ -96,6 +96,7 @@
   "cleanup.error": "ブランチ情報を取得できません",
   "cleanup.empty": "ローカルブランチがありません",
   "cleanup.action.show": "グラフで表示",
+  "cleanup.action.createWorktree": "ワークツリーを作成...",
   "cleanup.action.delete": "削除...",
   "dialog.yes": "はい",
   "dialog.no": "いいえ",

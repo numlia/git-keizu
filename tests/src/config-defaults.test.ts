@@ -100,7 +100,8 @@ describe("Config fallback defaults vs package.json", () => {
         "TC-065",
         "dialog.removeWorktree.deleteBranch",
         (c) => c.dialogDefaults().removeWorktree.deleteBranch
-      ]
+      ],
+      ["worktreePathTemplate", "worktreePathTemplate", (c) => c.worktreePathTemplate()]
     ];
 
     it.each(settings)("%s: %s fallback matches package.json default", (_tcId, key, getValue) => {
