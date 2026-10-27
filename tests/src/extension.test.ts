@@ -1128,7 +1128,10 @@ describe("extension", () => {
         expect(mocks.notifyShowRecentActionsChanged).not.toHaveBeenCalled();
       });
 
-      it("notifies the open panel when worktreePathTemplate changes", async () => {
+      // S11: Configuration change for worktreePathTemplate
+      // @see docs/testing/perspectives/src/extension-test.md
+      it("TC-040: notifies the open panel when worktreePathTemplate changes", async () => {
+        // Case: TC-040
         await activateExtension();
         const configHandler = getConfigurationChangeHandler();
         mocks.gitKeizuViewModule.GitKeizuView.currentPanel = {
