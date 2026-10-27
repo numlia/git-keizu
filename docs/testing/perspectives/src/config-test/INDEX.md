@@ -1,20 +1,20 @@
-# テスト観点表マニフェスト: src/config.ts
+# Test Perspectives Manifest: src/config.ts
 
 > Source: `src/config.ts`
 > Storage Mode: sharded
-> Generated: 2026-09-12T00:00:00Z
+> Generated: 2026-10-27T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 5
-> Total Sections: 19
-> Total Cases: 98
+> Total Sections: 20
+> Total Cases: 101
 
 ## Shards
 
 | Shard File                           | Responsibility              | Sections | Cases | Last Updated |
 | ------------------------------------ | --------------------------- | -------- | ----- | ------------ |
 | 01-existing-settings-01.md           | existing-settings           | 9        | 41    | 2026-07-19   |
-| 02-defaults-schema-01.md             | defaults-schema             | 6        | 41    | 2026-09-12   |
+| 02-defaults-schema-01.md             | defaults-schema             | 7        | 44    | 2026-10-27   |
 | 03-feature-040-settings-polish-01.md | feature-040-load-and-rgba   | 1        | 6     | 2026-07-19   |
 | 04-feature-045-defensive-fixes-01.md | feature-045-defensive-fixes | 2        | 9     | 2026-07-19   |
 | 05-feature-056-retain-context-01.md  | feature-056-retain-context  | 1        | 1     | 2026-09-12   |
@@ -35,3 +35,4 @@
 | Feature 045 (defensive-fixes) (light-spec-plan)                       | 04-feature-045-defensive-fixes-01.md |
 | Feature 056 (retain-context-when-hidden) issue #48                    | 05-feature-056-retain-context-01.md  |
 | Feature 057 (multi-repo-single-folder-workspace) issue #49            | 02-defaults-schema-01.md             |
+| Feature 062-01 (PR #114 follow-up)                                    | 02-defaults-schema-01.md             |

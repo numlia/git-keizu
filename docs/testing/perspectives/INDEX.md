@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-10-28T00:53:35+09:00
-> Total sources: 58
-> Total physical files: 104
-> Total sections: 618
-> Total cases: 3721
+> Auto-generated: 2026-10-28T01:15:12+09:00
+> Total sources: 59
+> Total physical files: 105
+> Total sections: 623
+> Total cases: 3759
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -23,11 +23,11 @@
 | `src/avatarManager.ts` | single-file | `src/avatarManager-test.md` | 1 | 25 | 101 | 2026-07-19 |
 | `src/branchCleanup.ts` | single-file | `src/branchCleanup-test.md` | 1 | 5 | 43 | 2026-08-25 |
 | `src/config.ts` | single-file | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md` | 1 | 14 | 79 | 2026-05-02 |
-| `src/config.ts` | sharded | `src/config-test/INDEX.md` | 5 | 19 | 98 | 2026-09-12 |
+| `src/config.ts` | sharded | `src/config-test/INDEX.md` | 5 | 20 | 101 | 2026-10-27 |
 | `src/dataSource.ts` | single-file | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md` | 1 | 25 | 149 | 2026-04-04 |
 | `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 9 | 46 | 325 | 2026-10-28 |
 | `src/diffDocProvider.ts` | single-file | `src/diffDocProvider-test.md` | 1 | 7 | 33 | 2026-07-04 |
-| `src/extension.ts` | single-file | `src/extension-test.md` | 1 | 9 | 32 | 2026-09-12 |
+| `src/extension.ts` | single-file | `src/extension-test.md` | 1 | 10 | 33 | 2026-10-27 |
 | `src/extensionState.ts` | single-file | `src/extensionState-test.md` | 1 | 14 | 42 | 2026-07-04 |
 | `src/fileHistory.ts` | single-file | `src/fileHistory-test.md` | 1 | 9 | 87 | 2026-10-28 |
 | `src/gitExecutable.ts` | single-file | `src/gitExecutable-test.md` | 1 | 1 | 6 | 2026-07-19 |
@@ -41,6 +41,7 @@
 | `src/types.ts` | single-file | `src/types-test.md` | 1 | 8 | 93 | 2026-09-13 |
 | `src/utils.ts` | single-file | `src/utils-test.md` | 1 | 6 | 26 | 2026-08-08 |
 | `src/worktree.ts` | single-file | `src/worktree-test.md` | 1 | 1 | 17 | 2026-08-08 |
+| `src/worktreePath.ts` | single-file | `src/worktreePath-test.md` | 1 | 3 | 34 | 2026-10-27 |
 | `web/branchCleanupPanel.ts` | single-file | `web/branchCleanupPanel-test.md` | 1 | 6 | 51 | 2026-10-07 |
 | `web/branchLabels.ts` | single-file | `web/branchLabels-test.md` | 1 | 1 | 17 | 2026-03-21 |
 | `web/commitMenu.ts` | single-file | `web/commitMenu-test.md` | 1 | 12 | 53 | 2026-10-03 |
@@ -153,6 +154,7 @@
 | Feature 061-05 (light-spec-plan) review fix | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md` |
 | Feature 061-05 (light-spec-plan) user follow-up | `web/main-test/INDEX.md` |
 | Feature 061-06 (light-spec-plan) | `web/main-test/INDEX.md`, `web/refOverflow-test.md` |
+| Feature 062-01 (PR #114 follow-up) | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/worktreePath-test.md` |
 | K2 demo-repository-config (light-spec-plan) | `scripts/readme-media/make-demo-repo-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |

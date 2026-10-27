@@ -305,6 +305,43 @@ describe("showRecentActions", () => {
   });
 });
 
+// S22: worktreePathTemplate() suggested worktree path template
+// @see docs/testing/perspectives/src/config-test/02-defaults-schema-01.md
+describe("worktreePathTemplate", () => {
+  beforeEach(() => {
+    mockGet.mockReset();
+  });
+
+  it("returns the sibling-directory template by default (TC-372)", () => {
+    // Case: TC-372
+    // Given: default configuration
+    mockGet.mockImplementation((_key: string, defaultValue: unknown) => defaultValue);
+
+    // When: reading worktreePathTemplate
+    const result = getConfig().worktreePathTemplate();
+
+    // Then: returns the concrete default template
+    expect(result).toBe(`${"$"}{repoPath}/../${"$"}{repoName}-${"$"}{branch}`);
+  });
+
+  it("returns an explicit template, including an empty one, as written (TC-373)", () => {
+    // Case: TC-373
+    // Given: worktreePathTemplate is set explicitly
+    const templates = [`~/.worktrees/${"$"}{repoName}/${"$"}{branch}`, ""];
+    for (const template of templates) {
+      mockGet.mockImplementation((key: string, defaultValue: unknown) =>
+        key === "worktreePathTemplate" ? template : defaultValue
+      );
+
+      // When: reading worktreePathTemplate
+      const result = getConfig().worktreePathTemplate();
+
+      // Then: the value is passed through; a blank one falls back later in the resolver
+      expect(result).toBe(template);
+    }
+  });
+});
+
 // S5: muteCommitsMergeCommits() マージコミット mute 設定
 describe("muteCommitsMergeCommits", () => {
   beforeEach(() => {
