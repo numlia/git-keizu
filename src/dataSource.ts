@@ -1136,13 +1136,13 @@ export class DataSource {
   }
 
   /**
-   * Run the lineage query, then for each rename it follows one lineage query
-   * on the old path whose groups after the rename replace the earlier ones.
+   * Run the lineage query, then for each rename it follows a lineage query on
+   * the old path whose groups after the rename replace the earlier ones.
    * Since Git 2.56, `--follow` keeps one path per commit and a commit reached
    * from two history lines takes the path of the line walked last, so the
    * history before a rename can be dropped; the continuation query recovers
    * it on every Git version. Each rename lies further along the shared walk,
-   * so the loop ends after one query per rename.
+   * so the loop ends after at most two queries per rename.
    */
   private async queryFileHistoryLineage(
     repo: string,
@@ -1159,13 +1159,33 @@ export class DataSource {
       if (lineage === null) return null;
       const rename = findLineageRename(lineage, followedRenames);
       if (rename === null) return lineage;
+      groups = await this.continueFileHistoryLineage(repo, anchorHash, groups, rename);
+      followedRenames++;
+    }
+    return null;
+  }
+
+  /**
+   * Query the lineage of the rename's old path from the anchor and splice it
+   * after the rename commit. When a later commit renamed another file onto
+   * the old path, `--follow` from the anchor tracks that file and never
+   * reaches the rename, so the query is repeated from the rename commit,
+   * whose ancestors only hold the renamed file at the old path.
+   */
+  private async continueFileHistoryLineage(
+    repo: string,
+    anchorHash: string,
+    groups: readonly FileHistoryRecordGroup[],
+    rename: FileHistoryEntry
+  ): Promise<FileHistoryRecordGroup[] | null> {
+    for (const startHash of [anchorHash, rename.hash]) {
       const continuation = await this.queryFileHistoryRecords(
-        buildLineageQueryArgs(anchorHash, rename.oldFilePath),
+        buildLineageQueryArgs(startHash, rename.oldFilePath),
         repo
       );
-      groups =
-        continuation === null ? null : spliceLineageContinuation(groups, rename.hash, continuation);
-      followedRenames++;
+      if (continuation === null) return null;
+      const spliced = spliceLineageContinuation(groups, rename, continuation);
+      if (spliced !== null) return spliced;
     }
     return null;
   }

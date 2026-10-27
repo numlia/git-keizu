@@ -293,16 +293,21 @@ export function findLineageRename(lineage: LineageResult, index: number): FileHi
  * after it. `--follow` disables pruning, so every lineage query from the same
  * anchor walks the same `--topo-order` commit list, and the rename commit (a
  * `D` of the old path) marks the same position in both. Returns null when
- * either list lacks the rename commit.
+ * either list lacks the rename commit, or when the continuation reaches it
+ * without the old path because it was tracking another file there.
  */
 export function spliceLineageContinuation(
   groups: readonly FileHistoryRecordGroup[],
-  renameHash: string,
+  rename: FileHistoryEntry,
   continuationGroups: readonly FileHistoryRecordGroup[]
 ): FileHistoryRecordGroup[] | null {
-  const renameIndex = groups.findIndex((group) => group.hash === renameHash);
-  const continuationIndex = continuationGroups.findIndex((group) => group.hash === renameHash);
+  const renameIndex = groups.findIndex((group) => group.hash === rename.hash);
+  const continuationIndex = continuationGroups.findIndex((group) => group.hash === rename.hash);
   if (renameIndex < 0 || continuationIndex < 0) return null;
+  const tracksOldPath = continuationGroups[continuationIndex].records.some((record) =>
+    record.entries.some((entry) => entry.newPath === rename.oldFilePath)
+  );
+  if (!tracksOldPath) return null;
   return [...groups.slice(0, renameIndex + 1), ...continuationGroups.slice(continuationIndex + 1)];
 }
 

@@ -1236,6 +1236,33 @@ describe("getFileHistory against real repositories (S50)", () => {
         E("base: add oldest file", "A", false, OLDEST)
       ]);
     });
+
+    it("follows the renamed file when a later rename reuses its old path (TC-807)", async () => {
+      // Case: TC-807
+      // Given: base legacy + other -> edit legacy -> rename legacy -> current
+      //        -> rename other -> legacy -> fix current
+      const OTHER = "src/other-name.txt";
+      const repo = await initFixture("reused-old-path");
+      await repo.write(LEG, numberedLines("legacy", 4));
+      await repo.write(OTHER, numberedLines("other", 4));
+      await repo.commitAll("base: add legacy and other");
+      await repo.append(LEG, "edit");
+      await repo.commitAll("feat: update legacy file");
+      repo.git(["mv", LEG, CUR]);
+      await repo.commitAll("refactor: rename legacy to current");
+      repo.git(["mv", OTHER, LEG]);
+      await repo.commitAll("refactor: rename other to legacy");
+      await repo.append(CUR, "fix");
+      await repo.commitAll("fix: update current file");
+
+      // When/Then: the legacy-path history is the renamed file's, not the other file's
+      await expectHistory(repo, "fix: update current file", CUR, [
+        E("fix: update current file", "M", false, CUR),
+        E("refactor: rename legacy to current", "R", false, CUR),
+        E("feat: update legacy file", "M", false, LEG),
+        E("base: add legacy and other", "A", false, LEG)
+      ]);
+    });
   });
 
   it("does not return a merge that never touches the historical paths (TC-355)", async () => {

@@ -6464,22 +6464,78 @@ describe("getFileHistory spawn orchestration (S49)", () => {
       expect(spawnArgs(1)).toEqual(buildLineageQueryArgs(ANCHOR, LEG));
     });
 
-    it("returns null after two spawns when the continuation lacks the rename commit (TC-796)", async () => {
+    it("returns null when neither continuation includes the rename commit (TC-796)", async () => {
       // Case: TC-796
-      // Given: a continuation whose groups do not include the rename commit
+      // Given: continuations from the anchor and from the rename commit without the rename commit
       const continuation = [
         fileHistoryRecord(similar.updLeg, [similar.base], ["M", LEG]),
         fileHistoryRecord(similar.base, [], ["A", LEG])
       ].join("");
-      installSpawnSequence([{ stdout: truncatedLineage }, { stdout: continuation }]);
+      installSpawnSequence([
+        { stdout: truncatedLineage },
+        { stdout: continuation },
+        { stdout: continuation }
+      ]);
 
       // When: the history is requested
       const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
 
       // Then: null rather than a lineage spliced at an unknown position
       expect(result).toBeNull();
-      expect(spawnMock).toHaveBeenCalledTimes(2);
+      expect(spawnMock).toHaveBeenCalledTimes(3);
       expect(spawnArgs(1)).toEqual(buildLineageQueryArgs(ANCHOR, LEG));
+      expect(spawnArgs(2)).toEqual(buildLineageQueryArgs(similar.ren, LEG));
+    });
+
+    /** The anchor continuation follows another file renamed onto the legacy path later. */
+    const reusedPathContinuation = [
+      fileHistoryRecord(ANCHOR, [similar.mergeHash], ["R100", "src/other.txt", LEG]),
+      fileHistoryRecord(similar.ren, [similar.updLeg], ["M", "src/other.txt"]),
+      fileHistoryRecord(similar.updLeg, [similar.base], ["M", "src/other.txt"])
+    ].join("");
+
+    it("retries the continuation from the rename commit when the old path was reused (TC-805)", async () => {
+      // Case: TC-805
+      // Given: the anchor continuation reaches the rename commit on another file's path
+      installSpawnSequence([
+        { stdout: truncatedLineage },
+        { stdout: reusedPathContinuation },
+        { stdout: similarContinuation },
+        { stdout: similarMerge }
+      ]);
+
+      // When: the history is requested
+      const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+      // Then: the third spawn starts at the rename commit and the legacy entries are recovered
+      expect(spawnMock).toHaveBeenCalledTimes(4);
+      expect(spawnArgs(2)).toEqual(buildLineageQueryArgs(similar.ren, LEG));
+      expect(result!.map((e) => [e.hash, e.type, e.historicalPath])).toEqual([
+        [ANCHOR, "M", CUR],
+        [similar.upd, "M", CUR],
+        [similar.ren, "R", CUR],
+        [similar.updLeg, "M", LEG],
+        [similar.base, "A", LEG],
+        [similar.mergeHash, "R", CUR]
+      ]);
+    });
+
+    it("returns null when the continuation from the rename commit fails (TC-806)", async () => {
+      // Case: TC-806
+      // Given: a reused old path and exit 1 for the retry from the rename commit
+      installSpawnSequence([
+        { stdout: truncatedLineage },
+        { stdout: reusedPathContinuation },
+        { stdout: "", exitCode: 1 }
+      ]);
+
+      // When: the history is requested
+      const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+      // Then: null after the retry, and the merge query never runs
+      expect(result).toBeNull();
+      expect(spawnMock).toHaveBeenCalledTimes(3);
+      expect(spawnArgs(2)).toEqual(buildLineageQueryArgs(similar.ren, LEG));
     });
   });
 });

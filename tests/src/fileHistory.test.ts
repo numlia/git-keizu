@@ -1496,6 +1496,9 @@ describe("findLineageRename / spliceLineageContinuation (S9)", () => {
   const upd = H(0x93);
   const base = H(0x92);
 
+  const rename1 = fileEntry(ren1, "R", CUR, { oldFilePath: LEG });
+  const rename2 = fileEntry(ren2, "R", LEG, { oldFilePath: OLDEST });
+
   /** The groups walked so far: anchor, rename, and a group past it that the splice drops. */
   function walkedGroups(): FileHistoryRecordGroup[] {
     return [
@@ -1556,7 +1559,7 @@ describe("findLineageRename / spliceLineageContinuation (S9)", () => {
     const continuationBefore = structuredClone(continuation);
 
     // When: the continuation is spliced at ren1
-    const result = spliceLineageContinuation(groups, ren1, continuation);
+    const result = spliceLineageContinuation(groups, rename1, continuation);
 
     // Then: fix and ren1 from the walk, then upd and base from the continuation; inputs unchanged
     expect(result).toEqual([groups[0], groups[1], continuation[2], continuation[3]]);
@@ -1571,7 +1574,7 @@ describe("findLineageRename / spliceLineageContinuation (S9)", () => {
     const continuation = [group(ren1, [upd], [entryOf("D", LEG)])];
 
     // When: the continuation is spliced at ren1
-    const result = spliceLineageContinuation(groups, ren1, continuation);
+    const result = spliceLineageContinuation(groups, rename1, continuation);
 
     // Then: fix and ren1 only
     expect(result).toEqual([groups[0], groups[1]]);
@@ -1584,8 +1587,8 @@ describe("findLineageRename / spliceLineageContinuation (S9)", () => {
     const continuation = [group(upd, [base], [entryOf("M", LEG)])];
 
     // When / Then: both splices are null
-    expect(spliceLineageContinuation(groups, ren1, continuation)).toBeNull();
-    expect(spliceLineageContinuation(groups, ren1, [])).toBeNull();
+    expect(spliceLineageContinuation(groups, rename1, continuation)).toBeNull();
+    expect(spliceLineageContinuation(groups, rename1, [])).toBeNull();
   });
 
   it("returns null when the walked groups lack the rename commit (TC-802)", () => {
@@ -1594,6 +1597,20 @@ describe("findLineageRename / spliceLineageContinuation (S9)", () => {
     const continuation = [group(ren2, [base], [entryOf("D", LEG)])];
 
     // When / Then: the splice is null
-    expect(spliceLineageContinuation(walkedGroups(), ren2, continuation)).toBeNull();
+    expect(spliceLineageContinuation(walkedGroups(), rename2, continuation)).toBeNull();
+  });
+
+  it("returns null when the continuation reaches the rename commit on another path (TC-804)", () => {
+    // Case: TC-804
+    // Given: a continuation that tracked another file onto the legacy path, so ren1 shows
+    //        that file's path instead of D legacy
+    const continuation = [
+      group(fix, [ren1], [entryOf("R", OTHER, LEG)]),
+      group(ren1, [upd], [entryOf("M", OTHER)]),
+      group(upd, [base], [entryOf("M", OTHER)])
+    ];
+
+    // When / Then: the splice is null so the caller can retry from the rename commit
+    expect(spliceLineageContinuation(walkedGroups(), rename1, continuation)).toBeNull();
   });
 });
