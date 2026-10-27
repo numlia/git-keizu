@@ -243,6 +243,7 @@ The Create Worktree dialog fills its Path input from `viewState.worktreePath` (t
 | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------- |
 | TC-133  | `repo = "/test/repo"`, `refName = "feature/x"`, template `~/.worktrees/${repoName}/${branch}`                                                                                                | Normal - template from viewState                                           | Path default is `/home/dev/.worktrees/repo/feature-x`                       | -                                           |
 | TC-134  | `repo` is the linked worktree `/test/repo/.worktrees/feat-slot-candidate-band`, `mainWorktreePaths` maps it to `/test/repo`, `refName = "main"`, template `${repoPath}/.worktrees/${branch}` | Normal - linked worktree uses the main worktree                            | Path default is `/test/repo/.worktrees/main`, not under the linked worktree | Deliberate difference from Better Worktrees |
+| TC-135  | `repo = "/test/repo"`, `mainWorktreePaths` maps it to `""`, `refName = "feature/x"`, template `${repoPath}/.worktrees/${branch}`                                                             | Boundary - empty main worktree recorded                                    | Path default is `/test/repo/.worktrees/feature-x` (the open repository)     | -                                           |
 
 ### Failure-source inventory (include-or-justify) — S27
 
@@ -250,6 +251,7 @@ The Create Worktree dialog fills its Path input from `viewState.worktreePath` (t
 | --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | Setting ignored (default template used)                   | TC-133                                                                                                         |
 | `${repoPath}` taken from the linked worktree that is open | TC-134                                                                                                         |
+| Empty main worktree recorded for the repository           | TC-135                                                                                                         |
 | No main worktree recorded for the repository              | excluded (`web/main-test/05-state-response-02.md` S86 TC-787 records the open checkout itself as the fallback) |
 | Template expansion rules                                  | excluded (`src/worktreePath-test.md` S1 to S3)                                                                 |
 | Create Worktree Here (commit menu)                        | excluded (`web/commitMenu-test.md` S4 TC-024 / TC-027 and S6 follow the resolved default template)             |
@@ -257,4 +259,4 @@ The Create Worktree dialog fills its Path input from `viewState.worktreePath` (t
 
 ### Test mapping — S27
 
-`tests/web/refMenu.test.ts` describe `buildRefContextMenuItems worktree menu items (S23)`: TC-133 `uses worktreePathTemplate from viewState for the suggested path (TC-133)`, TC-134 `uses the main worktree as repoPath when the graph is a linked worktree (TC-134)`.
+`tests/web/refMenu.test.ts` describe `buildRefContextMenuItems worktree menu items (S23)`: TC-133 `uses worktreePathTemplate from viewState for the suggested path (TC-133)`, TC-134 `uses the main worktree as repoPath when the graph is a linked worktree (TC-134)`, TC-135 `falls back to the open repository when its recorded main worktree is empty (TC-135)`.

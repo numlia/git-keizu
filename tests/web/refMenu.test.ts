@@ -959,6 +959,44 @@ describe("buildRefContextMenuItems worktree menu items (S23)", () => {
     expect(pathInput.default).toBe("/test/repo/.worktrees/main");
   });
 
+  it("falls back to the open repository when its recorded main worktree is empty (TC-135)", () => {
+    // Case: TC-135
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      },
+      worktreePath: {
+        template: `${"$"}{repoPath}/.worktrees/${"$"}{branch}`,
+        homeDir: "/home/dev",
+        platform: "posix"
+      },
+      mainWorktreePaths: {
+        [REPO]: ""
+      }
+    };
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      null
+    );
+
+    const createItem = findMenuItem(menu, "Create Worktree&#8230;");
+    createItem!.onClick();
+
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const pathInput = inputs[0] as DialogTextInput;
+    expect(pathInput.default).toBe("/test/repo/.worktrees/feature-x");
+  });
+
   it("Open Terminal Here sends openTerminal message (TC-114)", () => {
     // Case: TC-114
     // Given: A local branch with worktree info

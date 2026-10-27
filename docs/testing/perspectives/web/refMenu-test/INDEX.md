@@ -7,14 +7,14 @@
 > Test Framework: Vitest
 > Total Shards: 3
 > Total Sections: 21
-> Total Cases: 104
+> Total Cases: 105
 
 ## Shards
 
 | Shard File                           | Responsibility              | Sections | Cases | Last Updated |
 | ------------------------------------ | --------------------------- | -------- | ----- | ------------ |
 | 01-branch-actions-01.md              | branch-actions              | 10       | 50    | 2026-08-25   |
-| 02-worktree-actions-01.md            | worktree-actions            | 6        | 25    | 2026-10-27   |
+| 02-worktree-actions-01.md            | worktree-actions            | 6        | 26    | 2026-10-27   |
 | 03-context-menu-recent-actions-01.md | context-menu-recent-actions | 5        | 29    | 2026-10-03   |
 
 ## Origin Coverage
