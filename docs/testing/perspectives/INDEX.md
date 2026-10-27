@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-10-17T08:29:57+09:00
+> Auto-generated: 2026-10-28T00:26:46+09:00
 > Total sources: 58
 > Total physical files: 104
-> Total sections: 616
-> Total cases: 3715
+> Total sections: 618
+> Total cases: 3717
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -25,11 +25,11 @@
 | `src/config.ts` | single-file | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md` | 1 | 14 | 79 | 2026-05-02 |
 | `src/config.ts` | sharded | `src/config-test/INDEX.md` | 5 | 19 | 98 | 2026-09-12 |
 | `src/dataSource.ts` | single-file | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md` | 1 | 25 | 149 | 2026-04-04 |
-| `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 9 | 44 | 315 | 2026-09-13 |
+| `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 9 | 46 | 322 | 2026-10-28 |
 | `src/diffDocProvider.ts` | single-file | `src/diffDocProvider-test.md` | 1 | 7 | 33 | 2026-07-04 |
 | `src/extension.ts` | single-file | `src/extension-test.md` | 1 | 9 | 32 | 2026-09-12 |
 | `src/extensionState.ts` | single-file | `src/extensionState-test.md` | 1 | 14 | 42 | 2026-07-04 |
-| `src/fileHistory.ts` | single-file | `src/fileHistory-test.md` | 1 | 8 | 80 | 2026-09-08 |
+| `src/fileHistory.ts` | single-file | `src/fileHistory-test.md` | 1 | 9 | 86 | 2026-10-28 |
 | `src/gitExecutable.ts` | single-file | `src/gitExecutable-test.md` | 1 | 1 | 6 | 2026-07-19 |
 | `src/gitGraphView.ts` | single-file | `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md` | 1 | 17 | 60 | 2026-03-20 |
 | `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 11 | 37 | 181 | 2026-10-07 |
@@ -66,13 +66,14 @@
 | `web/refOverflow.ts` | single-file | `web/refOverflow-test.md` | 1 | 5 | 85 | 2026-10-17 |
 | `web/stashMenu.ts` | single-file | `web/stashMenu-test.md` | 1 | 8 | 30 | 2026-04-30 |
 | `web/uncommittedMenu.ts` | single-file | `web/uncommittedMenu-test.md` | 1 | 1 | 3 | 2026-03-09 |
-| `web/utils.ts` | single-file | `web/utils-test.md` | 1 | 5 | 31 | 2026-08-08 |
+| `web/utils.ts` | single-file | `web/utils-test.md` | 1 | 4 | 20 | 2026-08-08 |
 | `web/worktreeMenu.ts` | single-file | `web/worktreeMenu-test.md` | 1 | 1 | 21 | 2026-09-29 |
 
 ## Feature/Issue -> Perspectives (Reverse Lookup)
 
 | Feature / Issue | Perspectives Entries |
 |-----------------|----------------------|
+| Bug fix (git-2-56-follow-lineage) | `src/dataSource-test/INDEX.md`, `src/fileHistory-test.md` |
 | Feature 001 (menu-bar-enhancement) Task 1.2 | `src/types-test.md`, `web/utils-test.md` |
 | Feature 001 (menu-bar-enhancement) Task 3.2 | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md`, `src/dataSource-test/INDEX.md` |
 | Feature 001 (menu-bar-enhancement) Task 3.4 | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md`, `web/graph-test.md`, `web/main-test/INDEX.md` |
@@ -106,7 +107,7 @@
 | Feature 020 (legacy-branding-cleanup) (aidd-spec-tasks-test) | `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md`, `src/gitGraphView-test/INDEX.md` |
 | Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test) | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md`, `src/config-test/INDEX.md` |
 | Feature 023 (worktree-dialog-defaults) (aidd-spec-tasks-test) | `web/commitMenu-test.md` |
-| Feature 024 (worktree-path-normalize) (aidd-spec-tasks-test) | `web/commitMenu-test.md`, `web/utils-test.md` |
+| Feature 024 (worktree-path-normalize) (aidd-spec-tasks-test) | `web/commitMenu-test.md` |
 | Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test) | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md`, `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md`, `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md`, `src/config-test/INDEX.md`, `src/utils-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
 | Feature 027 (commit-file-context-menu) (aidd-spec-tasks-test) | `web/fileMenu-test.md` |
 | Feature 032 (context-menu-reorg) Task 7 | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, `web/commitMenu-test.md`, `web/contextMenu-test.md`, `web/refMenu-test/INDEX.md`, `web/stashMenu-test.md` |

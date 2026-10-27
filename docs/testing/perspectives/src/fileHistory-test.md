@@ -237,3 +237,48 @@ lineage と merge の entry を連結し、有効候補（historical path が re
 - Normal: TC-001、TC-002、TC-010、TC-012〜TC-014、TC-016、TC-017、TC-019、TC-020、TC-022、TC-037〜TC-040、TC-043、TC-045、TC-049〜TC-052、TC-055、TC-057、TC-059、TC-060、TC-062、TC-066〜TC-068、TC-071、TC-075〜TC-077、TC-079
 
 **失敗系/正常系比（煙感知器）**: 正常系35件、失敗系45件。parser と規則の正常分岐（layout・rename 遷移・merge 畳み込み・fixture 合成）が多いため比は 1.3 倍に留まるが、失敗源は上表で列挙済みで、インベントリ欠落ではないことを再導出で確認した。比率合わせのためのケース追加・削除は行わない。
+
+## S9: findLineageRename() / spliceLineageContinuation() lineage continuation
+
+> Origin: Bug fix (git-2-56-follow-lineage)
+> Added: 2026-10-28
+> Status: active
+> Supersedes: -
+> Signature: `export function findLineageRename(lineage: LineageResult, index: number): FileHistoryEntry | null` / `export function spliceLineageContinuation(groups: readonly FileHistoryRecordGroup[], renameHash: string, continuationGroups: readonly FileHistoryRecordGroup[]): FileHistoryRecordGroup[] | null`
+> Target Path: `src/fileHistory.ts` (right after `applyLineageRules()`)
+> Test File: `tests/src/fileHistory.test.ts`
+
+Perspectives for the two pure functions behind the lineage continuation: picking the next rename to follow, and splicing the lineage query on the old path after the rename commit. Every lineage query from the same anchor walks the same unpruned `--topo-order` commit list, so the rename commit marks the same position in both lists. Spawn order and Git failures are the responsibility of `src/dataSource-test/07-file-history-01.md` S52.
+
+| Case ID | Input / Precondition                                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                         | Notes                                      |
+| ------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| TC-797  | Lineage `M`, `R` (old legacy), `M`, `R` (old oldest); index 0 and 1               | Normal - renames in lineage order                                          | Index 0 returns the 1st `R` entry and index 1 the 2nd, whose `oldFilePath` is `"src/oldest-name.txt"`                                   | Non-rename entries are skipped             |
+| TC-798  | Index 1 on a lineage with one rename; index 0 on a lineage without one            | Boundary - no rename left                                                  | Both return `null`                                                                                                                      | Ends the continuation loop                 |
+| TC-799  | Walked groups `fix`, `ren1`, unrelated; continuation `fix`, `ren1`, `upd`, `base` | Normal - splice position                                                   | `[fix, ren1]` from the walk followed by `[upd, base]` from the continuation; neither input array changes (`structuredClone` comparison) | Walked groups after the rename are dropped |
+| TC-800  | Continuation whose last group is the rename commit                                | Boundary - nothing after the rename                                        | `[fix, ren1]` only                                                                                                                      | Not `null`                                 |
+| TC-801  | Continuation without the rename commit; empty continuation                        | Validation - rename missing in the continuation                            | Both return `null`                                                                                                                      | No splice at an unknown position           |
+| TC-802  | Rename hash not among the walked groups                                           | Validation - rename missing in the walk                                    | `null`                                                                                                                                  | -                                          |
+
+### Failure source inventory (include-or-justify) — Bug fix git-2-56-follow-lineage (S9)
+
+| Failure source                                                    | Covering cases or exclusion reason                                                                                                                                                     |
+| ----------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Wrong rename picked (order, non-rename entries)                   | TC-797                                                                                                                                                                                 |
+| Loop does not end once every rename is followed                   | TC-798                                                                                                                                                                                 |
+| Splice keeps stale walked groups or the continuation's own prefix | TC-799                                                                                                                                                                                 |
+| Splice at an unknown position                                     | TC-801, TC-802                                                                                                                                                                         |
+| Input arrays mutated                                              | TC-799                                                                                                                                                                                 |
+| Boundary values (0 / minimum / maximum / +/-1 / empty / NULL)     | Empty continuation: TC-801. Nothing after the rename: TC-800. No rename left: TC-798. maximum / +/-1: excluded (no numeric threshold; the index only grows by one per followed rename) |
+| External dependency × failure mode                                | excluded (pure functions without `child_process` / `vscode`. Git failures are the responsibility of S52)                                                                               |
+| Exceptions / error paths                                          | excluded (both functions return `null` instead of throwing, fixed by TC-798, TC-801 and TC-802)                                                                                        |
+
+**Failure category coverage (diversity floor)**:
+
+- Validation: TC-801, TC-802
+- Exception: excluded (no throw path, as above)
+- External: excluded (no external dependency, as above)
+- Boundary: TC-798, TC-800
+- Type: excluded (inputs are already parsed groups and entries; parse failures belong to S3)
+- Normal: TC-797, TC-799
+
+**Failure / normal ratio (smoke detector)**: 2 normal cases, 4 failure cases. The splice has two missing-commit branches and two boundary ends, which the inventory derives directly. No cases were added or removed to adjust the ratio.

@@ -6,8 +6,8 @@
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 9
-> Total Sections: 44
-> Total Cases: 315
+> Total Sections: 46
+> Total Cases: 322
 
 ## Shards
 
@@ -21,12 +21,13 @@
 | 04-spawn-refname-diff-01.md | spawn-refname-diff | 8        | 40    | 2026-07-19   |
 | 05-git-path-01.md           | git-path           | 1        | 3     | 2026-07-19   |
 | 06-branch-cleanup-01.md     | branch-cleanup     | 1        | 14    | 2026-08-25   |
-| 07-file-history-01.md       | file-history       | 2        | 37    | 2026-09-08   |
+| 07-file-history-01.md       | file-history       | 4        | 44    | 2026-10-28   |
 
 ## Origin Coverage
 
 | Origin                                                                 | Shard Files                                           |
 | ---------------------------------------------------------------------- | ----------------------------------------------------- |
+| Bug fix (git-2-56-follow-lineage)                                      | 07-file-history-01.md                                 |
 | Feature 001 (menu-bar-enhancement) Task 3.2                            | 01-history-diff-01.md                                 |
 | Feature 001 (menu-bar-enhancement) Task 4.2                            | 01-history-diff-01.md                                 |
 | Feature 001 (menu-bar-enhancement) Task 5.2                            | 01-history-diff-01.md                                 |
