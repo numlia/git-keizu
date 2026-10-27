@@ -7,7 +7,7 @@
 > Test Framework: Vitest
 > Total Shards: 9
 > Total Sections: 46
-> Total Cases: 322
+> Total Cases: 325
 
 ## Shards
 
@@ -21,7 +21,7 @@
 | 04-spawn-refname-diff-01.md | spawn-refname-diff | 8        | 40    | 2026-07-19   |
 | 05-git-path-01.md           | git-path           | 1        | 3     | 2026-07-19   |
 | 06-branch-cleanup-01.md     | branch-cleanup     | 1        | 14    | 2026-08-25   |
-| 07-file-history-01.md       | file-history       | 4        | 44    | 2026-10-28   |
+| 07-file-history-01.md       | file-history       | 4        | 47    | 2026-10-28   |
 
 ## Origin Coverage
 
