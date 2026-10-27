@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-10-27T21:15:38+09:00
+> Auto-generated: 2026-10-27T22:01:38+09:00
 > Total sources: 59
 > Total physical files: 105
-> Total sections: 625
-> Total cases: 3742
+> Total sections: 626
+> Total cases: 3757
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -23,7 +23,7 @@
 | `src/avatarManager.ts` | single-file | `src/avatarManager-test.md` | 1 | 25 | 101 | 2026-07-19 |
 | `src/branchCleanup.ts` | single-file | `src/branchCleanup-test.md` | 1 | 5 | 43 | 2026-08-25 |
 | `src/config.ts` | single-file | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md` | 1 | 14 | 79 | 2026-05-02 |
-| `src/config.ts` | sharded | `src/config-test/INDEX.md` | 5 | 19 | 98 | 2026-09-12 |
+| `src/config.ts` | sharded | `src/config-test/INDEX.md` | 5 | 20 | 101 | 2026-10-27 |
 | `src/dataSource.ts` | single-file | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md` | 1 | 25 | 149 | 2026-04-04 |
 | `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 9 | 44 | 315 | 2026-09-13 |
 | `src/diffDocProvider.ts` | single-file | `src/diffDocProvider-test.md` | 1 | 7 | 33 | 2026-07-04 |
@@ -41,7 +41,7 @@
 | `src/types.ts` | single-file | `src/types-test.md` | 1 | 8 | 93 | 2026-09-13 |
 | `src/utils.ts` | single-file | `src/utils-test.md` | 1 | 6 | 26 | 2026-08-08 |
 | `src/worktree.ts` | single-file | `src/worktree-test.md` | 1 | 1 | 17 | 2026-08-08 |
-| `src/worktreePath.ts` | single-file | `src/worktreePath-test.md` | 1 | 3 | 25 | 2026-10-27 |
+| `src/worktreePath.ts` | single-file | `src/worktreePath-test.md` | 1 | 3 | 34 | 2026-10-27 |
 | `web/branchCleanupPanel.ts` | single-file | `web/branchCleanupPanel-test.md` | 1 | 7 | 53 | 2026-10-27 |
 | `web/branchLabels.ts` | single-file | `web/branchLabels-test.md` | 1 | 1 | 17 | 2026-03-21 |
 | `web/commitMenu.ts` | single-file | `web/commitMenu-test.md` | 1 | 12 | 53 | 2026-10-03 |
@@ -57,13 +57,13 @@
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 3 | 11 | 2026-10-03 |
 | `web/keyboardNavigation.ts` | single-file | `web/keyboardNavigation-test.md` | 1 | 4 | 54 | 2026-10-07 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 19 | 63 | 455 | 2026-10-27 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 19 | 63 | 457 | 2026-10-27 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
 | `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 18 | 68 | 2026-10-27 |
 | `web/pathHighlight.ts` | single-file | `web/pathHighlight-test.md` | 1 | 3 | 21 | 2026-10-03 |
 | `web/pathHighlightController.ts` | single-file | `web/pathHighlightController-test.md` | 1 | 2 | 17 | 2026-10-07 |
 | `web/refMenu.ts` | single-file | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md` | 1 | 14 | 74 | 2026-07-19 |
-| `web/refMenu.ts` | sharded | `web/refMenu-test/INDEX.md` | 3 | 21 | 104 | 2026-10-27 |
+| `web/refMenu.ts` | sharded | `web/refMenu-test/INDEX.md` | 3 | 21 | 105 | 2026-10-27 |
 | `web/refOverflow.ts` | single-file | `web/refOverflow-test.md` | 1 | 5 | 85 | 2026-10-17 |
 | `web/stashMenu.ts` | single-file | `web/stashMenu-test.md` | 1 | 8 | 30 | 2026-04-30 |
 | `web/uncommittedMenu.ts` | single-file | `web/uncommittedMenu-test.md` | 1 | 1 | 3 | 2026-03-09 |
@@ -153,7 +153,7 @@
 | Feature 061-05 (light-spec-plan) review fix | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md` |
 | Feature 061-05 (light-spec-plan) user follow-up | `web/main-test/INDEX.md` |
 | Feature 061-06 (light-spec-plan) | `web/main-test/INDEX.md`, `web/refOverflow-test.md` |
-| Feature 062-01 (PR #114 follow-up) | `src/extension-test.md`, `src/gitGraphView-test/INDEX.md`, `src/worktreePath-test.md`, `web/branchCleanupPanel-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
+| Feature 062-01 (PR #114 follow-up) | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/gitGraphView-test/INDEX.md`, `src/worktreePath-test.md`, `web/branchCleanupPanel-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | K2 demo-repository-config (light-spec-plan) | `scripts/readme-media/make-demo-repo-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
