@@ -955,7 +955,10 @@ describe("handleMessage setShowRecentActions response (S9)", () => {
     expect(showErrorDialog).not.toHaveBeenCalled();
   });
 
-  it("routes a worktree path template update to gitKeizu.setWorktreePath", () => {
+  // S22: handleMessage() setWorktreePath routing
+  // @see docs/testing/perspectives/web/messageHandler-test/02-worktree-and-details-01.md
+  it("routes a worktree path template update to gitKeizu.setWorktreePath (TC-090)", () => {
+    // Case: TC-090
     const worktreePath = {
       template: `~/.worktrees/${"$"}{repoName}/${"$"}{branch}`,
       homeDir: "/home/dev",

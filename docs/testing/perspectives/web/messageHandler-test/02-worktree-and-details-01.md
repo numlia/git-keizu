@@ -1,4 +1,4 @@
-# テスト観点表: web/messageHandler.ts
+# Test Perspectives: web/messageHandler.ts
 
 > Source: `web/messageHandler.ts`
 > Generated: 2026-03-22T13:23:24Z
@@ -6,157 +6,157 @@
 > Test Framework: Vitest
 > Responsibility: worktree-and-details
 
-## S6: createWorktree/removeWorktree/openTerminal レスポンス処理
+## S6: Handling createWorktree/removeWorktree/openTerminal responses
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
-**テスト対象パス**: `web/messageHandler.ts`
+**Signature**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
+**Target path**: `web/messageHandler.ts`
 
-| Case ID | Input / Precondition                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                           | Notes            |
-| ------- | ------------------------------------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------- | ---------------- |
-| TC-015  | ResponseCreateWorktree: status = null            | Normal - success                                                           | refreshOrError が呼ばれ、グラフリフレッシュ               | REQ-3.1, REQ-3.2 |
-| TC-016  | ResponseCreateWorktree: status = "error message" | Exception - handled error                                                  | エラーダイアログ "Unable to Create Worktree" が表示される | -                |
-| TC-017  | ResponseRemoveWorktree: status = null            | Normal - success                                                           | refreshOrError が呼ばれ、グラフリフレッシュ               | REQ-4.1          |
-| TC-018  | ResponseRemoveWorktree: status = "error message" | Exception - handled error                                                  | エラーダイアログ "Unable to Remove Worktree" が表示される | -                |
-| TC-019  | ResponseOpenTerminal                             | Normal - standard                                                          | ノーオペレーション（エラーなく処理完了）                  | REQ-9.1          |
+| Case ID | Input / Precondition                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                       | Notes            |
+| ------- | ------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------- | ---------------- |
+| TC-015  | ResponseCreateWorktree: status = null            | Normal - success                                                           | refreshOrError is called and the graph refreshes      | REQ-3.1, REQ-3.2 |
+| TC-016  | ResponseCreateWorktree: status = "error message" | Exception - handled error                                                  | The error dialog "Unable to Create Worktree" is shown | -                |
+| TC-017  | ResponseRemoveWorktree: status = null            | Normal - success                                                           | refreshOrError is called and the graph refreshes      | REQ-4.1          |
+| TC-018  | ResponseRemoveWorktree: status = "error message" | Exception - handled error                                                  | The error dialog "Unable to Remove Worktree" is shown | -                |
+| TC-019  | ResponseOpenTerminal                             | Normal - standard                                                          | No-op (completes without errors)                      | REQ-9.1          |
 
-## S7: removeWorktree ブランチ削除結果の表示
+## S7: Showing the branch deletion result of removeWorktree
 
 > Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-15
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
-**テスト対象パス**: `web/messageHandler.ts`
+**Signature**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
+**Target path**: `web/messageHandler.ts`
 
-| Case ID | Input / Precondition                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                          | Notes       |
-| ------- | ------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------- | ----------- |
-| TC-020  | status=null, branchStatus=undefined        | Normal - standard                                                          | グラフリフレッシュ（既存動作同等、ブランチ削除未要求）   | REQ-4.2     |
-| TC-021  | status=null, branchStatus=null             | Normal - standard                                                          | グラフリフレッシュ（worktree + ブランチ両方削除成功）    | REQ-4.2-TC1 |
-| TC-022  | status=null, branchStatus="error msg"      | Normal - partial success                                                   | グラフリフレッシュ + ブランチ削除失敗エラー表示          | REQ-4.2-TC2 |
-| TC-023  | status="error msg", branchStatus=undefined | Exception - handled error                                                  | エラーダイアログ "Unable to Remove Worktree"（既存動作） | REQ-4.2-TC5 |
+| Case ID | Input / Precondition                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                          | Notes       |
+| ------- | ------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----------- |
+| TC-020  | status=null, branchStatus=undefined        | Normal - standard                                                          | Graph refresh (same as existing behavior; branch deletion not requested) | REQ-4.2     |
+| TC-021  | status=null, branchStatus=null             | Normal - standard                                                          | Graph refresh (both the worktree and the branch were deleted)            | REQ-4.2-TC1 |
+| TC-022  | status=null, branchStatus="error msg"      | Normal - partial success                                                   | Graph refresh + error display for the failed branch deletion             | REQ-4.2-TC2 |
+| TC-023  | status="error msg", branchStatus=undefined | Exception - handled error                                                  | Error dialog "Unable to Remove Worktree" (existing behavior)             | REQ-4.2-TC5 |
 
-## S8: handleMessage() openFile レスポンス処理
+## S8: handleMessage() handling the openFile response
 
 > Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
 > Added: 2026-04-04
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
-**テスト対象パス**: `web/messageHandler.ts`
+**Signature**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
+**Target path**: `web/messageHandler.ts`
 
-| Case ID | Input / Precondition                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                     | Notes                         |
-| ------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------- |
-| TC-024  | ResponseOpenFile: command="openFile", status=null            | Normal - success                                                           | showErrorDialog が呼ばれない。gitGraph のメソッドも呼ばれない（ノーオペレーション） | 成功時は何もしない            |
-| TC-025  | ResponseOpenFile: command="openFile", status="error message" | Exception - error display                                                  | showErrorDialog が ("Unable to open file", "error message", null) で呼ばれる        | removeWorktree パターンと同一 |
+| Case ID | Input / Precondition                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                               | Notes                              |
+| ------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------- |
+| TC-024  | ResponseOpenFile: command="openFile", status=null            | Normal - success                                                           | showErrorDialog is not called. No gitGraph method is called either (no-op)    | Nothing happens on success         |
+| TC-025  | ResponseOpenFile: command="openFile", status="error message" | Exception - error display                                                  | showErrorDialog is called with ("Unable to open file", "error message", null) | Same as the removeWorktree pattern |
 
-## S9: handleMessage() setShowRecentActions レスポンス処理
+## S9: handleMessage() handling the setShowRecentActions response
 
 > Origin: Feature 039 (show-recent-actions-runtime-sync) (light-spec-plan)
 > Added: 2026-05-10
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
-**テスト対象パス**: `web/messageHandler.ts`
+**Signature**: `handleMessage(msg: ResponseMessage, gitGraph: GitGraphViewAPI): void`
+**Target path**: `web/messageHandler.ts`
 
-| Case ID | Input / Precondition                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                               | Notes                                |
-| ------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| TC-026  | ResponseSetShowRecentActions: command="setShowRecentActions", showRecentActions=true  | Normal - standard                                                          | `gitKeizu.setShowRecentActions(true)` が 1 回呼ばれる。`refresh` / `showErrorDialog` / 他の API は呼ばれない  | runtime 同期経路の routing を検証    |
-| TC-027  | ResponseSetShowRecentActions: command="setShowRecentActions", showRecentActions=false | Normal - standard                                                          | `gitKeizu.setShowRecentActions(false)` が 1 回呼ばれる。`refresh` / `showErrorDialog` / 他の API は呼ばれない | 設定値 `false` でも routing は同経路 |
+| Case ID | Input / Precondition                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                  | Notes                                                 |
+| ------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| TC-026  | ResponseSetShowRecentActions: command="setShowRecentActions", showRecentActions=true  | Normal - standard                                                          | `gitKeizu.setShowRecentActions(true)` is called once. `refresh` / `showErrorDialog` / other APIs are not called  | Verifies the routing of the runtime sync path         |
+| TC-027  | ResponseSetShowRecentActions: command="setShowRecentActions", showRecentActions=false | Normal - standard                                                          | `gitKeizu.setShowRecentActions(false)` is called once. `refresh` / `showErrorDialog` / other APIs are not called | The setting value `false` takes the same routing path |
 
-## S10: commitDetails レスポンスの fileTree 生成 try/catch
+## S10: try/catch around building the fileTree for the commitDetails response
 
 > Origin: フェーズ2 修正 M13 (commit-details-file-tree-guard)
 > Added: 2026-07-04T02:44:58Z
 > Status: active
 > Supersedes: -
-> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void`（`case "commitDetails"`）
+> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void` (`case "commitDetails"`)
 > Target Path: `web/messageHandler.ts:55-75`
 
-`commitDetails` レスポンスの `else`（`msg.commitDetails !== null`）分岐で `generateGitFileTree(msg.commitDetails.fileChanges)` を `try/catch` で包む修正。ツリー構築が例外を投げた場合に `hideCommitDetails()` でローディングを解除し、`showErrorDialog(t("error.commitDetails"), error instanceof Error ? error.message : null, null)` を表示する。
+A fix that wraps `generateGitFileTree(msg.commitDetails.fileChanges)` in `try/catch` in the `else` branch (`msg.commitDetails !== null`) of the `commitDetails` response. When building the tree throws, `hideCommitDetails()` ends the loading state and `showErrorDialog(t("error.commitDetails"), error instanceof Error ? error.message : null, null)` is shown.
 
-| Case ID | Input / Precondition                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                              | Notes                             |
-| ------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| TC-028  | `msg.commitDetails` が有効、`generateGitFileTree` が正常にツリーを返す               | Normal - success                                                           | `gitKeizu.showCommitDetails(msg.commitDetails, fileTree)` が1回呼ばれる。`hideCommitDetails` と `showErrorDialog` は呼ばれない               | 成功経路                          |
-| TC-029  | `msg.commitDetails` が有効、`generateGitFileTree` が `Error("dup")` を throw         | Exception - handled error                                                  | `gitKeizu.hideCommitDetails()` が1回 + `showErrorDialog(t("error.commitDetails"), "dup", null)` が呼ばれる。`showCommitDetails` は呼ばれない | catch 経路（Error インスタンス）  |
-| TC-030  | `msg.commitDetails` が有効、`generateGitFileTree` が非 Error（文字列 `"x"`）を throw | Type - non-Error thrown                                                    | `showErrorDialog(t("error.commitDetails"), null, null)` が呼ばれる（`error instanceof Error` が false のため message が `null`）             | 非 Error 例外時の message null    |
-| TC-031  | `msg.commitDetails === null`                                                         | Validation - null commit details                                           | `gitKeizu.hideCommitDetails()` + `showErrorDialog(t("error.commitDetails"), null, null)` が呼ばれ、`generateGitFileTree` は呼ばれない        | null ガード（catch には入らない） |
+| Case ID | Input / Precondition                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                       | Notes                                     |
+| ------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| TC-028  | `msg.commitDetails` is valid and `generateGitFileTree` returns a tree normally               | Normal - success                                                           | `gitKeizu.showCommitDetails(msg.commitDetails, fileTree)` is called once. `hideCommitDetails` and `showErrorDialog` are not called                    | Success path                              |
+| TC-029  | `msg.commitDetails` is valid and `generateGitFileTree` throws `Error("dup")`                 | Exception - handled error                                                  | `gitKeizu.hideCommitDetails()` is called once + `showErrorDialog(t("error.commitDetails"), "dup", null)` is called. `showCommitDetails` is not called | catch path (Error instance)               |
+| TC-030  | `msg.commitDetails` is valid and `generateGitFileTree` throws a non-Error (the string `"x"`) | Type - non-Error thrown                                                    | `showErrorDialog(t("error.commitDetails"), null, null)` is called (the message is `null` because `error instanceof Error` is false)                   | message is null for a non-Error exception |
+| TC-031  | `msg.commitDetails === null`                                                                 | Validation - null commit details                                           | `gitKeizu.hideCommitDetails()` + `showErrorDialog(t("error.commitDetails"), null, null)` are called, and `generateGitFileTree` is not called          | null guard (does not enter catch)         |
 
-## S11: openWorktreeInNewWindow / revealWorktreeInOS レスポンスのエラー表示
+## S11: Error display for openWorktreeInNewWindow / revealWorktreeInOS responses
 
 > Origin: Feature 045 (defensive-fixes) (light-spec-plan)
 > Added: 2026-07-19
 > Status: active
 > Supersedes: -
-> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void`（`case "openWorktreeInNewWindow"` / `case "revealWorktreeInOS"` を追加）
-> Target Path: `web/messageHandler.ts`（handleMessage switch。実装後に行範囲へ更新）
+> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void` (adds `case "openWorktreeInNewWindow"` / `case "revealWorktreeInOS"`)
+> Target Path: `web/messageHandler.ts` (handleMessage switch; to be updated to a line range after implementation)
 
-`handleMessage` の switch に両 command の case を追加し、`status !== null`（文字列）のときだけ操作別の翻訳キーで `showErrorDialog` を1回呼ぶ修正。成功時（`status === null`）は何も表示しない（[2] の webview 側。status の必須化により成功応答の `undefined` は到達しない。host 側の送出は `src/gitGraphView-test/` owner の責務）。
+A fix that adds cases for both commands to the `handleMessage` switch and calls `showErrorDialog` once with a per-action translation key only when `status !== null` (a string). Nothing is shown on success (`status === null`) (the webview side of [2]. Because status is now required, `undefined` in a success response cannot arrive. Sending on the host side belongs to the `src/gitGraphView-test/` owner).
 
-| Case ID | Input / Precondition                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                             | Notes                |
-| ------- | -------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | -------------------- |
-| TC-032  | `{ command: "openWorktreeInNewWindow", status: null }`   | Normal - open 成功は無表示                                                 | `showErrorDialog` が呼ばれず、`gitKeizu` の API も呼ばれない（ノーオペレーション）          | 成功時は何もしない   |
-| TC-033  | `{ command: "openWorktreeInNewWindow", status: "boom" }` | Exception - open 失敗の表示                                                | `showErrorDialog` が `(t("error.openWorktreeInNewWindow"), "boom", null)` で1回だけ呼ばれる | 操作別の専用翻訳キー |
-| TC-034  | `{ command: "revealWorktreeInOS", status: null }`        | Normal - reveal 成功は無表示                                               | `showErrorDialog` が呼ばれず、`gitKeizu` の API も呼ばれない                                | -                    |
-| TC-035  | `{ command: "revealWorktreeInOS", status: "no" }`        | Exception - reveal 失敗の表示                                              | `showErrorDialog` が `(t("error.revealWorktreeInOS"), "no", null)` で1回だけ呼ばれる        | 操作別の専用翻訳キー |
+| Case ID | Input / Precondition                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                    | Notes                                |
+| ------- | -------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| TC-032  | `{ command: "openWorktreeInNewWindow", status: null }`   | Normal - nothing shown on a successful open                                | `showErrorDialog` is not called, and no `gitKeizu` API is called either (no-op)                    | Nothing happens on success           |
+| TC-033  | `{ command: "openWorktreeInNewWindow", status: "boom" }` | Exception - display of an open failure                                     | `showErrorDialog` is called exactly once with `(t("error.openWorktreeInNewWindow"), "boom", null)` | Dedicated per-action translation key |
+| TC-034  | `{ command: "revealWorktreeInOS", status: null }`        | Normal - nothing shown on a successful reveal                              | `showErrorDialog` is not called, and no `gitKeizu` API is called either                            | -                                    |
+| TC-035  | `{ command: "revealWorktreeInOS", status: "no" }`        | Exception - display of a reveal failure                                    | `showErrorDialog` is called exactly once with `(t("error.revealWorktreeInOS"), "no", null)`        | Dedicated per-action translation key |
 
-### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S11）
+### Failure-source inventory (include-or-justify) — added by Feature 045 (S11)
 
-| 失敗源                                        | 対応ケースまたは除外理由                                                                                  |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
-| 応答が switch で未処理（エラーの握りつぶし）  | TC-033、TC-035                                                                                            |
-| 成功応答の誤エラー表示                        | TC-032、TC-034                                                                                            |
-| 操作別翻訳キーの取り違え・他 command との混同 | TC-033、TC-035（`showErrorDialog` の第1引数で検証）                                                       |
-| 成功応答の `undefined` status                 | excluded(`status: GitCommandStatus` の必須化により型で防止。`src/types-test.md` TC-008/TC-009 で担保)     |
-| 翻訳キーの欠落                                | excluded(`l10n/web/web.l10n.en.json-test.md` TC-001〜002 / `web.l10n.ja.json-test.md` TC-003〜004 で担保) |
+| Failure source                                                        | Covering case or reason for exclusion                                                                                        |
+| --------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| The response is not handled in the switch (error swallowed)           | TC-033, TC-035                                                                                                               |
+| An error is wrongly shown for a success response                      | TC-032, TC-034                                                                                                               |
+| Per-action translation keys mixed up, or confused with other commands | TC-033, TC-035 (verified by the 1st argument of `showErrorDialog`)                                                           |
+| `undefined` status in a success response                              | excluded(prevented by the type because `status: GitCommandStatus` is required. Covered by `src/types-test.md` TC-008/TC-009) |
+| Missing translation keys                                              | excluded(covered by `l10n/web/web.l10n.en.json-test.md` TC-001 to 002 / `web.l10n.ja.json-test.md` TC-003 to 004)            |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(handler は status の null / string 判定のみで、他の検証分岐を持たない)
-- Exception: TC-033、TC-035
-- External: excluded(外部依存なし。応答メッセージはテスト側で直接構築する)
-- Boundary: excluded(`null` は成功契約値として TC-032/TC-034 で検証済み。空文字 status は host が送らない契約で、`""` は文字列としてエラー表示経路に含まれる)
-- Type: excluded(応答型は TypeScript コンパイル時に保証される)
+- Validation: excluded(the handler only checks whether status is null or a string and has no other validation branch)
+- Exception: TC-033, TC-035
+- External: excluded(no external dependency. The tests build the response messages directly)
+- Boundary: excluded(`null` is verified as the success contract value in TC-032/TC-034. An empty status is not sent by the host by contract, and `""` as a string goes through the error display path)
+- Type: excluded(response types are guaranteed at TypeScript compile time)
 
-**失敗系/正常系比（煙感知器）**: 正常系2件（TC-032、TC-034）、失敗系2件（TC-033、TC-035）。件数が同数のためインベントリを再導出したが、本変更（2 command × 成功/失敗の4分岐）の失敗源は上表のとおりすべて対応ケースまたは除外理由で充足されており、追加すべき失敗系ケースはないことを確認した。
+**Failure/normal ratio (smoke detector)**: 2 normal cases (TC-032, TC-034), 2 failure cases (TC-033, TC-035). Because the counts are equal, the inventory was re-derived; every failure source of this change (4 branches: 2 commands × success/failure) is covered by a case or a reason for exclusion in the table above, and no failure case needs to be added.
 
-## S19: removeWorktree 応答の成功／失敗の呼び出し回数
+## S19: Call counts for success / failure of the removeWorktree response
 
 > Origin: Feature 053 (detached-worktree-menu) (light-spec-plan)
 > Added: 2026-09-13
 > Status: active
 > Supersedes: -
-> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void`（`case "removeWorktree"`）
+> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void` (`case "removeWorktree"`)
 > Target Path: `web/messageHandler.ts:218-227`
 > Test File: `tests/web/messageHandler.test.ts`
 
-S6 TC-017 / TC-018、S7 TC-020〜TC-023は維持する。本sectionは回数を固定する。
+S6 TC-017 / TC-018 and S7 TC-020 to TC-023 are kept. This section pins the call counts.
 
-| Case ID | Input / Precondition                                                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                | Notes |
-| ------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ----- |
-| TC-085  | `{ command: "removeWorktree", status: null }`                                                     | Normal - soft refresh once                                                 | `gitKeizu.refresh`が1回`("soft")`、`showErrorDialog`が0回                                      | -     |
-| TC-086  | `{ command: "removeWorktree", status: "fatal: '/tmp/wt8' contains modified or untracked files" }` | External - Git reason shown once                                           | `showErrorDialog`が1回`("Unable to Remove Worktree", <status>, null)`、`gitKeizu.refresh`が0回 | -     |
+| Case ID | Input / Precondition                                                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                       | Notes |
+| ------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- | ----- |
+| TC-085  | `{ command: "removeWorktree", status: null }`                                                     | Normal - soft refresh once                                                 | `gitKeizu.refresh` is called once with `("soft")`, and `showErrorDialog` 0 times                                      | -     |
+| TC-086  | `{ command: "removeWorktree", status: "fatal: '/tmp/wt8' contains modified or untracked files" }` | External - Git reason shown once                                           | `showErrorDialog` is called once with `("Unable to Remove Worktree", <status>, null)`, and `gitKeizu.refresh` 0 times | -     |
 
-### 失敗源インベントリ（include-or-justify）— Feature 053 追加分（S19）
+### Failure-source inventory (include-or-justify) — added by Feature 053 (S19)
 
-| 失敗源           | 対応ケースまたは除外理由 |
-| ---------------- | ------------------------ |
-| 失敗時refresh    | TC-086                   |
-| 成功時ダイアログ | TC-085                   |
+| Failure source     | Covering case or reason for exclusion |
+| ------------------ | ------------------------------------- |
+| Refresh on failure | TC-086                                |
+| Dialog on success  | TC-085                                |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(S7が`branchStatus`の組合せを担う)
+- Validation: excluded(S7 covers the `branchStatus` combinations)
 - External: TC-086
-- Boundary: excluded(同上)
-- Type: excluded(同上)
+- Boundary: excluded(same as above)
+- Type: excluded(same as above)
 
 ## S20: Branch deletion error after worktree removal stays open across the refresh
 
@@ -196,3 +196,31 @@ Test file: `tests/web/main.refOverflow.test.ts`, describe `branch deletion error
 | S20     | TC-088  | keeps the branch deletion error open across a queued refresh (TC-088)     | pass (2026-09-29); RED before the fix |
 
 - RED and GREEN (2026-09-29): recorded with the main regression in `web/main-test/08-request-queue-01.md` S67. At the base `web/main.ts`, both cases failed with `expected false to be true` on the dialog `active` class right after the first commit load response with changes.
+
+## S22: handleMessage() setWorktreePath routing
+
+> Origin: Feature 062-01 (PR #114 follow-up)
+> Added: 2026-10-27
+> Status: active
+> Supersedes: -
+> Signature: `handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void` for `ResponseSetWorktreePath`
+> Target Path: `web/messageHandler.ts` (`case "setWorktreePath"`)
+> Test File: `tests/web/messageHandler.test.ts`
+
+Routes the host's `setWorktreePath` (`src/gitGraphView-test/03-worktree-actions-01.md` S44) to `GitKeizuView.setWorktreePath` (`web/main-test/05-state-response-02.md` S86), the same way S9 routes `setShowRecentActions`. Fixture: `createMockGitKeizuView()` of the test file.
+
+| Case ID | Input / Precondition                                                                                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                 | Notes |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----- |
+| TC-090  | `{ command: "setWorktreePath", worktreePath: { template: "~/.worktrees/${repoName}/${branch}", homeDir: "/home/dev", platform: "posix" } }` | Normal - routed without refresh                                            | `gitKeizu.setWorktreePath` is called once with the same `worktreePath`; `refresh` is not called | -     |
+
+### Failure-source inventory (include-or-justify) — S22
+
+| Failure source                     | Case or reason for exclusion                                            |
+| ---------------------------------- | ----------------------------------------------------------------------- |
+| Message not routed or payload lost | TC-090                                                                  |
+| Unneeded refresh                   | TC-090                                                                  |
+| Exception / External / Type        | excluded (a single delegating call; the message type is a union member) |
+
+### Test mapping — S22
+
+`tests/web/messageHandler.test.ts` describe `handleMessage setShowRecentActions response (S9)`: TC-090 `routes a worktree path template update to gitKeizu.setWorktreePath (TC-090)`.

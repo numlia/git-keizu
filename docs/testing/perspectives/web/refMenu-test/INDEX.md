@@ -1,20 +1,20 @@
-# テスト観点表マニフェスト: web/refMenu.ts
+# Test Perspectives Manifest: web/refMenu.ts
 
 > Source: `web/refMenu.ts`
 > Storage Mode: sharded
-> Generated: 2026-10-03T00:00:00Z
+> Generated: 2026-10-27T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 3
-> Total Sections: 20
-> Total Cases: 102
+> Total Sections: 21
+> Total Cases: 105
 
 ## Shards
 
 | Shard File                           | Responsibility              | Sections | Cases | Last Updated |
 | ------------------------------------ | --------------------------- | -------- | ----- | ------------ |
 | 01-branch-actions-01.md              | branch-actions              | 10       | 50    | 2026-08-25   |
-| 02-worktree-actions-01.md            | worktree-actions            | 5        | 23    | 2026-09-29   |
+| 02-worktree-actions-01.md            | worktree-actions            | 6        | 26    | 2026-10-27   |
 | 03-context-menu-recent-actions-01.md | context-menu-recent-actions | 5        | 29    | 2026-10-03   |
 
 ## Origin Coverage
@@ -35,7 +35,8 @@
 | Feature 055-03 (light-spec-plan)                                       | 01-branch-actions-01.md                                         |
 | Feature 060-03 (light-spec-plan)                                       | 02-worktree-actions-01.md, 03-context-menu-recent-actions-01.md |
 | Feature 061-01 (light-spec-plan)                                       | 03-context-menu-recent-actions-01.md                            |
+| Feature 062-01 (PR #114 follow-up)                                     | 02-worktree-actions-01.md                                       |
 
-## 移行履歴
+## Migration history
 
-single-file の `web/refMenu-test.md` は 14 sections / 74 cases に達し、shard 成長上限（12 sections）を超えたため 2026-08-03 に sharded mode へ移行した。移行前のスナップショットは `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md` に保存し、既存 S1〜S16 と TC-001〜TC-080 は番号・本文とも変更していない。
+The single file `web/refMenu-test.md` reached 14 sections / 74 cases, exceeding the shard growth limit (12 sections), so it was migrated to sharded mode on 2026-08-03. The pre-migration snapshot is saved at `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md`, and the existing S1 to S16 and TC-001 to TC-080 were kept unchanged in both numbering and content.

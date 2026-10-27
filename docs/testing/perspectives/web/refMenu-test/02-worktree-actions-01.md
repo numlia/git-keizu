@@ -1,4 +1,4 @@
-# テスト観点表: web/refMenu.ts
+# Test Perspectives: web/refMenu.ts
 
 > Source: `web/refMenu.ts`
 > Generated: 2026-08-03T00:00:00Z
@@ -6,7 +6,7 @@
 > Test Framework: Vitest
 > Responsibility: worktree-actions
 
-## S8: buildRefContextMenuItems() worktree 関連メニュー項目
+## S8: buildRefContextMenuItems() worktree menu items
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
@@ -14,35 +14,35 @@
 > Superseded By: S23
 > Supersedes: -
 
-**テスト対象パス**: `web/refMenu.ts`
+**Target path**: `web/refMenu.ts`
 
-| Case ID | Input / Precondition                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                | Notes            |
-| ------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ---------------- |
-| TC-033  | ローカルブランチ、worktreeInfo = null                            | Normal - standard                                                          | メニューに "Create Worktree..." が含まれる                                                     | REQ-2.3-TC1      |
-| TC-034  | ローカルブランチ、worktreeInfo = { path, isMainWorktree: false } | Normal - standard                                                          | メニューに "Open Terminal Here" / "Copy Worktree Path" / "Remove Worktree" の 3 項目が含まれる | REQ-2.3-TC2      |
-| TC-035  | ローカルブランチ、worktreeInfo = { path, isMainWorktree: true }  | Normal - main wt                                                           | メニューに "Open Terminal Here" / "Copy Worktree Path" のみ（Remove Worktree なし）            | REQ-2.3-TC4      |
-| TC-036  | リモートブランチ                                                 | Normal - exclusion                                                         | worktree 関連メニュー項目が一切含まれない                                                      | REQ-2.3-TC3      |
-| TC-037  | Create Worktree... 選択                                          | Normal - standard                                                          | showFormDialog が Path + Open Terminal の 2 フィールドで呼ばれる                               | REQ-3.2, REQ-3.3 |
-| TC-038  | Create Worktree ダイアログの Path デフォルト値                   | Normal - standard                                                          | `../<repoName>-<sanitize(branchName)>` 形式                                                    | REQ-3.3-TC3      |
-| TC-039  | Open Terminal Here 選択                                          | Normal - standard                                                          | sendMessage openTerminal に path と name が含まれる                                            | REQ-9.1          |
-| TC-040  | Copy Worktree Path 選択                                          | Normal - standard                                                          | sendMessage copyToClipboard に type: "worktreePath" と data: path が含まれる                   | REQ-9.2          |
-| TC-041  | Remove Worktree 選択                                             | Normal - standard                                                          | showConfirmationDialog が呼ばれ、確認メッセージにブランチ名とパスが含まれる                    | REQ-4.1          |
+| Case ID | Input / Precondition                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                  | Notes            |
+| ------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------- |
+| TC-033  | Local branch, worktreeInfo = null                            | Normal - standard                                                          | The menu contains "Create Worktree..."                                                           | REQ-2.3-TC1      |
+| TC-034  | Local branch, worktreeInfo = { path, isMainWorktree: false } | Normal - standard                                                          | The menu contains the 3 items "Open Terminal Here" / "Copy Worktree Path" / "Remove Worktree"    | REQ-2.3-TC2      |
+| TC-035  | Local branch, worktreeInfo = { path, isMainWorktree: true }  | Normal - main wt                                                           | The menu contains only "Open Terminal Here" / "Copy Worktree Path" (no Remove Worktree)          | REQ-2.3-TC4      |
+| TC-036  | Remote branch                                                | Normal - exclusion                                                         | The menu contains no worktree-related items at all                                               | REQ-2.3-TC3      |
+| TC-037  | Select Create Worktree...                                    | Normal - standard                                                          | showFormDialog is called with 2 fields, Path and Open Terminal                                   | REQ-3.2, REQ-3.3 |
+| TC-038  | Path default of the Create Worktree dialog                   | Normal - standard                                                          | In the form `../<repoName>-<sanitize(branchName)>`                                               | REQ-3.3-TC3      |
+| TC-039  | Select Open Terminal Here                                    | Normal - standard                                                          | The sendMessage openTerminal contains path and name                                              | REQ-9.1          |
+| TC-040  | Select Copy Worktree Path                                    | Normal - standard                                                          | The sendMessage copyToClipboard contains type: "worktreePath" and data: path                     | REQ-9.2          |
+| TC-041  | Select Remove Worktree                                       | Normal - standard                                                          | showConfirmationDialog is called, and the confirmation message contains the branch name and path | REQ-4.1          |
 
-## S11: Create Worktree ダイアログ Open Terminal 設定反映
+## S11: Create Worktree dialog reflects the Open Terminal setting
 
 > Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-15
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `web/refMenu.ts`
+**Target path**: `web/refMenu.ts`
 
-| Case ID | Input / Precondition                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                     | Notes       |
-| ------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- | ----------- |
-| TC-048  | viewState.dialogDefaults.createWorktree.openTerminal=true  | Normal - standard                                                          | showFormDialog の Open Terminal チェックボックスが checked で表示   | REQ-9.1-TC1 |
-| TC-049  | viewState.dialogDefaults.createWorktree.openTerminal=false | Normal - standard                                                          | showFormDialog の Open Terminal チェックボックスが unchecked で表示 | REQ-9.1-TC2 |
+| Case ID | Input / Precondition                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                 | Notes       |
+| ------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------- | ----------- |
+| TC-048  | viewState.dialogDefaults.createWorktree.openTerminal=true  | Normal - standard                                                          | The Open Terminal checkbox of showFormDialog is shown checked   | REQ-9.1-TC1 |
+| TC-049  | viewState.dialogDefaults.createWorktree.openTerminal=false | Normal - standard                                                          | The Open Terminal checkbox of showFormDialog is shown unchecked | REQ-9.1-TC2 |
 
-## S12: Remove Worktree ブランチ同時削除ダイアログ
+## S12: Remove Worktree dialog with branch deletion
 
 > Origin: Feature 019 (worktree-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-15
@@ -50,88 +50,88 @@
 > Superseded By: S24
 > Supersedes: -
 
-**テスト対象パス**: `web/refMenu.ts`
+**Target path**: `web/refMenu.ts`
 
-| Case ID | Input / Precondition                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                   | Notes                |
-| ------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------- | -------------------- |
-| TC-050  | Remove Worktree 選択、非メインworktree                     | Normal - standard                                                          | showFormDialog がチェックボックス入力付きで呼ばれる               | REQ-4.1-TC1          |
-| TC-051  | viewState.dialogDefaults.removeWorktree.deleteBranch=true  | Normal - standard                                                          | チェックボックスのデフォルトが checked                            | REQ-9.2-TC1          |
-| TC-052  | viewState.dialogDefaults.removeWorktree.deleteBranch=false | Normal - standard                                                          | チェックボックスのデフォルトが unchecked                          | REQ-9.2-TC2          |
-| TC-053  | チェックボックスの info プロパティ確認                     | Normal - standard                                                          | 安全な削除（git branch -d）の説明テキストが info に設定されている | REQ-4.1-TC2          |
-| TC-054  | チェックON + Remove ボタン押下                             | Normal - standard                                                          | sendMessage に deleteBranch: true が含まれる                      | REQ-4.1              |
-| TC-055  | チェックOFF + Remove ボタン押下                            | Normal - standard                                                          | sendMessage に deleteBranch: false が含まれる                     | REQ-4.1              |
-| TC-056  | ダイアログのアクションボタン名                             | Normal - standard                                                          | ボタンテキストが "Remove" である                                  | REQ-4.1              |
-| TC-057  | 確認メッセージの内容                                       | Normal - standard                                                          | メッセージにブランチ名と worktree パスが含まれる                  | REQ-4.1 既存動作維持 |
+| Case ID | Input / Precondition                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                              | Notes                          |
+| ------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------------------------ |
+| TC-050  | Select Remove Worktree, non-main worktree                  | Normal - standard                                                          | showFormDialog is called with a checkbox input               | REQ-4.1-TC1                    |
+| TC-051  | viewState.dialogDefaults.removeWorktree.deleteBranch=true  | Normal - standard                                                          | The checkbox defaults to checked                             | REQ-9.2-TC1                    |
+| TC-052  | viewState.dialogDefaults.removeWorktree.deleteBranch=false | Normal - standard                                                          | The checkbox defaults to unchecked                           | REQ-9.2-TC2                    |
+| TC-053  | Check the checkbox's info property                         | Normal - standard                                                          | info holds the text explaining safe deletion (git branch -d) | REQ-4.1-TC2                    |
+| TC-054  | Checkbox ON + press the Remove button                      | Normal - standard                                                          | sendMessage contains deleteBranch: true                      | REQ-4.1                        |
+| TC-055  | Checkbox OFF + press the Remove button                     | Normal - standard                                                          | sendMessage contains deleteBranch: false                     | REQ-4.1                        |
+| TC-056  | The dialog's action button name                            | Normal - standard                                                          | The button text is "Remove"                                  | REQ-4.1                        |
+| TC-057  | The confirmation message content                           | Normal - standard                                                          | The message contains the branch name and the worktree path   | REQ-4.1 existing behavior kept |
 
-## S16: Remove Worktree チェックボックス名の raw 引き渡し（単一エスケープ境界）
+## S16: Passing the raw Remove Worktree checkbox name (single escaping boundary)
 
 > Origin: Feature 045 (defensive-fixes) (light-spec-plan)
 > Added: 2026-07-19
 > Status: active
 > Supersedes: -
-> Signature: `buildRefContextMenuItems()` 内 `removeWorktreeItem` の `showFormDialog` 呼び出し
+> Signature: the `showFormDialog` call of `removeWorktreeItem` in `buildRefContextMenuItems()`
 > Target Path: `web/refMenu.ts:402-420`
 
-Remove Worktree ダイアログの「Also delete branch」チェックボックスの `name` へ raw の `refName` を渡し、`showFormDialog` の checkbox 描画（`web/dialogs.ts` の `escapeHtml`）を唯一の HTML エスケープ境界とする修正。呼び出し側の事前 `escapeHtml` を外すことで、`feature/login` が `feature&#x2F;login` と二重エスケープ表示される [7] を解消する。dialog 側の共通エスケープ実装自体は `web/dialogs-test.md` owner（S6 TC-034）の責務。
+A fix that passes the raw `refName` to the `name` of the "Also delete branch" checkbox in the Remove Worktree dialog, making the checkbox rendering of `showFormDialog` (`escapeHtml` in `web/dialogs.ts`) the only HTML escaping boundary. Removing the caller's prior `escapeHtml` resolves [7], where `feature/login` was shown double-escaped as `feature&#x2F;login`. The shared escaping implementation on the dialog side itself belongs to the `web/dialogs-test.md` owner (S6 TC-034).
 
-| Case ID | Input / Precondition                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                          | Notes                |
-| ------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------- |
-| TC-079  | `refName = "feature/a&b"` の worktree 付きブランチで Remove Worktree の onClick を実行 | Normal - raw name の引き渡し                                               | `showFormDialog` の checkbox 要素の `name` 引数に `&amp;` / `&#x2F;` を含まない raw の `feature/a&b`（翻訳テンプレート適用後の文字列内）が渡る。モック検証: 呼び出し引数 | 事前エスケープの除去 |
-| TC-080  | 同条件で dialog を実際に描画する                                                       | Boundary - 二重エスケープの解消                                            | checkbox label の `textContent` に `feature/a&b` がそのまま表示され、`&amp;` / `&#x2F;` の literal 文字列が現れない（エスケープは dialogs.ts 境界の1回のみ）             | [7] の観測条件       |
+| Case ID | Input / Precondition                                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                  | Notes                        |
+| ------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| TC-079  | Run the Remove Worktree onClick on a branch with a worktree and `refName = "feature/a&b"` | Normal - passing the raw name                                              | The `name` argument of the `showFormDialog` checkbox element receives the raw `feature/a&b` without `&amp;` / `&#x2F;` (inside the string after the translation template is applied). Mock check: call arguments | Prior escaping removed       |
+| TC-080  | Render the dialog for real under the same conditions                                      | Boundary - double escaping resolved                                        | The checkbox label's `textContent` shows `feature/a&b` as is, and the literal strings `&amp;` / `&#x2F;` do not appear (escaping happens only once, at the dialogs.ts boundary)                                  | Observation condition of [7] |
 
-### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S16）
+### Failure-source inventory (include-or-justify) — added for Feature 045 (S16)
 
-| 失敗源                                             | 対応ケースまたは除外理由                                                       |
-| -------------------------------------------------- | ------------------------------------------------------------------------------ |
-| 呼び出し側の事前エスケープによる二重エスケープ表示 | TC-079、TC-080                                                                 |
-| エスケープの欠落（raw 名が HTML として展開される） | excluded(描画境界のエスケープは `web/dialogs-test.md` S6 TC-034 で担保済み)    |
-| ダイアログ本文（message）のエスケープ              | excluded(本文の `escapeHtml` は変更対象外で既存挙動を維持)                     |
-| git 操作への refName 引き渡し                      | excluded(送信 payload は raw refName を使う既存挙動で、本変更は表示のみに影響) |
+| Failure source                                               | Covering case or reason for exclusion                                                              |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| Double-escaped display caused by the caller's prior escaping | TC-079, TC-080                                                                                     |
+| Missing escaping (the raw name is expanded as HTML)          | excluded(escaping at the rendering boundary is already covered by `web/dialogs-test.md` S6 TC-034) |
+| Escaping of the dialog body (message)                        | excluded(the body's `escapeHtml` is out of scope and keeps its existing behavior)                  |
+| Passing refName to the git operation                         | excluded(the sent payload uses the raw refName as before; this change affects only the display)    |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(本変更は引数の受け渡し契約のみで、検証分岐を追加しない)
-- Exception: excluded(throw 経路が存在しない)
-- External: excluded(外部依存なし。dialog はモックまたは jsdom 描画で観測)
+- Validation: excluded(this change only concerns the argument-passing contract and adds no validation branch)
+- Exception: excluded(there is no throw path)
+- External: excluded(no external dependencies; the dialog is observed through a mock or jsdom rendering)
 - Boundary: TC-080
-- Type: excluded(`name` は `string` 型で TypeScript コンパイル時に保証される)
+- Type: excluded(`name` is of type `string`, guaranteed at TypeScript compile time)
 
-数値・空値境界（0 / minimum / maximum / +/-1 / empty / NULL）は、本セクションの対象がエスケープ回数の契約であり仕様上意味を持たないため対象外とする（意味のある境界は `&` / `/` を含む refName の TC-079/TC-080 で充足）。
+Numeric and empty-value boundaries (0 / minimum / maximum / +/-1 / empty / NULL) are out of scope, because this section targets the contract on how many times escaping happens and they have no meaning in the spec (the meaningful boundary is covered by TC-079/TC-080 with a refName containing `&` / `/`).
 
-**失敗系/正常系比（煙感知器）**: 正常系1件（TC-079）、失敗系1件（TC-080）。件数が同数のためインベントリを再導出したが、本変更の失敗源は二重エスケープのみで、他の失敗源は上表の除外理由（owner 分離）により充足されていることを確認した。
+**Failure/normal ratio (smoke detector)**: 1 normal case (TC-079), 1 failure case (TC-080). Since the counts are equal, the inventory was re-derived, confirming that the only failure source of this change is double escaping and that the other failure sources are covered by the exclusion reasons in the table above (separate owners).
 
-## S22: 共通 builder 抽出後のブランチ付き worktree menu 契約の維持
+## S22: Keeping the menu contract for worktrees with a branch after extracting the shared builder
 
 > Origin: Feature 053 (detached-worktree-menu) (light-spec-plan)
 > Added: 2026-09-13
 > Status: active
 > Supersedes: -
 > Signature: `buildRefContextMenuItems(repo, refName, sourceElem, isRemoteCombined, gitBranchHead, remotes?, worktreeInfo?): ContextMenuElement[]`
-> Target Path: `web/refMenu.ts:309-312`（worktreeItems）
+> Target Path: `web/refMenu.ts:309-312` (worktreeItems)
 > Test File: `tests/web/refMenu.test.ts`
 
-S8のTC-034 / TC-039 / TC-040は`toContain`で項目の有無を見る。本sectionは順序とterminal名の供給元を固定する。`WORKTREE_PATH = "/home/user/project-feature"`、`REPO = "/test/repo"`。
+S8's TC-034 / TC-039 / TC-040 check only whether items exist, with `toContain`. This section fixes the order and where the terminal name comes from. `WORKTREE_PATH = "/home/user/project-feature"`, `REPO = "/test/repo"`.
 
-| Case ID | Input / Precondition                                                                                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                                                                                                                                                         | Notes |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| TC-106  | `createMockElement(["head"])`、`refName = "feature/x"`、`gitBranchHead = "feature/x"`、`worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false }` | Normal - HEAD branch menu order                                            | `title`／`null`の並びが`Pull`、`Push`、`null`、`Open in New Window`、`Reveal in File Manager`、`Open Terminal Here`、`Copy Worktree Path`、`null`、`More...`、`null`、`Copy Branch Name to Clipboard`。index 3〜5の`recentActionId`が`ref.openWorktreeInNewWindow` / `ref.revealWorktreeInOS` / `ref.openTerminal`。index 5の`onClick()`で`sendMessage`が1回`{ command: "openTerminal", repo: REPO, path: WORKTREE_PATH, name: "Worktree: feature/x" }` | -     |
-| TC-107  | 同条件で`gitBranchHead = "main"`                                                                                                                       | Normal - non-HEAD local branch menu order                                  | 並びが`Checkout Branch`、`Merge into current branch&#8230;`、`Rebase current branch on Branch&#8230;`、`null`、共通4項目、`null`、`More...`、`null`、`Copy Branch Name to Clipboard`。`More...`の`submenu`の`title`が`Rename Branch&#8230;`、`Delete Branch&#8230;`、`Remove Worktree&#8230;`の順。`Remove Worktree&#8230;`の`onClick()`で`showFormDialog`が1回、第2引数の入力配列の長さが1で`type: "checkbox"`                                         | -     |
+| Case ID | Input / Precondition                                                                                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  | Notes |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----- |
+| TC-106  | `createMockElement(["head"])`, `refName = "feature/x"`, `gitBranchHead = "feature/x"`, `worktreeInfo = { path: WORKTREE_PATH, isMainWorktree: false }` | Normal - HEAD branch menu order                                            | The sequence of `title` / `null` is `Pull`, `Push`, `null`, `Open in New Window`, `Reveal in File Manager`, `Open Terminal Here`, `Copy Worktree Path`, `null`, `More...`, `null`, `Copy Branch Name to Clipboard`. The `recentActionId` at index 3 to 5 is `ref.openWorktreeInNewWindow` / `ref.revealWorktreeInOS` / `ref.openTerminal`. `onClick()` at index 5 calls `sendMessage` once with `{ command: "openTerminal", repo: REPO, path: WORKTREE_PATH, name: "Worktree: feature/x" }`      | -     |
+| TC-107  | Same conditions with `gitBranchHead = "main"`                                                                                                          | Normal - non-HEAD local branch menu order                                  | The sequence is `Checkout Branch`, `Merge into current branch&#8230;`, `Rebase current branch on Branch&#8230;`, `null`, the 4 shared items, `null`, `More...`, `null`, `Copy Branch Name to Clipboard`. The `title` values in the `submenu` of `More...` are `Rename Branch&#8230;`, `Delete Branch&#8230;`, `Remove Worktree&#8230;` in that order. `onClick()` of `Remove Worktree&#8230;` calls `showFormDialog` once, with an input array (2nd argument) of length 1 and `type: "checkbox"` | -     |
 
-### 失敗源インベントリ（include-or-justify）— Feature 053 追加分（S22）
+### Failure-source inventory (include-or-justify) — added for Feature 053 (S22)
 
-| 失敗源                         | 対応ケースまたは除外理由 |
-| ------------------------------ | ------------------------ |
-| 共通化による順序変化           | TC-106、TC-107           |
-| terminal名の末尾名化           | TC-106                   |
-| detached用Removeへの置き換わり | TC-107                   |
+| Failure source                                  | Covering case or reason for exclusion |
+| ----------------------------------------------- | ------------------------------------- |
+| Order changes from sharing the builder          | TC-106, TC-107                        |
+| The terminal name becomes the last path segment | TC-106                                |
+| Replaced by the Remove for detached worktrees   | TC-107                                |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(本sectionは既存契約の固定で、分岐を追加しない)
-- Exception: excluded(同上)
-- External: excluded(同上)
-- Boundary: excluded(同上)
-- Type: excluded(同上)
+- Validation: excluded(this section fixes an existing contract and adds no branch)
+- Exception: excluded(same as above)
+- External: excluded(same as above)
+- Boundary: excluded(same as above)
+- Type: excluded(same as above)
 
 ## S23: buildRefContextMenuItems() worktree menu items
 
@@ -226,3 +226,37 @@ Test file: `tests/web/refMenu.test.ts`. The existing S8 and S12 tests were renam
 
 - RED before implementation (2026-09-29): the base commit `2a3cc5f` was extracted with `git archive` into a temporary directory outside the checkout, the updated test files and the `src/types.ts` union were copied in, and `web/refMenu.ts` stayed at the base. `pnpm exec vitest run tests/web/refMenu.test.ts -t 'TC-(121|122|125)'` gave `Tests 3 failed | 100 skipped (103)`; TC-121 and TC-122 failed with `AssertionError: expected "vi.fn()" to be called 1 times, but got 0 times` (no record on confirmation; TC-125 is in `03-context-menu-recent-actions-01.md` S25). No failure came from dependency resolution, DOM setup or types. The temporary copy was removed afterwards.
 - GREEN after implementation (2026-09-29): the same command in the checkout gave `Tests 3 passed | 100 skipped (103)`.
+
+## S27: Create Worktree suggested path from `worktreePathTemplate` and the main worktree
+
+> Origin: Feature 062-01 (PR #114 follow-up)
+> Added: 2026-10-27
+> Status: active
+> Supersedes: -
+> Signature: `buildRefContextMenuItems(repo, refName, sourceElem, isRemoteCombined, gitBranchHead, remotes?, worktreeInfo?)` with `viewState.worktreePath` and `viewState.mainWorktreePaths`
+> Target Path: `web/refMenu.ts` (`showCreateWorktreeDialog`), `web/worktreeSuggestion.ts` (`suggestedWorktreePath`)
+> Test File: `tests/web/refMenu.test.ts`
+
+The Create Worktree dialog fills its Path input from `viewState.worktreePath` (template, home directory and platform from the extension host), resolved by `src/worktreePath.ts` (`src/worktreePath-test.md` S2 / S3). `${repoPath}` is the main worktree recorded in `viewState.mainWorktreePaths` for the open repository, so a graph opened on a linked worktree does not nest new worktrees inside it. The default template case is S23 TC-113. Fixture: S23's `viewState.dialogDefaults`, `homeDir = "/home/dev"`, `platform: "posix"`, branch `createMockElement(["head"])`, `worktreeInfo = null`; select `Create Worktree&#8230;` and read the `default` of the first `showFormDialog` input.
+
+| Case ID | Input / Precondition                                                                                                                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                             | Notes                                       |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------------------------- |
+| TC-133  | `repo = "/test/repo"`, `refName = "feature/x"`, template `~/.worktrees/${repoName}/${branch}`                                                                                                | Normal - template from viewState                                           | Path default is `/home/dev/.worktrees/repo/feature-x`                       | -                                           |
+| TC-134  | `repo` is the linked worktree `/test/repo/.worktrees/feat-slot-candidate-band`, `mainWorktreePaths` maps it to `/test/repo`, `refName = "main"`, template `${repoPath}/.worktrees/${branch}` | Normal - linked worktree uses the main worktree                            | Path default is `/test/repo/.worktrees/main`, not under the linked worktree | Deliberate difference from Better Worktrees |
+| TC-135  | `repo = "/test/repo"`, `mainWorktreePaths` maps it to `""`, `refName = "feature/x"`, template `${repoPath}/.worktrees/${branch}`                                                             | Boundary - empty main worktree recorded                                    | Path default is `/test/repo/.worktrees/feature-x` (the open repository)     | -                                           |
+
+### Failure-source inventory (include-or-justify) — S27
+
+| Failure source                                            | Case or reason for exclusion                                                                                   |
+| --------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| Setting ignored (default template used)                   | TC-133                                                                                                         |
+| `${repoPath}` taken from the linked worktree that is open | TC-134                                                                                                         |
+| Empty main worktree recorded for the repository           | TC-135                                                                                                         |
+| No main worktree recorded for the repository              | excluded (`web/main-test/05-state-response-02.md` S86 TC-787 records the open checkout itself as the fallback) |
+| Template expansion rules                                  | excluded (`src/worktreePath-test.md` S1 to S3)                                                                 |
+| Create Worktree Here (commit menu)                        | excluded (`web/commitMenu-test.md` S4 TC-024 / TC-027 and S6 follow the resolved default template)             |
+| Exception / External / Type                               | excluded (dialogs are mocked; `viewState` shape is typed by `GitKeizuViewState`)                               |
+
+### Test mapping — S27
+
+`tests/web/refMenu.test.ts` describe `buildRefContextMenuItems worktree menu items (S23)`: TC-133 `uses worktreePathTemplate from viewState for the suggested path (TC-133)`, TC-134 `uses the main worktree as repoPath when the graph is a linked worktree (TC-134)`, TC-135 `falls back to the open repository when its recorded main worktree is empty (TC-135)`.
