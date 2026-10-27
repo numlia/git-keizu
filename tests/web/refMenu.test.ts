@@ -883,7 +883,10 @@ describe("buildRefContextMenuItems worktree menu items (S23)", () => {
     expect(pathInput.default).toBe("/test/repo-feature-x");
   });
 
-  it("uses worktreePathTemplate from viewState for the suggested path", () => {
+  // S27: Create Worktree suggested path from worktreePathTemplate and the main worktree
+  // @see docs/testing/perspectives/web/refMenu-test/02-worktree-actions-01.md
+  it("uses worktreePathTemplate from viewState for the suggested path (TC-133)", () => {
+    // Case: TC-133
     (globalThis as Record<string, unknown>).viewState = {
       dialogDefaults: {
         merge: { noFastForward: true, squashCommits: false, noCommit: false },
@@ -917,7 +920,8 @@ describe("buildRefContextMenuItems worktree menu items (S23)", () => {
     expect(pathInput.default).toBe("/home/dev/.worktrees/repo/feature-x");
   });
 
-  it("uses the main worktree as repoPath when the graph is a linked worktree", () => {
+  it("uses the main worktree as repoPath when the graph is a linked worktree (TC-134)", () => {
+    // Case: TC-134
     const linked = "/test/repo/.worktrees/feat-slot-candidate-band";
     (globalThis as Record<string, unknown>).viewState = {
       dialogDefaults: {
@@ -953,6 +957,44 @@ describe("buildRefContextMenuItems worktree menu items (S23)", () => {
     const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
     const pathInput = inputs[0] as DialogTextInput;
     expect(pathInput.default).toBe("/test/repo/.worktrees/main");
+  });
+
+  it("falls back to the open repository when its recorded main worktree is empty (TC-135)", () => {
+    // Case: TC-135
+    (globalThis as Record<string, unknown>).viewState = {
+      dialogDefaults: {
+        merge: { noFastForward: true, squashCommits: false, noCommit: false },
+        cherryPick: { recordOrigin: false, noCommit: false },
+        stashUncommittedChanges: { includeUntracked: false },
+        createWorktree: { openTerminal: true },
+        removeWorktree: { deleteBranch: true }
+      },
+      worktreePath: {
+        template: `${"$"}{repoPath}/.worktrees/${"$"}{branch}`,
+        homeDir: "/home/dev",
+        platform: "posix"
+      },
+      mainWorktreePaths: {
+        [REPO]: ""
+      }
+    };
+    const sourceElem = createMockElement(["head"]);
+    const menu = buildRefContextMenuItems(
+      REPO,
+      "feature/x",
+      sourceElem,
+      false,
+      "main",
+      undefined,
+      null
+    );
+
+    const createItem = findMenuItem(menu, "Create Worktree&#8230;");
+    createItem!.onClick();
+
+    const inputs = vi.mocked(showFormDialog).mock.calls[0][1];
+    const pathInput = inputs[0] as DialogTextInput;
+    expect(pathInput.default).toBe("/test/repo/.worktrees/feature-x");
   });
 
   it("Open Terminal Here sends openTerminal message (TC-114)", () => {
