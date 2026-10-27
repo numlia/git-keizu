@@ -6,7 +6,7 @@
 > Test Framework: Vitest
 > Responsibility: defaults-schema
 
-## S10: Config fallback defaults vs package.json — simple value comparison (24 settings)
+## S10: Config fallback defaults vs package.json — simple value comparison (25 settings)
 
 > Origin: Feature 021 (loadMoreCommits-default-mismatch) (aidd-spec-tasks-test)
 > Added: 2026-03-21
@@ -18,32 +18,33 @@
 
 Verifies that the fallback value of each Config method (with the mock returning the fallback) matches the default value in `contributes.configuration.properties` of `package.json`.
 
-| Case ID | Input / Precondition                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                        | Notes            |
-| ------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------- | ---------------- |
-| TC-042  | dateFormat fallback                                               | Normal - cross-check                                                       | Matches the package.json default       | string type      |
-| TC-043  | dateType fallback                                                 | Normal - cross-check                                                       | Matches the package.json default       | string type      |
-| TC-044  | fetchAvatars fallback                                             | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-045  | graphStyle fallback                                               | Normal - cross-check                                                       | Matches the package.json default       | string type      |
-| TC-046  | initialLoadCommits fallback                                       | Normal - cross-check                                                       | Matches the package.json default       | number type      |
-| TC-047  | loadMoreCommits fallback                                          | Normal - cross-check                                                       | Matches the package.json default (100) | Fixed by REQ-9.1 |
-| TC-048  | loadMoreCommitsAutomatically fallback                             | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-049  | maxDepthOfRepoSearch fallback                                     | Normal - cross-check                                                       | Matches the package.json default       | number type      |
-| TC-050  | showCurrentBranchByDefault fallback                               | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-051  | showStatusBarItem fallback                                        | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-052  | showUncommittedChanges fallback                                   | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-053  | tabIconColourTheme fallback                                       | Normal - cross-check                                                       | Matches the package.json default       | string type      |
-| TC-054  | sourceCodeProviderIntegrationLocation fallback                    | Normal - cross-check                                                       | Matches the package.json default       | string type      |
-| TC-055  | repository.commits.order fallback                                 | Normal - cross-check                                                       | Matches the package.json default       | string type      |
-| TC-056  | repository.commits.mute.mergeCommits fallback                     | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-057  | repository.commits.mute.commitsThatAreNotAncestorsOfHead fallback | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-058  | dialog.merge.noFastForward fallback                               | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-059  | dialog.merge.squashCommits fallback                               | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-060  | dialog.merge.noCommit fallback                                    | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-061  | dialog.cherryPick.recordOrigin fallback                           | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-062  | dialog.cherryPick.noCommit fallback                               | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-063  | dialog.stashUncommittedChanges.includeUntracked fallback          | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-064  | dialog.createWorktree.openTerminal fallback                       | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
-| TC-065  | dialog.removeWorktree.deleteBranch fallback                       | Normal - cross-check                                                       | Matches the package.json default       | boolean type     |
+| Case ID | Input / Precondition                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                        | Notes                 |
+| ------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------- | --------------------- |
+| TC-042  | dateFormat fallback                                               | Normal - cross-check                                                       | Matches the package.json default       | string type           |
+| TC-043  | dateType fallback                                                 | Normal - cross-check                                                       | Matches the package.json default       | string type           |
+| TC-044  | fetchAvatars fallback                                             | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-045  | graphStyle fallback                                               | Normal - cross-check                                                       | Matches the package.json default       | string type           |
+| TC-046  | initialLoadCommits fallback                                       | Normal - cross-check                                                       | Matches the package.json default       | number type           |
+| TC-047  | loadMoreCommits fallback                                          | Normal - cross-check                                                       | Matches the package.json default (100) | Fixed by REQ-9.1      |
+| TC-048  | loadMoreCommitsAutomatically fallback                             | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-049  | maxDepthOfRepoSearch fallback                                     | Normal - cross-check                                                       | Matches the package.json default       | number type           |
+| TC-050  | showCurrentBranchByDefault fallback                               | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-051  | showStatusBarItem fallback                                        | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-052  | showUncommittedChanges fallback                                   | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-053  | tabIconColourTheme fallback                                       | Normal - cross-check                                                       | Matches the package.json default       | string type           |
+| TC-054  | sourceCodeProviderIntegrationLocation fallback                    | Normal - cross-check                                                       | Matches the package.json default       | string type           |
+| TC-055  | repository.commits.order fallback                                 | Normal - cross-check                                                       | Matches the package.json default       | string type           |
+| TC-056  | repository.commits.mute.mergeCommits fallback                     | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-057  | repository.commits.mute.commitsThatAreNotAncestorsOfHead fallback | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-058  | dialog.merge.noFastForward fallback                               | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-059  | dialog.merge.squashCommits fallback                               | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-060  | dialog.merge.noCommit fallback                                    | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-061  | dialog.cherryPick.recordOrigin fallback                           | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-062  | dialog.cherryPick.noCommit fallback                               | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-063  | dialog.stashUncommittedChanges.includeUntracked fallback          | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-064  | dialog.createWorktree.openTerminal fallback                       | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-065  | dialog.removeWorktree.deleteBranch fallback                       | Normal - cross-check                                                       | Matches the package.json default       | boolean type          |
+| TC-371  | worktreePathTemplate fallback                                     | Normal - cross-check                                                       | Matches the package.json default       | string type (PR #114) |
 
 ## S11: Config fallback defaults vs package.json — comparison after keybinding conversion (4 settings)
 
@@ -146,3 +147,29 @@ S10 TC-049 only checks that the two values match, so it also passes with `0 === 
 - Normal: TC-369
 
 **Failure/normal ratio (smoke detector)**: 1 normal case (TC-369), 1 failure case (TC-370). Only the concrete default value changes, and the table above was confirmed to cover all failure sources.
+
+## S22: worktreePathTemplate() suggested worktree path template
+
+> Origin: Feature 062-01 (PR #114 follow-up)
+> Added: 2026-10-27
+> Status: active
+> Supersedes: -
+> Signature: `worktreePathTemplate(): string`
+> Target Path: `src/config.ts` (`worktreePathTemplate`)
+> Test File: `tests/src/config.test.ts`
+
+S10 TC-371 only checks that the fallback matches `package.json`. This section pins the concrete default and checks that an explicit value is passed through. A blank template falls back to the default later, in the resolver (`src/worktreePath-test.md` S2 TC-017), not here.
+
+| Case ID | Input / Precondition                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                | Notes                                     |
+| ------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------- | ----------------------------------------- |
+| TC-372  | `worktreePathTemplate` not specified                                             | Normal - default                                                           | Returns `${repoPath}/../${repoName}-${branch}` | Beside the repository                     |
+| TC-373  | `worktreePathTemplate` set to `~/.worktrees/${repoName}/${branch}`, then to `""` | Boundary - explicit value, including empty                                 | Returns each value as written                  | The getter does not replace a blank value |
+
+### Failure-source inventory (include-or-justify) — S22
+
+| Failure source                             | Case or reason for exclusion                                                                                            |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Default changed in code only               | TC-372 (and S10 TC-371 against `package.json`)                                                                          |
+| Explicit setting ignored or misspelled key | TC-373                                                                                                                  |
+| Blank value replaced too early             | TC-373                                                                                                                  |
+| Exception / External / Type                | excluded (`workspaceConfiguration.get()` does not throw under its default-value contract; types are left to the schema) |
