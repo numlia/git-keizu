@@ -1,4 +1,4 @@
-# テスト観点表: src/gitGraphView.ts
+# Test Perspectives: src/gitGraphView.ts
 
 > Source: `src/gitGraphView.ts`
 > Generated: 2026-09-08T00:00:00Z
@@ -6,55 +6,55 @@
 > Test Framework: Vitest
 > Responsibility: file-history
 
-## S34: fileHistory routing・requestId validation・response echo
+## S34: fileHistory routing, requestId validation and response echo
 
 > Origin: Feature 055-07 (light-spec-plan)
 > Added: 2026-09-08
 > Status: active
 > Supersedes: -
-> Signature: `private respondToMessage()` の `case "fileHistory"`（`case "fetchAvatar"` の後）
-> Target Path: `src/gitGraphView.ts`（message switch。実装後に行範囲へ更新）
+> Signature: `case "fileHistory"` in `private respondToMessage()` (after `case "fetchAvatar"`)
+> Target Path: `src/gitGraphView.ts` (message switch; to be updated to a line range after implementation)
 > Test File: `tests/src/gitGraphView.test.ts`
 
-登録済み repository の request だけが先頭フィルタ（`src/gitGraphView.ts:161-170`）を通過し、`Number.isSafeInteger(requestId) && requestId > 0` を満たすときだけ `dataSource.getFileHistory()` を 1 回呼んで `repo` / `requestId` / `anchorHash` / `filePath` を echo する routing の観点（対応プラン §4 Task 3 実装内容 2〜3）。Git 引数と entry の算出は `src/dataSource-test/07-file-history-01.md` S49〜S50、hash / path の検証は DataSource 側の責務で本表には含めない。
+Perspectives for the routing where only requests for registered repositories pass the leading filter (`src/gitGraphView.ts:161-170`), and only when `Number.isSafeInteger(requestId) && requestId > 0` holds is `dataSource.getFileHistory()` called once and `repo` / `requestId` / `anchorHash` / `filePath` echoed (implementation plan §4 Task 3, implementation items 2 to 3). Git arguments and entry computation belong to `src/dataSource-test/07-file-history-01.md` S49 to S50, and hash / path validation to the DataSource side; they are not in this table.
 
-| Case ID | Input / Precondition                                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                        | Notes                      |
-| ------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------- |
-| TC-173  | `{ command: "fileHistory", repo: <未登録>, requestId: 1, anchorHash, filePath }` を受信 | Validation - 未登録 repository                                             | `dataSource.getFileHistory` と `postMessage` の call count が 0（無応答）                              | 既存の先頭フィルタに委ねる |
-| TC-174  | `requestId: 0` の request                                                               | Boundary - requestId 0                                                     | `getFileHistory` と `postMessage` の call count が 0                                                   | `> 0` を満たさない         |
-| TC-175  | `requestId: -1` の request                                                              | Validation - 負数                                                          | `getFileHistory` と `postMessage` の call count が 0                                                   | -                          |
-| TC-176  | `requestId: 1.5` の request                                                             | Type - 非整数                                                              | `getFileHistory` と `postMessage` の call count が 0                                                   | `Number.isSafeInteger` 偽  |
-| TC-177  | `requestId: Number.MAX_SAFE_INTEGER + 1` の request                                     | Boundary - safe integer 上限 +1                                            | `getFileHistory` と `postMessage` の call count が 0                                                   | -                          |
-| TC-178  | `requestId: 1`（最小の有効値）の request                                                | Boundary - 最小の有効値                                                    | `getFileHistory` が 1 回呼ばれ、`postMessage` が `command: "fileHistory"` の response 1 件で呼ばれる   | -                          |
-| TC-179  | `requestId: Number.MAX_SAFE_INTEGER` の request                                         | Boundary - safe integer 上限                                               | `getFileHistory` が 1 回呼ばれ、response の `requestId` が同じ値                                       | -                          |
-| TC-180  | 登録済み repo、`requestId: 5`、`anchorHash: "abc"`、`filePath: "src/a.txt"` の request  | Normal - DataSource への委譲                                               | `getFileHistory` が `("<repo>", "abc", "src/a.txt")` で 1 回呼ばれる                                   | 引数の加工なし             |
-| TC-181  | 同 request の response                                                                  | Normal - 4 field の echo                                                   | response の `repo` / `requestId` / `anchorHash` / `filePath` が request の値と `toBe` で一致する       | -                          |
-| TC-182  | `getFileHistory` が entries 配列を返す                                                  | Normal - entries の同一参照                                                | response の `entries` が戻り値と `toBe` で同一参照（無変換）                                           | -                          |
-| TC-183  | `getFileHistory` が `null` を返す                                                       | Normal - null の素通し                                                     | response の `entries` が `null`（`[]` や `undefined` へ畳まない）で、`postMessage` は 1 回呼ばれる     | 失敗も response する       |
-| TC-184  | `anchorHash: "zz"`（不正 hash）の有効 requestId request                                 | Normal - hash / path 検証の委譲                                            | `getFileHistory` が `"zz"` をそのまま渡して 1 回呼ばれ、response の `entries` が戻り値（`null`）である | 検証は DataSource owner    |
+| Case ID | Input / Precondition                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                     | Notes                                      |
+| ------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| TC-173  | Receive `{ command: "fileHistory", repo: <unregistered repo>, requestId: 1, anchorHash, filePath }` | Validation - unregistered repository                                       | The call counts of `dataSource.getFileHistory` and `postMessage` are 0 (no response)                                | Left to the existing leading filter        |
+| TC-174  | A request with `requestId: 0`                                                                       | Boundary - requestId 0                                                     | The call counts of `getFileHistory` and `postMessage` are 0                                                         | Does not satisfy `> 0`                     |
+| TC-175  | A request with `requestId: -1`                                                                      | Validation - negative number                                               | The call counts of `getFileHistory` and `postMessage` are 0                                                         | -                                          |
+| TC-176  | A request with `requestId: 1.5`                                                                     | Type - non-integer                                                         | The call counts of `getFileHistory` and `postMessage` are 0                                                         | `Number.isSafeInteger` is false            |
+| TC-177  | A request with `requestId: Number.MAX_SAFE_INTEGER + 1`                                             | Boundary - safe integer limit +1                                           | The call counts of `getFileHistory` and `postMessage` are 0                                                         | -                                          |
+| TC-178  | A request with `requestId: 1` (the smallest valid value)                                            | Boundary - smallest valid value                                            | `getFileHistory` is called once, and `postMessage` is called with 1 response of `command: "fileHistory"`            | -                                          |
+| TC-179  | A request with `requestId: Number.MAX_SAFE_INTEGER`                                                 | Boundary - safe integer limit                                              | `getFileHistory` is called once, and the response's `requestId` is the same value                                   | -                                          |
+| TC-180  | A request with a registered repo, `requestId: 5`, `anchorHash: "abc"`, `filePath: "src/a.txt"`      | Normal - delegation to the DataSource                                      | `getFileHistory` is called once with `("<repo>", "abc", "src/a.txt")`                                               | Arguments are not modified                 |
+| TC-181  | The response to the same request                                                                    | Normal - echo of 4 fields                                                  | The response's `repo` / `requestId` / `anchorHash` / `filePath` match the request values with `toBe`                | -                                          |
+| TC-182  | `getFileHistory` returns an entries array                                                           | Normal - same reference for entries                                        | The response's `entries` is the same reference as the return value with `toBe` (not converted)                      | -                                          |
+| TC-183  | `getFileHistory` returns `null`                                                                     | Normal - null passed through                                               | The response's `entries` is `null` (not folded into `[]` or `undefined`), and `postMessage` is called once          | Failures also get a response               |
+| TC-184  | A request with a valid requestId and `anchorHash: "zz"` (invalid hash)                              | Normal - hash / path validation is delegated                               | `getFileHistory` is called once with `"zz"` passed as is, and the response's `entries` is the return value (`null`) | Validation belongs to the DataSource owner |
 
-### 失敗源インベントリ（include-or-justify）— Feature 055-07 追加分（S34）
+### Failure-source inventory (include-or-justify) — added by Feature 055-07 (S34)
 
-| 失敗源                                                 | 対応ケースまたは除外理由                                                                                                                                                |
-| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 未登録 repository への応答                             | TC-173                                                                                                                                                                  |
-| 不正 requestId（0 / 負数 / 非整数 / 上限超え）への応答 | TC-174〜TC-177                                                                                                                                                          |
-| 有効 requestId の取り漏れ（境界）                      | TC-178、TC-179                                                                                                                                                          |
-| echo field の欠落・値の加工                            | TC-181、TC-182、TC-184                                                                                                                                                  |
-| `null` を `[]` や `undefined` へ畳む                   | TC-183                                                                                                                                                                  |
-| DataSource の重複呼出・引数の加工                      | TC-180                                                                                                                                                                  |
-| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）  | 0: TC-174。minimum: TC-178。maximum: TC-179。+1: TC-177。NULL: TC-183。empty: excluded(requestId は数値で、`anchorHash` / `filePath` の空文字列検証は DataSource owner) |
-| 外部依存×失敗モード                                    | excluded(Git 失敗は `getFileHistory()` が `null` へ写像し、routing は TC-183 で素通しを固定する)                                                                        |
-| 例外・エラー経路                                       | excluded(case 節に throw 分岐を追加しない)                                                                                                                              |
-| stale response / anchor 不在 / DOM 再生成 / unload     | excluded(webview owner の責務。host は request 単位で応答する)                                                                                                          |
+| Failure source                                                                   | Covering case or reason for exclusion                                                                                                                                                                  |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Responding to an unregistered repository                                         | TC-173                                                                                                                                                                                                 |
+| Responding to an invalid requestId (0 / negative / non-integer / over the limit) | TC-174 to TC-177                                                                                                                                                                                       |
+| Missing a valid requestId (boundary)                                             | TC-178, TC-179                                                                                                                                                                                         |
+| Missing echo fields or modified values                                           | TC-181, TC-182, TC-184                                                                                                                                                                                 |
+| Folding `null` into `[]` or `undefined`                                          | TC-183                                                                                                                                                                                                 |
+| Duplicate DataSource calls or modified arguments                                 | TC-180                                                                                                                                                                                                 |
+| Boundary values (0 / minimum / maximum / +/-1 / empty / NULL)                    | 0: TC-174. minimum: TC-178. maximum: TC-179. +1: TC-177. NULL: TC-183. empty: excluded(requestId is a number, and the empty-string check of `anchorHash` / `filePath` belongs to the DataSource owner) |
+| External dependency × failure mode                                               | excluded(`getFileHistory()` maps Git failures to `null`, and TC-183 pins that the routing passes it through)                                                                                           |
+| Exception and error paths                                                        | excluded(no throw branch is added to the case clause)                                                                                                                                                  |
+| Stale response / missing anchor / DOM re-creation / unload                       | excluded(belongs to the webview owner. The host responds per request)                                                                                                                                  |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: TC-173、TC-175
-- Exception: excluded(上表のとおり throw 経路なし)
-- External: excluded(上表のとおり)
-- Boundary: TC-174、TC-177〜TC-179
+- Validation: TC-173, TC-175
+- Exception: excluded(no throw path; see the table above)
+- External: excluded(see the table above)
+- Boundary: TC-174, TC-177 to TC-179
 - Type: TC-176
-- Normal: TC-180〜TC-184
+- Normal: TC-180 to TC-184
 
-**失敗系/正常系比（煙感知器）**: 正常系5件、失敗系7件。routing 1 case の section で失敗源は repo フィルタと requestId 検証に限られ、上表で列挙済みであることを確認した。比率合わせのためのケース追加・削除は行わない。
+**Failure/normal ratio (smoke detector)**: 5 normal cases, 7 failure cases. This section covers one routing case, its failure sources are limited to the repo filter and the requestId check, and they are all listed in the table above. No cases are added or removed just to adjust the ratio.
