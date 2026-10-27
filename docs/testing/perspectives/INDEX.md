@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-10-28T01:52:05+09:00
+> Auto-generated: 2026-10-28T01:56:25+09:00
 > Total sources: 59
 > Total physical files: 105
-> Total sections: 626
-> Total cases: 3768
+> Total sections: 627
+> Total cases: 3770
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -42,7 +42,7 @@
 | `src/utils.ts` | single-file | `src/utils-test.md` | 1 | 6 | 26 | 2026-08-08 |
 | `src/worktree.ts` | single-file | `src/worktree-test.md` | 1 | 1 | 17 | 2026-08-08 |
 | `src/worktreePath.ts` | single-file | `src/worktreePath-test.md` | 1 | 3 | 34 | 2026-10-27 |
-| `web/branchCleanupPanel.ts` | single-file | `web/branchCleanupPanel-test.md` | 1 | 6 | 51 | 2026-10-07 |
+| `web/branchCleanupPanel.ts` | single-file | `web/branchCleanupPanel-test.md` | 1 | 7 | 53 | 2026-10-27 |
 | `web/branchLabels.ts` | single-file | `web/branchLabels-test.md` | 1 | 1 | 17 | 2026-03-21 |
 | `web/commitMenu.ts` | single-file | `web/commitMenu-test.md` | 1 | 12 | 53 | 2026-10-03 |
 | `web/contextMenu.ts` | single-file | `web/contextMenu-test.md` | 1 | 10 | 77 | 2026-10-07 |
@@ -154,7 +154,7 @@
 | Feature 061-05 (light-spec-plan) review fix | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md` |
 | Feature 061-05 (light-spec-plan) user follow-up | `web/main-test/INDEX.md` |
 | Feature 061-06 (light-spec-plan) | `web/main-test/INDEX.md`, `web/refOverflow-test.md` |
-| Feature 062-01 (PR #114 follow-up) | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/gitGraphView-test/INDEX.md`, `src/worktreePath-test.md`, `web/main-test/INDEX.md` |
+| Feature 062-01 (PR #114 follow-up) | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/gitGraphView-test/INDEX.md`, `src/worktreePath-test.md`, `web/branchCleanupPanel-test.md`, `web/main-test/INDEX.md` |
 | K2 demo-repository-config (light-spec-plan) | `scripts/readme-media/make-demo-repo-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
 | notes/features/044/memo-対応プラン.md | `web/dialogs-test.md` |
