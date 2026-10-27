@@ -1,2 +1,11 @@
 onlyBuiltDependencies:
   - esbuild
+
+auditConfig:
+  ignoreGhsas:
+    # @azure/msal-node <7.1.0 (via @vscode/vsce > @azure/identity) leaks data only in the
+    # auth code flow (acquireTokenByCode). Neither the VSIX nor our vsce usage reaches it:
+    # msal-node is dev-only, `vsce package` never authenticates, publishing uses PATs, and
+    # vsce's Azure credential chain does not include AuthorizationCodeCredential.
+    # Remove once @azure/identity accepts msal-node >=7.1.0.
+    - GHSA-xcx6-jx8p-x3h5

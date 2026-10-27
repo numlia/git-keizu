@@ -4,6 +4,7 @@
 
 # Whitelist files
 !LICENSE
+!ThirdPartyNotices.txt
 !CHANGELOG.md
 !out/
 !media/

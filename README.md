@@ -261,7 +261,7 @@ Bug reports and feedback via [GitHub Issues](https://github.com/numlia/git-keizu
 
 The codebase uses async/await throughout, targets ES2020, and includes a Vitest test suite with oxlint and oxfmt for consistent style.
 
-Pull requests are welcome as well. Fork the repository and open a pull request against `main`. CI runs `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test:ci`, so please confirm those pass locally first. For anything larger than a small fix, opening an issue first helps avoid wasted effort.
+Pull requests are welcome as well. Fork the repository and open a pull request against `main`. CI runs `pnpm run format`, `pnpm run lint`, `pnpm run typecheck`, and `pnpm run test:ci`, so please confirm those pass locally first. For anything larger than a small fix, opening an issue first helps avoid wasted effort. [CONTRIBUTING.md](CONTRIBUTING.md) covers the development setup, conventions, and what the maintainer takes care of for you.
 
 Supported build environments are **Linux, macOS, and WSL**. The build scripts rely on Unix shell commands (such as `rm` and `cp`), so building on a native Windows shell is not supported — on Windows, please develop inside WSL.
 
@@ -273,6 +273,6 @@ Thanks also to [asispts](https://github.com/asispts) for carrying the project fo
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT — see [LICENSE](LICENSE). Bundled third-party material and its licenses are listed in [ThirdPartyNotices.txt](ThirdPartyNotices.txt).
 
 > Not affiliated with or endorsed by the original Git Graph or neo-git-graph projects.

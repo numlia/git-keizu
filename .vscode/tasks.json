@@ -4,7 +4,7 @@
     {
       "label": "compile",
       "type": "shell",
-      "command": "npm exec --yes -- pnpm@10.29.3 run compile",
+      "command": "pnpm run compile",
       "group": "build",
       "problemMatcher": []
     }
