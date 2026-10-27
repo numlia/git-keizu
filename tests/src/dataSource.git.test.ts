@@ -1198,6 +1198,73 @@ describe("getFileHistory against real repositories (S50)", () => {
     ]);
   });
 
+  // @see docs/testing/perspectives/src/dataSource-test/07-file-history-01.md
+  describe("rename chain (S53)", () => {
+    it("follows a two-step rename chain behind a rename-undetected merge (TC-377)", async () => {
+      // Case: TC-377
+      // Given: base oldest -> edit -> unrelated main -> feature renames oldest -> legacy -> current
+      //        and rewrites it -> --no-ff merge -> fix
+      const OLDEST = "src/oldest-name.txt";
+      const repo = await initFixture("rename-chain");
+      await repo.write(OLDEST, numberedLines("line", 3));
+      await repo.commitAll("base: add oldest file");
+      await repo.append(OLDEST, "oldest");
+      await repo.commitAll("feat: update oldest file");
+      await repo.write("README.md", "readme\n");
+      await repo.commitAll("docs: unrelated main change");
+      repo.git(["branch", "feature", repo.hashOf("feat: update oldest file")]);
+      repo.git(["checkout", "feature"]);
+      repo.git(["mv", OLDEST, LEG]);
+      await repo.commitAll("refactor: rename oldest to legacy");
+      repo.git(["mv", LEG, CUR]);
+      await repo.commitAll("refactor: rename legacy to current");
+      await repo.write(CUR, numberedLines("different content", 8));
+      await repo.commitAll("feat: update renamed file");
+      repo.git(["checkout", MAIN_BRANCH]);
+      repo.git(["merge", "feature", "-m", "merge: rename feature"]);
+      await repo.append(CUR, "fix");
+      await repo.commitAll("fix: update file after merge");
+
+      // When/Then: both renames are followed down to the oldest path's birth
+      await expectHistory(repo, "fix: update file after merge", CUR, [
+        E("fix: update file after merge", "M", false, CUR),
+        E("merge: rename feature", "A", true, CUR),
+        E("feat: update renamed file", "M", false, CUR),
+        E("refactor: rename legacy to current", "R", false, CUR),
+        E("refactor: rename oldest to legacy", "R", false, LEG),
+        E("feat: update oldest file", "M", false, OLDEST),
+        E("base: add oldest file", "A", false, OLDEST)
+      ]);
+    });
+
+    it("follows the renamed file when a later rename reuses its old path (TC-380)", async () => {
+      // Case: TC-380
+      // Given: base legacy + other -> edit legacy -> rename legacy -> current
+      //        -> rename other -> legacy -> fix current
+      const OTHER = "src/other-name.txt";
+      const repo = await initFixture("reused-old-path");
+      await repo.write(LEG, numberedLines("legacy", 4));
+      await repo.write(OTHER, numberedLines("other", 4));
+      await repo.commitAll("base: add legacy and other");
+      await repo.append(LEG, "edit");
+      await repo.commitAll("feat: update legacy file");
+      repo.git(["mv", LEG, CUR]);
+      await repo.commitAll("refactor: rename legacy to current");
+      repo.git(["mv", OTHER, LEG]);
+      await repo.commitAll("refactor: rename other to legacy");
+      await repo.append(CUR, "fix");
+      await repo.commitAll("fix: update current file");
+
+      // When/Then: the legacy-path history is the renamed file's, not the other file's
+      await expectHistory(repo, "fix: update current file", CUR, [
+        E("fix: update current file", "M", false, CUR),
+        E("refactor: rename legacy to current", "R", false, CUR),
+        E("feat: update legacy file", "M", false, LEG),
+        E("base: add legacy and other", "A", false, LEG)
+      ]);
+    });
+  });
+
   it("does not return a merge that never touches the historical paths (TC-355)", async () => {
     // Case: TC-355
     // Given: the unrelated-merge fixture with merge: unrelated other in the history
