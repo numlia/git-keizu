@@ -6351,8 +6351,8 @@ describe("getFileHistory spawn orchestration (S49)", () => {
       fileHistoryRecord(similar.ren, [similar.updLeg], ["R100", LEG, CUR])
     ].join("");
 
-    it("runs the continuation lineage query on the old path of the rename (TC-791)", async () => {
-      // Case: TC-791
+    it("runs the continuation lineage query on the old path of the rename (TC-371)", async () => {
+      // Case: TC-371
       // Given: a lineage containing the rename legacy -> current
       installSpawnSequence([
         { stdout: similarLineage },
@@ -6367,8 +6367,8 @@ describe("getFileHistory spawn orchestration (S49)", () => {
       expect(spawnArgs(1)).toEqual(buildLineageQueryArgs(ANCHOR, LEG));
     });
 
-    it("recovers the pre-rename entries that the lineage query dropped (TC-792)", async () => {
-      // Case: TC-792
+    it("recovers the pre-rename entries that the lineage query dropped (TC-372)", async () => {
+      // Case: TC-372
       // Given: a lineage truncated after the rename and a continuation holding the legacy entries
       installSpawnSequence([
         { stdout: truncatedLineage },
@@ -6391,8 +6391,8 @@ describe("getFileHistory spawn orchestration (S49)", () => {
       ]);
     });
 
-    it("follows each rename of a chain with one continuation query (TC-793)", async () => {
-      // Case: TC-793
+    it("follows each rename of a chain with one continuation query (TC-373)", async () => {
+      // Case: TC-373
       // Given: oldest -> legacy at ren2 and legacy -> current at ren1, each continuation truncated
       const OLDEST = "src/oldest-name.txt";
       const ren1 = FH(0x91);
@@ -6436,8 +6436,8 @@ describe("getFileHistory spawn orchestration (S49)", () => {
       ]);
     });
 
-    it("returns null after two spawns when the continuation query fails (TC-794)", async () => {
-      // Case: TC-794
+    it("returns null after two spawns when the continuation query fails (TC-374)", async () => {
+      // Case: TC-374
       // Given: a lineage with a rename and exit 1 for the continuation query
       installSpawnSequence([{ stdout: similarLineage }, { stdout: "", exitCode: 1 }]);
 
@@ -6450,8 +6450,8 @@ describe("getFileHistory spawn orchestration (S49)", () => {
       expect(spawnArgs(1)).toEqual(buildLineageQueryArgs(ANCHOR, LEG));
     });
 
-    it("returns null after two spawns when the continuation output is malformed (TC-795)", async () => {
-      // Case: TC-795
+    it("returns null after two spawns when the continuation output is malformed (TC-375)", async () => {
+      // Case: TC-375
       // Given: a lineage with a rename and malformed continuation stdout
       installSpawnSequence([{ stdout: similarLineage }, { stdout: "x" }]);
 
@@ -6464,8 +6464,8 @@ describe("getFileHistory spawn orchestration (S49)", () => {
       expect(spawnArgs(1)).toEqual(buildLineageQueryArgs(ANCHOR, LEG));
     });
 
-    it("returns null when neither continuation includes the rename commit (TC-796)", async () => {
-      // Case: TC-796
+    it("returns null when neither continuation includes the rename commit (TC-376)", async () => {
+      // Case: TC-376
       // Given: continuations from the anchor and from the rename commit without the rename commit
       const continuation = [
         fileHistoryRecord(similar.updLeg, [similar.base], ["M", LEG]),
@@ -6494,8 +6494,8 @@ describe("getFileHistory spawn orchestration (S49)", () => {
       fileHistoryRecord(similar.updLeg, [similar.base], ["M", "src/other.txt"])
     ].join("");
 
-    it("retries the continuation from the rename commit when the old path was reused (TC-805)", async () => {
-      // Case: TC-805
+    it("retries the continuation from the rename commit when the old path was reused (TC-378)", async () => {
+      // Case: TC-378
       // Given: the anchor continuation reaches the rename commit on another file's path
       installSpawnSequence([
         { stdout: truncatedLineage },
@@ -6520,8 +6520,8 @@ describe("getFileHistory spawn orchestration (S49)", () => {
       ]);
     });
 
-    it("returns null when the continuation from the rename commit fails (TC-806)", async () => {
-      // Case: TC-806
+    it("returns null when the continuation from the rename commit fails (TC-379)", async () => {
+      // Case: TC-379
       // Given: a reused old path and exit 1 for the retry from the rename commit
       installSpawnSequence([
         { stdout: truncatedLineage },

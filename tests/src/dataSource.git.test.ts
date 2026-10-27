@@ -1200,8 +1200,8 @@ describe("getFileHistory against real repositories (S50)", () => {
 
   // @see docs/testing/perspectives/src/dataSource-test/07-file-history-01.md
   describe("rename chain (S53)", () => {
-    it("follows a two-step rename chain behind a rename-undetected merge (TC-803)", async () => {
-      // Case: TC-803
+    it("follows a two-step rename chain behind a rename-undetected merge (TC-377)", async () => {
+      // Case: TC-377
       // Given: base oldest -> edit -> unrelated main -> feature renames oldest -> legacy -> current
       //        and rewrites it -> --no-ff merge -> fix
       const OLDEST = "src/oldest-name.txt";
@@ -1237,8 +1237,8 @@ describe("getFileHistory against real repositories (S50)", () => {
       ]);
     });
 
-    it("follows the renamed file when a later rename reuses its old path (TC-807)", async () => {
-      // Case: TC-807
+    it("follows the renamed file when a later rename reuses its old path (TC-380)", async () => {
+      // Case: TC-380
       // Given: base legacy + other -> edit legacy -> rename legacy -> current
       //        -> rename other -> legacy -> fix current
       const OTHER = "src/other-name.txt";

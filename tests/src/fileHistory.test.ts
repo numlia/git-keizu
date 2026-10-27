@@ -1508,8 +1508,8 @@ describe("findLineageRename / spliceLineageContinuation (S9)", () => {
     ];
   }
 
-  it("returns the renames in lineage order by index (TC-797)", () => {
-    // Case: TC-797
+  it("returns the renames in lineage order by index (TC-081)", () => {
+    // Case: TC-081
     // Given: a lineage with two renames among other entries
     const lineage = lineageOf(
       [
@@ -1531,8 +1531,8 @@ describe("findLineageRename / spliceLineageContinuation (S9)", () => {
     expect(second!.oldFilePath).toBe(OLDEST);
   });
 
-  it("returns null once every rename has been followed (TC-798)", () => {
-    // Case: TC-798
+  it("returns null once every rename has been followed (TC-082)", () => {
+    // Case: TC-082
     // Given: a lineage with one rename and one without any
     const withRename = lineageOf(
       [fileEntry(fix, "M", CUR), fileEntry(ren1, "R", CUR, { oldFilePath: LEG })],
@@ -1545,8 +1545,8 @@ describe("findLineageRename / spliceLineageContinuation (S9)", () => {
     expect(findLineageRename(withoutRename, 0)).toBeNull();
   });
 
-  it("keeps the groups through the rename and appends the continuation after it (TC-799)", () => {
-    // Case: TC-799
+  it("keeps the groups through the rename and appends the continuation after it (TC-083)", () => {
+    // Case: TC-083
     // Given: walked groups and a continuation starting before the rename
     const groups = walkedGroups();
     const continuation = [
@@ -1567,8 +1567,8 @@ describe("findLineageRename / spliceLineageContinuation (S9)", () => {
     expect(continuation).toEqual(continuationBefore);
   });
 
-  it("returns only the groups through the rename when the continuation ends at it (TC-800)", () => {
-    // Case: TC-800
+  it("returns only the groups through the rename when the continuation ends at it (TC-084)", () => {
+    // Case: TC-084
     // Given: a continuation whose last group is the rename commit
     const groups = walkedGroups();
     const continuation = [group(ren1, [upd], [entryOf("D", LEG)])];
@@ -1580,8 +1580,8 @@ describe("findLineageRename / spliceLineageContinuation (S9)", () => {
     expect(result).toEqual([groups[0], groups[1]]);
   });
 
-  it("returns null when the continuation lacks the rename commit (TC-801)", () => {
-    // Case: TC-801
+  it("returns null when the continuation lacks the rename commit (TC-085)", () => {
+    // Case: TC-085
     // Given: a continuation without ren1 and an empty continuation
     const groups = walkedGroups();
     const continuation = [group(upd, [base], [entryOf("M", LEG)])];
@@ -1591,8 +1591,8 @@ describe("findLineageRename / spliceLineageContinuation (S9)", () => {
     expect(spliceLineageContinuation(groups, rename1, [])).toBeNull();
   });
 
-  it("returns null when the walked groups lack the rename commit (TC-802)", () => {
-    // Case: TC-802
+  it("returns null when the walked groups lack the rename commit (TC-086)", () => {
+    // Case: TC-086
     // Given: a rename hash that is not among the walked groups
     const continuation = [group(ren2, [base], [entryOf("D", LEG)])];
 
@@ -1600,8 +1600,8 @@ describe("findLineageRename / spliceLineageContinuation (S9)", () => {
     expect(spliceLineageContinuation(walkedGroups(), rename2, continuation)).toBeNull();
   });
 
-  it("returns null when the continuation reaches the rename commit on another path (TC-804)", () => {
-    // Case: TC-804
+  it("returns null when the continuation reaches the rename commit on another path (TC-087)", () => {
+    // Case: TC-087
     // Given: a continuation that tracked another file onto the legacy path, so ren1 shows
     //        that file's path instead of D legacy
     const continuation = [
