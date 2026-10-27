@@ -12,7 +12,7 @@
 > Status: active
 > Supersedes: -
 
-**Signature**: `file row 要素 / expandedCommit / repo を受け取り openFile request を送る helper`
+**Signature**: a helper that takes a file row element, `expandedCommit` and `repo` and sends an `openFile` request
 **Target path**: `web/fileMenu.ts`
 
 | Case ID | Input / Precondition                                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                         | Notes                    |
@@ -179,7 +179,7 @@ Perspectives for the contract that places the 4 conditions of the context menu (
 | TC-037  | hash is `*`                                                                             | Validation - uncommitted                                                   | `false`                                                                                                                    | `UNCOMMITTED_CHANGES_HASH`                 |
 | TC-038  | isStash is `true`                                                                       | Validation - stash                                                         | `false`                                                                                                                    | -                                          |
 | TC-039  | compareWithHash is `"def"`                                                              | Validation - comparison view                                               | `false`                                                                                                                    | -                                          |
-| TC-040  | `sendHighlightFileHistoryAction(基本行, 基本commit, TEST_REPO, context)`                | Normal - launch                                                            | `onHighlightFileHistory` is called once with `("abc", "src/file.ts")`, `postMessage` 0 times, `recordRecentAction` 0 times | Same arguments as the menu item            |
+| TC-040  | `sendHighlightFileHistoryAction(<base row>, <base commit>, TEST_REPO, context)`         | Normal - launch                                                            | `onHighlightFileHistory` is called once with `("abc", "src/file.ts")`, `postMessage` 0 times, `recordRecentAction` 0 times | Same arguments as the menu item            |
 | TC-041  | `data-newfilepath` is `encodeURIComponent("src/テスト ファイル.ts")`                    | Boundary - special characters                                              | The second argument is `"src/テスト ファイル.ts"`                                                                          | `decodeURIComponent`                       |
 | TC-042  | fileRow is `null` (the result of `resolveFileRow(span)`)                                | Validation - row resolution failed                                         | Callback 0 times, no exception                                                                                             | Same guard as S1 TC-006                    |
 | TC-043  | expandedCommit is `null`                                                                | Validation - no commit context                                             | 0 times                                                                                                                    | -                                          |

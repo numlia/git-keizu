@@ -124,7 +124,7 @@
 > Signature: `export function encodeDiffDocUri(repo: string, filePath: string, commit: string, version?: string): vscode.Uri`
 > Target Path: `src/diffDocProvider.ts:58-71`
 
-A fix that changes `encodeDiffDocUri` from `vscode.Uri.parse(文字列連結)` to construction with `vscode.Uri.from({ scheme, path, query })`, and adds an optional `version` query field. Each query field (`commit` / `repo` / `version`) is encoded separately with `encodeURIComponent` and joined with `&`. `version` is not added when it is `undefined`. Replaces the old S1 (the `Uri.parse` version with `commit` only).
+A fix that changes `encodeDiffDocUri` from `vscode.Uri.parse(<concatenated string>)` to construction with `vscode.Uri.from({ scheme, path, query })`, and adds an optional `version` query field. Each query field (`commit` / `repo` / `version`) is encoded separately with `encodeURIComponent` and joined with `&`. `version` is not added when it is `undefined`. Replaces the old S1 (the `Uri.parse` version with `commit` only).
 
 | Case ID | Input / Precondition                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                             | Notes                                             |
 | ------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |

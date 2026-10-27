@@ -119,14 +119,14 @@
 **Signature**: `private renderTable(): void`
 **Target path**: `web/main.ts:610`
 
-| Case ID | Input / Precondition                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                    | Notes                                |
-| ------- | ------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------ |
-| TC-123  | Row HTML for a normal commit (mute=false)         | Normal - standard                                                          | The message text is wrapped in `<span class="commitMessage">`      | Applies to every commit row          |
-| TC-124  | Row HTML for a muted commit (mute=true)           | Normal - muted                                                             | The message text is wrapped in `<span class="commitMessage">`      | Works with CSS for the muted display |
-| TC-125  | Row HTML for the commit matching currentHash      | Normal - current                                                           | In the form `<span class="commitMessage"><b>メッセージ</b></span>` | bold is inside the wrapper           |
-| TC-126  | Row HTML for a commit not matching currentHash    | Normal - standard                                                          | In the form `<span class="commitMessage">メッセージ</span>`        | plain text                           |
-| TC-127  | Row HTML for a commit with reference labels       | Normal - with refs                                                         | The `.gitRef` span is outside (right before) `.commitMessage`      | Labels are outside the wrapper       |
-| TC-128  | Row HTML for the HEAD commit (with commitHeadDot) | Normal - HEAD                                                              | The `.commitHeadDot` span is outside `.commitMessage`              | The HEAD dot is outside the wrapper  |
+| Case ID | Input / Precondition                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                   | Notes                                |
+| ------- | ------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------ |
+| TC-123  | Row HTML for a normal commit (mute=false)         | Normal - standard                                                          | The message text is wrapped in `<span class="commitMessage">`     | Applies to every commit row          |
+| TC-124  | Row HTML for a muted commit (mute=true)           | Normal - muted                                                             | The message text is wrapped in `<span class="commitMessage">`     | Works with CSS for the muted display |
+| TC-125  | Row HTML for the commit matching currentHash      | Normal - current                                                           | In the form `<span class="commitMessage"><b>{message}</b></span>` | bold is inside the wrapper           |
+| TC-126  | Row HTML for a commit not matching currentHash    | Normal - standard                                                          | In the form `<span class="commitMessage">{message}</span>`        | plain text                           |
+| TC-127  | Row HTML for a commit with reference labels       | Normal - with refs                                                         | The `.gitRef` span is outside (right before) `.commitMessage`     | Labels are outside the wrapper       |
+| TC-128  | Row HTML for the HEAD commit (with commitHeadDot) | Normal - HEAD                                                              | The `.commitHeadDot` span is outside `.commitMessage`             | The HEAD dot is outside the wrapper  |
 
 ## S35: Rendering the worktree icon and data attributes
 

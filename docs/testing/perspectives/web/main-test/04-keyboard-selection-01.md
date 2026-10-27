@@ -214,7 +214,7 @@ A fix that adds a small predicate to the ArrowUp/ArrowDown commit-move branch to
 > Target Path: `web/main.ts` (`handleEscape()`; to be updated to a line range after implementation)
 > Test File: `tests/web/main.refOverflow.test.ts`
 
-The Esc order becomes `contextMenu → dialog → repoDropdown → branchDropdown → authorDropdown → ref一覧 → findWidget → expandedCommit`, and if `closePopup()` returns `true`, that Esc ends there. The existing S40 order still holds as is when the list is closed, so this section is additive. The list is opened by clicking the counter with the real controller.
+The Esc order becomes `contextMenu → dialog → repoDropdown → branchDropdown → authorDropdown → ref list → findWidget → expandedCommit`, and if `closePopup()` returns `true`, that Esc ends there. The existing S40 order still holds as is when the list is closed, so this section is additive. The list is opened by clicking the counter with the real controller.
 
 | Case ID | Input / Precondition                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                        | Notes                                                       |
 | ------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
