@@ -1,4 +1,4 @@
-# テスト観点表: web/main.ts
+# Test Perspectives: web/main.ts
 
 > Source: `web/main.ts`
 > Generated: 2026-03-22T14:25:09Z
@@ -6,7 +6,7 @@
 > Test Framework: Vitest
 > Responsibility: keyboard-selection
 
-## S10: handleKeyboardShortcut() ショートカットキーマッチング
+## S10: handleKeyboardShortcut() shortcut key matching
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
@@ -14,61 +14,44 @@
 > Superseded By: S72（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
 
-**シグネチャ**: `handleKeyboardShortcut(e: KeyboardEvent): void`
-**テスト対象パス**: `web/main.ts`
+**Signature**: `handleKeyboardShortcut(e: KeyboardEvent): void`
+**Target path**: `web/main.ts`
 
-| Case ID | Input / Precondition                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                               | Notes                  |
-| ------- | ------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------- | ---------------------- |
-| TC-065  | Ctrl+F (config find="f")                          | Normal - standard                                                          | findWidget.show(true) が呼ばれる                              | Find アクション        |
-| TC-066  | Cmd+F (metaKey=true, config find="f")             | Normal - macOS                                                             | findWidget.show(true) が呼ばれる                              | macOS対応              |
-| TC-067  | Ctrl+R (config refresh="r")                       | Normal - standard                                                          | refresh(true) が呼ばれる                                      | Refresh アクション     |
-| TC-068  | Ctrl+H (config scrollToHead="h"), commitHead 存在 | Normal - standard                                                          | scrollToCommit(commitHead, true, true) が呼ばれる             | HEAD スクロール        |
-| TC-069  | Ctrl+H, commitHead が null                        | Boundary - no HEAD                                                         | 何も起きない                                                  | HEAD 不在時            |
-| TC-070  | キー押下（Ctrl/Cmd なし）                         | Validation - no modifier                                                   | 何も起きない                                                  | 修飾キーなし           |
-| TC-071  | Ctrl + 設定に存在しないキー                       | Validation - unmapped key                                                  | 何も起きない                                                  | マッチなし             |
-| TC-072  | isComposing=true の状態でCtrl+F                   | Boundary - IME composing                                                   | 何も起きない                                                  | IME入力中は無視        |
-| TC-073  | Shift+Ctrl+F (Shift修飾あり)                      | Normal - with shift                                                        | e.key を toLowerCase して "f" にマッチ、findWidget.show(true) | Shift時の大文字対応    |
-| TC-074  | Ctrl+F だが find 設定が null (UNASSIGNED)         | Boundary - disabled shortcut                                               | 何も起きない                                                  | ショートカット無効化時 |
+| Case ID | Input / Precondition                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                            | Notes                        |
+| ------- | --------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------- | ---------------------------- |
+| TC-065  | Ctrl+F (config find="f")                            | Normal - standard                                                          | findWidget.show(true) is called                            | Find action                  |
+| TC-066  | Cmd+F (metaKey=true, config find="f")               | Normal - macOS                                                             | findWidget.show(true) is called                            | macOS support                |
+| TC-067  | Ctrl+R (config refresh="r")                         | Normal - standard                                                          | refresh(true) is called                                    | Refresh action               |
+| TC-068  | Ctrl+H (config scrollToHead="h"), commitHead exists | Normal - standard                                                          | scrollToCommit(commitHead, true, true) is called           | Scroll to HEAD               |
+| TC-069  | Ctrl+H, commitHead is null                          | Boundary - no HEAD                                                         | Nothing happens                                            | No HEAD                      |
+| TC-070  | Key press (no Ctrl/Cmd)                             | Validation - no modifier                                                   | Nothing happens                                            | No modifier key              |
+| TC-071  | Ctrl + a key not in the config                      | Validation - unmapped key                                                  | Nothing happens                                            | No match                     |
+| TC-072  | Ctrl+F with isComposing=true                        | Boundary - IME composing                                                   | Nothing happens                                            | Ignored during IME input     |
+| TC-073  | Shift+Ctrl+F (with the Shift modifier)              | Normal - with shift                                                        | e.key is lowercased and matches "f"; findWidget.show(true) | Handles uppercase with Shift |
+| TC-074  | Ctrl+F, but the find config is null (UNASSIGNED)    | Boundary - disabled shortcut                                               | Nothing happens                                            | Shortcut disabled            |
 
-## S11: scrollToStash() スタッシュナビゲーション
+## S11: scrollToStash() stash navigation
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `scrollToStash(forward: boolean): void`
-**テスト対象パス**: `web/main.ts`
+**Signature**: `scrollToStash(forward: boolean): void`
+**Target path**: `web/main.ts`
 
-| Case ID | Input / Precondition                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                 | Notes                       |
-| ------- | ------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------- | --------------------------- |
-| TC-075  | forward=true, stash 3件, index=-1 (初期)          | Normal - first nav                                                         | 最初の stash (index 0) にスクロール、フラッシュ | index=-1 → 0                |
-| TC-076  | forward=true, stash 3件, index=0                  | Normal - standard                                                          | 次の stash (index 1) にスクロール               | 前方移動                    |
-| TC-077  | forward=true, stash 3件, index=2 (末尾)           | Boundary - wrap forward                                                    | 最初の stash (index 0) に循環移動               | 末尾 → 先頭                 |
-| TC-078  | forward=false (Shift), stash 3件, index=-1 (初期) | Normal - reverse first nav                                                 | 最後の stash (index 2) にスクロール             | 逆方向初期                  |
-| TC-079  | forward=false, stash 3件, index=0 (先頭)          | Boundary - wrap backward                                                   | 最後の stash (index 2) に循環移動               | 先頭 → 末尾                 |
-| TC-080  | stash コミットが 0 件                             | Boundary - no stashes                                                      | 何も起きない（サイレント）                      | stash 不在                  |
-| TC-081  | stash 操作後、5秒タイムアウト経過                 | Boundary - timeout reset                                                   | stashNavigationIndex が -1 にリセットされる     | STASH_NAVIGATION_TIMEOUT_MS |
-| TC-082  | stash 1件のみ, forward=true                       | Boundary - single stash                                                    | 同じ stash にスクロール（循環）                 | index 0 → 0                 |
+| Case ID | Input / Precondition                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                     | Notes                       |
+| ------- | ---------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------- | --------------------------- |
+| TC-075  | forward=true, 3 stashes, index=-1 (initial)          | Normal - first nav                                                         | Scrolls to the first stash (index 0) and flashes it | index=-1 → 0                |
+| TC-076  | forward=true, 3 stashes, index=0                     | Normal - standard                                                          | Scrolls to the next stash (index 1)                 | Forward move                |
+| TC-077  | forward=true, 3 stashes, index=2 (last)              | Boundary - wrap forward                                                    | Wraps around to the first stash (index 0)           | Last → first                |
+| TC-078  | forward=false (Shift), 3 stashes, index=-1 (initial) | Normal - reverse first nav                                                 | Scrolls to the last stash (index 2)                 | Initial reverse move        |
+| TC-079  | forward=false, 3 stashes, index=0 (first)            | Boundary - wrap backward                                                   | Wraps around to the last stash (index 2)            | First → last                |
+| TC-080  | 0 stash commits                                      | Boundary - no stashes                                                      | Nothing happens (silent)                            | No stashes                  |
+| TC-081  | The 5-second timeout passes after a stash action     | Boundary - timeout reset                                                   | stashNavigationIndex is reset to -1                 | STASH_NAVIGATION_TIMEOUT_MS |
+| TC-082  | Only 1 stash, forward=true                           | Boundary - single stash                                                    | Scrolls to the same stash (wrap-around)             | index 0 → 0                 |
 
-## S29: handleKeyboardShortcut() Arrow キー テーブル順ナビゲーション
-
-> Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
-> Added: 2026-03-08
-> Status: superseded
-> Superseded By: S70（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
-> Supersedes: -
-
-**テスト対象パス**: `web/main.ts`
-
-| Case ID | Input / Precondition                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                          | Notes       |
-| ------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------- | ----------- |
-| TC-164  | expandedCommit あり、index=2、ArrowDown（修飾キーなし）        | Normal - standard                                                          | index=3 のコミット詳細を表示（loadCommitDetails 呼出）   | REQ-2.1     |
-| TC-165  | expandedCommit あり、index=2、ArrowUp（修飾キーなし）          | Normal - standard                                                          | index=1 のコミット詳細を表示（loadCommitDetails 呼出）   | REQ-2.1     |
-| TC-166  | expandedCommit あり、index=0（先頭）、ArrowUp                  | Boundary - table start                                                     | 何も起きない（loadCommitDetails 未呼出、イベント未消費） | newIndex=-1 |
-| TC-167  | expandedCommit あり、index=commits.length-1（末尾）、ArrowDown | Boundary - table end                                                       | 何も起きない（loadCommitDetails 未呼出、イベント未消費） | 範囲外      |
-
-## S30: handleKeyboardShortcut() Arrow キー ブランチ追跡ナビゲーション
+## S29: handleKeyboardShortcut() Arrow key navigation in table order
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
@@ -76,16 +59,16 @@
 > Superseded By: S70（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
 
-**テスト対象パス**: `web/main.ts`
+**Target path**: `web/main.ts`
 
-| Case ID | Input / Precondition                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                          | Notes   |
-| ------- | -------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------- | ------- |
-| TC-168  | expandedCommit あり、Ctrl+ArrowDown                      | Normal - standard                                                          | getFirstParentIndex で同一ブランチの親へ移動             | REQ-2.2 |
-| TC-169  | expandedCommit あり、Ctrl+ArrowUp                        | Normal - standard                                                          | getFirstChildIndex で同一ブランチの子へ移動              | REQ-2.2 |
-| TC-170  | ブランチ終端、Ctrl+ArrowDown（getFirstParentIndex → -1） | Boundary - branch end                                                      | 何も起きない（loadCommitDetails 未呼出、イベント未消費） | -       |
-| TC-171  | ブランチ始端、Ctrl+ArrowUp（getFirstChildIndex → -1）    | Boundary - branch start                                                    | 何も起きない（loadCommitDetails 未呼出、イベント未消費） | -       |
+| Case ID | Input / Precondition                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                    | Notes        |
+| ------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------ |
+| TC-164  | expandedCommit set, index=2, ArrowDown (no modifier)         | Normal - standard                                                          | Shows the commit details at index=3 (calls loadCommitDetails)      | REQ-2.1      |
+| TC-165  | expandedCommit set, index=2, ArrowUp (no modifier)           | Normal - standard                                                          | Shows the commit details at index=1 (calls loadCommitDetails)      | REQ-2.1      |
+| TC-166  | expandedCommit set, index=0 (first), ArrowUp                 | Boundary - table start                                                     | Nothing happens (loadCommitDetails not called, event not consumed) | newIndex=-1  |
+| TC-167  | expandedCommit set, index=commits.length-1 (last), ArrowDown | Boundary - table end                                                       | Nothing happens (loadCommitDetails not called, event not consumed) | Out of range |
 
-## S31: handleKeyboardShortcut() Arrow キー 代替ブランチナビゲーション
+## S30: handleKeyboardShortcut() Arrow key navigation following the branch
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
@@ -93,15 +76,32 @@
 > Superseded By: S70（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
 
-**テスト対象パス**: `web/main.ts`
+**Target path**: `web/main.ts`
 
-| Case ID | Input / Precondition                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                               | Notes   |
-| ------- | -------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------- | ------- |
-| TC-172  | マージコミット展開中、Ctrl+Shift+ArrowDown               | Normal - standard                                                          | getAlternativeParentIndex で代替親コミットへ移動              | REQ-2.3 |
-| TC-173  | 展開中、Ctrl+Shift+ArrowUp                               | Normal - standard                                                          | getAlternativeChildIndex で代替子コミットへ移動               | REQ-2.3 |
-| TC-174  | 代替ブランチなし（親/子が1つ以下）、Ctrl+Shift+ArrowDown | Normal - fallback                                                          | フォールバック動作（親が1つならその親、なしなら何も起きない） | -       |
+| Case ID | Input / Precondition                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                    | Notes   |
+| ------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------- |
+| TC-168  | expandedCommit set, Ctrl+ArrowDown                           | Normal - standard                                                          | Moves to the parent on the same branch via getFirstParentIndex     | REQ-2.2 |
+| TC-169  | expandedCommit set, Ctrl+ArrowUp                             | Normal - standard                                                          | Moves to the child on the same branch via getFirstChildIndex       | REQ-2.2 |
+| TC-170  | End of the branch, Ctrl+ArrowDown (getFirstParentIndex → -1) | Boundary - branch end                                                      | Nothing happens (loadCommitDetails not called, event not consumed) | -       |
+| TC-171  | Start of the branch, Ctrl+ArrowUp (getFirstChildIndex → -1)  | Boundary - branch start                                                    | Nothing happens (loadCommitDetails not called, event not consumed) | -       |
 
-## S32: handleKeyboardShortcut() Arrow キー 前提条件チェック
+## S31: handleKeyboardShortcut() Arrow key navigation to alternative branches
+
+> Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
+> Added: 2026-03-08
+> Status: superseded
+> Superseded By: S70（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
+> Supersedes: -
+
+**Target path**: `web/main.ts`
+
+| Case ID | Input / Precondition                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                  | Notes   |
+| ------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ------- |
+| TC-172  | A merge commit is expanded, Ctrl+Shift+ArrowDown                     | Normal - standard                                                          | Moves to the alternative parent commit via getAlternativeParentIndex             | REQ-2.3 |
+| TC-173  | A commit is expanded, Ctrl+Shift+ArrowUp                             | Normal - standard                                                          | Moves to the alternative child commit via getAlternativeChildIndex               | REQ-2.3 |
+| TC-174  | No alternative branch (at most 1 parent/child), Ctrl+Shift+ArrowDown | Normal - fallback                                                          | Fallback behavior (the single parent if there is one, otherwise nothing happens) | -       |
+
+## S32: handleKeyboardShortcut() Arrow key precondition checks
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
@@ -109,17 +109,17 @@
 > Superseded By: S64（[04-keyboard-selection-02.md](04-keyboard-selection-02.md)）
 > Supersedes: -
 
-**テスト対象パス**: `web/main.ts`
+**Target path**: `web/main.ts`
 
-| Case ID | Input / Precondition                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                      | Notes      |
-| ------- | ------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------- | ---------- |
-| TC-175  | expandedCommit が null の状態で ArrowDown              | Validation - rejected precondition                                         | Arrow キー処理スキップ（loadCommitDetails 未呼出）   | REQ-2.4    |
-| TC-176  | expandedCommit.compareWithHash が非 null で ArrowDown  | Validation - rejected precondition                                         | Arrow キー処理スキップ（比較モード中）               | REQ-2.4    |
-| TC-177  | commitLookup に expandedCommit.hash が不在で ArrowDown | Boundary - unknown hash                                                    | ナビゲーション処理スキップ                           | -          |
-| TC-178  | isComposing=true の状態で ArrowDown                    | Validation - rejected precondition                                         | handleKeyboardShortcut 全体が即座に return           | IME 入力中 |
-| TC-179  | expandedCommit あり、ArrowLeft キー                    | Validation - rejected precondition                                         | Arrow キー処理スキップ（ArrowUp/ArrowDown のみ対象） | -          |
+| Case ID | Input / Precondition                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                    | Notes            |
+| ------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------ | ---------------- |
+| TC-175  | ArrowDown with expandedCommit null                           | Validation - rejected precondition                                         | Arrow key handling is skipped (loadCommitDetails not called)       | REQ-2.4          |
+| TC-176  | ArrowDown with expandedCommit.compareWithHash non-null       | Validation - rejected precondition                                         | Arrow key handling is skipped (in compare mode)                    | REQ-2.4          |
+| TC-177  | ArrowDown with expandedCommit.hash missing from commitLookup | Boundary - unknown hash                                                    | Navigation handling is skipped                                     | -                |
+| TC-178  | ArrowDown with isComposing=true                              | Validation - rejected precondition                                         | handleKeyboardShortcut returns immediately as a whole              | During IME input |
+| TC-179  | expandedCommit set, ArrowLeft key                            | Validation - rejected precondition                                         | Arrow key handling is skipped (only ArrowUp/ArrowDown are handled) | -                |
 
-## S33: handleKeyboardShortcut() Arrow キー イベント制御
+## S33: handleKeyboardShortcut() Arrow key event control
 
 > Origin: Feature 013 (arrow-key-navigation) (aidd-spec-tasks-test)
 > Added: 2026-03-08
@@ -127,16 +127,16 @@
 > Superseded By: S64（[04-keyboard-selection-02.md](04-keyboard-selection-02.md)）
 > Supersedes: -
 
-**テスト対象パス**: `web/main.ts`
+**Target path**: `web/main.ts`
 
-| Case ID | Input / Precondition                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                        | Notes          |
-| ------- | ---------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------ | -------------- |
-| TC-180  | ナビゲーション成功（有効な newIndex + DOM 要素あり） | Normal - standard                                                          | preventDefault() と stopPropagation() が呼び出される   | REQ-2.5        |
-| TC-181  | ナビゲーション失敗（newIndex=-1 or DOM 要素なし）    | Normal - no nav                                                            | preventDefault() と stopPropagation() が呼び出されない | イベント透過   |
-| TC-182  | Shift のみ + ArrowUp（Ctrl/Cmd なし）                | Validation - rejected precondition                                         | Arrow キー処理スキップ（修飾キーパターン不一致）       | フォールスルー |
-| TC-183  | Alt + ArrowUp（Ctrl/Cmd なし）                       | Validation - rejected precondition                                         | Arrow キー処理スキップ（修飾キーパターン不一致）       | フォールスルー |
+| Case ID | Input / Precondition                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                 | Notes                |
+| ------- | --------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------- | -------------------- |
+| TC-180  | Navigation succeeds (valid newIndex and the DOM element exists) | Normal - standard                                                          | preventDefault() and stopPropagation() are called               | REQ-2.5              |
+| TC-181  | Navigation fails (newIndex=-1 or no DOM element)                | Normal - no nav                                                            | preventDefault() and stopPropagation() are not called           | Event passes through |
+| TC-182  | Shift only + ArrowUp (no Ctrl/Cmd)                              | Validation - rejected precondition                                         | Arrow key handling is skipped (modifier pattern does not match) | Fall-through         |
+| TC-183  | Alt + ArrowUp (no Ctrl/Cmd)                                     | Validation - rejected precondition                                         | Arrow key handling is skipped (modifier pattern does not match) | Fall-through         |
 
-## S40: handleEscape() 優先順位チェーン
+## S40: handleEscape() priority chain
 
 > Origin: test-plan (既存コード網羅)
 > Added: 2026-05-17
@@ -146,109 +146,109 @@
 > Signature: `handleEscape(): void`
 > Target Path: `web/main.ts`
 
-Escape キー押下時の dismissal チェーン: `contextMenu → dialog → repoDropdown → branchDropdown → authorDropdown → findWidget → expandedCommit`。各レベルで該当する UI が active なら hide / close を呼んで早期 return し、後段は実行されない。
+The dismissal chain when Escape is pressed: `contextMenu → dialog → repoDropdown → branchDropdown → authorDropdown → findWidget → expandedCommit`. At each level, if the matching UI is active, it calls hide / close and returns early, and later levels do not run.
 
-| Case ID | Input / Precondition                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                             | Notes                          |
-| ------- | --------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------ |
-| TC-221  | `isContextMenuActive()` が true                           | Normal - first priority                                                    | `hideContextMenu()` が 1 回呼ばれ、以降の hide 系（dialog/dropdown/findWidget）は呼ばれない | 最優先で context menu を閉じる |
-| TC-222  | contextMenu inactive、`isDialogActive()` true             | Normal - second priority                                                   | `hideDialog()` が 1 回呼ばれ、dropdown / findWidget / expandedCommit は触られない           | dialog 優先                    |
-| TC-223  | contextMenu/dialog inactive、`repoDropdown.isOpen()` true | Normal - third priority                                                    | `repoDropdown.close()` が呼ばれ、後段の branch/author dropdown は close されない            | repo dropdown のみ閉じる       |
-| TC-224  | repo dropdown も閉じている、`findWidget.isVisible()` true | Normal - findWidget priority                                               | `findWidget.close()` が呼ばれ、`hideCommitDetails` は呼ばれない                             | findWidget が次優先            |
-| TC-225  | findWidget も非表示、`expandedCommit !== null`            | Normal - last fallback                                                     | `hideCommitDetails()` が呼ばれる                                                            | チェーンの最後段               |
-| TC-226  | 上記すべて非アクティブ                                    | Boundary - no active UI                                                    | hide/close 系 API は一切呼ばれず、Escape は no-op として透過する                            | DOM 状態に副作用なし           |
-| TC-227  | `contextMenu` と `dialog` が両方 active                   | Validation - priority order                                                | `hideContextMenu()` のみ呼ばれ、`hideDialog()` は呼ばれない                                 | contextMenu が dialog より優先 |
-| TC-228  | `repoDropdown` と `branchDropdown` が両方 open            | Validation - priority order                                                | `repoDropdown.close()` のみ呼ばれ、`branchDropdown.close()` は呼ばれない                    | 宣言順に最初に open のもの優先 |
+| Case ID | Input / Precondition                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                   | Notes                                        |
+| ------- | --------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| TC-221  | `isContextMenuActive()` is true                                 | Normal - first priority                                                    | `hideContextMenu()` is called once, and the later hide calls (dialog/dropdown/findWidget) are not | Closes the context menu first                |
+| TC-222  | contextMenu inactive, `isDialogActive()` true                   | Normal - second priority                                                   | `hideDialog()` is called once, and the dropdowns / findWidget / expandedCommit are untouched      | Dialog takes priority                        |
+| TC-223  | contextMenu/dialog inactive, `repoDropdown.isOpen()` true       | Normal - third priority                                                    | `repoDropdown.close()` is called, and the later branch/author dropdowns are not closed            | Closes only the repo dropdown                |
+| TC-224  | The repo dropdown is also closed, `findWidget.isVisible()` true | Normal - findWidget priority                                               | `findWidget.close()` is called, and `hideCommitDetails` is not                                    | findWidget comes next                        |
+| TC-225  | findWidget is also hidden, `expandedCommit !== null`            | Normal - last fallback                                                     | `hideCommitDetails()` is called                                                                   | Last step of the chain                       |
+| TC-226  | All of the above inactive                                       | Boundary - no active UI                                                    | No hide/close API is called, and Escape passes through as a no-op                                 | No side effects on the DOM state             |
+| TC-227  | `contextMenu` and `dialog` both active                          | Validation - priority order                                                | Only `hideContextMenu()` is called, and `hideDialog()` is not                                     | contextMenu takes priority over dialog       |
+| TC-228  | `repoDropdown` and `branchDropdown` both open                   | Validation - priority order                                                | Only `repoDropdown.close()` is called, and `branchDropdown.close()` is not                        | The first open one in declaration order wins |
 
-## S46: handleKeyboardShortcut() Arrow ナビゲーション分岐の入力可能要素ガード
+## S46: handleKeyboardShortcut() editable-element guard on the Arrow navigation branch
 
 > Origin: Feature 045 (defensive-fixes) (light-spec-plan)
 > Added: 2026-07-19
 > Status: superseded
 > Superseded By: S70（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
-> Signature: `handleKeyboardShortcut(e: KeyboardEvent): void` の Arrow 分岐 + 入力可能要素判定 predicate
+> Signature: the Arrow branch of `handleKeyboardShortcut(e: KeyboardEvent): void` + the editable-element predicate
 > Target Path: `web/main.ts:1226-1263`
 
-ArrowUp/ArrowDown のコミット移動分岐に、event target が入力可能要素（`input` / `textarea` / `select` / contenteditable）かを判定する小さな predicate を追加し、入力可能要素からの発火時はコミット移動せず return する修正。predicate は Arrow 分岐内だけで使用し、関数先頭では return しない（入力中の Ctrl/Cmd+F 等のグローバルショートカットと、非入力要素の既存 Arrow ナビゲーションを維持する）。[4] の修正。既存 S29〜S33 の Arrow ナビゲーション観点は変更しない。
+A fix that adds a small predicate to the ArrowUp/ArrowDown commit-move branch to check whether the event target is an editable element (`input` / `textarea` / `select` / contenteditable), and returns without moving the commit when the event comes from an editable element. The predicate is used only inside the Arrow branch and does not return at the top of the function (keeping global shortcuts such as Ctrl/Cmd+F while typing, and the existing Arrow navigation on non-editable elements). Fix for [4]. The existing Arrow navigation perspectives in S29 to S33 are unchanged.
 
-| Case ID | Input / Precondition                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                         | Notes                                 |
-| ------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
-| TC-257  | CDV 展開中（移動可能な index）、`<input>` 要素を target に ArrowDown keydown を dispatch   | Validation - input target の抑止                                           | `loadCommitDetails` 呼び出し 0 回、`preventDefault()` / `stopPropagation()` 呼び出し 0 回（キャレット操作が奪われない） | 検索欄・ダイアログ入力の代表          |
-| TC-258  | CDV 展開中、`<textarea>` 要素を target に ArrowUp keydown を dispatch                      | Validation - textarea target の抑止                                        | `loadCommitDetails` 0 回、`preventDefault()` / `stopPropagation()` 0 回                                                 | -                                     |
-| TC-259  | CDV 展開中、`<select>` 要素を target に ArrowDown keydown を dispatch                      | Validation - select target の抑止                                          | `loadCommitDetails` 0 回、`preventDefault()` / `stopPropagation()` 0 回                                                 | ドロップダウン操作の維持              |
-| TC-260  | CDV 展開中、`contenteditable` な要素を target に ArrowDown keydown を dispatch             | Validation - contenteditable target の抑止                                 | `loadCommitDetails` 0 回、`preventDefault()` / `stopPropagation()` 0 回                                                 | `document.activeElement` に依存しない |
-| TC-261  | CDV 展開中、`document.body` を target に ArrowDown keydown を dispatch（隣接コミットあり） | Normal - 非入力要素の既存ナビ維持                                          | `loadCommitDetails` が1回呼ばれ、`preventDefault()` / `stopPropagation()` が各1回呼ばれる（S29 TC-164 と同挙動）        | ガード追加による退行なし              |
-| TC-262  | `<input>` 要素を target に Ctrl+F keydown を dispatch（config find="f"）                   | Normal - 入力中のグローバルショートカット維持                              | `findWidget.show(true)` が1回呼ばれる（関数先頭での一律 return が存在しない）                                           | NO-GO 条件（先頭 return）の検出       |
+| Case ID | Input / Precondition                                                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                     | Notes                                           |
+| ------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| TC-257  | CDV expanded (at a movable index), dispatch an ArrowDown keydown targeting an `<input>` element   | Validation - suppression for an input target                               | `loadCommitDetails` called 0 times, `preventDefault()` / `stopPropagation()` called 0 times (caret movement is not taken over)      | Represents the search field and dialog inputs   |
+| TC-258  | CDV expanded, dispatch an ArrowUp keydown targeting a `<textarea>` element                        | Validation - suppression for a textarea target                             | `loadCommitDetails` 0 times, `preventDefault()` / `stopPropagation()` 0 times                                                       | -                                               |
+| TC-259  | CDV expanded, dispatch an ArrowDown keydown targeting a `<select>` element                        | Validation - suppression for a select target                               | `loadCommitDetails` 0 times, `preventDefault()` / `stopPropagation()` 0 times                                                       | Keeps dropdown operation                        |
+| TC-260  | CDV expanded, dispatch an ArrowDown keydown targeting a `contenteditable` element                 | Validation - suppression for a contenteditable target                      | `loadCommitDetails` 0 times, `preventDefault()` / `stopPropagation()` 0 times                                                       | Does not depend on `document.activeElement`     |
+| TC-261  | CDV expanded, dispatch an ArrowDown keydown targeting `document.body` (an adjacent commit exists) | Normal - existing navigation kept for non-editable elements                | `loadCommitDetails` is called once, and `preventDefault()` / `stopPropagation()` are each called once (same behavior as S29 TC-164) | No regression from adding the guard             |
+| TC-262  | Dispatch a Ctrl+F keydown targeting an `<input>` element (config find="f")                        | Normal - global shortcut kept while typing                                 | `findWidget.show(true)` is called once (there is no blanket return at the top of the function)                                      | Detects the NO-GO condition (return at the top) |
 
-### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S46）
+### Failure-source inventory (include-or-justify) — added for Feature 045 (S46)
 
-| 失敗源                                                           | 対応ケースまたは除外理由                                           |
-| ---------------------------------------------------------------- | ------------------------------------------------------------------ |
-| `input` からの Arrow でコミット移動（入力横取り）                | TC-257                                                             |
-| `textarea` からの Arrow                                          | TC-258                                                             |
-| `select` からの Arrow                                            | TC-259                                                             |
-| contenteditable からの Arrow                                     | TC-260                                                             |
-| 関数先頭の一律 return による既存グローバルショートカットの無効化 | TC-262                                                             |
-| 非入力要素の Arrow ナビゲーション退行                            | TC-261                                                             |
-| IME 入力中の発火                                                 | excluded(既存 S32 TC-178 で担保済み。本変更で挙動を変えない)       |
-| 修飾キーパターン・境界 index の分岐                              | excluded(既存 S29〜S33 で担保済み。本変更の対象は target 判定のみ) |
+| Failure source                                                                 | Covering case or reason for exclusion                                                           |
+| ------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Arrow from an `input` moves the commit (input is hijacked)                     | TC-257                                                                                          |
+| Arrow from a `textarea`                                                        | TC-258                                                                                          |
+| Arrow from a `select`                                                          | TC-259                                                                                          |
+| Arrow from contenteditable                                                     | TC-260                                                                                          |
+| A blanket return at the top of the function disables existing global shortcuts | TC-262                                                                                          |
+| Regression of Arrow navigation on non-editable elements                        | TC-261                                                                                          |
+| Firing during IME input                                                        | excluded(already covered by the existing S32 TC-178; this change does not alter that behavior)  |
+| Branches on modifier patterns and boundary indexes                             | excluded(already covered by the existing S29 to S33; this change only targets the target check) |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: TC-257、TC-258、TC-259、TC-260
-- Exception: excluded(predicate は DOM プロパティ参照のみで throw 分岐を持たない)
-- External: excluded(外部依存なし。keydown はテスト側で直接 dispatch する)
-- Boundary: excluded(数値・空値境界が仕様上存在しない。target 種別4種の列挙が本変更の境界であり Validation 4件で充足)
-- Type: excluded(event target は DOM 型で、実行時の型分岐は要素種別判定として Validation 4件に含まれる)
+- Validation: TC-257, TC-258, TC-259, TC-260
+- Exception: excluded(the predicate only reads DOM properties and has no throw branch)
+- External: excluded(no external dependencies; the tests dispatch keydown directly)
+- Boundary: excluded(the spec has no numeric or empty-value boundaries. The 4 target kinds are the boundary of this change and are covered by the 4 Validation cases)
+- Type: excluded(the event target is a DOM type, and the runtime type branch is the element-kind check included in the 4 Validation cases)
 
-**失敗系/正常系比（煙感知器）**: 正常系2件（TC-261、TC-262）、失敗系4件（TC-257〜TC-260）、比2.0。
+**Failure/normal ratio (smoke detector)**: 2 normal cases (TC-261, TC-262), 4 failure cases (TC-257 to TC-260), ratio 2.0.
 
-## S58: handleEscape() ref一覧の段階的閉鎖
+## S58: handleEscape() closing the ref list step by step
 
 > Origin: Feature 059-02 (light-spec-plan)
 > Added: 2026-09-24
 > Status: superseded
 > Superseded By: S72（[13-keyboard-accessibility-01.md](13-keyboard-accessibility-01.md)）
 > Supersedes: -
-> Signature: `handleEscape(): void`（`RefOverflowController.closePopup(): boolean` の呼出しを既存ドロップダウンの後、findWidgetの前へ追加）
-> Target Path: `web/main.ts`（`handleEscape()`。実装後に行範囲へ更新）
+> Signature: `handleEscape(): void` (adds the call to `RefOverflowController.closePopup(): boolean` after the existing dropdowns and before findWidget)
+> Target Path: `web/main.ts` (`handleEscape()`; to be updated to a line range after implementation)
 > Test File: `tests/web/main.refOverflow.test.ts`
 
-Escの順序を `contextMenu → dialog → repoDropdown → branchDropdown → authorDropdown → ref一覧 → findWidget → expandedCommit` とし、`closePopup()` が `true` ならそのEscを終える。既存S40の順序は一覧が閉じている場合にそのまま成り立つため、本節はadditive。一覧は実controllerでcounterをclickして開く。
+The Esc order becomes `contextMenu → dialog → repoDropdown → branchDropdown → authorDropdown → ref一覧 → findWidget → expandedCommit`, and if `closePopup()` returns `true`, that Esc ends there. The existing S40 order still holds as is when the list is closed, so this section is additive. The list is opened by clicking the counter with the real controller.
 
-| Case ID | Input / Precondition                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                              | Notes                                        |
-| ------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| TC-457  | 一覧を開き、その複製からcontextメニューを開いた状態で1回目のEsc                               | Normal - メニューを先に閉じる                                              | `hideContextMenu()` だけが呼ばれ、`.refOverflowPopup` が1個のまま                            | AC-04                                        |
-| TC-458  | TC-457の後、findWidget表示中・コミット詳細展開中のまま2回目のEsc                              | Normal - 次のEscで一覧だけ閉じる                                           | `.refOverflowPopup` が0個になり、`findWidget.close()` と `hideCommitDetails()` の呼出しが0回 | AC-04                                        |
-| TC-459  | ダイアログ表示中かつ一覧表示中にEsc                                                           | Validation - ダイアログ優先                                                | `hideDialog()` だけが呼ばれ、一覧は1個のまま                                                 | -                                            |
-| TC-460  | repo / branch / author の各ドロップダウンを1つずつ開き、一覧も表示した状態でEsc               | Validation - 既存ドロップダウン優先                                        | 開いたドロップダウンの `close()` だけが呼ばれ、一覧は1個のまま                               | 既存ドロップダウン同士の順序はS40のまま      |
-| TC-461  | 一覧表示中、findWidget表示中、コミット詳細展開中にEsc                                         | Normal - 検索・詳細より先に一覧                                            | 一覧が0個になり、`findWidget.close()` と `hideCommitDetails()` の呼出しが0回                 | 一覧を閉じた同じEscで他のUIを閉じない。AC-04 |
-| TC-462  | 一覧を開いていない（`closePopup()` が `false`）状態でfindWidget表示中にEsc                    | Boundary - 一覧なしで既存順へ進む                                          | `findWidget.close()` が1回呼ばれる                                                           | S40 TC-224の維持                             |
-| TC-463  | メニュー・ダイアログ・ドロップダウン・一覧・findWidget・コミット詳細がすべて非アクティブでEsc | Boundary - 何も開いていない                                                | hide / close系の呼出しが0回で、`.refOverflowPopup` も生成されない                            | S40 TC-226の維持                             |
+| Case ID | Input / Precondition                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                        | Notes                                                       |
+| ------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------- |
+| TC-457  | First Esc with the list open and a context menu opened from one of its copies                | Normal - closes the menu first                                             | Only `hideContextMenu()` is called, and there is still 1 `.refOverflowPopup`                           | AC-04                                                       |
+| TC-458  | After TC-457, second Esc with findWidget still shown and commit details still expanded       | Normal - the next Esc closes only the list                                 | There are 0 `.refOverflowPopup`, and `findWidget.close()` and `hideCommitDetails()` are called 0 times | AC-04                                                       |
+| TC-459  | Esc with a dialog shown and the list shown                                                   | Validation - dialog takes priority                                         | Only `hideDialog()` is called, and the list stays at 1                                                 | -                                                           |
+| TC-460  | Esc with each of the repo / branch / author dropdowns opened in turn and the list also shown | Validation - existing dropdowns take priority                              | Only `close()` of the open dropdown is called, and the list stays at 1                                 | The order among the existing dropdowns stays as in S40      |
+| TC-461  | Esc with the list shown, findWidget shown and commit details expanded                        | Normal - the list before search and details                                | The list goes to 0, and `findWidget.close()` and `hideCommitDetails()` are called 0 times              | The Esc that closes the list does not close other UI. AC-04 |
+| TC-462  | Esc with the list not open (`closePopup()` returns `false`) and findWidget shown             | Boundary - no list, continues in the existing order                        | `findWidget.close()` is called once                                                                    | Keeps S40 TC-224                                            |
+| TC-463  | Esc with the menu, dialog, dropdowns, list, findWidget and commit details all inactive       | Boundary - nothing is open                                                 | No hide / close call is made, and no `.refOverflowPopup` is created                                    | Keeps S40 TC-226                                            |
 
-### 失敗源インベントリ（include-or-justify）— Feature 059-02 追加分（S58）
+### Failure-source inventory (include-or-justify) — added for Feature 059-02 (S58)
 
-| 失敗源                                         | 対応ケースまたは除外理由                                   |
-| ---------------------------------------------- | ---------------------------------------------------------- |
-| メニューと一覧を同じEscで閉じる                | TC-457、TC-458                                             |
-| 一覧を閉じたEscで検索・詳細も閉じる            | TC-458、TC-461                                             |
-| 既存のダイアログ・ドロップダウン優先順位の破壊 | TC-459、TC-460                                             |
-| 一覧がないときに後段へ進まない                 | TC-462、TC-463                                             |
-| 検索パターン解析                               | excluded(`web/findWidget-test.md` の責務)                  |
-| 外部依存・例外                                 | excluded(DOM状態の判定だけで外部依存とthrow経路を持たない) |
+| Failure source                                              | Covering case or reason for exclusion                                        |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| The menu and the list close on the same Esc                 | TC-457, TC-458                                                               |
+| The Esc that closes the list also closes search and details | TC-458, TC-461                                                               |
+| Breaking the existing priority of dialogs and dropdowns     | TC-459, TC-460                                                               |
+| Not moving on to later steps when there is no list          | TC-462, TC-463                                                               |
+| Parsing the search pattern                                  | excluded(belongs to `web/findWidget-test.md`)                                |
+| External dependencies and exceptions                        | excluded(only checks DOM state, with no external dependencies or throw path) |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: TC-459、TC-460
-- Exception: excluded(throw経路なし)
-- External: excluded(外部依存なし)
-- Boundary: TC-462、TC-463
-- Type: excluded(キー判定は既存S10の責務)
+- Validation: TC-459, TC-460
+- Exception: excluded(no throw path)
+- External: excluded(no external dependencies)
+- Boundary: TC-462, TC-463
+- Type: excluded(key matching belongs to the existing S10)
 
-**失敗系/正常系比（煙感知器）**: 正常系3件（TC-457、TC-458、TC-461）、失敗系4件。
+**Failure/normal ratio (smoke detector)**: 3 normal cases (TC-457, TC-458, TC-461), 4 failure cases.
 
-### Feature 059-02 テスト対応と実行証跡（S58）
+### Feature 059-02 test mapping and execution evidence (S58)
 
-- テストファイル: `tests/web/main.refOverflow.test.ts` の describe `handleEscape with the ref list (S58)`。一覧は実controllerでcounterをclickして開き、メニューは実 contextMenu（spyで呼出し記録）、ダイアログは実 dialogs、検索は実 FindWidget（`FindWidget.prototype.close` をspy）、コミット詳細は `#commitDetails` の存在で判定
-- Case対応: TC-457/TC-458 は同じ `it` で1回目・2回目のEscを順に検証。TC-459、TC-460（3種のドロップダウンを `it.each`）、TC-461、TC-462、TC-463 は各 `it`
-- 実ブラウザ確認（Chromium headless、実キー入力）: 一覧起点メニュー表示中のEscでメニューだけ閉じ一覧維持、次のEscで一覧が閉じる。確認ダイアログ表示中のEscはダイアログだけ閉じ一覧維持
+- Test file: describe `handleEscape with the ref list (S58)` in `tests/web/main.refOverflow.test.ts`. The list is opened by clicking the counter with the real controller; the menu is the real contextMenu (calls recorded with a spy), the dialog is the real dialogs, search is the real FindWidget (spy on `FindWidget.prototype.close`), and commit details are judged by whether `#commitDetails` exists
+- Case mapping: TC-457/TC-458 check the first and second Esc in order in the same `it`. TC-459, TC-460 (`it.each` over the 3 dropdowns), TC-461, TC-462 and TC-463 each have their own `it`
+- Real browser check (Chromium headless, real key input): with a menu opened from the list, Esc closes only the menu and keeps the list, and the next Esc closes the list. With a confirmation dialog shown, Esc closes only the dialog and keeps the list

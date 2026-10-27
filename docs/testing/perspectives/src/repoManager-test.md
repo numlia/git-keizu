@@ -1,4 +1,4 @@
-# テスト観点表: src/repoManager.ts
+# Test Perspectives: src/repoManager.ts
 
 > Source: `src/repoManager.ts`
 > Generated: 2026-03-22T13:23:24Z
@@ -12,14 +12,14 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `registerRepoFromUri(uri: vscode.Uri): Promise<void>`
-**テスト対象パス**: `src/repoManager.ts:184-193`
+**Signature**: `registerRepoFromUri(uri: vscode.Uri): Promise<void>`
+**Target path**: `src/repoManager.ts:184-193`
 
-| Case ID | Input / Precondition                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                           | Notes          |
-| ------- | --------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------- | -------------- |
-| TC-001  | URI が既に登録済みリポジトリを指す            | Normal - existing                                                          | addRepo が呼ばれない、既存状態維持                        | 重複登録防止   |
-| TC-002  | URI が未登録の有効な Git リポジトリを指す     | Normal - new repo                                                          | addRepo が呼ばれ、sendRepos でビューに通知される          | 新規登録フロー |
-| TC-003  | URI が Git リポジトリでないディレクトリを指す | Validation - non-git                                                       | isGitRepository が false を返し、登録処理がスキップされる | 事前検証       |
+| Case ID | Input / Precondition                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                           | Notes                           |
+| ------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------- | ------------------------------- |
+| TC-001  | The URI points to an already registered repository         | Normal - existing                                                          | addRepo is not called; the existing state is kept         | Prevents duplicate registration |
+| TC-002  | The URI points to an unregistered valid Git repository     | Normal - new repo                                                          | addRepo is called and the view is notified via sendRepos  | New registration flow           |
+| TC-003  | The URI points to a directory that is not a Git repository | Validation - non-git                                                       | isGitRepository returns false and registration is skipped | Up-front validation             |
 
 ## S2: constructor (workspace folder change handler)
 
@@ -28,18 +28,18 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `constructor(dataSource: DataSource, extensionState: ExtensionState, statusBarItem: StatusBarItem)`
-**テスト対象パス**: `src/repoManager.ts:30-60`
+**Signature**: `constructor(dataSource: DataSource, extensionState: ExtensionState, statusBarItem: StatusBarItem)`
+**Target path**: `src/repoManager.ts:30-60`
 
-| Case ID | Input / Precondition                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result             | Notes         |
-| ------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------- | ------------- |
-| TC-004  | added にフォルダ1件、searchDirectoryForRepos が true を返す    | Normal - standard                                                          | sendRepos が1回呼ばれる     | L40-48        |
-| TC-005  | added にフォルダ1件、searchDirectoryForRepos が false を返す   | Normal - branch                                                            | sendRepos が呼ばれない      | L48 false分岐 |
-| TC-006  | removed にフォルダ1件、removeReposWithinFolder が true を返す  | Normal - standard                                                          | sendRepos が1回呼ばれる     | L50-58        |
-| TC-007  | removed にフォルダ1件、removeReposWithinFolder が false を返す | Normal - branch                                                            | sendRepos が呼ばれない      | L58 false分岐 |
-| TC-008  | added.length = 0                                               | Boundary - zero                                                            | added処理がスキップされる   | L40           |
-| TC-009  | removed.length = 0                                             | Boundary - zero                                                            | removed処理がスキップされる | L50           |
-| TC-010  | added と removed の両方が非空                                  | Normal - standard                                                          | 両方の処理が順に実行される  | -             |
+| Case ID | Input / Precondition                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                  | Notes            |
+| ------- | ---------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------- | ---------------- |
+| TC-004  | 1 folder in added, searchDirectoryForRepos returns true    | Normal - standard                                                          | sendRepos is called once         | L40-48           |
+| TC-005  | 1 folder in added, searchDirectoryForRepos returns false   | Normal - branch                                                            | sendRepos is not called          | L48 false branch |
+| TC-006  | 1 folder in removed, removeReposWithinFolder returns true  | Normal - standard                                                          | sendRepos is called once         | L50-58           |
+| TC-007  | 1 folder in removed, removeReposWithinFolder returns false | Normal - branch                                                            | sendRepos is not called          | L58 false branch |
+| TC-008  | added.length = 0                                           | Boundary - zero                                                            | Processing of added is skipped   | L40              |
+| TC-009  | removed.length = 0                                         | Boundary - zero                                                            | Processing of removed is skipped | L50              |
+| TC-010  | Both added and removed are non-empty                       | Normal - standard                                                          | Both are processed in order      | -                |
 
 ## S3: dispose
 
@@ -48,15 +48,15 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `dispose(): void`
-**テスト対象パス**: `src/repoManager.ts:62-72`
+**Signature**: `dispose(): void`
+**Target path**: `src/repoManager.ts:62-72`
 
-| Case ID | Input / Precondition           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                  | Notes         |
-| ------- | ------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------ | ------------- |
-| TC-011  | folderChangeHandler が存在する | Normal - standard                                                          | handler.dispose() が呼ばれ、null に設定される    | L64           |
-| TC-012  | folderChangeHandler が null    | Boundary - null                                                            | エラーなく完了                                   | L64 false分岐 |
-| TC-013  | folderWatchers に複数エントリ  | Normal - standard                                                          | 全 watcher の dispose() が呼ばれ、全エントリ削除 | L68-71        |
-| TC-014  | folderWatchers が空            | Boundary - empty                                                           | ループ未実行で正常完了                           | L68           |
+| Case ID | Input / Precondition               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                  | Notes            |
+| ------- | ---------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------- |
+| TC-011  | folderChangeHandler exists         | Normal - standard                                                          | handler.dispose() is called and it is set to null                | L64              |
+| TC-012  | folderChangeHandler is null        | Boundary - null                                                            | Completes without error                                          | L64 false branch |
+| TC-013  | Multiple entries in folderWatchers | Normal - standard                                                          | dispose() of every watcher is called and all entries are removed | L68-71           |
+| TC-014  | folderWatchers is empty            | Boundary - empty                                                           | The loop does not run and it completes normally                  | L68              |
 
 ## S4: View callback management (registerViewCallback, deregisterViewCallback, sendRepos)
 
@@ -65,16 +65,16 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `registerViewCallback(viewCallback: (...) => void): void` / `deregisterViewCallback(): void` / `sendRepos(): void`
-**テスト対象パス**: `src/repoManager.ts:74-80,158-163`
+**Signature**: `registerViewCallback(viewCallback: (...) => void): void` / `deregisterViewCallback(): void` / `sendRepos(): void`
+**Target path**: `src/repoManager.ts:74-80,158-163`
 
-| Case ID | Input / Precondition                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                | Notes          |
-| ------- | --------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------- | -------------- |
-| TC-015  | registerViewCallback にコールバック関数を渡す | Normal - standard                                                          | this.viewCallback にコールバックが格納される   | -              |
-| TC-016  | deregisterViewCallback 呼び出し               | Normal - standard                                                          | this.viewCallback が null に設定される         | -              |
-| TC-017  | sendRepos: viewCallback 登録済み、repos に2件 | Normal - standard                                                          | viewCallback が (repos, 2) で呼ばれる          | L161           |
-| TC-018  | sendRepos: viewCallback が null               | Boundary - null                                                            | 呼び出しなし、エラーなし                       | L161 false分岐 |
-| TC-019  | sendRepos: repos が空                         | Boundary - zero                                                            | viewCallback が (空のGitRepoSet, 0) で呼ばれる | numRepos = 0   |
+| Case ID | Input / Precondition                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                      | Notes             |
+| ------- | ------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------- | ----------------- |
+| TC-015  | Pass a callback function to registerViewCallback       | Normal - standard                                                          | The callback is stored in this.viewCallback          | -                 |
+| TC-016  | Call deregisterViewCallback                            | Normal - standard                                                          | this.viewCallback is set to null                     | -                 |
+| TC-017  | sendRepos: viewCallback registered, 2 entries in repos | Normal - standard                                                          | viewCallback is called with (repos, 2)               | L161              |
+| TC-018  | sendRepos: viewCallback is null                        | Boundary - null                                                            | No call, no error                                    | L161 false branch |
+| TC-019  | sendRepos: repos is empty                              | Boundary - zero                                                            | viewCallback is called with (an empty GitRepoSet, 0) | numRepos = 0      |
 
 ## S5: maxDepthOfRepoSearchChanged
 
@@ -83,14 +83,14 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `maxDepthOfRepoSearchChanged(): void`
-**テスト対象パス**: `src/repoManager.ts:82-92`
+**Signature**: `maxDepthOfRepoSearchChanged(): void`
+**Target path**: `src/repoManager.ts:82-92`
 
-| Case ID | Input / Precondition                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                     | Notes            |
-| ------- | ---------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------- | ---------------- |
-| TC-020  | newDepth(=3) > this.maxDepthOfRepoSearch(=1)   | Normal - standard                                                          | depth が3に更新、searchWorkspaceForRepos が呼ばれる | L84 true         |
-| TC-021  | newDepth(=1) < this.maxDepthOfRepoSearch(=3)   | Normal - branch                                                            | depth が1に更新、searchWorkspaceForRepos 呼ばれない | L84 false        |
-| TC-022  | newDepth(=2) === this.maxDepthOfRepoSearch(=2) | Boundary - equal                                                           | depth そのまま、searchWorkspaceForRepos 呼ばれない  | L84 false (等値) |
+| Case ID | Input / Precondition                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                 | Notes             |
+| ------- | ---------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------- | ----------------- |
+| TC-020  | newDepth(=3) > this.maxDepthOfRepoSearch(=1)   | Normal - standard                                                          | depth is updated to 3 and searchWorkspaceForRepos is called     | L84 true          |
+| TC-021  | newDepth(=1) < this.maxDepthOfRepoSearch(=3)   | Normal - branch                                                            | depth is updated to 1 and searchWorkspaceForRepos is not called | L84 false         |
+| TC-022  | newDepth(=2) === this.maxDepthOfRepoSearch(=2) | Boundary - equal                                                           | depth unchanged and searchWorkspaceForRepos is not called       | L84 false (equal) |
 
 ## S6: getRepos
 
@@ -99,13 +99,13 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `getRepos(): GitRepoSet`
-**テスト対象パス**: `src/repoManager.ts:120-128`
+**Signature**: `getRepos(): GitRepoSet`
+**Target path**: `src/repoManager.ts:120-128`
 
-| Case ID | Input / Precondition | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                       | Notes |
-| ------- | -------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----- |
-| TC-023  | repos に2件登録済み  | Normal - standard                                                          | 2件を含む GitRepoSet が返る。各キーに対応する GitRepoState が含まれる | L123  |
-| TC-024  | repos が空           | Boundary - empty                                                           | 空の GitRepoSet が返る                                                | -     |
+| Case ID | Input / Precondition          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                         | Notes |
+| ------- | ----------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------- | ----- |
+| TC-023  | 2 entries registered in repos | Normal - standard                                                          | A GitRepoSet with 2 entries is returned, each key with its GitRepoState | L123  |
+| TC-024  | repos is empty                | Boundary - empty                                                           | An empty GitRepoSet is returned                                         | -     |
 
 ## S7: addRepo / removeRepo
 
@@ -114,16 +114,16 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `addRepo(repo: string): void` / `removeRepo(repo: string): void`
-**テスト対象パス**: `src/repoManager.ts:130-137`
+**Signature**: `addRepo(repo: string): void` / `removeRepo(repo: string): void`
+**Target path**: `src/repoManager.ts:130-137`
 
-| Case ID | Input / Precondition                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                  | Notes          |
-| ------- | ----------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------- | -------------- |
-| TC-025  | addRepo: 有効なパス "/path/to/repo" | Normal - standard                                                          | repos にキー追加、デフォルト state 設定、saveRepos が1回呼ばれる | L131-132       |
-| TC-026  | addRepo: 空文字列 ""                | Boundary - empty                                                           | repos に空文字列キーが追加される (バリデーションなし)            | -              |
-| TC-027  | removeRepo: 登録済みキー            | Normal - standard                                                          | repos からキー削除、saveRepos が1回呼ばれる                      | L135-136       |
-| TC-028  | removeRepo: 未登録キー              | Boundary - non-existing                                                    | delete はエラーにならず、saveRepos が呼ばれる                    | -              |
-| TC-029  | addRepo: 既に同一キーが存在する場合 | Boundary - duplicate                                                       | 既存の state がデフォルト state で上書きされる                   | state リセット |
+| Case ID | Input / Precondition                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                | Notes       |
+| ------- | ------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ----------- |
+| TC-025  | addRepo: valid path "/path/to/repo"  | Normal - standard                                                          | The key is added to repos with the default state, and saveRepos is called once | L131-132    |
+| TC-026  | addRepo: empty string ""             | Boundary - empty                                                           | An empty-string key is added to repos (no validation)                          | -           |
+| TC-027  | removeRepo: registered key           | Normal - standard                                                          | The key is removed from repos and saveRepos is called once                     | L135-136    |
+| TC-028  | removeRepo: unregistered key         | Boundary - non-existing                                                    | delete does not error, and saveRepos is called                                 | -           |
+| TC-029  | addRepo: the same key already exists | Boundary - duplicate                                                       | The existing state is overwritten with the default state                       | State reset |
 
 ## S8: setRepoState
 
@@ -132,16 +132,16 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `setRepoState(repo: string, state: GitRepoState): void`
-**テスト対象パス**: `src/repoManager.ts:176-182`
+**Signature**: `setRepoState(repo: string, state: GitRepoState): void`
+**Target path**: `src/repoManager.ts:176-182`
 
-| Case ID | Input / Precondition                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                    | Notes                       |
-| ------- | ------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------- | --------------------------- |
-| TC-030  | repo = "/valid/path", state = 有効な GitRepoState | Normal - standard                                                          | repos[repo] に state 設定、saveRepos が1回呼ばれる | L180-181                    |
-| TC-031  | repo = "\_\_proto\_\_"                            | Validation - rejected precondition                                         | 早期 return、state 未設定、saveRepos 呼ばれない    | L177 プロトタイプ汚染ガード |
-| TC-032  | repo = "constructor"                              | Validation - rejected precondition                                         | 早期 return、state 未設定、saveRepos 呼ばれない    | L177                        |
-| TC-033  | repo = "prototype"                                | Validation - rejected precondition                                         | 早期 return、state 未設定、saveRepos 呼ばれない    | L177                        |
-| TC-034  | repo = "" (空文字列)                              | Boundary - empty                                                           | state 設定される (ガードに該当しない)              | -                           |
+| Case ID | Input / Precondition                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                          | Notes                          |
+| ------- | -------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------ |
+| TC-030  | repo = "/valid/path", state = a valid GitRepoState | Normal - standard                                                          | state is set to repos[repo] and saveRepos is called once | L180-181                       |
+| TC-031  | repo = "\_\_proto\_\_"                             | Validation - rejected precondition                                         | Early return, state not set, saveRepos not called        | L177 prototype pollution guard |
+| TC-032  | repo = "constructor"                               | Validation - rejected precondition                                         | Early return, state not set, saveRepos not called        | L177                           |
+| TC-033  | repo = "prototype"                                 | Validation - rejected precondition                                         | Early return, state not set, saveRepos not called        | L177                           |
+| TC-034  | repo = "" (empty string)                           | Boundary - empty                                                           | state is set (not caught by the guard)                   | -                              |
 
 ## S9: checkReposExist
 
@@ -150,15 +150,15 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `checkReposExist(): Promise<boolean>`
-**テスト対象パス**: `src/repoManager.ts:164-175`
+**Signature**: `checkReposExist(): Promise<boolean>`
+**Target path**: `src/repoManager.ts:164-175`
 
-| Case ID | Input / Precondition                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                 | Notes               |
-| ------- | --------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------- |
-| TC-035  | repos に3件、全て isGitRepository が true     | Normal - standard                                                          | 削除なし、sendRepos 呼ばれない、false を返す                    | L168 全て false分岐 |
-| TC-036  | repos に3件、1件だけ isGitRepository が false | Normal - standard                                                          | 該当1件が removeRepo で削除、sendRepos が1回呼ばれ、true を返す | L168-173            |
-| TC-037  | repos に3件、全て isGitRepository が false    | Validation - rejected precondition                                         | 全3件削除、sendRepos が1回呼ばれ、true を返す                   | 全リポジトリ不在    |
-| TC-038  | repos が空                                    | Boundary - empty                                                           | 削除なし、sendRepos 呼ばれない、false を返す                    | ループ未実行        |
+| Case ID | Input / Precondition                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                               | Notes                     |
+| ------- | ---------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------- |
+| TC-035  | 3 entries in repos, isGitRepository true for all     | Normal - standard                                                          | Nothing removed, sendRepos not called, returns false                          | L168 false branch for all |
+| TC-036  | 3 entries in repos, isGitRepository false for only 1 | Normal - standard                                                          | That 1 entry is removed by removeRepo, sendRepos is called once, returns true | L168-173                  |
+| TC-037  | 3 entries in repos, isGitRepository false for all    | Validation - rejected precondition                                         | All 3 removed, sendRepos is called once, returns true                         | No repository exists      |
+| TC-038  | repos is empty                                       | Boundary - empty                                                           | Nothing removed, sendRepos not called, returns false                          | The loop does not run     |
 
 ## S10: removeReposNotInWorkspace
 
@@ -167,16 +167,16 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `removeReposNotInWorkspace(): void` (private)
-**テスト対象パス**: `src/repoManager.ts:100-118`
+**Signature**: `removeReposNotInWorkspace(): void` (private)
+**Target path**: `src/repoManager.ts:100-118`
 
-| Case ID | Input / Precondition                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                    | Notes            |
-| ------- | ------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------- | ---------------- |
-| TC-039  | workspaceFolders に2件、repos 全てワークスペース内     | Normal - standard                                                          | removeRepo 呼ばれない                              | L113-116 false   |
-| TC-040  | workspaceFolders に1件、repos の一部がワークスペース外 | Normal - standard                                                          | ワークスペース外の repo が removeRepo で削除される | L117             |
-| TC-041  | workspaceFolders が undefined                          | Boundary - undefined                                                       | rootsExact/rootsFolder が空、全 repos が削除対象   | L105 false分岐   |
-| TC-042  | workspaceFolders が空配列                              | Boundary - empty                                                           | ルートなし、全 repos が外部扱いで削除される        | -                |
-| TC-043  | repos の1つが workspaceFolder.uri.fsPath と完全一致    | Boundary - exact match                                                     | rootsExact 一致で維持される                        | L113 exact match |
+| Case ID | Input / Precondition                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                      | Notes             |
+| ------- | ------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------- | ----------------- |
+| TC-039  | 2 entries in workspaceFolders, all repos inside the workspace | Normal - standard                                                          | removeRepo is not called                                             | L113-116 false    |
+| TC-040  | 1 entry in workspaceFolders, some repos outside the workspace | Normal - standard                                                          | Repos outside the workspace are removed by removeRepo                | L117              |
+| TC-041  | workspaceFolders is undefined                                 | Boundary - undefined                                                       | rootsExact/rootsFolder are empty, and every repo is a removal target | L105 false branch |
+| TC-042  | workspaceFolders is an empty array                            | Boundary - empty                                                           | No roots; every repo is treated as outside and removed               | -                 |
+| TC-043  | One repo exactly equals workspaceFolder.uri.fsPath            | Boundary - exact match                                                     | Kept by the rootsExact match                                         | L113 exact match  |
 
 ## S11: Path matching (removeReposWithinFolder, isDirectoryWithinRepos)
 
@@ -185,21 +185,21 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `removeReposWithinFolder(path: string): boolean` / `isDirectoryWithinRepos(path: string): boolean` (private)
-**テスト対象パス**: `src/repoManager.ts:139-155`
+**Signature**: `removeReposWithinFolder(path: string): boolean` / `isDirectoryWithinRepos(path: string): boolean` (private)
+**Target path**: `src/repoManager.ts:139-155`
 
-| Case ID | Input / Precondition                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                    | Notes                |
-| ------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------- | -------------------- |
-| TC-044  | removeReposWithinFolder: path と repo パスが完全一致                      | Normal - standard                                                          | removeRepo が呼ばれ、true を返す                   | L143 === 分岐        |
-| TC-045  | removeReposWithinFolder: path が repo の親ディレクトリ (/a → /a/sub)      | Normal - standard                                                          | 子 repo が removeRepo で削除され、true を返す      | L143 startsWith 分岐 |
-| TC-046  | removeReposWithinFolder: path にマッチする repo なし                      | Validation - rejected precondition                                         | 削除なし、false を返す                             | L143 全 false        |
-| TC-047  | removeReposWithinFolder: repos が空                                       | Boundary - empty                                                           | ループ未実行、false を返す                         | -                    |
-| TC-048  | removeReposWithinFolder: 複数の repo がマッチ                             | Boundary - multiple                                                        | 全マッチ repo が削除され、true を返す              | -                    |
-| TC-049  | isDirectoryWithinRepos: path === repoPaths[i]                             | Normal - standard                                                          | true を返す                                        | L153 ===             |
-| TC-050  | isDirectoryWithinRepos: path が repo のサブディレクトリ (/repo/sub)       | Normal - standard                                                          | true を返す                                        | L153 startsWith      |
-| TC-051  | isDirectoryWithinRepos: path が無関係なパス                               | Validation - rejected precondition                                         | false を返す                                       | L155                 |
-| TC-052  | isDirectoryWithinRepos: prefix部分一致だが/区切りでない (/repo2 vs /repo) | Boundary - prefix edge                                                     | false を返す (startsWith("/repo/") にマッチしない) | エッジケース         |
-| TC-053  | isDirectoryWithinRepos: repos が空                                        | Boundary - empty                                                           | ループ未実行、false を返す                         | -                    |
+| Case ID | Input / Precondition                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                             | Notes                  |
+| ------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- | ---------------------- |
+| TC-044  | removeReposWithinFolder: path exactly equals the repo path                       | Normal - standard                                                          | removeRepo is called and it returns true                    | L143 === branch        |
+| TC-045  | removeReposWithinFolder: path is the parent directory of a repo (/a → /a/sub)    | Normal - standard                                                          | The child repo is removed by removeRepo and it returns true | L143 startsWith branch |
+| TC-046  | removeReposWithinFolder: no repo matches path                                    | Validation - rejected precondition                                         | Nothing removed, returns false                              | L143 all false         |
+| TC-047  | removeReposWithinFolder: repos is empty                                          | Boundary - empty                                                           | The loop does not run, returns false                        | -                      |
+| TC-048  | removeReposWithinFolder: multiple repos match                                    | Boundary - multiple                                                        | Every matching repo is removed, returns true                | -                      |
+| TC-049  | isDirectoryWithinRepos: path === repoPaths[i]                                    | Normal - standard                                                          | Returns true                                                | L153 ===               |
+| TC-050  | isDirectoryWithinRepos: path is a subdirectory of a repo (/repo/sub)             | Normal - standard                                                          | Returns true                                                | L153 startsWith        |
+| TC-051  | isDirectoryWithinRepos: path is unrelated                                        | Validation - rejected precondition                                         | Returns false                                               | L155                   |
+| TC-052  | isDirectoryWithinRepos: prefix matches but not at a / boundary (/repo2 vs /repo) | Boundary - prefix edge                                                     | Returns false (does not match startsWith("/repo/"))         | Edge case              |
+| TC-053  | isDirectoryWithinRepos: repos is empty                                           | Boundary - empty                                                           | The loop does not run, returns false                        | -                      |
 
 ## S12: searchDirectoryForRepos
 
@@ -208,21 +208,21 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `searchDirectoryForRepos(directory: string, maxDepth: number): Promise<boolean>` (private)
-**テスト対象パス**: `src/repoManager.ts:212-245`
+**Signature**: `searchDirectoryForRepos(directory: string, maxDepth: number): Promise<boolean>` (private)
+**Target path**: `src/repoManager.ts:212-245`
 
-| Case ID | Input / Precondition                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                     | Notes      |
-| ------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------- | ---------- |
-| TC-054  | directory が既存 repo 内のパス                                   | Validation - guard                                                         | isDirectoryWithinRepos true → 早期 return false     | L214       |
-| TC-055  | directory が Git リポジトリのルート                              | Normal - standard                                                          | isGitRepository true → addRepo 呼ばれ、true を返す  | L220       |
-| TC-056  | directory が非 Git、maxDepth=1、サブディレクトリに Git repo あり | Normal - standard                                                          | 再帰でサブディレクトリ探索後 true を返す            | L224-239   |
-| TC-057  | maxDepth = 0                                                     | Boundary - zero                                                            | 再帰なし、false を返す                              | L224 false |
-| TC-058  | maxDepth = 1、サブディレクトリに .git エントリ                   | Normal - branch                                                            | .git はフィルタされ探索対象外                       | L233       |
-| TC-059  | maxDepth = 1、サブディレクトリに repo なし                       | Normal - branch                                                            | 全探索後 false を返す                               | -          |
-| TC-060  | fs.readdir が失敗 (権限エラー等)                                 | External - fs readdir failure                                              | 内側 catch でエラー捕捉、空配列扱いで続行           | L226-230   |
-| TC-061  | isGitRepository が例外を throw                                   | External - API failure                                                     | 外側 catch でエラー捕捉、false を返す               | L218-245   |
-| TC-062  | directory が存在しないパス                                       | External - fs failure                                                      | 外側 catch でエラー捕捉、false を返す               | L218-245   |
-| TC-063  | ディレクトリ内にファイルのみ (サブディレクトリなし)              | Boundary - no subdirectories                                               | isDirectory で全てフィルタ、再帰呼び出しなし、false | L233       |
+| Case ID | Input / Precondition                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                      | Notes      |
+| ------- | --------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------- |
+| TC-054  | directory is a path inside an existing repo                     | Validation - guard                                                         | isDirectoryWithinRepos true → early return false                     | L214       |
+| TC-055  | directory is the root of a Git repository                       | Normal - standard                                                          | isGitRepository true → addRepo is called and it returns true         | L220       |
+| TC-056  | directory is not Git, maxDepth=1, a subdirectory has a Git repo | Normal - standard                                                          | Returns true after recursively searching subdirectories              | L224-239   |
+| TC-057  | maxDepth = 0                                                    | Boundary - zero                                                            | No recursion, returns false                                          | L224 false |
+| TC-058  | maxDepth = 1, a subdirectory has a .git entry                   | Normal - branch                                                            | .git is filtered out and not searched                                | L233       |
+| TC-059  | maxDepth = 1, no repo in subdirectories                         | Normal - branch                                                            | Returns false after searching everything                             | -          |
+| TC-060  | fs.readdir fails (permission error, etc.)                       | External - fs readdir failure                                              | The inner catch handles the error and it continues as an empty array | L226-230   |
+| TC-061  | isGitRepository throws                                          | External - API failure                                                     | The outer catch handles the error and it returns false               | L218-245   |
+| TC-062  | directory is a path that does not exist                         | External - fs failure                                                      | The outer catch handles the error and it returns false               | L218-245   |
+| TC-063  | The directory contains only files (no subdirectories)           | Boundary - no subdirectories                                               | All filtered out by isDirectory, no recursive call, false            | L233       |
 
 ## S13: Watcher event handlers (onWatcherCreate, onWatcherChange, onWatcherDelete)
 
@@ -231,24 +231,24 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `onWatcherCreate(uri): Promise<void>` / `onWatcherChange(uri): void` / `onWatcherDelete(uri): void` (private)
-**テスト対象パス**: `src/repoManager.ts:268-293`
+**Signature**: `onWatcherCreate(uri): Promise<void>` / `onWatcherChange(uri): void` / `onWatcherDelete(uri): void` (private)
+**Target path**: `src/repoManager.ts:268-293`
 
-| Case ID | Input / Precondition                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                       | Notes      |
-| ------- | -------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------- | ---------- |
-| TC-064  | onWatcherCreate: path に /.git/ を含む                   | Validation - filter                                                        | 早期 return、キューに追加されない                                     | L270       |
-| TC-065  | onWatcherCreate: path が /.git で終わる                  | Normal - standard                                                          | path から末尾5文字除去して処理継続                                    | L271       |
-| TC-066  | onWatcherCreate: path が既に createEventPaths に存在     | Validation - dedup                                                         | 早期 return、重複追加されない                                         | L272       |
-| TC-067  | onWatcherCreate: 新規 path、タイムアウト未設定           | Normal - standard                                                          | path がキューに追加、タイムアウト設定                                 | L273-276   |
-| TC-068  | onWatcherCreate: 新規 path、タイムアウト設定済み         | Normal - branch                                                            | 既存タイムアウト clearTimeout → 新タイムアウト設定                    | L275       |
-| TC-069  | onWatcherChange: path に /.git/ を含む                   | Validation - filter                                                        | 早期 return                                                           | L280       |
-| TC-070  | onWatcherChange: path が /.git で終わる                  | Normal - standard                                                          | path 末尾5文字除去して処理継続                                        | L281       |
-| TC-071  | onWatcherChange: path が既に changeEventPaths に存在     | Validation - dedup                                                         | 早期 return                                                           | L282       |
-| TC-072  | onWatcherChange: 新規 path                               | Normal - standard                                                          | path がキューに追加、タイムアウト設定                                 | L283-286   |
-| TC-073  | onWatcherDelete: path に /.git/ を含む                   | Validation - filter                                                        | 早期 return                                                           | L290       |
-| TC-074  | onWatcherDelete: path が /.git で終わる、repo マッチあり | Normal - standard                                                          | path 末尾5文字除去、removeReposWithinFolder true → sendRepos 呼ばれる | L291-292   |
-| TC-075  | onWatcherDelete: 通常 path、repo マッチあり              | Normal - standard                                                          | removeReposWithinFolder true → sendRepos 呼ばれる                     | L292       |
-| TC-076  | onWatcherDelete: 通常 path、repo マッチなし              | Validation - rejected precondition                                         | removeReposWithinFolder false → sendRepos 呼ばれない                  | L292 false |
+| Case ID | Input / Precondition                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                 | Notes      |
+| ------- | -------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ---------- |
+| TC-064  | onWatcherCreate: path contains /.git/                    | Validation - filter                                                        | Early return, not added to the queue                                                            | L270       |
+| TC-065  | onWatcherCreate: path ends with /.git                    | Normal - standard                                                          | The last 5 characters are removed from path and processing continues                            | L271       |
+| TC-066  | onWatcherCreate: path already exists in createEventPaths | Validation - dedup                                                         | Early return, not added twice                                                                   | L272       |
+| TC-067  | onWatcherCreate: new path, no timeout set                | Normal - standard                                                          | path is added to the queue and a timeout is set                                                 | L273-276   |
+| TC-068  | onWatcherCreate: new path, timeout already set           | Normal - branch                                                            | clearTimeout on the existing timeout → a new timeout is set                                     | L275       |
+| TC-069  | onWatcherChange: path contains /.git/                    | Validation - filter                                                        | Early return                                                                                    | L280       |
+| TC-070  | onWatcherChange: path ends with /.git                    | Normal - standard                                                          | The last 5 characters are removed from path and processing continues                            | L281       |
+| TC-071  | onWatcherChange: path already exists in changeEventPaths | Validation - dedup                                                         | Early return                                                                                    | L282       |
+| TC-072  | onWatcherChange: new path                                | Normal - standard                                                          | path is added to the queue and a timeout is set                                                 | L283-286   |
+| TC-073  | onWatcherDelete: path contains /.git/                    | Validation - filter                                                        | Early return                                                                                    | L290       |
+| TC-074  | onWatcherDelete: path ends with /.git, a repo matches    | Normal - standard                                                          | The last 5 characters are removed from path, removeReposWithinFolder true → sendRepos is called | L291-292   |
+| TC-075  | onWatcherDelete: normal path, a repo matches             | Normal - standard                                                          | removeReposWithinFolder true → sendRepos is called                                              | L292       |
+| TC-076  | onWatcherDelete: normal path, no repo matches            | Validation - rejected precondition                                         | removeReposWithinFolder false → sendRepos is not called                                         | L292 false |
 
 ## S14: Event processing (processCreateEvents, processChangeEvents)
 
@@ -257,19 +257,19 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `processCreateEvents(): Promise<void>` / `processChangeEvents(): Promise<void>` (private)
-**テスト対象パス**: `src/repoManager.ts:295-315`
+**Signature**: `processCreateEvents(): Promise<void>` / `processChangeEvents(): Promise<void>` (private)
+**Target path**: `src/repoManager.ts:295-315`
 
-| Case ID | Input / Precondition                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                        | Notes      |
-| ------- | ------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------ | ---------- |
-| TC-077  | processCreateEvents: createEventPaths が空                   | Boundary - empty                                                           | while ループ未実行、sendRepos 呼ばれない               | L297       |
-| TC-078  | processCreateEvents: 1件、path がディレクトリ、repo 発見     | Normal - standard                                                          | searchDirectoryForRepos true → sendRepos が1回呼ばれる | L298-303   |
-| TC-079  | processCreateEvents: 1件、path がディレクトリでない          | Validation - rejected precondition                                         | isDirectory false → searchDirectoryForRepos 呼ばれない | L298 false |
-| TC-080  | processCreateEvents: 複数件、一部で repo 発見                | Normal - standard                                                          | 全件処理後 sendRepos が1回呼ばれる                     | -          |
-| TC-081  | processChangeEvents: changeEventPaths が空                   | Boundary - empty                                                           | while ループ未実行、sendRepos 呼ばれない               | L308       |
-| TC-082  | processChangeEvents: 1件、path が存在しない、repo マッチあり | Normal - standard                                                          | removeReposWithinFolder true → sendRepos が1回呼ばれる | L309-314   |
-| TC-083  | processChangeEvents: 1件、path が存在する                    | Normal - branch                                                            | doesPathExist true → 削除処理スキップ                  | L309 false |
-| TC-084  | processChangeEvents: 1件、path 不在、repo マッチなし         | Validation - rejected precondition                                         | removeReposWithinFolder false → sendRepos 呼ばれない   | L310-314   |
+| Case ID | Input / Precondition                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                           | Notes      |
+| ------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------- | ---------- |
+| TC-077  | processCreateEvents: createEventPaths is empty                     | Boundary - empty                                                           | The while loop does not run, sendRepos is not called      | L297       |
+| TC-078  | processCreateEvents: 1 entry, path is a directory, a repo is found | Normal - standard                                                          | searchDirectoryForRepos true → sendRepos is called once   | L298-303   |
+| TC-079  | processCreateEvents: 1 entry, path is not a directory              | Validation - rejected precondition                                         | isDirectory false → searchDirectoryForRepos is not called | L298 false |
+| TC-080  | processCreateEvents: multiple entries, repos found for some        | Normal - standard                                                          | sendRepos is called once after all entries are processed  | -          |
+| TC-081  | processChangeEvents: changeEventPaths is empty                     | Boundary - empty                                                           | The while loop does not run, sendRepos is not called      | L308       |
+| TC-082  | processChangeEvents: 1 entry, path does not exist, a repo matches  | Normal - standard                                                          | removeReposWithinFolder true → sendRepos is called once   | L309-314   |
+| TC-083  | processChangeEvents: 1 entry, path exists                          | Normal - branch                                                            | doesPathExist true → the removal is skipped               | L309 false |
+| TC-084  | processChangeEvents: 1 entry, path missing, no repo matches        | Validation - rejected precondition                                         | removeReposWithinFolder false → sendRepos is not called   | L310-314   |
 
 ## S15: File system utilities (isDirectory, doesPathExist)
 
@@ -278,16 +278,16 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `isDirectory(path: string): Promise<boolean>` / `doesPathExist(path: string): Promise<boolean>` (module private)
-**テスト対象パス**: `src/repoManager.ts:318-334`
+**Signature**: `isDirectory(path: string): Promise<boolean>` / `doesPathExist(path: string): Promise<boolean>` (module private)
+**Target path**: `src/repoManager.ts:318-334`
 
-| Case ID | Input / Precondition          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                             | Notes    |
-| ------- | ----------------------------- | -------------------------------------------------------------------------- | ------------------------------------------- | -------- |
-| TC-085  | isDirectory: ディレクトリパス | Normal - standard                                                          | stats.isDirectory() が true → true を返す   | L320-321 |
-| TC-086  | isDirectory: ファイルパス     | Boundary - type mismatch                                                   | stats.isDirectory() が false → false を返す | L321     |
-| TC-087  | isDirectory: 存在しないパス   | External - fs stat failure                                                 | catch で false を返す                       | L322-324 |
-| TC-088  | doesPathExist: 存在するパス   | Normal - standard                                                          | stat 成功 → true を返す                     | L329     |
-| TC-089  | doesPathExist: 存在しないパス | External - fs stat failure                                                 | catch で false を返す                       | L331-333 |
+| Case ID | Input / Precondition                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                              | Notes    |
+| ------- | ----------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------- | -------- |
+| TC-085  | isDirectory: a directory path             | Normal - standard                                                          | stats.isDirectory() is true → returns true   | L320-321 |
+| TC-086  | isDirectory: a file path                  | Boundary - type mismatch                                                   | stats.isDirectory() is false → returns false | L321     |
+| TC-087  | isDirectory: a path that does not exist   | External - fs stat failure                                                 | Returns false from the catch                 | L322-324 |
+| TC-088  | doesPathExist: a path that exists         | Normal - standard                                                          | stat succeeds → returns true                 | L329     |
+| TC-089  | doesPathExist: a path that does not exist | External - fs stat failure                                                 | Returns false from the catch                 | L331-333 |
 
 ## S16: Watcher management (startWatchingFolders, startWatchingFolder, stopWatchingFolder)
 
@@ -297,16 +297,16 @@
 > Superseded By: S20
 > Supersedes: -
 
-**シグネチャ**: `startWatchingFolders(): void` / `startWatchingFolder(path): void` / `stopWatchingFolder(path): void` (private)
-**テスト対象パス**: `src/repoManager.ts:248-266`
+**Signature**: `startWatchingFolders(): void` / `startWatchingFolder(path): void` / `stopWatchingFolder(path): void` (private)
+**Target path**: `src/repoManager.ts:248-266`
 
-| Case ID | Input / Precondition                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                               | Notes           |
-| ------- | --------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | --------------- |
-| TC-090  | startWatchingFolders: workspaceFolders に2件        | Normal - standard                                                          | 各フォルダに対して startWatchingFolder が呼ばれる                             | L251            |
-| TC-091  | startWatchingFolders: workspaceFolders が undefined | Boundary - undefined                                                       | startWatchingFolder 呼ばれない                                                | L251 false      |
-| TC-092  | startWatchingFolder: 有効なパス                     | Normal - standard                                                          | createFileSystemWatcher 呼ばれ、3イベントハンドラ (create/change/delete) 登録 | L258-262        |
-| TC-093  | stopWatchingFolder: folderWatchers に存在するパス   | Normal - standard                                                          | watcher.dispose() が呼ばれ、エントリ削除される                                | L265-266        |
-| TC-094  | stopWatchingFolder: folderWatchers に存在しないパス | Boundary - non-existing key                                                | 未定義プロパティの dispose() でランタイムエラーの可能性                       | L265 潜在的バグ |
+| Case ID | Input / Precondition                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                              | Notes           |
+| ------- | -------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | --------------- |
+| TC-090  | startWatchingFolders: 2 entries in workspaceFolders      | Normal - standard                                                          | startWatchingFolder is called for each folder                                                | L251            |
+| TC-091  | startWatchingFolders: workspaceFolders is undefined      | Boundary - undefined                                                       | startWatchingFolder is not called                                                            | L251 false      |
+| TC-092  | startWatchingFolder: a valid path                        | Normal - standard                                                          | createFileSystemWatcher is called and 3 event handlers (create/change/delete) are registered | L258-262        |
+| TC-093  | stopWatchingFolder: a path present in folderWatchers     | Normal - standard                                                          | watcher.dispose() is called and the entry is removed                                         | L265-266        |
+| TC-094  | stopWatchingFolder: a path not present in folderWatchers | Boundary - non-existing key                                                | Possible runtime error from dispose() on an undefined property                               | L265 latent bug |
 
 ## S17: startupTasks
 
@@ -315,15 +315,15 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `startupTasks(): Promise<void>` (private)
-**テスト対象パス**: `src/repoManager.ts:92-97`
+**Signature**: `startupTasks(): Promise<void>` (private)
+**Target path**: `src/repoManager.ts:92-97`
 
-| Case ID | Input / Precondition                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                          | Notes                          |
-| ------- | ------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| TC-095  | checkReposExist が false を返す (変更なし) | Normal - standard                                                          | sendRepos が startupTasks 内で1回呼ばれる                                                                | L94 true分岐 (!false = true)   |
-| TC-096  | checkReposExist が true を返す (変更あり)  | Normal - branch                                                            | sendRepos は startupTasks 内では呼ばれない (checkReposExist 内で呼び出し済み)                            | L94 false分岐 (!true = false)  |
-| TC-097  | 正常な初期状態                             | Normal - standard                                                          | removeReposNotInWorkspace, checkReposExist, searchWorkspaceForRepos, startWatchingFolders が順に呼ばれる | オーケストレーション順序の検証 |
-| TC-098  | repos が空の初期状態                       | Boundary - empty                                                           | removeReposNotInWorkspace は no-op、checkReposExist false → sendRepos が空 repos で呼ばれる              | repos = {}                     |
+| Case ID | Input / Precondition                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                               | Notes                            |
+| ------- | ----------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| TC-095  | checkReposExist returns false (no change) | Normal - standard                                                          | sendRepos is called once within startupTasks                                                                  | L94 true branch (!false = true)  |
+| TC-096  | checkReposExist returns true (changed)    | Normal - branch                                                            | sendRepos is not called within startupTasks (already called inside checkReposExist)                           | L94 false branch (!true = false) |
+| TC-097  | Normal initial state                      | Normal - standard                                                          | removeReposNotInWorkspace, checkReposExist, searchWorkspaceForRepos, startWatchingFolders are called in order | Verifies the orchestration order |
+| TC-098  | Initial state with empty repos            | Boundary - empty                                                           | removeReposNotInWorkspace is a no-op, checkReposExist false → sendRepos is called with empty repos            | repos = {}                       |
 
 ## S18: searchWorkspaceForRepos
 
@@ -332,19 +332,19 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `searchWorkspaceForRepos(): Promise<void>` (private)
-**テスト対象パス**: `src/repoManager.ts:197-212`
+**Signature**: `searchWorkspaceForRepos(): Promise<void>` (private)
+**Target path**: `src/repoManager.ts:197-212`
 
-| Case ID | Input / Precondition                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                   | Notes               |
-| ------- | --------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------- |
-| TC-099  | workspaceFolders が undefined                                   | Boundary - undefined                                                       | searchDirectoryForRepos 呼ばれない、sendRepos 呼ばれない                          | L200 false分岐      |
-| TC-100  | workspaceFolders に1件、searchDirectoryForRepos が true を返す  | Normal - standard                                                          | sendRepos が1回呼ばれる                                                           | L202-211            |
-| TC-101  | workspaceFolders に1件、searchDirectoryForRepos が false を返す | Normal - branch                                                            | sendRepos 呼ばれない                                                              | L211 false分岐      |
-| TC-102  | workspaceFolders に2件、一方で searchDirectoryForRepos が true  | Normal - standard                                                          | 2回 searchDirectoryForRepos 呼ばれ、sendRepos が1回呼ばれる                       | 複数フォルダ混合    |
-| TC-103  | workspaceFolders が空配列                                       | Boundary - empty                                                           | ループ未実行、sendRepos 呼ばれない                                                | L201                |
-| TC-104  | maxDepthOfRepoSearch が 0                                       | Boundary - zero                                                            | searchDirectoryForRepos が maxDepth=0 で呼ばれ、再帰なしで false → sendRepos なし | L205 maxDepth境界値 |
+| Case ID | Input / Precondition                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                       | Notes                  |
+| ------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ---------------------- |
+| TC-099  | workspaceFolders is undefined                                       | Boundary - undefined                                                       | searchDirectoryForRepos is not called, sendRepos is not called                        | L200 false branch      |
+| TC-100  | 1 entry in workspaceFolders, searchDirectoryForRepos returns true   | Normal - standard                                                          | sendRepos is called once                                                              | L202-211               |
+| TC-101  | 1 entry in workspaceFolders, searchDirectoryForRepos returns false  | Normal - branch                                                            | sendRepos is not called                                                               | L211 false branch      |
+| TC-102  | 2 entries in workspaceFolders, searchDirectoryForRepos true for one | Normal - standard                                                          | searchDirectoryForRepos is called twice and sendRepos once                            | Mixed multiple folders |
+| TC-103  | workspaceFolders is an empty array                                  | Boundary - empty                                                           | The loop does not run, sendRepos is not called                                        | L201                   |
+| TC-104  | maxDepthOfRepoSearch is 0                                           | Boundary - zero                                                            | searchDirectoryForRepos is called with maxDepth=0, no recursion, false → no sendRepos | L205 maxDepth boundary |
 
-## S19: dispose() 保留イベント処理タイマーのクリア
+## S19: dispose() clears the pending event processing timers
 
 > Origin: フェーズ2 修正 L10 (repo-manager-dispose-clear-timers)
 > Added: 2026-07-04T02:44:58Z
@@ -353,17 +353,17 @@
 > Signature: `public dispose(): void`
 > Target Path: `src/repoManager.ts:62-80`
 
-`dispose()` に「`processCreateEventsTimeout` / `processChangeEventsTimeout` がそれぞれ `!== null` なら `clearTimeout` して `null` 化する」処理を追加する修正。破棄後に保留中のデバウンス済み `processCreateEvents` / `processChangeEvents` が発火してしまうのを防ぐ。既存 S3（handler/watcher の破棄）に対する追加処理であり、S3 の観点は変更しない。
+A fix that adds to `dispose()`: "if `processCreateEventsTimeout` / `processChangeEventsTimeout` is `!== null`, call `clearTimeout` and set it to `null`". It prevents the pending debounced `processCreateEvents` / `processChangeEvents` from firing after disposal. This is additional processing on top of the existing S3 (disposing the handler/watchers), and the S3 perspectives are unchanged.
 
-| Case ID | Input / Precondition                                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                      | Notes                        |
-| ------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| TC-105  | `processCreateEventsTimeout` が保留中（`!== null`）で `dispose()` を呼ぶ        | Normal - create timeout cleared                                            | `clearTimeout(processCreateEventsTimeout)` が呼ばれ `null` 化される。保留の `processCreateEvents` が発火しない       | 作成イベントタイマーのクリア |
-| TC-106  | `processCreateEventsTimeout === null` で `dispose()` を呼ぶ                     | Boundary - create timeout null                                             | `processCreateEventsTimeout` 用の `clearTimeout` は呼ばれない。エラーなく完了                                        | 保留なし境界                 |
-| TC-107  | `processChangeEventsTimeout` が保留中（`!== null`）で `dispose()` を呼ぶ        | Normal - change timeout cleared                                            | `clearTimeout(processChangeEventsTimeout)` が呼ばれ `null` 化される。保留の `processChangeEvents` が発火しない       | 変更イベントタイマーのクリア |
-| TC-108  | `processChangeEventsTimeout === null` で `dispose()` を呼ぶ                     | Boundary - change timeout null                                             | `processChangeEventsTimeout` 用の `clearTimeout` は呼ばれない。エラーなく完了                                        | 保留なし境界                 |
-| TC-109  | 両タイマーとも保留中で `dispose()` を呼び、`advanceTimersByTime` で時間を進める | Boundary - both cleared no fire                                            | 両 timeout に `clearTimeout` + `null` 化が行われ、`processCreateEvents` / `processChangeEvents` がどちらも発火しない | 破棄後の保留イベント非発火   |
+| Case ID | Input / Precondition                                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                               | Notes                                     |
+| ------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- |
+| TC-105  | Call `dispose()` with `processCreateEventsTimeout` pending (`!== null`)                 | Normal - create timeout cleared                                            | `clearTimeout(processCreateEventsTimeout)` is called and it is set to `null`. The pending `processCreateEvents` does not fire | Clears the create event timer             |
+| TC-106  | Call `dispose()` with `processCreateEventsTimeout === null`                             | Boundary - create timeout null                                             | `clearTimeout` for `processCreateEventsTimeout` is not called. Completes without error                                        | Nothing-pending boundary                  |
+| TC-107  | Call `dispose()` with `processChangeEventsTimeout` pending (`!== null`)                 | Normal - change timeout cleared                                            | `clearTimeout(processChangeEventsTimeout)` is called and it is set to `null`. The pending `processChangeEvents` does not fire | Clears the change event timer             |
+| TC-108  | Call `dispose()` with `processChangeEventsTimeout === null`                             | Boundary - change timeout null                                             | `clearTimeout` for `processChangeEventsTimeout` is not called. Completes without error                                        | Nothing-pending boundary                  |
+| TC-109  | Call `dispose()` with both timers pending, then advance time with `advanceTimersByTime` | Boundary - both cleared no fire                                            | Both timeouts get `clearTimeout` and are set to `null`, and neither `processCreateEvents` nor `processChangeEvents` fires     | Pending events do not fire after disposal |
 
-## S20: startWatchingFolder / stopWatchingFolder の冪等化
+## S20: Idempotent startWatchingFolder / stopWatchingFolder
 
 > Origin: Feature 045 (defensive-fixes) (light-spec-plan)
 > Added: 2026-07-19
@@ -372,35 +372,35 @@
 > Signature: `private startWatchingFolder(path: string): void` / `private stopWatchingFolder(path: string): void`
 > Target Path: `src/repoManager.ts:256-275`
 
-watcher の開始を「同一正規化 path の entry が存在すれば何もしない」、停止を「entry が存在する場合だけ dispose/delete する」冪等な処理へ変更する修正。S16 の「未登録停止で `undefined.dispose()` のランタイムエラーの可能性」（TC-094）と「重複開始の上書き」を置き換える。startupTasks の await 中に folder removed イベントが発火しても、`removeReposWithinFolder` から `sendRepos()` まで継続できる契約を保証する（[6] の修正）。`startWatchingFolders` の列挙（S16 TC-090/TC-091 相当）は挙動を変えない。
+A fix that makes starting a watcher idempotent ("do nothing if an entry for the same normalized path exists") and stopping idempotent ("dispose/delete only when the entry exists"). It replaces S16's "possible runtime error from `undefined.dispose()` when stopping an unregistered path" (TC-094) and "overwrite on duplicate start". It guarantees that even if a folder removed event fires while startupTasks is awaiting, processing continues from `removeReposWithinFolder` to `sendRepos()` (the fix for [6]). The enumeration of `startWatchingFolders` (equivalent to S16 TC-090/TC-091) does not change behavior.
 
-| Case ID | Input / Precondition                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                        | Notes                                |
-| ------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| TC-110  | 同一の正規化 path で `startWatchingFolder` を2回呼ぶ                                          | Boundary - 重複開始の冪等性                                                | `createFileSystemWatcher` の呼び出しが1回のみで、既存 watcher の `dispose()` は0回（上書き・リークなし）               | S16 の上書き挙動を置換               |
-| TC-111  | `folderWatchers` に存在しない path で `stopWatchingFolder` を呼ぶ                             | Boundary - 未登録停止の安全終了                                            | `TypeError` を throw せず正常終了し、いずれの watcher の `dispose()` も呼ばれない                                      | S16 TC-094 の潜在バグ期待を置換      |
-| TC-112  | 登録済み path で `stopWatchingFolder` を呼び、続けて同じ path でもう一度呼ぶ                  | Normal - 登録済み停止と entry 削除                                         | 1回目で対象 watcher の `dispose()` が1回呼ばれ entry が削除される。2回目は `dispose()` の追加呼び出し0回で正常終了する | dispose 1回 + delete の契約          |
-| TC-113  | `startupTasks` の await 中（`folderWatchers` が空）に workspace folder removed イベントを発火 | External - 起動中の folder 削除イベント                                    | `TypeError` が発生せず、`removeReposWithinFolder` による repo 削除後に `sendRepos` が1回呼ばれる（ビューが更新される） | 起動レース窓の回帰（[6] の観測条件） |
+| Case ID | Input / Precondition                                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                      | Notes                                                             |
+| ------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| TC-110  | Call `startWatchingFolder` twice with the same normalized path                                     | Boundary - idempotent duplicate start                                      | `createFileSystemWatcher` is called only once, and `dispose()` of the existing watcher is called 0 times (no overwrite, no leak)                     | Replaces the overwrite behavior of S16                            |
+| TC-111  | Call `stopWatchingFolder` with a path not present in `folderWatchers`                              | Boundary - safe end when stopping an unregistered path                     | Ends normally without throwing a `TypeError`, and `dispose()` of no watcher is called                                                                | Replaces the latent-bug expectation of S16 TC-094                 |
+| TC-112  | Call `stopWatchingFolder` with a registered path, then call it again with the same path            | Normal - stopping a registered path and removing the entry                 | The first call calls `dispose()` of the target watcher once and removes the entry. The second call ends normally with 0 additional `dispose()` calls | Contract of 1 dispose + delete                                    |
+| TC-113  | Fire a workspace folder removed event while `startupTasks` is awaiting (`folderWatchers` is empty) | External - folder removal event during startup                             | No `TypeError` occurs, and after `removeReposWithinFolder` removes the repo, `sendRepos` is called once (the view is updated)                        | Regression of the startup race window (observed condition of [6]) |
 
-### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S20）
+### Failure-source inventory (include-or-justify) — added by Feature 045 (S20)
 
-| 失敗源                                                   | 対応ケースまたは除外理由                                                               |
-| -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| 未登録 path の停止による `undefined.dispose()` TypeError | TC-111、TC-113                                                                         |
-| 重複開始による既存 watcher の上書き・リーク              | TC-110                                                                                 |
-| throw による `sendRepos()` 未達（ビュー未更新）          | TC-113                                                                                 |
-| 登録済み watcher の解放漏れ                              | TC-112                                                                                 |
-| optional chaining だけで entry が残る退行                | TC-112（2回目呼び出しで entry 削除を検証）                                             |
-| workspaceFolders 未定義・空の列挙分岐                    | excluded(S16 TC-090/TC-091 相当の `startWatchingFolders` 列挙は本変更で挙動を変えない) |
-| watcher イベントハンドラの分岐                           | excluded(既存 S13〜S14 で担保済み。本変更の対象外)                                     |
+| Failure source                                                        | Case or reason for exclusion                                                                                               |
+| --------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
+| `undefined.dispose()` TypeError from stopping an unregistered path    | TC-111, TC-113                                                                                                             |
+| Overwrite or leak of the existing watcher on a duplicate start        | TC-110                                                                                                                     |
+| `sendRepos()` not reached because of a throw (view not updated)       | TC-113                                                                                                                     |
+| Registered watcher not released                                       | TC-112                                                                                                                     |
+| Regression where only optional chaining is used and the entry remains | TC-112 (verifies the entry is removed through the second call)                                                             |
+| Enumeration branches for undefined / empty workspaceFolders           | excluded(the `startWatchingFolders` enumeration, equivalent to S16 TC-090/TC-091, does not change behavior in this change) |
+| Branches of the watcher event handlers                                | excluded(already covered by the existing S13 to S14; outside this change)                                                  |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(path 引数の検証分岐は追加しない。存在判定は Boundary として TC-110/TC-111 で検証)
-- Exception: excluded(冪等化により throw 経路を除去する変更のため、非 throw を TC-111/TC-113 で検証)
+- Validation: excluded(no validation branch is added for the path argument; the existence check is verified as Boundary in TC-110/TC-111)
+- Exception: excluded(the change removes the throw path through idempotency, so the absence of a throw is verified in TC-111/TC-113)
 - External: TC-113
-- Boundary: TC-110、TC-111
-- Type: excluded(引数は内部呼び出しの `string` で、実行時の型分岐が存在しない)
+- Boundary: TC-110, TC-111
+- Type: excluded(the argument is an internally passed `string` with no runtime type branch)
 
-数値・空値境界（0 / minimum / maximum / +/-1 / empty / NULL）は、本セクションの対象が Map entry の存在有無の契約であり数値境界を持たないため対象外とする（意味のある境界は「未登録」「重複」の TC-110/TC-111 で充足）。
+Numeric and empty boundaries (0 / minimum / maximum / +/-1 / empty / NULL) are out of scope because this section covers the contract of whether a Map entry exists and has no numeric boundary (the meaningful boundaries "unregistered" and "duplicate" are covered by TC-110/TC-111).
 
-**失敗系/正常系比（煙感知器）**: 正常系1件（TC-112）、失敗系3件（TC-110、TC-111、TC-113）、比3.0。
+**Failure/normal ratio (smoke detector)**: 1 normal case (TC-112), 3 failure cases (TC-110, TC-111, TC-113), ratio 3.0.

@@ -1,4 +1,4 @@
-# テスト観点表マニフェスト: src/dataSource.ts
+# Test Perspectives Manifest: src/dataSource.ts
 
 > Source: `src/dataSource.ts`
 > Storage Mode: sharded

@@ -1,4 +1,4 @@
-# テスト観点表: src/config.ts
+# Test Perspectives: src/config.ts
 
 > Source: `src/config.ts`
 > Generated: 2026-09-12T00:00:00Z
@@ -6,39 +6,39 @@
 > Test Framework: Vitest
 > Responsibility: feature-056-retain-context
 
-## S20: retainContextWhenHidden() 既定値の package.json 整合
+## S20: retainContextWhenHidden() default value consistent with package.json
 
 > Origin: Feature 056 (retain-context-when-hidden) issue #48
 > Added: 2026-09-12
 > Status: active
 > Supersedes: -
 > Signature: `retainContextWhenHidden(): boolean`
-> Target Path: `src/config.ts`（`maxDepthOfRepoSearch()` の直後）
-> Test File: `tests/src/config-defaults.test.ts`（Group 1 の `it.each` 行）
+> Target Path: `src/config.ts` (right after `maxDepthOfRepoSearch()`)
+> Test File: `tests/src/config-defaults.test.ts` (an `it.each` row of Group 1)
 
-`workspaceConfiguration.get("retainContextWhenHidden", true)` のフォールバック値が `package.json` の `git-keizu.retainContextWhenHidden.default` と一致する観点。S10 の単純値比較グループに 1 行追加する。設定値の型検証は VS Code の設定スキーマに委ね、本表では既定値契約のみ扱う。
+Checks that the fallback value of `workspaceConfiguration.get("retainContextWhenHidden", true)` matches `git-keizu.retainContextWhenHidden.default` in `package.json`. Adds one row to the simple value comparison group of S10. Type checking of the setting value is left to the VS Code settings schema; this table covers only the default value contract.
 
-| Case ID | Input / Precondition                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                    | Notes              |
-| ------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------ |
-| TC-368  | `get` mock がフォールバック値をそのまま返す状態で `retainContextWhenHidden()` を呼ぶ | Normal - 既定値の整合                                                      | 戻り値が `package.json` の `default`（`true`）と `toBe` で一致する | S10 と同じ比較方式 |
+| Case ID | Input / Precondition                                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                           | Notes                  |
+| ------- | --------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------- |
+| TC-368  | Call `retainContextWhenHidden()` with the `get` mock returning the fallback value as is | Normal - default value consistency                                         | The return value matches `default` (`true`) of `package.json` with `toBe` | Same comparison as S10 |
 
-### 失敗源インベントリ（include-or-justify）— Feature 056 追加分（S20）
+### Failure-source inventory (include-or-justify) — added by Feature 056 (S20)
 
-| 失敗源                                                 | 対応ケースまたは除外理由                                                                          |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------- |
-| コード側フォールバックと `package.json` 既定値の不一致 | TC-368                                                                                            |
-| 設定キー名の綴り違い                                   | TC-368（`package.json` のキーで `default` を引くため、キーが無ければ `undefined` と不一致になる） |
-| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）  | excluded(boolean 設定。`true` / `false` 以外はスキーマで拒否される)                               |
-| 外部依存×失敗モード                                    | excluded(`workspaceConfiguration.get()` は既定値契約で throw しない既存挙動)                      |
-| 例外・エラー経路                                       | excluded(getter に分岐なし)                                                                       |
+| Failure source                                                    | Covering cases or reason for exclusion                                                                           |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| The fallback in code does not match the default in `package.json` | TC-368                                                                                                           |
+| Misspelled setting key                                            | TC-368 (`default` is looked up by the `package.json` key, so a missing key gives `undefined` and does not match) |
+| Boundary values (0 / minimum / maximum / +/-1 / empty / NULL)     | excluded(boolean setting. Values other than `true` / `false` are rejected by the schema)                         |
+| External dependency × failure mode                                | excluded(`workspaceConfiguration.get()` does not throw under the default value contract; existing behaviour)     |
+| Exception and error paths                                         | excluded(the getter has no branch)                                                                               |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(上表のとおり)
-- Exception: excluded(上表のとおり)
-- External: excluded(上表のとおり)
-- Boundary: excluded(上表のとおり)
-- Type: excluded(上表のとおり)
+- Validation: excluded(as in the table above)
+- Exception: excluded(as in the table above)
+- External: excluded(as in the table above)
+- Boundary: excluded(as in the table above)
+- Type: excluded(as in the table above)
 - Normal: TC-368
 
-**失敗系/正常系比（煙感知器）**: 正常系1件、失敗系0件。既定値 getter 1 本の追加で、失敗源は上表で網羅済みであることを確認した。
+**Failure/normal ratio (smoke detector)**: 1 normal case, 0 failure cases. This adds a single default value getter, and it was confirmed that the table above covers the failure sources.

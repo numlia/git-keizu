@@ -1,4 +1,4 @@
-# テスト観点表: web/main.ts
+# Test Perspectives: web/main.ts
 
 > Source: `web/main.ts`
 > Generated: 2026-03-22T14:25:09Z
@@ -6,129 +6,129 @@
 > Test Framework: Vitest
 > Responsibility: rendering
 
-## S1: スタッシュ行描画（行構成・ラベル）
+## S1: Rendering stash rows (row structure and labels)
 
 > Origin: Feature 001 (menu-bar-enhancement) Task 3.4
 > Added: 2026-02-25
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `web/main.ts`
+**Target path**: `web/main.ts`
 
-| Case ID | Input / Precondition                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                              | Notes                 |
-| ------- | ------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------ | --------------------- |
-| TC-001  | commit.stash !== null のコミットノード     | Normal - standard                                                          | 行要素の CSS クラスに `"commit"` と `"stash"` が両方含まれる | -                     |
-| TC-002  | commit.stash.selector が `"stash@{0}"`     | Normal - standard                                                          | ラベルに `"@{0}"` が表示される（"stash" プレフィックス除去） | selector.substring(5) |
-| TC-003  | commit.stash.selector が `"stash@{12}"`    | Boundary - multi-digit index                                               | ラベルに `"@{12}"` が表示される                              | 2桁インデックス       |
-| TC-004  | commit.stash !== null のコミットノード     | Normal - standard                                                          | data-hash 属性にスタッシュのコミットハッシュが設定される     | -                     |
-| TC-005  | commit.stash === null の通常コミットノード | Normal - non-stash                                                         | 行要素の CSS クラスに `"stash"` が含まれない                 | 既存動作が維持される  |
+| Case ID | Input / Precondition                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                     | Notes                     |
+| ------- | ----------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------- |
+| TC-001  | A commit node with commit.stash !== null        | Normal - standard                                                          | The row element's CSS classes include both `"commit"` and `"stash"` | -                         |
+| TC-002  | commit.stash.selector is `"stash@{0}"`          | Normal - standard                                                          | The label shows `"@{0}"` (the "stash" prefix is removed)            | selector.substring(5)     |
+| TC-003  | commit.stash.selector is `"stash@{12}"`         | Boundary - multi-digit index                                               | The label shows `"@{12}"`                                           | Two-digit index           |
+| TC-004  | A commit node with commit.stash !== null        | Normal - standard                                                          | The data-hash attribute is set to the stash's commit hash           | -                         |
+| TC-005  | A normal commit node with commit.stash === null | Normal - non-stash                                                         | The row element's CSS classes do not include `"stash"`              | Existing behavior is kept |
 
-## S7: calculateCdvHeight() CDV高さ算出
-
-> Origin: Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)
-> Added: 2026-02-26
-> Status: active
-> Supersedes: -
-
-**シグネチャ**: `private calculateCdvHeight(): number`
-**テスト対象パス**: `web/main.ts`
-
-| Case ID | Input / Precondition               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                     | Notes                          |
-| ------- | ---------------------------------- | -------------------------------------------------------------------------- | ----------------------------------- | ------------------------------ |
-| TC-050  | innerHeight=800, controlsHeight=50 | Normal - standard                                                          | 250 (CDV_DEFAULT_HEIGHT)            | available=695 > 250            |
-| TC-051  | innerHeight=355, controlsHeight=50 | Boundary - available == default                                            | 250                                 | available=250, 境界一致        |
-| TC-052  | innerHeight=354, controlsHeight=50 | Boundary - available == default-1                                          | 249                                 | available=249 < 250            |
-| TC-053  | innerHeight=205, controlsHeight=50 | Boundary - available == min                                                | 100 (CDV_MIN_HEIGHT)                | available=100, 最小境界一致    |
-| TC-054  | innerHeight=204, controlsHeight=50 | Boundary - available == min-1                                              | 100 (CDV_MIN_HEIGHT)                | available=99 → 100にクランプ   |
-| TC-055  | innerHeight=0                      | Boundary - zero viewport                                                   | 100 (CDV_MIN_HEIGHT)                | 負の available → 100にクランプ |
-| TC-056  | #controls要素が存在しない          | Boundary - missing element                                                 | ビューポート全体 - マージンから算出 | controlsHeight=0フォールバック |
-
-## S8: showCommitDetails() CDV高さ適用・スクロール制御
+## S7: calculateCdvHeight() computing the CDV height
 
 > Origin: Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)
 > Added: 2026-02-26
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `web/main.ts`
+**Signature**: `private calculateCdvHeight(): number`
+**Target path**: `web/main.ts`
 
-| Case ID | Input / Precondition                                                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                             | Notes                    |
-| ------- | ------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------- | ------------------------ |
-| TC-057  | CDVがビューポート内に完全に収まる (offsetTop > scrollTop, offsetTop + expandY < scrollTop + viewHeight) | Normal - standard                                                          | scrollTop が変化しない                                                      | スクロール位置維持       |
-| TC-058  | CDV上端がビューポートより上 (offsetTop - CDV_SCROLL_PADDING < scrollTop)                                | Normal - top overflow                                                      | scrollTop = offsetTop - CDV_SCROLL_PADDING                                  | 上方はみ出し時スクロール |
-| TC-059  | CDV下端がビューポートより下 (offsetTop + expandY + CDV_SCROLL_BOTTOM_OFFSET > scrollTop + viewHeight)   | Normal - bottom overflow                                                   | scrollTop = offsetTop + expandY - viewHeight + CDV_SCROLL_BOTTOM_OFFSET     | 下方はみ出し時スクロール |
-| TC-060  | showCommitDetails() 呼び出し                                                                            | Normal - standard                                                          | CDV要素の style.height に calculateCdvHeight() の結果が px 単位で設定される | 動的高さ適用             |
-| TC-061  | showCommitDetails() 呼び出し                                                                            | Normal - standard                                                          | renderGraph() が CDV高さ適用後に呼ばれる                                    | 描画座標更新             |
+| Case ID | Input / Precondition                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                   | Notes                                          |
+| ------- | ------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------- |
+| TC-050  | innerHeight=800, controlsHeight=50   | Normal - standard                                                          | 250 (CDV_DEFAULT_HEIGHT)                          | available=695 > 250                            |
+| TC-051  | innerHeight=355, controlsHeight=50   | Boundary - available == default                                            | 250                                               | available=250, exactly at the boundary         |
+| TC-052  | innerHeight=354, controlsHeight=50   | Boundary - available == default-1                                          | 249                                               | available=249 < 250                            |
+| TC-053  | innerHeight=205, controlsHeight=50   | Boundary - available == min                                                | 100 (CDV_MIN_HEIGHT)                              | available=100, exactly at the minimum boundary |
+| TC-054  | innerHeight=204, controlsHeight=50   | Boundary - available == min-1                                              | 100 (CDV_MIN_HEIGHT)                              | available=99 → clamped to 100                  |
+| TC-055  | innerHeight=0                        | Boundary - zero viewport                                                   | 100 (CDV_MIN_HEIGHT)                              | Negative available → clamped to 100            |
+| TC-056  | The #controls element does not exist | Boundary - missing element                                                 | Computed from the whole viewport minus the margin | controlsHeight=0 fallback                      |
 
-## S9: updateCommitDetailsHeight() リサイズ対応
+## S8: showCommitDetails() applying the CDV height and controlling scroll
 
 > Origin: Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)
 > Added: 2026-02-26
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `private updateCommitDetailsHeight(): void`
-**テスト対象パス**: `web/main.ts`
+**Target path**: `web/main.ts`
 
-| Case ID | Input / Precondition                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                          | Notes                         |
-| ------- | ----------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------- | ----------------------------- |
-| TC-062  | CDV表示中 + resize イベント (outer dimensions change) | Normal - standard                                                          | CDV高さ再計算・style.height 更新、renderGraph() 呼び出し | -                             |
-| TC-063  | CDV非表示 + resize イベント                           | Normal - no CDV                                                            | CDV高さ変更なし、既存動作維持                            | expandedCommit === null       |
-| TC-064  | CDV表示中 + 内部リサイズ (outer unchanged)            | Normal - inner resize                                                      | CDV高さ再計算・更新（パネル幅変更に対応）                | 既存renderGraph動作 + CDV更新 |
+| Case ID | Input / Precondition                                                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                   | Notes                                   |
+| ------- | --------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | --------------------------------------- |
+| TC-057  | The CDV fits fully inside the viewport (offsetTop > scrollTop, offsetTop + expandY < scrollTop + viewHeight)          | Normal - standard                                                          | scrollTop does not change                                                         | Scroll position kept                    |
+| TC-058  | The top of the CDV is above the viewport (offsetTop - CDV_SCROLL_PADDING < scrollTop)                                 | Normal - top overflow                                                      | scrollTop = offsetTop - CDV_SCROLL_PADDING                                        | Scrolls when it overflows at the top    |
+| TC-059  | The bottom of the CDV is below the viewport (offsetTop + expandY + CDV_SCROLL_BOTTOM_OFFSET > scrollTop + viewHeight) | Normal - bottom overflow                                                   | scrollTop = offsetTop + expandY - viewHeight + CDV_SCROLL_BOTTOM_OFFSET           | Scrolls when it overflows at the bottom |
+| TC-060  | Call showCommitDetails()                                                                                              | Normal - standard                                                          | The CDV element's style.height is set to the result of calculateCdvHeight() in px | Dynamic height applied                  |
+| TC-061  | Call showCommitDetails()                                                                                              | Normal - standard                                                          | renderGraph() is called after the CDV height is applied                           | Drawing coordinates updated             |
 
-## S15: ファイルリスト表示切替（Tree/List トグル）
+## S9: updateCommitDetailsHeight() handling resize
+
+> Origin: Feature 004 (webview-ux-polish) (aidd-spec-tasks-test)
+> Added: 2026-02-26
+> Status: active
+> Supersedes: -
+
+**Signature**: `private updateCommitDetailsHeight(): void`
+**Target path**: `web/main.ts`
+
+| Case ID | Input / Precondition                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                      | Notes                                      |
+| ------- | -------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------ |
+| TC-062  | CDV shown + resize event (outer dimensions change) | Normal - standard                                                          | The CDV height is recalculated and style.height updated, and renderGraph() is called | -                                          |
+| TC-063  | CDV hidden + resize event                          | Normal - no CDV                                                            | The CDV height does not change, and existing behavior is kept                        | expandedCommit === null                    |
+| TC-064  | CDV shown + inner resize (outer unchanged)         | Normal - inner resize                                                      | The CDV height is recalculated and updated (handles panel width changes)             | Existing renderGraph behavior + CDV update |
+
+## S15: Switching the file list view (Tree/List toggle)
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `web/main.ts`
+**Target path**: `web/main.ts`
 
-| Case ID | Input / Precondition                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                               | Notes              |
-| ------- | ----------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------ |
-| TC-101  | fileViewType="tree" の状態でトグルクリック      | Normal - standard                                                          | fileViewType が "list" に変更され、フラットリスト描画関数が呼ばれる           | tree → list        |
-| TC-102  | fileViewType="list" の状態でトグルクリック      | Normal - standard                                                          | fileViewType が "tree" に変更され、ツリー描画関数が呼ばれる                   | list → tree        |
-| TC-103  | トグルクリック後                                | Normal - standard                                                          | saveRepoState メッセージが新しい fileViewType を含んで送信される              | 永続化             |
-| TC-104  | 初期表示: GitRepoState.fileViewType = "list"    | Normal - standard                                                          | リスト表示で初期描画される                                                    | 保存値の復元       |
-| TC-105  | 初期表示: GitRepoState.fileViewType = undefined | Boundary - default                                                         | ツリー表示で初期描画される（現行動作と同一）                                  | デフォルト値       |
-| TC-106  | トグルアイコンの表示                            | Normal - standard                                                          | 現在のモードに応じたアイコンが表示される（Tree アイコンまたは List アイコン） | 視覚フィードバック |
+| Case ID | Input / Precondition                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                | Notes                    |
+| ------- | ------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------ |
+| TC-101  | Click the toggle with fileViewType="tree"              | Normal - standard                                                          | fileViewType changes to "list", and the flat list rendering function is called | tree → list              |
+| TC-102  | Click the toggle with fileViewType="list"              | Normal - standard                                                          | fileViewType changes to "tree", and the tree rendering function is called      | list → tree              |
+| TC-103  | After clicking the toggle                              | Normal - standard                                                          | A saveRepoState message containing the new fileViewType is sent                | Persistence              |
+| TC-104  | Initial display: GitRepoState.fileViewType = "list"    | Normal - standard                                                          | The initial render is the list view                                            | Restores the saved value |
+| TC-105  | Initial display: GitRepoState.fileViewType = undefined | Boundary - default                                                         | The initial render is the tree view (same as the current behavior)             | Default value            |
+| TC-106  | Display of the toggle icon                             | Normal - standard                                                          | The icon for the current mode is shown (Tree icon or List icon)                | Visual feedback          |
 
-## S17: コミット詳細表示改善
+## S17: Commit details display improvements
 
 > Origin: Feature 006 (git-graph-parity) (aidd-spec-tasks-test)
 > Added: 2026-03-01
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `web/main.ts`
+**Target path**: `web/main.ts`
 
-| Case ID | Input / Precondition                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                             | Notes             |
-| ------- | -------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------- | ----------------- |
-| TC-112  | コミット詳細表示                             | Normal - standard                                                          | 表示順: Commit → Parents → Author → Committer → Date        | 表示順変更        |
-| TC-113  | Committer に committerEmail が設定されている | Normal - standard                                                          | "Committer: {name} <{email}>" 形式で表示。mailto リンク付き | Author 行と同形式 |
-| TC-114  | committerEmail が空文字列                    | Boundary - empty email                                                     | Committer 名のみ表示（メールアドレス部分は省略）            | 防御的表示        |
+| Case ID | Input / Precondition              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                    | Notes                          |
+| ------- | --------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------ |
+| TC-112  | Commit details are shown          | Normal - standard                                                          | Display order: Commit → Parents → Author → Committer → Date        | Display order changed          |
+| TC-113  | Committer has committerEmail set  | Normal - standard                                                          | Shown in the form "Committer: {name} <{email}>" with a mailto link | Same format as the Author line |
+| TC-114  | committerEmail is an empty string | Boundary - empty email                                                     | Only the committer name is shown (the email part is omitted)       | Defensive display              |
 
-## S20: renderTable() commitMessage ラッパー生成
+## S20: renderTable() generating the commitMessage wrapper
 
 > Origin: Feature 010 (mute-branch-label-fix) (aidd-spec-tasks-test)
 > Added: 2026-03-05
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `private renderTable(): void`
-**テスト対象パス**: `web/main.ts:610`
+**Signature**: `private renderTable(): void`
+**Target path**: `web/main.ts:610`
 
-| Case ID | Input / Precondition                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                    | Notes                      |
-| ------- | ----------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ | -------------------------- |
-| TC-123  | 通常コミット（mute=false）の行HTML生成          | Normal - standard                                                          | メッセージテキストが `<span class="commitMessage">` で囲まれている | 全コミット行に適用         |
-| TC-124  | ミュートコミット（mute=true）の行HTML生成       | Normal - muted                                                             | メッセージテキストが `<span class="commitMessage">` で囲まれている | CSS と連携してミュート表示 |
-| TC-125  | currentHash と一致するコミットの行HTML生成      | Normal - current                                                           | `<span class="commitMessage"><b>メッセージ</b></span>` 形式        | bold がラッパー内側        |
-| TC-126  | currentHash と一致しないコミットの行HTML生成    | Normal - standard                                                          | `<span class="commitMessage">メッセージ</span>` 形式               | plain text                 |
-| TC-127  | リファレンスラベル付きコミットの行HTML生成      | Normal - with refs                                                         | `.gitRef` スパンが `.commitMessage` の外側（直前）にある           | ラベルが wrapper 外        |
-| TC-128  | HEAD コミット（commitHeadDot 付き）の行HTML生成 | Normal - HEAD                                                              | `.commitHeadDot` スパンが `.commitMessage` の外側にある            | HEAD dot が wrapper 外     |
+| Case ID | Input / Precondition                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                    | Notes                                |
+| ------- | ------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------ | ------------------------------------ |
+| TC-123  | Row HTML for a normal commit (mute=false)         | Normal - standard                                                          | The message text is wrapped in `<span class="commitMessage">`      | Applies to every commit row          |
+| TC-124  | Row HTML for a muted commit (mute=true)           | Normal - muted                                                             | The message text is wrapped in `<span class="commitMessage">`      | Works with CSS for the muted display |
+| TC-125  | Row HTML for the commit matching currentHash      | Normal - current                                                           | In the form `<span class="commitMessage"><b>メッセージ</b></span>` | bold is inside the wrapper           |
+| TC-126  | Row HTML for a commit not matching currentHash    | Normal - standard                                                          | In the form `<span class="commitMessage">メッセージ</span>`        | plain text                           |
+| TC-127  | Row HTML for a commit with reference labels       | Normal - with refs                                                         | The `.gitRef` span is outside (right before) `.commitMessage`      | Labels are outside the wrapper       |
+| TC-128  | Row HTML for the HEAD commit (with commitHeadDot) | Normal - HEAD                                                              | The `.commitHeadDot` span is outside `.commitMessage`              | The HEAD dot is outside the wrapper  |
 
-## S35: worktree アイコン描画とデータ属性
+## S35: Rendering the worktree icon and data attributes
 
 > Origin: Feature 016 (worktree-support) (aidd-spec-tasks-test)
 > Added: 2026-03-12
@@ -136,15 +136,15 @@
 > Supersedes: -
 > Superseded By: S48
 
-**テスト対象パス**: `web/main.ts`
+**Target path**: `web/main.ts`
 
-| Case ID | Input / Precondition                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                       | Notes        |
-| ------- | --------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------ |
-| TC-194  | worktreeMap にブランチ名が存在するラベル                        | Normal - standard                                                          | span に worktree CSS クラス、data-worktree-path 属性、worktree アイコン要素が含まれる | REQ-2.1      |
-| TC-195  | worktreeMap にブランチ名が存在しないラベル                      | Normal - no worktree                                                       | 従来通りの描画（worktree CSS クラスなし、アイコンなし）                               | REQ-2.1-TC2  |
-| TC-196  | worktree アイコンの title 属性                                  | Normal - standard                                                          | title="Worktree: <path>" が設定される                                                 | REQ-2.2      |
-| TC-197  | worktree パスに HTML 特殊文字を含む（例: `<script>` 含むパス）  | Boundary - XSS prevention                                                  | data-worktree-path の値が escapeHtml() 適用済み                                       | セキュリティ |
-| TC-198  | リモートブランチ（worktreeMap にエントリがあっても）            | Normal - exclusion                                                         | worktree アイコンが表示されない                                                       | REQ-2.1-TC3  |
-| TC-199  | コンテキストメニューへの worktreeInfo 受け渡し（worktree あり） | Normal - standard                                                          | worktreeInfo に path と isMainWorktree が含まれる                                     | REQ-2.3      |
-| TC-200  | コンテキストメニューへの worktreeInfo 受け渡し（worktree なし） | Normal - null                                                              | worktreeInfo が null                                                                  | REQ-2.3      |
-| TC-201  | worktreeMap が空オブジェクト                                    | Boundary - empty map                                                       | すべてのブランチラベルが従来通り（worktree 関連表示なし）                             | 後方互換     |
+| Case ID | Input / Precondition                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                           | Notes               |
+| ------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | ------------------- |
+| TC-194  | A label whose branch name exists in worktreeMap                                               | Normal - standard                                                          | The span includes the worktree CSS class, the data-worktree-path attribute, and the worktree icon element | REQ-2.1             |
+| TC-195  | A label whose branch name does not exist in worktreeMap                                       | Normal - no worktree                                                       | Rendered as before (no worktree CSS class, no icon)                                                       | REQ-2.1-TC2         |
+| TC-196  | The title attribute of the worktree icon                                                      | Normal - standard                                                          | title="Worktree: <path>" is set                                                                           | REQ-2.2             |
+| TC-197  | The worktree path contains HTML special characters (for example a path containing `<script>`) | Boundary - XSS prevention                                                  | The data-worktree-path value has escapeHtml() applied                                                     | Security            |
+| TC-198  | A remote branch (even if worktreeMap has an entry)                                            | Normal - exclusion                                                         | The worktree icon is not shown                                                                            | REQ-2.1-TC3         |
+| TC-199  | Passing worktreeInfo to the context menu (with a worktree)                                    | Normal - standard                                                          | worktreeInfo contains path and isMainWorktree                                                             | REQ-2.3             |
+| TC-200  | Passing worktreeInfo to the context menu (without a worktree)                                 | Normal - null                                                              | worktreeInfo is null                                                                                      | REQ-2.3             |
+| TC-201  | worktreeMap is an empty object                                                                | Boundary - empty map                                                       | All branch labels are rendered as before (no worktree-related display)                                    | Backward compatible |

@@ -1,88 +1,88 @@
-# テスト観点表: web/dropdown.ts
+# Test Perspectives: web/dropdown.ts
 
 > Source: `web/dropdown.ts`
 > Generated: 2026-03-22T13:23:24Z
 > Language: TypeScript
 > Test Framework: Vitest
 
-## S1: isOpen() 展開状態判定
+## S1: isOpen() open state check
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `isOpen(): boolean`
-**テスト対象パス**: `web/dropdown.ts`
+**Signature**: `isOpen(): boolean`
+**Target path**: `web/dropdown.ts`
 
-| Case ID | Input / Precondition                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result | Notes        |
-| ------- | ------------------------------------ | -------------------------------------------------------------------------- | --------------- | ------------ |
-| TC-001  | ドロップダウン初期状態（閉じている） | Normal - closed                                                            | false を返す    | 初期状態     |
-| TC-002  | ドロップダウン展開後                 | Normal - open                                                              | true を返す     | open() 後    |
-| TC-003  | 展開後に close() 呼び出し            | Normal - re-closed                                                         | false を返す    | 状態遷移検証 |
+| Case ID | Input / Precondition            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result | Notes                  |
+| ------- | ------------------------------- | -------------------------------------------------------------------------- | --------------- | ---------------------- |
+| TC-001  | Initial dropdown state (closed) | Normal - closed                                                            | Returns false   | Initial state          |
+| TC-002  | After the dropdown is opened    | Normal - open                                                              | Returns true    | After open()           |
+| TC-003  | close() called after opening    | Normal - re-closed                                                         | Returns false   | State transition check |
 
-## S2: close() パブリック化
-
-> Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
-> Added: 2026-02-27
-> Status: active
-> Supersedes: -
-
-**シグネチャ**: `close(): void`
-**テスト対象パス**: `web/dropdown.ts`
-
-| Case ID | Input / Precondition           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                 | Notes  |
-| ------- | ------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------- | ------ |
-| TC-004  | ドロップダウン展開中に close() | Normal - standard                                                          | ドロップダウンが非表示になり、isOpen() が false | -      |
-| TC-005  | 既に閉じている状態で close()   | Boundary - already closed                                                  | エラーなし、isOpen() は引き続き false           | 冪等性 |
-
-## S3: escapeHtml XSS修正
+## S2: Making close() public
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `web/dropdown.ts`
+**Signature**: `close(): void`
+**Target path**: `web/dropdown.ts`
 
-| Case ID | Input / Precondition                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                | Notes               |
-| ------- | -------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------- | ------------------- |
-| TC-006  | オプション名に HTML特殊文字を含む（例: `<script>alert(1)</script>`） | Validation - XSS attempt                                                   | 選択値表示にエスケープ済みテキストが設定される | escapeHtml 適用検証 |
-| TC-007  | オプション名が通常テキスト（例: `main`）                             | Normal - standard                                                          | テキストがそのまま表示される                   | 通常動作の維持      |
-| TC-008  | オプション名に `&`, `<`, `>`, `"`, `'` を含む                        | Boundary - all HTML entities                                               | すべての特殊文字が適切にエスケープされる       | 各エンティティ検証  |
+| Case ID | Input / Precondition               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                              | Notes      |
+| ------- | ---------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------- | ---------- |
+| TC-004  | close() while the dropdown is open | Normal - standard                                                          | The dropdown is hidden and isOpen() is false | -          |
+| TC-005  | close() when already closed        | Boundary - already closed                                                  | No error, isOpen() stays false               | Idempotent |
 
-## S4: title 属性設定
-
-> Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
-> Added: 2026-02-27
-> Status: active
-> Supersedes: -
-
-**テスト対象パス**: `web/dropdown.ts`
-
-| Case ID | Input / Precondition               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                    | Notes                      |
-| ------- | ---------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------- | -------------------------- |
-| TC-009  | render() 実行後の選択値表示要素    | Normal - standard                                                          | title 属性にオプション名（生テキスト）が設定される | ブラウザがエスケープ       |
-| TC-010  | ドロップダウンオプション要素の描画 | Normal - standard                                                          | 各オプション div に title 属性が設定される         | ツールチップ用             |
-| TC-011  | 長いオプション名（100文字以上）    | Boundary - long text                                                       | title 属性にフルテキストが設定される               | 省略表示時のフルネーム表示 |
-
-## S5: マジックナンバー定数化
+## S3: escapeHtml XSS fix
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `web/dropdown.ts`
+**Target path**: `web/dropdown.ts`
 
-| Case ID | Input / Precondition     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result | Notes                  |
-| ------- | ------------------------ | -------------------------------------------------------------------------- | --------------- | ---------------------- |
-| TC-012  | MIN_DROPDOWN_WIDTH 定数  | Normal - standard                                                          | 値が 130        | 最小幅                 |
-| TC-013  | SCROLLBAR_THRESHOLD 定数 | Normal - standard                                                          | 値が 272        | スクロールバー表示閾値 |
-| TC-014  | SCROLLBAR_WIDTH 定数     | Normal - standard                                                          | 値が 12         | スクロールバー幅       |
-| TC-015  | MAX_DROPDOWN_HEIGHT 定数 | Normal - standard                                                          | 値が 297        | 最大高さ               |
+| Case ID | Input / Precondition                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                   | Notes                             |
+| ------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------- | --------------------------------- |
+| TC-006  | The option name contains HTML special characters (e.g. `<script>alert(1)</script>`) | Validation - XSS attempt                                                   | Escaped text is set in the selected value display | Checks that escapeHtml is applied |
+| TC-007  | The option name is plain text (e.g. `main`)                                         | Normal - standard                                                          | The text is shown as is                           | Normal behavior kept              |
+| TC-008  | The option name contains `&`, `<`, `>`, `"`, `'`                                    | Boundary - all HTML entities                                               | All special characters are escaped correctly      | Checks each entity                |
 
-## S6: マルチセレクトモード初期化
+## S4: Setting the title attribute
+
+> Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-02-27
+> Status: active
+> Supersedes: -
+
+**Target path**: `web/dropdown.ts`
+
+| Case ID | Input / Precondition                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                          | Notes                              |
+| ------- | ------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------- | ---------------------------------- |
+| TC-009  | The selected value display element after render() | Normal - standard                                                          | The title attribute is set to the option name (raw text) | The browser escapes it             |
+| TC-010  | Rendering the dropdown option elements            | Normal - standard                                                          | Each option div has a title attribute                    | For tooltips                       |
+| TC-011  | Long option name (100 characters or more)         | Boundary - long text                                                       | The title attribute holds the full text                  | Shows the full name when truncated |
+
+## S5: Magic numbers turned into constants
+
+> Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-02-27
+> Status: active
+> Supersedes: -
+
+**Target path**: `web/dropdown.ts`
+
+| Case ID | Input / Precondition         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result | Notes                               |
+| ------- | ---------------------------- | -------------------------------------------------------------------------- | --------------- | ----------------------------------- |
+| TC-012  | MIN_DROPDOWN_WIDTH constant  | Normal - standard                                                          | Value is 130    | Minimum width                       |
+| TC-013  | SCROLLBAR_THRESHOLD constant | Normal - standard                                                          | Value is 272    | Threshold for showing the scrollbar |
+| TC-014  | SCROLLBAR_WIDTH constant     | Normal - standard                                                          | Value is 12     | Scrollbar width                     |
+| TC-015  | MAX_DROPDOWN_HEIGHT constant | Normal - standard                                                          | Value is 297    | Maximum height                      |
+
+## S6: Multi-select mode initialization
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
@@ -90,178 +90,178 @@
 > Superseded By: S11
 > Supersedes: -
 
-**テスト対象パス**: `web/dropdown.ts`
+**Target path**: `web/dropdown.ts`
 
-| Case ID | Input / Precondition                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                | Notes                 |
-| ------- | ---------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------- | --------------------- |
-| TC-016  | multipleAllowed=true でコンストラクタ呼び出し  | Normal - standard                                                          | マルチセレクトモードが有効になる               | -                     |
-| TC-017  | multipleAllowed=false でコンストラクタ呼び出し | Normal - standard                                                          | 単一選択モード（既存動作）が維持される         | 後方互換              |
-| TC-018  | multipleAllowed=true で render() 実行          | Normal - standard                                                          | 各オプションにチェックボックス要素が描画される | input type="checkbox" |
-| TC-019  | multipleAllowed=false で render() 実行         | Normal - no checkbox                                                       | チェックボックス要素が描画されない             | 既存動作維持          |
+| Case ID | Input / Precondition                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                | Notes                  |
+| ------- | --------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------- | ---------------------- |
+| TC-016  | Constructor called with multipleAllowed=true  | Normal - standard                                                          | Multi-select mode is enabled                   | -                      |
+| TC-017  | Constructor called with multipleAllowed=false | Normal - standard                                                          | Single-select mode (existing behavior) is kept | Backward compatibility |
+| TC-018  | render() with multipleAllowed=true            | Normal - standard                                                          | A checkbox element is rendered for each option | input type="checkbox"  |
+| TC-019  | render() with multipleAllowed=false           | Normal - no checkbox                                                       | No checkbox elements are rendered              | Existing behavior kept |
 
-## S7: マルチセレクト "Show All" 排他制御
-
-> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
-> Added: 2026-03-07
-> Status: active
-> Supersedes: -
-
-**テスト対象パス**: `web/dropdown.ts`
-
-| Case ID | Input / Precondition                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                       | Notes        |
-| ------- | ---------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------- | ------------ |
-| TC-020  | "Show All"（インデックス 0）をクリック               | Normal - standard                                                          | 全ての個別チェックボックスが解除される                | -            |
-| TC-021  | 個別オプションをクリック                             | Normal - standard                                                          | "Show All" が解除され、クリックしたオプションがトグル | -            |
-| TC-022  | 全ての個別選択を 1 つずつ解除                        | Boundary - all deselected                                                  | 自動的に "Show All" が選択状態に復帰する              | 自動復帰     |
-| TC-023  | "Show All" 選択中に個別オプションを 1 つクリック     | Normal - standard                                                          | "Show All" が解除され、個別オプションがチェックされる | 排他切替     |
-| TC-024  | 複数の個別オプションが選択中に "Show All" をクリック | Normal - standard                                                          | 全個別選択が解除され、"Show All" のみ選択             | 一括リセット |
-
-## S8: マルチセレクト閉じ・コールバック動作
+## S7: Multi-select "Show All" exclusivity
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `web/dropdown.ts`
+**Target path**: `web/dropdown.ts`
 
-| Case ID | Input / Precondition                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                              | Notes              |
-| ------- | --------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------- | ------------------ |
-| TC-025  | ドロップダウン open → 選択変更あり → close          | Normal - standard                                                          | コールバックが発火し、選択値の配列が渡される | -                  |
-| TC-026  | ドロップダウン open → 選択変更なし → close          | Boundary - no change                                                       | コールバックが発火しない                     | 不要なリロード防止 |
-| TC-027  | "Show All" 選択状態で close                         | Normal - standard                                                          | コールバックに空配列が渡される               | 空配列 = Show All  |
-| TC-028  | 1 項目のみ選択状態で close                          | Normal - single                                                            | コールバックに 1 要素の配列が渡される        | -                  |
-| TC-029  | 3 項目選択状態で close                              | Normal - multiple                                                          | コールバックに 3 要素の配列が渡される        | -                  |
-| TC-030  | open 時の選択状態を記録 → トグル → 元に戻す → close | Boundary - revert to original                                              | コールバックが発火しない（変更なしと判定）   | 差分検知           |
+| Case ID | Input / Precondition                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                       | Notes             |
+| ------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----------------- |
+| TC-020  | Click "Show All" (index 0)                                     | Normal - standard                                                          | All individual checkboxes are cleared                                 | -                 |
+| TC-021  | Click an individual option                                     | Normal - standard                                                          | "Show All" is cleared and the clicked option toggles                  | -                 |
+| TC-022  | Clear every individual selection one by one                    | Boundary - all deselected                                                  | "Show All" automatically returns to selected                          | Automatic restore |
+| TC-023  | Click one individual option while "Show All" is selected       | Normal - standard                                                          | "Show All" is cleared and the individual option is checked            | Exclusive switch  |
+| TC-024  | Click "Show All" while several individual options are selected | Normal - standard                                                          | All individual selections are cleared and only "Show All" is selected | Bulk reset        |
 
-## S9: マルチセレクト表示ラベル
-
-> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
-> Added: 2026-03-07
-> Status: active
-> Supersedes: -
-
-**テスト対象パス**: `web/dropdown.ts`
-
-| Case ID | Input / Precondition        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                | Notes      |
-| ------- | --------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------- | ---------- |
-| TC-031  | "Show All" が選択中         | Normal - standard                                                          | 表示ラベルが "Show All" の名前になる           | -          |
-| TC-032  | 個別オプション 1 件が選択中 | Normal - single                                                            | 表示ラベルがそのオプション名になる             | -          |
-| TC-033  | 個別オプション 2 件が選択中 | Normal - multi                                                             | 表示ラベルが件数表示になる（例: "2 selected"） | -          |
-| TC-034  | 個別オプション 5 件が選択中 | Boundary - many selections                                                 | 表示ラベルが件数表示になる（例: "5 selected"） | 多数選択時 |
-
-## S10: マルチセレクトイベントハンドリング
+## S8: Multi-select close and callback behavior
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `web/dropdown.ts`
+**Target path**: `web/dropdown.ts`
 
-| Case ID | Input / Precondition                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                             | Notes                |
-| ------- | ------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------- | -------------------- |
-| TC-035  | マルチセレクト: オプションクリック         | Normal - standard                                                          | ドロップダウンが閉じない（stopPropagation） | 単一選択との差異     |
-| TC-036  | 単一選択: オプションクリック               | Normal - standard                                                          | ドロップダウンが閉じる（既存動作維持）      | 後方互換             |
-| TC-037  | マルチセレクト: フィルタ入力で文字列を入力 | Normal - standard                                                          | オプションがフィルタテキストで絞り込まれる  | 既存フィルタ機能維持 |
-| TC-038  | マルチセレクト: フィルタ入力でマッチなし   | Boundary - no match                                                        | オプションが全て非表示になる                | 既存フィルタ動作維持 |
+| Case ID | Input / Precondition                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                      | Notes                        |
+| ------- | ------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------- |
+| TC-025  | Open the dropdown → change the selection → close       | Normal - standard                                                          | The callback fires with the array of selected values | -                            |
+| TC-026  | Open the dropdown → no selection change → close        | Boundary - no change                                                       | The callback does not fire                           | Prevents unnecessary reloads |
+| TC-027  | Close with "Show All" selected                         | Normal - standard                                                          | An empty array is passed to the callback             | Empty array = Show All       |
+| TC-028  | Close with only 1 item selected                        | Normal - single                                                            | An array with 1 element is passed to the callback    | -                            |
+| TC-029  | Close with 3 items selected                            | Normal - multiple                                                          | An array with 3 elements is passed to the callback   | -                            |
+| TC-030  | Record the selection on open → toggle → revert → close | Boundary - revert to original                                              | The callback does not fire (treated as no change)    | Change detection             |
 
-## S11: 起動 button・開閉・候補移動・内部 Tab 順と候補の再解決
+## S9: Multi-select display label
+
+> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+> Status: active
+> Supersedes: -
+
+**Target path**: `web/dropdown.ts`
+
+| Case ID | Input / Precondition              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                       | Notes           |
+| ------- | --------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------- | --------------- |
+| TC-031  | "Show All" is selected            | Normal - standard                                                          | The display label is the name of "Show All"           | -               |
+| TC-032  | 1 individual option is selected   | Normal - single                                                            | The display label is that option's name               | -               |
+| TC-033  | 2 individual options are selected | Normal - multi                                                             | The display label shows the count (e.g. "2 selected") | -               |
+| TC-034  | 5 individual options are selected | Boundary - many selections                                                 | The display label shows the count (e.g. "5 selected") | Many selections |
+
+## S10: Multi-select event handling
+
+> Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
+> Added: 2026-03-07
+> Status: active
+> Supersedes: -
+
+**Target path**: `web/dropdown.ts`
+
+| Case ID | Input / Precondition                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                               | Notes                         |
+| ------- | ----------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------- | ----------------------------- |
+| TC-035  | Multi-select: option click                      | Normal - standard                                                          | The dropdown does not close (stopPropagation) | Differs from single select    |
+| TC-036  | Single select: option click                     | Normal - standard                                                          | The dropdown closes (existing behavior kept)  | Backward compatibility        |
+| TC-037  | Multi-select: type a string in the filter input | Normal - standard                                                          | Options are narrowed by the filter text       | Existing filter feature kept  |
+| TC-038  | Multi-select: no match in the filter input      | Boundary - no match                                                        | All options are hidden                        | Existing filter behavior kept |
+
+## S11: Opener button, open/close, option movement, internal Tab order and re-resolving options
 
 > Origin: Feature 061-05 (light-spec-plan)
 > Added: 2026-10-07
 > Status: active
 > Supersedes: S6
-> Signature: `new Dropdown(id, showInfo, label, callback, multipleAllowed?)`（既存 overload を維持）/ `setOptions(options, selected)` / 起動 `button`（名前・`aria-expanded`・`aria-controls`）/ 検索 `input` と `listbox` / `option` の keydown
-> Target Path: `web/dropdown.ts:69-178, 209-294, 315-386, 407-474, 490-511`（constructor と `createHintButton`、`setOptions` / `refresh` / `render`、`filter` と候補の再解決、`handleTriggerKeydown` / `handleFilterKeydown` / `handleOptionKeydown`、`handleTab`）
+> Signature: `new Dropdown(id, showInfo, label, callback, multipleAllowed?)` (existing overload kept) / `setOptions(options, selected)` / the opener `button` (name, `aria-expanded`, `aria-controls`) / keydown on the search `input` and on `listbox` / `option`
+> Target Path: `web/dropdown.ts:69-178, 209-294, 315-386, 407-474, 490-511` (the constructor and `createHintButton`, `setOptions` / `refresh` / `render`, `filter` and re-resolving options, `handleTriggerKeydown` / `handleFilterKeydown` / `handleOptionKeydown`, `handleTab`)
 > Test File: `tests/web/dropdown.test.ts`
 
-対応プラン §3.7.2 R4.5 と Task 4 の観点。S6（マルチセレクト初期化）は option 内に `input type="checkbox"` を描画する契約（TC-018）だったが、checkbox を装飾表示に置き換え `listbox` / `option` / `aria-multiselectable` / `aria-selected` で状態を表すため置き換える。S6 の単一 / 複数のモード判定（TC-016 / TC-017 / TC-019）の意味は本節へ引き継ぐ。fixture は `#branchSelect` 相当の `div.dropdown` に options `[Show All, feature, hotfix, main]`（複数選択）と `[/a, /b]`（単一）を与え、`document.activeElement` と `aria-*` 属性、変更 callback の回数を観測する。候補のフォーカスは選択状態と別に `value` で保持し、表示候補のうち 1 個だけを Tab 停止点にする。実装前実測: 現在値要素は `div`（`tabIndex -1`）で `focus()` しても `activeElement` は `body`。
+Perspectives for §3.7.2 R4.5 and Task 4 of the implementation plan. S6 (multi-select initialization) was a contract that rendered `input type="checkbox"` inside each option (TC-018); it is replaced because the checkbox becomes a decorative display and the state is expressed with `listbox` / `option` / `aria-multiselectable` / `aria-selected`. The meaning of the single / multiple mode checks of S6 (TC-016 / TC-017 / TC-019) carries over to this section. The fixture gives a `div.dropdown` like `#branchSelect` the options `[Show All, feature, hotfix, main]` (multi-select) and `[/a, /b]` (single select), and observes `document.activeElement`, the `aria-*` attributes and the number of change callbacks. The focused option is held by `value`, separately from the selection, and only one of the visible options is a Tab stop. Measured before implementation: the current value element is a `div` (`tabIndex -1`), and after `focus()` `activeElement` is `body`.
 
-| Case ID | Input / Precondition                                                                                                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                | Notes                                                                                                |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
-| TC-039  | 起動 button に実フォーカスして `Enter`、`Space`、`ArrowDown` の各キー（keydown → keyup）                                                          | Normal - 起動 button で開き検索へフォーカス                                | 3 通りとも `dropdownOpen` が付き `aria-expanded="true"`、`activeElement` が検索 `input`、起動 button が `button` 要素で `type="button"`・名前（`aria-label` または `aria-labelledby` で `label` の文言）・`aria-controls` が menu の `id` と一致。keyup で二重に toggle しない | K23 / A8.1-3。実装前実測: `div.dropdownCurrentValue` は focus 不可                                   |
-| TC-040  | 開いた状態で検索 input に `f`、`e`、` `（Space）を入力（`keyup` で `filter()`）                                                                   | Normal - 文字と Space は検索文字列                                         | `input.value` が `"fe "` 相当で候補が絞られ、Space で選択が反転しない（`aria-selected` 不変）、callback 0 回                                                                                                                                                                   | R4.5「入力中の文字とSpaceは検索文字列として扱う」                                                    |
-| TC-041  | 検索 input に実フォーカスして `ArrowDown`、別途 `ArrowUp`                                                                                         | Normal - 入力の↓は最初、↑は最後の表示候補                                  | `ArrowDown` で `activeElement` が表示中の最初の `option`（絞り込み後はその先頭）、`ArrowUp` で最後の表示 `option`。keydown が消費される                                                                                                                                        | R4.5                                                                                                 |
-| TC-042  | 候補の先頭に実フォーカスして `ArrowUp`、末尾で `ArrowDown`、中間で `ArrowDown`                                                                    | Boundary - 候補の端で止まる                                                | 先頭 `↑` / 末尾 `↓` は `activeElement` 不変（検索 input へ戻らず循環しない）。中間 `↓` は次の表示候補。非表示（絞り込みで隠れた）候補を飛ばす                                                                                                                                  | R4.5「表示候補だけを移動し端で止まる」                                                               |
-| TC-043  | 候補上で `Home`、`End`                                                                                                                            | Normal - 先頭 / 末尾へ                                                     | `activeElement` が表示中の先頭 / 末尾の `option`                                                                                                                                                                                                                               | R4.5                                                                                                 |
-| TC-044  | 複数選択と単一選択の各 render 結果の属性                                                                                                          | Normal - roles と選択状態                                                  | 候補群が `role="listbox"`、各候補が `role="option"`、複数選択は `aria-multiselectable="true"`、選択済み候補が `aria-selected="true"`。option 内に focus 可能な `input` が無く（装飾表示）、Tab 停止点が重複しない                                                              | S6 TC-018 の契約変更。R4.5                                                                           |
-| TC-045  | 候補群へ初回入場（`Tab` 相当で `getTabStops` の 1 停止点）。選択済み `hotfix` がある場合と無い場合。候補 `main` へ移動して検索 input へ戻り再入場 | Normal - 候補群の 1 停止点と再入場                                         | 表示候補のうち `tabindex="0"` が 1 個だけ。初回は選択済み先頭（`hotfix`）、無ければ先頭候補。再入場では直前の `main`                                                                                                                                                           | R4.5「候補群への初回入場は表示中の選択済み先頭、なければ先頭候補とし、以後は表示中の直前候補を保つ」 |
-| TC-046  | 検索文字列 `zzz` で表示候補 0 件のまま `ArrowDown`、`Enter`                                                                                       | Boundary - 検索 0 件                                                       | `activeElement` が検索 input のまま、`input.value` が `"zzz"` を保持、`dropdown.noResults` の文言が表示され `role="status"` 等で通知、閉じない、callback 0 回                                                                                                                  | K26 / A8.3-1                                                                                         |
-| TC-047  | `setOptions([], [])`（データ 0 件）で render                                                                                                      | Boundary - データ 0 件                                                     | 起動 button が `disabled`、`getTabStops` 相当で停止点にならず、`click` / `Enter` で開かない（`dropdownOpen` なし）                                                                                                                                                             | K26 / A8.3-1。「0件の起動は無効」                                                                    |
-| TC-048  | 開いた状態で `setOptions` を候補 1 件（Show All + 1 件、または単一の 1 件）へ更新                                                                 | Boundary - 1 件以下への更新で閉じる                                        | `dropdownOpen` が外れ、`activeElement` が起動 button（復元）、callback 0 回。`options[0]` を無条件参照せず表示名が空 options でも例外にならない                                                                                                                                | K26 / A8.3-1。現行の「候補が1件以下なら閉じる」を維持                                                |
-| TC-049  | 複数選択を開き、検索 input から `Tab` を繰り返す（`getTabStops` と内部 keydown）                                                                  | Normal - 内部 Tab 順                                                       | 検索 input → 候補群の 1 停止点 → 適用 `button` → 取消 `button` の順。単一選択では適用 / 取消が無く検索 input → 候補群。Shift + `Tab` で候補から検索 input へ戻れる                                                                                                             | K27 / A8.3-4                                                                                         |
-| TC-050  | 複数選択で候補を変更した後、取消 button から `Tab`（外側へ）。単一選択で候補にフォーカスした後に外側へ `Tab`                                      | Normal - 外部 Tab 退出                                                     | 複数選択は変更を適用（callback 1 回）、単一選択は未確定候補を破棄（callback 0 回、値不変）。どちらも閉じるが `activeElement` を起動 button へ戻さない（`Tab` の移動先を奪わない。`restoreFocus(origin, "tab")` が `false`）                                                    | K27 / A8.3-4                                                                                         |
-| TC-051  | 複数選択で候補を変更した後、`document.body` の空き領域を `click`（外側）                                                                          | Normal - 外側クリックは適用し移動先を優先                                  | callback 1 回、`dropdownOpen` 除去、`activeElement` が起動 button ではない（移動先を奪わない）                                                                                                                                                                                 | K27 / A8.2-3                                                                                         |
-| TC-052  | 開いた状態で起動 button を `click` / `Enter`                                                                                                      | Normal - 起動 button で閉じる                                              | 複数選択は変更があれば callback 1 回（適用）、単一選択は破棄。`aria-expanded="false"`、`activeElement` が起動 button                                                                                                                                                           | K27                                                                                                  |
+| Case ID | Input / Precondition                                                                                                                                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type)    | Expected Result                                                                                                                                                                                                                                                                                                  | Notes                                                                                                                                                      |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| TC-039  | Real focus on the opener button, then each of `Enter`, `Space`, `ArrowDown` (keydown → keyup)                                                                                           | Normal - opener button opens and focuses the search                           | In all 3 cases `dropdownOpen` is added and `aria-expanded="true"`, `activeElement` is the search `input`, the opener is a `button` element with `type="button"`, a name (the `label` text via `aria-label` or `aria-labelledby`) and `aria-controls` matching the menu `id`. keyup does not toggle a second time | K23 / A8.1-3. Measured before implementation: `div.dropdownCurrentValue` cannot take focus                                                                 |
+| TC-040  | While open, type `f`, `e`, ` ` (Space) in the search input (`filter()` on `keyup`)                                                                                                      | Normal - characters and Space are search text                                 | `input.value` is equivalent to `"fe "` and options are narrowed, Space does not toggle a selection (`aria-selected` unchanged), callback 0 times                                                                                                                                                                 | R4.5 "Treat typed characters and Space as search text"                                                                                                     |
+| TC-041  | Real focus on the search input, `ArrowDown`, and separately `ArrowUp`                                                                                                                   | Normal - Down from the input goes to the first, Up to the last visible option | `ArrowDown` moves `activeElement` to the first visible `option` (the first after filtering), `ArrowUp` to the last visible `option`. The keydown is consumed                                                                                                                                                     | R4.5                                                                                                                                                       |
+| TC-042  | Real focus on the first option and `ArrowUp`, `ArrowDown` on the last, `ArrowDown` in the middle                                                                                        | Boundary - stops at the ends of the options                                   | `↑` on the first / `↓` on the last leaves `activeElement` unchanged (does not return to the search input or wrap). `↓` in the middle goes to the next visible option. Hidden options (filtered out) are skipped                                                                                                  | R4.5 "Move only between visible options and stop at the ends"                                                                                              |
+| TC-043  | `Home`, `End` on an option                                                                                                                                                              | Normal - to the first / last                                                  | `activeElement` is the first / last visible `option`                                                                                                                                                                                                                                                             | R4.5                                                                                                                                                       |
+| TC-044  | Attributes of the render result for multi-select and single select                                                                                                                      | Normal - roles and selection state                                            | The option group has `role="listbox"`, each option `role="option"`, multi-select has `aria-multiselectable="true"`, selected options have `aria-selected="true"`. There is no focusable `input` inside an option (decorative display), and Tab stops are not duplicated                                          | Contract change of S6 TC-018. R4.5                                                                                                                         |
+| TC-045  | First entry into the options (1 stop in `getTabStops`, equivalent to `Tab`), with and without the selected `hotfix`. Move to option `main`, go back to the search input and enter again | Normal - one stop for the options and re-entry                                | Exactly 1 visible option has `tabindex="0"`. On first entry it is the first selected (`hotfix`), or the first option if none is selected. On re-entry it is the previous `main`                                                                                                                                  | R4.5 "On first entry into the options use the first visible selected option, or the first option if none, and after that keep the previous visible option" |
+| TC-046  | `ArrowDown`, `Enter` with search text `zzz` and 0 visible options                                                                                                                       | Boundary - 0 search results                                                   | `activeElement` stays the search input, `input.value` keeps `"zzz"`, the `dropdown.noResults` text is shown and announced with `role="status"` etc., the dropdown does not close, callback 0 times                                                                                                               | K26 / A8.3-1                                                                                                                                               |
+| TC-047  | render with `setOptions([], [])` (0 data items)                                                                                                                                         | Boundary - 0 data items                                                       | The opener button is `disabled`, it is not a stop in `getTabStops`, and `click` / `Enter` do not open it (no `dropdownOpen`)                                                                                                                                                                                     | K26 / A8.3-1. "The opener is disabled with 0 items"                                                                                                        |
+| TC-048  | While open, `setOptions` updates to 1 option (Show All + 1, or a single 1 item)                                                                                                         | Boundary - closes when updated to 1 item or fewer                             | `dropdownOpen` is removed, `activeElement` is the opener button (restored), callback 0 times. `options[0]` is not read unconditionally, so no exception even if the display name options are empty                                                                                                               | K26 / A8.3-1. Keeps the current "close when there is 1 option or fewer"                                                                                    |
+| TC-049  | Open multi-select and repeat `Tab` from the search input (`getTabStops` and internal keydown)                                                                                           | Normal - internal Tab order                                                   | The order is search input → the one stop of the options → apply `button` → cancel `button`. Single select has no apply / cancel, so it is search input → options. Shift + `Tab` goes back from the options to the search input                                                                                   | K27 / A8.3-4                                                                                                                                               |
+| TC-050  | After changing options in multi-select, `Tab` (outward) from the cancel button. In single select, `Tab` outward after focusing an option                                                | Normal - leaving with Tab                                                     | Multi-select applies the change (callback 1 time), single select discards the unconfirmed option (callback 0 times, value unchanged). Both close but do not move `activeElement` back to the opener button (do not steal the `Tab` destination; `restoreFocus(origin, "tab")` is `false`)                        | K27 / A8.3-4                                                                                                                                               |
+| TC-051  | After changing options in multi-select, `click` on an empty area of `document.body` (outside)                                                                                           | Normal - an outside click applies and the destination wins                    | Callback 1 time, `dropdownOpen` removed, `activeElement` is not the opener button (does not steal the destination)                                                                                                                                                                                               | K27 / A8.2-3                                                                                                                                               |
+| TC-052  | While open, `click` / `Enter` on the opener button                                                                                                                                      | Normal - the opener button closes                                             | Multi-select calls the callback once if there are changes (apply), single select discards. `aria-expanded="false"`, `activeElement` is the opener button                                                                                                                                                         | K27                                                                                                                                                        |
 
-### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S11）
+### Failure-source inventory (include-or-justify) — added by Feature 061-05 (S11)
 
-| 失敗源                                             | 対応ケースまたは除外理由                                        |
-| -------------------------------------------------- | --------------------------------------------------------------- |
-| 起動要素がフォーカス不可・名前 / 状態なし          | TC-039                                                          |
-| Space で反転する、文字が候補移動になる             | TC-040                                                          |
-| 入力↑↓・候補端・Home / End の誤り                  | TC-041〜TC-043                                                  |
-| checkbox が停止点に残る、roles 不在                | TC-044                                                          |
-| 候補群の停止点が複数・初回 / 再入場先の誤り        | TC-045                                                          |
-| 0 件 / 1 件 / データ 0 件                          | TC-046〜TC-048                                                  |
-| 内部 Tab 順・外部退出の適用 / 破棄・移動先の横取り | TC-049〜TC-052                                                  |
-| 外部依存・例外                                     | excluded(DOM と callback だけで外部依存と throw 経路を持たない) |
+| Failure source                                                             | Covering case or reason for exclusion                                       |
+| -------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| The opener cannot take focus, has no name / state                          | TC-039                                                                      |
+| Space toggles, characters move between options                             | TC-040                                                                      |
+| Wrong Up/Down from the input, at option ends, Home / End                   | TC-041 to TC-043                                                            |
+| Checkboxes remain as stops, roles missing                                  | TC-044                                                                      |
+| Several stops in the options, wrong first / re-entry target                | TC-045                                                                      |
+| 0 results / 1 option / 0 data items                                        | TC-046 to TC-048                                                            |
+| Internal Tab order, apply / discard when leaving, stealing the destination | TC-049 to TC-052                                                            |
+| External dependencies, exceptions                                          | excluded(only DOM and callbacks, with no external dependency or throw path) |
 
-### Task 12 テスト対応（Feature 061-05）— S11
+### Task 12 test mapping (Feature 061-05) — S11
 
-- テスト: `tests/web/dropdown.test.ts` describe `S11: Trigger button, option movement, internal Tab order and re-resolution`。TC-039〜TC-052 を同番号の `it` で 1 件ずつ（`it` 名末尾が Case ID）。TC-044 は加えて describe `S6 (superseded by S11)` の `renders decorative checkboxes without focusable inputs in multi-select mode (TC-018)` が S6 TC-018 の契約変更として本節を参照
-- TC-046 の解釈（Task 4 handoff）: 「表示候補 0 件のまま `Enter` で閉じない」は **単一選択** の契約。複数選択の検索 input 上の Enter は R4.5 により変更を適用して閉じる（S12 TC-059）。TC-046 の test は単一選択で 0 件を作って確認する
-- TC-048 の解釈（Task 4 handoff）: 「候補 1 件以下」は `options.length <= 1`（Show All を含む全候補数）。複数選択は Show All + 0 件、単一選択は 1 件で閉じ、起動 button へ復元する
-- 実行結果（2026-10-07）: 14 件 pass。実装前実測（`div.dropdownCurrentValue` が focus 不可）は TC-039 で GREEN
+- Tests: `tests/web/dropdown.test.ts` describe `S11: Trigger button, option movement, internal Tab order and re-resolution`. TC-039 to TC-052 each have one `it` with the same number (the `it` name ends with the Case ID). For TC-044, `renders decorative checkboxes without focusable inputs in multi-select mode (TC-018)` in describe `S6 (superseded by S11)` also refers to this section as the contract change of S6 TC-018
+- Interpretation of TC-046 (Task 4 handoff): "does not close on `Enter` with 0 visible options" is the **single select** contract. In multi-select, Enter on the search input applies the change and closes per R4.5 (S12 TC-059). The TC-046 test checks it by creating 0 results in single select
+- Interpretation of TC-048 (Task 4 handoff): "1 option or fewer" means `options.length <= 1` (the number of all options including Show All). Multi-select closes with Show All + 0 items, single select with 1 item, and focus is restored to the opener button
+- Execution result (2026-10-07): 14 pass. The pre-implementation measurement (`div.dropdownCurrentValue` cannot take focus) is GREEN in TC-039
 
-## S12: 適用・取消・IME / repeat / keyup の保護と close / cancelAndClose の契約
+## S12: Apply, cancel, IME / repeat / keyup guards and the close / cancelAndClose contract
 
 > Origin: Feature 061-05 (light-spec-plan)
 > Added: 2026-10-07
 > Status: active
 > Supersedes: -
-> Signature: `public close(reason?: FocusCloseReason): void` / `public cancelAndClose(reason?: FocusCloseReason): void`（公開化）/ 候補・検索 input の `Enter` / `Space` / `Escape` keydown / `isKeyboardActionBlocked(event)` の利用 / `setOptions()` の取消基準更新
-> Target Path: `web/dropdown.ts:188-208, 387-406, 475-489, 519-597`（`toggleMultiSelectOption` / `confirmSingleOption`、`handleKeydown`、`activateOption`、`toggleFromTrigger` / `open` / `leave` / `isOpen` / `close` / `cancelAndClose` / `hideMenu` / `fireMultiSelectCallbackIfChanged`）
+> Signature: `public close(reason?: FocusCloseReason): void` / `public cancelAndClose(reason?: FocusCloseReason): void` (made public) / `Enter` / `Space` / `Escape` keydown on options and the search input / use of `isKeyboardActionBlocked(event)` / updating the cancel baseline in `setOptions()`
+> Target Path: `web/dropdown.ts:188-208, 387-406, 475-489, 519-597` (`toggleMultiSelectOption` / `confirmSingleOption`, `handleKeydown`, `activateOption`, `toggleFromTrigger` / `open` / `leave` / `isOpen` / `close` / `cancelAndClose` / `hideMenu` / `fireMultiSelectCallbackIfChanged`)
 > Test File: `tests/web/dropdown.test.ts`
 
-対応プラン §3.5「Dropdownのcloseは適用、cancelAndCloseは取消であり、同じ意味へまとめない」と R4.5 / R4.6 の観点。document の capture Enter / Escape リスナーを部品内の keydown へ置き換える。S8（閉じ・callback）と S10（イベント）は適用の意味が変わらないため active のまま。実装前実測（実 Dropdown、`M` の詳細を開いた状態）: 候補変更後の `Escape` keydown で取消は成立するが同じ押下の keyup で背後の詳細が閉じる。`isComposing: true` の `Enter` keydown で閉じて callback が 1 回実行される（IME 確定で適用）。
+Perspectives for §3.5 of the implementation plan ("Dropdown close applies and cancelAndClose cancels; do not merge them into one meaning") and R4.5 / R4.6. The document capture Enter / Escape listeners are replaced by keydown inside the component. S8 (close and callback) and S10 (events) stay active because the meaning of apply does not change. Measured before implementation (real Dropdown, with the details of `M` open): `Escape` keydown after changing options cancels, but the keyup of the same press closes the details behind it. `Enter` keydown with `isComposing: true` closes and runs the callback once (applies on IME commit).
 
-| Case ID | Input / Precondition                                                                                                                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                   | Notes                                                                                  |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| TC-053  | 複数選択を起動 button の `Enter` で開き、検索に `h` → `ArrowDown`（候補 `hotfix`）→ `Space` → `Enter`（keydown → keyup）                                                  | Normal - 候補変更を 1 回適用し起動 button へ復帰                           | `Space` 後に `hotfix` の `aria-selected="true"`（callback まだ 0 回）。`Enter` で callback が `["hotfix"]` で 1 回、`dropdownOpen` 除去、`activeElement` が起動 button。keyup で追加 0 回                                         | K23 / A8.1-3                                                                           |
-| TC-054  | 複数選択を開き `Space` で `hotfix` を反転した後、`Escape` keydown → keyup を一連で送る（document に bubble リスナーを登録）                                               | Normal - Escape keydown で開始選択へ取消                                   | keydown で選択が開いた時点へ戻り（`aria-selected` が元どおり）、callback 0 回、`activeElement` が起動 button。keydown が `defaultPrevented` かつ bubble リスナー呼出し 0 回（上位の Escape 列へ流さない）。keyup では何も起きない | K24 / A8.1-3 / A8.3-4。実装前実測: keyup で背後の詳細が閉じる（main 側 TC-690）        |
-| TC-055  | TC-054 を `isComposing: false` の `Escape` の `keyup` だけで送る（keydown なし）                                                                                          | Validation - keyup 単独では取消しない                                      | `dropdownOpen` のまま、選択不変、callback 0 回                                                                                                                                                                                    | R4.6「keyupでは閉じない」。片方だけの擬似操作で検証済みとしない前提の確認              |
-| TC-056  | 複数選択を開き `main` を反転した後、`setOptions([Show All, feature, hotfix], ["feature"])`（`main` 削除・選択値受信）→ `Escape`                                           | Normal - 候補更新は新しい取消基準                                          | 取消後の選択が受信した `["feature"]`（開いた時点の選択ではなく、削除された `main` が復活しない）、callback 0 回                                                                                                                   | K25 / A8.3-1                                                                           |
-| TC-057  | 単一選択（`[/a, /b]`、現在 `/a`）で候補 `/b` に実フォーカスして `Enter`、別試行で `Space`                                                                                 | Normal - 単一は候補上の Enter / Space で確定                               | callback が `"/b"` で 1 回、`dropdownOpen` 除去、現在値表示が `/b`、`activeElement` が起動 button                                                                                                                                 | R4.5                                                                                   |
-| TC-058  | 単一選択で検索 `b` → 検索 input 上で `Enter`。別途検索 `zzz`（0 件）で `Enter`                                                                                            | Normal / Boundary - 入力 Enter は表示先頭を確定、0 件は閉じない            | 前者は callback `"/b"` 1 回で閉じる。後者は callback 0 回、`dropdownOpen` のまま、`input.value` 保持                                                                                                                              | R4.5「0件なら閉じない」                                                                |
-| TC-059  | 複数選択で `hotfix` を反転後、検索 input 上で `Enter`                                                                                                                     | Normal - 複数の入力 Enter は適用                                           | callback `["hotfix"]` 1 回、閉じる、`activeElement` が起動 button                                                                                                                                                                 | R4.5                                                                                   |
-| TC-060  | 複数選択で `feature` と `hotfix` を選択した後、候補 `Show All` 上で `Space`。続けて `feature` で `Space`                                                                  | Normal - Show All の排他をキーボードでも維持                               | `Show All` の `Space` で個別選択が空（`aria-selected` が Show All だけ）。`feature` の `Space` で Show All が外れる                                                                                                               | S7 の契約維持                                                                          |
-| TC-061  | 複数選択で `hotfix` を反転後、`compositionstart` → `Enter` keydown（`isComposing: true`）→ `compositionend` → `Enter` keyup                                               | Validation - IME 変換中の Enter で適用しない                               | `dropdownOpen` のまま、callback 0 回（keyup でも 0 回）                                                                                                                                                                           | K34 / A8.3-2。実装前実測: 閉じて callback 1 回（RED）                                  |
-| TC-062  | 複数選択で候補を反転後、`Enter` keydown（`repeat: false`）→ `Enter` keydown（`repeat: true`）× 2                                                                          | Validation - repeat で二重適用しない                                       | callback が合計 1 回                                                                                                                                                                                                              | A8.3-2                                                                                 |
-| TC-063  | 候補上で `Space` keydown → `Space` keyup、`Enter` keydown → `Enter` keyup                                                                                                 | Validation - keyup で二重に反転 / 適用しない                               | `Space` の反転が 1 回（keyup で戻らない）、`Enter` の callback が 1 回                                                                                                                                                            | A8.3-2。標準 button の既定 click は jsdom が生成しないため Task 12 の実 Webview 確認へ |
-| TC-064  | 複数選択で候補を変更後に `close("keyboard")`、別試行で `cancelAndClose("keyboard")`、別試行で引数なし `close()` / `cancelAndClose()`。事前に `#refreshBtn` へ実フォーカス | Normal - close は適用、cancelAndClose は取消、引数なしは focus を奪わない  | `close("keyboard")` は callback 1 回で `activeElement` が起動 button。`cancelAndClose("keyboard")` は callback 0 回・選択復元で起動 button。引数なしはそれぞれ適用 / 取消しつつ `activeElement` が `#refreshBtn` のまま           | §3.5。`cancelAndClose` が public                                                       |
-| TC-065  | 候補 `hotfix` → `main` へ `ArrowDown` でフォーカス移動だけ行い、`Escape`                                                                                                  | Validation - フォーカス移動だけでは値を変えない                            | `aria-selected` が移動前後で不変、callback 0 回                                                                                                                                                                                   | R4.5「フォーカス移動だけでは値を変更しない」                                           |
-| TC-066  | dropdown を閉じた状態で、無関係な `<input>` 上で `Enter` keydown と document 上で `Escape` keydown を発火                                                                 | Validation - 閉じているときに document の Enter / Escape を横取りしない    | どちらも `defaultPrevented === false` で、dropdown の callback 0 回（document capture リスナーが残っていない）                                                                                                                    | Task 4「documentのcapture Enter/Escapeを部品内のkeydownへ置き換える」                  |
+| Case ID | Input / Precondition                                                                                                                                                                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type)                         | Expected Result                                                                                                                                                                                                                                                                         | Notes                                                                                                                       |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| TC-053  | Open multi-select with `Enter` on the opener button, type `h` in the search → `ArrowDown` (option `hotfix`) → `Space` → `Enter` (keydown → keyup)                                                                         | Normal - apply the option change once and return to the opener button                              | After `Space`, `hotfix` has `aria-selected="true"` (callback still 0 times). `Enter` calls the callback once with `["hotfix"]`, removes `dropdownOpen`, and `activeElement` is the opener button. keyup adds 0 calls                                                                    | K23 / A8.1-3                                                                                                                |
+| TC-054  | Open multi-select, toggle `hotfix` with `Space`, then send `Escape` keydown → keyup in sequence (with a bubble listener registered on document)                                                                           | Normal - Escape keydown cancels back to the starting selection                                     | On keydown the selection returns to its state at open (`aria-selected` restored), callback 0 times, `activeElement` is the opener button. The keydown is `defaultPrevented` and the bubble listener is called 0 times (not passed to the upper Escape chain). Nothing happens on keyup  | K24 / A8.1-3 / A8.3-4. Measured before implementation: keyup closes the details behind it (TC-690 on the main side)         |
+| TC-055  | Send only the `keyup` of `Escape` from TC-054 with `isComposing: false` (no keydown)                                                                                                                                      | Validation - keyup alone does not cancel                                                           | Stays `dropdownOpen`, selection unchanged, callback 0 times                                                                                                                                                                                                                             | R4.6 "Do not close on keyup". Confirms the premise that a pseudo operation sending only one half does not count as verified |
+| TC-056  | Open multi-select, toggle `main`, then `setOptions([Show All, feature, hotfix], ["feature"])` (`main` removed, selection received) → `Escape`                                                                             | Normal - an options update becomes the new cancel baseline                                         | The selection after cancel is the received `["feature"]` (not the selection at open, and the removed `main` does not come back), callback 0 times                                                                                                                                       | K25 / A8.3-1                                                                                                                |
+| TC-057  | Single select (`[/a, /b]`, currently `/a`), real focus on option `/b` and `Enter`, and in a separate attempt `Space`                                                                                                      | Normal - single select confirms with Enter / Space on an option                                    | Callback once with `"/b"`, `dropdownOpen` removed, the current value shows `/b`, `activeElement` is the opener button                                                                                                                                                                   | R4.5                                                                                                                        |
+| TC-058  | Single select, search `b` → `Enter` on the search input. Separately search `zzz` (0 results) and `Enter`                                                                                                                  | Normal / Boundary - Enter in the input confirms the first visible option, 0 results does not close | The former calls the callback once with `"/b"` and closes. The latter calls the callback 0 times, stays `dropdownOpen` and keeps `input.value`                                                                                                                                          | R4.5 "Do not close with 0 results"                                                                                          |
+| TC-059  | Multi-select, toggle `hotfix`, then `Enter` on the search input                                                                                                                                                           | Normal - Enter in the input applies in multi-select                                                | Callback once with `["hotfix"]`, closes, `activeElement` is the opener button                                                                                                                                                                                                           | R4.5                                                                                                                        |
+| TC-060  | Multi-select with `feature` and `hotfix` selected, `Space` on option `Show All`. Then `Space` on `feature`                                                                                                                | Normal - Show All exclusivity also kept with the keyboard                                          | `Space` on `Show All` clears the individual selections (only Show All has `aria-selected`). `Space` on `feature` clears Show All                                                                                                                                                        | Keeps the S7 contract                                                                                                       |
+| TC-061  | Multi-select, toggle `hotfix`, then `compositionstart` → `Enter` keydown (`isComposing: true`) → `compositionend` → `Enter` keyup                                                                                         | Validation - Enter during IME composition does not apply                                           | Stays `dropdownOpen`, callback 0 times (also 0 on keyup)                                                                                                                                                                                                                                | K34 / A8.3-2. Measured before implementation: closes with callback 1 time (RED)                                             |
+| TC-062  | Multi-select, toggle an option, then `Enter` keydown (`repeat: false`) → `Enter` keydown (`repeat: true`) × 2                                                                                                             | Validation - repeat does not apply twice                                                           | Callback 1 time in total                                                                                                                                                                                                                                                                | A8.3-2                                                                                                                      |
+| TC-063  | `Space` keydown → `Space` keyup, and `Enter` keydown → `Enter` keyup on an option                                                                                                                                         | Validation - keyup does not toggle / apply twice                                                   | `Space` toggles once (keyup does not revert it), `Enter` calls the callback once                                                                                                                                                                                                        | A8.3-2. jsdom does not generate the default click of a standard button, so this goes to the real Webview check of Task 12   |
+| TC-064  | Multi-select, change options, then `close("keyboard")`; in a separate attempt `cancelAndClose("keyboard")`; in separate attempts `close()` / `cancelAndClose()` without arguments. Real focus on `#refreshBtn` beforehand | Normal - close applies, cancelAndClose cancels, no argument does not steal focus                   | `close("keyboard")` calls the callback once and `activeElement` is the opener button. `cancelAndClose("keyboard")` calls it 0 times, restores the selection and focuses the opener button. Without arguments they apply / cancel respectively while `activeElement` stays `#refreshBtn` | §3.5. `cancelAndClose` is public                                                                                            |
+| TC-065  | Only move focus from option `hotfix` to `main` with `ArrowDown`, then `Escape`                                                                                                                                            | Validation - moving focus alone does not change the value                                          | `aria-selected` is unchanged before and after the move, callback 0 times                                                                                                                                                                                                                | R4.5 "Moving focus alone does not change the value"                                                                         |
+| TC-066  | With the dropdown closed, fire `Enter` keydown on an unrelated `<input>` and `Escape` keydown on document                                                                                                                 | Validation - does not intercept document Enter / Escape while closed                               | Both have `defaultPrevented === false`, and the dropdown callback is called 0 times (no document capture listener remains)                                                                                                                                                              | Task 4 "Replace the document capture Enter/Escape with keydown inside the component"                                        |
 
-### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S12）
+### Failure-source inventory (include-or-justify) — added by Feature 061-05 (S12)
 
-| 失敗源                                                  | 対応ケースまたは除外理由                                     |
-| ------------------------------------------------------- | ------------------------------------------------------------ |
-| 適用が複数回 / 起動 button へ戻らない                   | TC-053、TC-059                                               |
-| Escape で適用する、keyup で閉じる、上位へ流す           | TC-054、TC-055                                               |
-| 候補更新後の取消基準・削除値の復活                      | TC-056                                                       |
-| 単一の確定・0 件 Enter で閉じる                         | TC-057、TC-058                                               |
-| Show All 排他の退行                                     | TC-060                                                       |
-| IME / repeat / keyup の二重適用                         | TC-061〜TC-063                                               |
-| close と cancelAndClose の混同、引数なしで focus を奪う | TC-064                                                       |
-| フォーカス移動で値が変わる                              | TC-065                                                       |
-| document capture リスナーの残存                         | TC-066                                                       |
-| 外部依存・例外                                          | excluded(callback 呼出だけで外部依存と throw 経路を持たない) |
+| Failure source                                                      | Covering case or reason for exclusion                                    |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Applied more than once / does not return to the opener button       | TC-053, TC-059                                                           |
+| Escape applies, keyup closes, passed upward                         | TC-054, TC-055                                                           |
+| Cancel baseline after an options update, removed values coming back | TC-056                                                                   |
+| Single select confirmation, closing on Enter with 0 results         | TC-057, TC-058                                                           |
+| Regression of Show All exclusivity                                  | TC-060                                                                   |
+| Double apply via IME / repeat / keyup                               | TC-061 to TC-063                                                         |
+| close and cancelAndClose confused, stealing focus without arguments | TC-064                                                                   |
+| Moving focus changes the value                                      | TC-065                                                                   |
+| A document capture listener remains                                 | TC-066                                                                   |
+| External dependencies, exceptions                                   | excluded(only callback calls, with no external dependency or throw path) |
 
-### Task 12 テスト対応（Feature 061-05）— S12
+### Task 12 test mapping (Feature 061-05) — S12
 
-- テスト: `tests/web/dropdown.test.ts` describe `S12: Apply / cancel, input guards and the close / cancelAndClose contract`。TC-053〜TC-066 を同番号の `it` で 1 件ずつ。fixture は `installKeyboardGuards` を登録せず、IME・repeat・keyup はイベント自身の値（`isComposing` / `repeat` / `type`）による判定で検証する（変換状態の追跡は `keyboardNavigation-test.md` S2 TC-013〜TC-024 が担う）
-- RED → GREEN: 実装前実測「`isComposing: true` の Enter で閉じて callback 1 回」は TC-061、「keyup で背後の詳細が閉じる」は TC-054（本表）と `web/main-test/13-keyboard-accessibility-01.md` S72 TC-690（main）で GREEN
-- TC-063 の未自動化部分: 標準 button（候補は `div[role=option]` のため対象外、Apply / Cancel の `button.dropdownHintBtn` と起動 button）の既定 click は jsdom が生成しない。手動 Case（未実施）: 実 Webview で branch 複数選択を Tab / Enter で開き、候補で Space → Enter、別試行で Apply button 上の Enter / Space を 1 回・repeat・IME 確定直後に押す。期待: 適用が合計 1 回（`loadCommits` 要求 1 件）。影響: 二重適用で要求 2 件。代替確認: TC-062 / TC-063 の callback 回数（jsdom）。実 Webview の手動 Case は `web/main-test/13-keyboard-accessibility-01.md` 冒頭「Task 12 実 Webview 手動確認（未実施一覧）」の様式で記録し、自動テストの pass に含めない
-- 実行結果（2026-10-07）: 14 件 pass
+- Tests: `tests/web/dropdown.test.ts` describe `S12: Apply / cancel, input guards and the close / cancelAndClose contract`. TC-053 to TC-066 each have one `it` with the same number. The fixture does not register `installKeyboardGuards`, and IME, repeat and keyup are verified by checks on the event's own values (`isComposing` / `repeat` / `type`) (tracking the composition state is covered by `keyboardNavigation-test.md` S2 TC-013 to TC-024)
+- RED → GREEN: the pre-implementation measurement "Enter with `isComposing: true` closes with callback 1 time" is GREEN in TC-061, and "keyup closes the details behind it" is GREEN in TC-054 (this table) and in `web/main-test/13-keyboard-accessibility-01.md` S72 TC-690 (main)
+- The part of TC-063 that is not automated: jsdom does not generate the default click of a standard button (options are `div[role=option]` and out of scope; this concerns the Apply / Cancel `button.dropdownHintBtn` and the opener button). Manual case (not run): in a real Webview, open the branch multi-select with Tab / Enter, press Space → Enter on an option, and in separate attempts press Enter / Space on the Apply button once, with repeat, and right after an IME commit. Expected: applied once in total (1 `loadCommits` request). Impact: double apply sends 2 requests. Alternative check: the callback counts of TC-062 / TC-063 (jsdom). Manual cases in a real Webview are recorded in the format of "Task 12 manual checks in a real Webview (not yet done)" at the top of `web/main-test/13-keyboard-accessibility-01.md` and are not counted in the automated test pass
+- Execution result (2026-10-07): 14 pass

@@ -1,4 +1,4 @@
-# テスト観点表マニフェスト: web/messageHandler.ts
+# Test Perspectives Manifest: web/messageHandler.ts
 
 > Source: `web/messageHandler.ts`
 > Storage Mode: sharded

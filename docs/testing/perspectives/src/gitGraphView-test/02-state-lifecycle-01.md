@@ -1,4 +1,4 @@
-# テスト観点表: src/gitGraphView.ts
+# Test Perspectives: src/gitGraphView.ts
 
 > Source: `src/gitGraphView.ts`
 > Generated: 2026-05-02T01:45:44Z
@@ -6,7 +6,7 @@
 > Test Framework: Vitest
 > Responsibility: state-lifecycle
 
-## S6: createOrShow() rootUri ハンドリング
+## S6: createOrShow() rootUri handling
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
@@ -14,75 +14,75 @@
 > Supersedes: -
 > Superseded By: S36
 
-**テスト対象パス**: `src/gitGraphView.ts`
+**Target path**: `src/gitGraphView.ts`
 
-| Case ID | Input / Precondition                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                        | Notes          |
-| ------- | ------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------------- | -------------- |
-| TC-015  | rootUri 指定あり、パネル未作成                   | Normal - new panel                                                         | viewState.lastActiveRepo が rootUri.fsPath に設定される                | 初回起動時     |
-| TC-016  | rootUri 指定あり、パネル既存、リポジトリ登録済み | Normal - existing panel                                                    | panel.reveal() 後に ResponseSelectRepo が送信される                    | リポジトリ切替 |
-| TC-017  | rootUri 指定あり、パネル既存、リポジトリ未登録   | Normal - unregistered                                                      | registerRepoFromUri() が呼ばれ、その後 ResponseSelectRepo が送信される | 新規登録フロー |
-| TC-018  | rootUri 指定なし（コマンドパレットから実行）     | Normal - no rootUri                                                        | 従来動作維持（selectRepo メッセージ送信なし）                          | 後方互換       |
+| Case ID | Input / Precondition                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                  | Notes                  |
+| ------- | ------------------------------------------------------ | -------------------------------------------------------------------------- | ---------------------------------------------------------------- | ---------------------- |
+| TC-015  | rootUri given, no panel yet                            | Normal - new panel                                                         | viewState.lastActiveRepo is set to rootUri.fsPath                | First launch           |
+| TC-016  | rootUri given, panel exists, repository registered     | Normal - existing panel                                                    | ResponseSelectRepo is sent after panel.reveal()                  | Repository switch      |
+| TC-017  | rootUri given, panel exists, repository not registered | Normal - unregistered                                                      | registerRepoFromUri() is called, then ResponseSelectRepo is sent | New registration flow  |
+| TC-018  | No rootUri (run from the Command Palette)              | Normal - no rootUri                                                        | Previous behavior kept (no selectRepo message sent)              | Backward compatibility |
 
-## S7: viewState キーバインド・自動読み込み設定の受け渡し
+## S7: Passing keybinding and auto-load settings in viewState
 
 > Origin: Feature 005 (webview-ux-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-02-27
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `src/gitGraphView.ts`
+**Target path**: `src/gitGraphView.ts`
 
-| Case ID | Input / Precondition         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                      | Notes                |
-| ------- | ---------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------- | -------------------- |
-| TC-019  | getHtmlForWebview() 呼び出し | Normal - standard                                                          | viewState に keybindings オブジェクトが含まれる      | 設定パイプライン検証 |
-| TC-020  | getHtmlForWebview() 呼び出し | Normal - standard                                                          | viewState に loadMoreCommitsAutomatically が含まれる | 設定パイプライン検証 |
+| Case ID | Input / Precondition     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                 | Notes                        |
+| ------- | ------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------- | ---------------------------- |
+| TC-019  | Call getHtmlForWebview() | Normal - standard                                                          | viewState contains the keybindings object       | Checks the settings pipeline |
+| TC-020  | Call getHtmlForWebview() | Normal - standard                                                          | viewState contains loadMoreCommitsAutomatically | Checks the settings pipeline |
 
-## S12: loadCommits branches/authors 配列パススルー
+## S12: loadCommits passes the branches/authors arrays through
 
 > Origin: Feature 012 (ui-enhancements) (aidd-spec-tasks-test)
 > Added: 2026-03-07
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `src/gitGraphView.ts:279-291`
+**Target path**: `src/gitGraphView.ts:279-291`
 
-| Case ID | Input / Precondition                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                     | Notes          |
-| ------- | -------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------- | -------------- |
-| TC-037  | msg.branches=["main","dev"], msg.authors=["Alice"] | Normal - standard                                                          | getCommits が branches=["main","dev"], authors=["Alice"] で呼ばれる | 配列パススルー |
-| TC-038  | msg.branches=[], msg.authors=[]                    | Boundary - empty arrays                                                    | getCommits が branches=[], authors=[] で呼ばれる（全件表示）        | 空配列         |
+| Case ID | Input / Precondition                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                      | Notes              |
+| ------- | -------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------- | ------------------ |
+| TC-037  | msg.branches=["main","dev"], msg.authors=["Alice"] | Normal - standard                                                          | getCommits is called with branches=["main","dev"], authors=["Alice"] | Array pass-through |
+| TC-038  | msg.branches=[], msg.authors=[]                    | Boundary - empty arrays                                                    | getCommits is called with branches=[], authors=[] (shows everything) | Empty arrays       |
 
-## S14: viewState commitOrdering 受け渡し / loadCommits ハンドラ
+## S14: Passing commitOrdering in viewState / loadCommits handler
 
 > Origin: Feature 015 (commit-sort-order) (aidd-spec-tasks-test)
 > Added: 2026-03-10
 > Status: active
 > Supersedes: -
 
-**テスト対象パス**: `src/gitGraphView.ts`
+**Target path**: `src/gitGraphView.ts`
 
-| Case ID | Input / Precondition                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                  | Notes                |
-| ------- | ----------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | -------------------- |
-| TC-044  | getHtmlForWebview() 呼び出し                          | Normal - standard                                                          | viewState に commitOrdering が含まれ、Config.commitOrdering() の返却値と一致する | 設定パイプライン検証 |
-| TC-045  | loadCommits メッセージに commitOrdering="topo"        | Normal - standard                                                          | dataSource.getCommits() に commitOrdering="topo" が渡される                      | -                    |
-| TC-046  | loadCommits メッセージに commitOrdering="author-date" | Normal - standard                                                          | dataSource.getCommits() に commitOrdering="author-date" が渡される               | -                    |
-| TC-047  | loadCommits メッセージに commitOrdering="date"        | Normal - default                                                           | dataSource.getCommits() に commitOrdering="date" が渡される                      | デフォルト動作確認   |
+| Case ID | Input / Precondition                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                         | Notes                        |
+| ------- | ----------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- | ---------------------------- |
+| TC-044  | Call getHtmlForWebview()                              | Normal - standard                                                          | viewState contains commitOrdering, equal to the return value of Config.commitOrdering() | Checks the settings pipeline |
+| TC-045  | loadCommits message with commitOrdering="topo"        | Normal - standard                                                          | commitOrdering="topo" is passed to dataSource.getCommits()                              | -                            |
+| TC-046  | loadCommits message with commitOrdering="author-date" | Normal - standard                                                          | commitOrdering="author-date" is passed to dataSource.getCommits()                       | -                            |
+| TC-047  | loadCommits message with commitOrdering="date"        | Normal - default                                                           | commitOrdering="date" is passed to dataSource.getCommits()                              | Checks the default behavior  |
 
-## S17: CSS_COLOR_VAR_PREFIX 定数による変数生成
+## S17: Variable generation with the CSS_COLOR_VAR_PREFIX constant
 
 > Origin: Feature 020 (legacy-branding-cleanup) (aidd-spec-tasks-test)
 > Added: 2026-03-20
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `private getHtmlForWebview(uri: vscode.Uri): string`
-**テスト対象パス**: `src/gitGraphView.ts:553-560`
+**Signature**: `private getHtmlForWebview(uri: vscode.Uri): string`
+**Target path**: `src/gitGraphView.ts:553-560`
 
-| Case ID | Input / Precondition                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                  | Notes                       |
-| ------- | --------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------- | --------------------------- |
-| TC-059  | getHtmlForWebview() 呼び出し、graphColours に色あり | Normal - standard                                                          | 生成 HTML の style 属性に `--git-keizu-color` プレフィックスの変数定義が含まれる | CSS 定数リネーム検証        |
-| TC-060  | getHtmlForWebview() 呼び出し、graphColours に色あり | Normal - standard                                                          | 生成 HTML の data-color セレクタに `var(--git-keizu-color` の変数参照が含まれる  | 定義-参照チェーン一致の検証 |
+| Case ID | Input / Precondition                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                             | Notes                                              |
+| ------- | ---------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| TC-059  | Call getHtmlForWebview() with colors in graphColours | Normal - standard                                                          | The style attribute of the generated HTML contains variable definitions with the `--git-keizu-color` prefix | Checks the CSS constant rename                     |
+| TC-060  | Call getHtmlForWebview() with colors in graphColours | Normal - standard                                                          | The data-color selectors of the generated HTML contain variable references `var(--git-keizu-color`          | Checks that the definition-reference chain matches |
 
-## S18: loadBranches watcher 起動オーケストレーション
+## S18: loadBranches watcher start orchestration
 
 > Origin: Feature 033 (watch-refresh-scope) Task 3
 > Added: 2026-05-02T01:45:44Z
@@ -91,50 +91,50 @@
 > Signature: `loadBranches`
 > Target Path: `src/gitGraphView.ts`
 
-| Case ID | Input / Precondition                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                           | Notes                       |
-| ------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| TC-061  | `loadBranches` を新規 repo で受信、`getBranches.error=false`     | Normal - repo change                                                       | `dataSource.getRepositoryStateWatchPaths(repo)` が1回呼ばれ、その戻り値配列で `repoFileWatcher.start(...)` が1回呼ばれる。あわせて `extensionState.setLastActiveRepo(repo)` が1回呼ばれる | repo 切替                   |
-| TC-062  | 同一 repo で `loadBranches` を連続受信                           | Boundary - same repo                                                       | `getBranches` は再実行されるが、`getRepositoryStateWatchPaths` と `repoFileWatcher.start` は追加で呼ばれない                                                                              | 不要再起動抑止              |
-| TC-063  | `getBranches.error=true`, `isGitRepository=false`, repo 切替あり | External - branch load failure                                             | `isGitRepository(repo)` が1回呼ばれ、`loadBranches` 応答の `isRepo` が `false` になりつつ、watch root 解決結果で `repoFileWatcher.start(...)` が1回呼ばれる                               | error 分岐でも watcher 起動 |
-| TC-064  | panel.visible が `true -> false` に変化                          | Normal - hidden panel stop                                                 | view state handler 実行後に `repoFileWatcher.stop()` が1回呼ばれる                                                                                                                        | 非表示時停止維持            |
+| Case ID | Input / Precondition                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                       | Notes                                       |
+| ------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| TC-061  | Receive `loadBranches` for a new repo, `getBranches.error=false` | Normal - repo change                                                       | `dataSource.getRepositoryStateWatchPaths(repo)` is called once, and `repoFileWatcher.start(...)` is called once with the returned array. `extensionState.setLastActiveRepo(repo)` is also called once | Repo switch                                 |
+| TC-062  | Receive `loadBranches` repeatedly for the same repo              | Boundary - same repo                                                       | `getBranches` runs again, but `getRepositoryStateWatchPaths` and `repoFileWatcher.start` are not called again                                                                                         | Avoids needless restarts                    |
+| TC-063  | `getBranches.error=true`, `isGitRepository=false`, repo switched | External - branch load failure                                             | `isGitRepository(repo)` is called once, and while `isRepo` in the `loadBranches` response becomes `false`, `repoFileWatcher.start(...)` is called once with the resolved watch roots                  | The watcher starts even on the error branch |
+| TC-064  | panel.visible changes `true -> false`                            | Normal - hidden panel stop                                                 | `repoFileWatcher.stop()` is called once after the view state handler runs                                                                                                                             | Keeps stopping while hidden                 |
 
-## S21: メッセージハンドラ try/finally による unmute 保証
+## S21: try/finally in the message handler guarantees unmute
 
 > Origin: フェーズ2 修正 M5 (message-handler-try-finally-unmute)
 > Added: 2026-07-04T02:44:58Z
 > Status: active
 > Supersedes: -
-> Signature: `onDidReceiveMessage` ハンドラ本体（`mute()` → `try { switch(msg.command) } finally { unmute() }`）
+> Signature: the body of the `onDidReceiveMessage` handler (`mute()` → `try { switch(msg.command) } finally { unmute() }`)
 > Target Path: `src/gitGraphView.ts:154-770`
 
-`this.repoFileWatcher.mute()` の後に `switch` を `try` で包み、`finally` で `this.repoFileWatcher.unmute()` を呼ぶよう変更する修正。従来は switch 後に unmute を直呼びしていたため、ハンドラが例外を投げると unmute されず watcher がミュートに固定されていた。finally 化により正常・異常いずれの経路でも `repoFileWatcher.unmute()` が確実に1回呼ばれる。観測は `repoFileWatcher.unmute` の呼び出し回数で行う（`muteCount` 内部遷移は repoFileWatcher 側 S11 の責務）。
+A fix that wraps the `switch` in `try` after `this.repoFileWatcher.mute()` and calls `this.repoFileWatcher.unmute()` in `finally`. Previously unmute was called directly after the switch, so when the handler threw, unmute never ran and the watcher stayed muted. With finally, `repoFileWatcher.unmute()` is reliably called once on both the normal and the failure path. It is observed through the call count of `repoFileWatcher.unmute` (the internal `muteCount` transitions belong to S11 on the repoFileWatcher side).
 
-| Case ID | Input / Precondition                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                  | Notes                                 |
-| ------- | ----------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------- |
-| TC-076  | 登録済み repo でハンドラが正常完了する（例: `addTag` 成功） | Normal - normal path unmutes                                               | `repoFileWatcher.mute()` の後に処理が走り、`finally` で `repoFileWatcher.unmute()` が1回呼ばれる | 正常経路の unmute                     |
-| TC-077  | switch 内の DataSource メソッドが例外を throw する          | Exception - handler throws still unmutes                                   | 例外が発生しても `finally` で `repoFileWatcher.unmute()` が1回呼ばれる（ミュート固定にならない） | 修正の肝（例外時の unmute 保証）      |
-| TC-078  | 処理中の `sendMessage` が例外を throw する                  | Exception - send throws still unmutes                                      | `finally` で `repoFileWatcher.unmute()` が1回呼ばれる                                            | 送信例外時も unmute                   |
-| TC-079  | 未登録 repo で mute 前の早期 return ガードに掛かる          | Boundary - early return before mute                                        | `repoFileWatcher.mute()` も `repoFileWatcher.unmute()` も呼ばれない（try の外で return）         | S17/TC-073 と整合（過剰 unmute なし） |
+| Case ID | Input / Precondition                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                | Notes                                            |
+| ------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| TC-076  | The handler completes normally for a registered repo (e.g. `addTag` succeeds) | Normal - normal path unmutes                                               | Processing runs after `repoFileWatcher.mute()`, and `repoFileWatcher.unmute()` is called once in `finally`     | Unmute on the normal path                        |
+| TC-077  | A DataSource method in the switch throws                                      | Exception - handler throws still unmutes                                   | Even when an exception occurs, `repoFileWatcher.unmute()` is called once in `finally` (it does not stay muted) | Core of the fix (unmute guaranteed on exception) |
+| TC-078  | `sendMessage` throws during processing                                        | Exception - send throws still unmutes                                      | `repoFileWatcher.unmute()` is called once in `finally`                                                         | Unmute also when sending throws                  |
+| TC-079  | An unregistered repo hits the early-return guard before mute                  | Boundary - early return before mute                                        | Neither `repoFileWatcher.mute()` nor `repoFileWatcher.unmute()` is called (returns outside try)                | Consistent with S17/TC-073 (no extra unmute)     |
 
-## S23: createOrShow() 既存パネル reveal 前の lastActiveRepo 永続化
+## S23: createOrShow() persists lastActiveRepo before revealing an existing panel
 
 > Origin: フェーズ2 修正 M6 (reveal-persist-last-active-repo)
 > Added: 2026-07-04T02:44:58Z
 > Status: superseded
 > Supersedes: -
 > Superseded By: S36
-> Signature: `public static createOrShow(...)`（`currentPanel` 既存かつ `rootUri !== undefined` の reveal 経路）
+> Signature: `public static createOrShow(...)` (the reveal path when `currentPanel` exists and `rootUri !== undefined`)
 > Target Path: `src/gitGraphView.ts:52-58`
 
-既存パネルを reveal する経路で、`rootUri !== undefined` のときに `panel.reveal()` の前へ `extensionState.setLastActiveRepo(getPathFromUri(rootUri))` を追加する修正。従来は新規パネル生成経路（S6/TC-015）でのみ lastActiveRepo を永続化しており、既存パネルの reveal 時に対象 repo が記録されなかった。
+A fix that adds `extensionState.setLastActiveRepo(getPathFromUri(rootUri))` before `panel.reveal()` on the path that reveals an existing panel, when `rootUri !== undefined`. Previously lastActiveRepo was persisted only on the new-panel path (S6/TC-015), so the target repo was not recorded when an existing panel was revealed.
 
-| Case ID | Input / Precondition                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                           | Notes                        |
-| ------- | ------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------- |
-| TC-086  | `currentPanel` 既存、`rootUri` 指定あり                 | Normal - existing panel persists repo                                      | `extensionState.setLastActiveRepo(getPathFromUri(rootUri))` が1回呼ばれる | 既存パネル reveal 時の永続化 |
-| TC-087  | `currentPanel` 既存、`rootUri === undefined`            | Boundary - no rootUri                                                      | `setLastActiveRepo` は呼ばれず、`panel.reveal()` のみ実行される           | rootUri 無し時は記録しない   |
-| TC-088  | `currentPanel` 既存、`rootUri` 指定あり（呼び出し順序） | Normal - persist before reveal                                             | `setLastActiveRepo` が `panel.reveal()` より前に呼ばれる（呼び出し順序）  | reveal 前永続化の順序保証    |
+| Case ID | Input / Precondition                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                            | Notes                                      |
+| ------- | --------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------ |
+| TC-086  | `currentPanel` exists, `rootUri` given              | Normal - existing panel persists repo                                      | `extensionState.setLastActiveRepo(getPathFromUri(rootUri))` is called once | Persisted when revealing an existing panel |
+| TC-087  | `currentPanel` exists, `rootUri === undefined`      | Boundary - no rootUri                                                      | `setLastActiveRepo` is not called, and only `panel.reveal()` runs          | Not recorded without rootUri               |
+| TC-088  | `currentPanel` exists, `rootUri` given (call order) | Normal - persist before reveal                                             | `setLastActiveRepo` is called before `panel.reveal()` (call order)         | Guarantees persisting before reveal        |
 
-## S25: getHtmlForWebview() アバターストレージ初期化の完了待ち
+## S25: getHtmlForWebview() waits for avatar storage initialization
 
 > Origin: フェーズ3 修正 L8 (avatar-storage-init-await)
 > Added: 2026-07-04T04:29:24Z
@@ -143,217 +143,217 @@
 > Signature: `private async getHtmlForWebview(): Promise<string>`
 > Target Path: `src/gitGraphView.ts:604-614`
 
-`getHtmlForWebview` で viewState を構築する前に `await this.extensionState.waitForAvatarStorage()` を追加する修正。`viewState.fetchAvatars = config.fetchAvatars() && this.extensionState.isAvatarStorageAvailable()` の評価がアバターストレージ初期化（非同期の fs.stat/mkdir）の完了後に行われることを保証し、初期化レース中の暫定値 `false` を掴む不具合を防ぐ。
+A fix that adds `await this.extensionState.waitForAvatarStorage()` in `getHtmlForWebview` before building viewState. It guarantees that `viewState.fetchAvatars = config.fetchAvatars() && this.extensionState.isAvatarStorageAvailable()` is evaluated after avatar storage initialization (async fs.stat/mkdir) completes, preventing the bug of picking up the interim value `false` during the initialization race.
 
-| Case ID | Input / Precondition                                                                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                      | Notes                    |
-| ------- | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| TC-096  | `getHtmlForWebview()` 呼び出し                                                                                  | Normal - awaits before viewState                                           | `extensionState.waitForAvatarStorage()` が viewState 構築（`isAvatarStorageAvailable` 評価）より前に1回 await される | 完了待ちの順序保証       |
-| TC-097  | `config.fetchAvatars()` が `true`、await 完了後に `isAvatarStorageAvailable()` が `true` を返す                 | Normal - fetchAvatars enabled after init                                   | 生成された `viewState.fetchAvatars` が `true` になる                                                                 | 初期化完了後の確定値反映 |
-| TC-098  | `config.fetchAvatars()` が `true`、await 完了後も `isAvatarStorageAvailable()` が `false`（ストレージ利用不可） | Boundary - storage unavailable                                             | `viewState.fetchAvatars` が `false` になる                                                                           | ストレージ不可時         |
-| TC-099  | `config.fetchAvatars()` が `false`、`isAvatarStorageAvailable()` が `true`                                      | Boundary - config disabled                                                 | `viewState.fetchAvatars` が `false`（AND 条件で config 側が優先的に false）                                          | 設定 OFF 時              |
+| Case ID | Input / Precondition                                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                    | Notes                                         |
+| ------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| TC-096  | Call `getHtmlForWebview()`                                                                                                 | Normal - awaits before viewState                                           | `extensionState.waitForAvatarStorage()` is awaited once before viewState is built (before `isAvatarStorageAvailable` is evaluated) | Guarantees the wait comes first               |
+| TC-097  | `config.fetchAvatars()` is `true`, and `isAvatarStorageAvailable()` returns `true` after the await completes               | Normal - fetchAvatars enabled after init                                   | The generated `viewState.fetchAvatars` is `true`                                                                                   | Reflects the final value after initialization |
+| TC-098  | `config.fetchAvatars()` is `true`, and `isAvatarStorageAvailable()` is still `false` after the await (storage unavailable) | Boundary - storage unavailable                                             | `viewState.fetchAvatars` is `false`                                                                                                | Storage unavailable                           |
+| TC-099  | `config.fetchAvatars()` is `false`, `isAvatarStorageAvailable()` is `true`                                                 | Boundary - config disabled                                                 | `viewState.fetchAvatars` is `false` (under the AND condition the config side wins with false)                                      | Setting OFF                                   |
 
-## S27: script 埋め込み JSON の `<` エスケープ serializer
+## S27: `<`-escaping serializer for JSON embedded in scripts
 
 > Origin: Feature 045 (defensive-fixes) (light-spec-plan)
 > Added: 2026-07-19
 > Status: active
 > Supersedes: -
-> Signature: private serializer（`JSON.stringify` 結果中の `<` を serialized literal `\u003c` へ置換。実装時に確定）
+> Signature: private serializer (replaces `<` in the `JSON.stringify` result with the serialized literal `\u003c`; finalized at implementation)
 > Target Path: `src/gitGraphView.ts:667-668`
 
-`<script>` 要素へ埋め込む3値（`locale` / `webviewMessages` / `viewState`）を共通の安全な serializer 経由へ変更する修正。`JSON.stringify` の出力中の `<` を JavaScript Unicode escape `\u003c`（TypeScript の置換文字列は `"\\u003c"`）へ置換し、repo path 等に `</script>` を含んでも script 要素が分断されないようにする（[17] の修正）。入力値そのものは変更せず、復元可能性を維持する。CSP・nonce・外部 script URI は変更しない。
+A fix that routes the 3 values embedded in `<script>` elements (`locale` / `webviewMessages` / `viewState`) through a shared safe serializer. It replaces `<` in the `JSON.stringify` output with the JavaScript Unicode escape `\u003c` (the TypeScript replacement string is `"\\u003c"`), so that the script element is not split even if a repo path or similar contains `</script>` (fix for [17]). The input values themselves are not changed, keeping them recoverable. CSP, nonce and external script URIs are unchanged.
 
-| Case ID | Input / Precondition                                                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                    | Notes                                  |
-| ------- | --------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| TC-106  | `<` を含まない通常の locale / webviewMessages / viewState で `getHtmlForWebview()` を実行                 | Normal - 通常値の等価性                                                    | 埋め込み JSON 文字列を `JSON.parse` した結果が元の値と deep-equal（既存 TC-019/020/039/044/097〜099 の viewState 経路が維持される）                | 通常値では `JSON.stringify` と同一出力 |
-| TC-107  | viewState の repo path（`repos` キーと `lastActiveRepo`）に `</script><script>alert(1)</script>` を含める | Boundary - script 要素の分断防止                                           | 生成 HTML の nonce 付き `<script>` 要素数が通常時と同数で、埋め込み JSON 内に literal な部分文字列 `</script>` が現れない（`\u003c` へ置換される） | HTML 注入を伴う機能不全の防止          |
-| TC-108  | `</script>` を含む文字列値を serializer で直列化し、出力を復元                                            | Normal - 復元同値性                                                        | serializer 出力（`\u003c` 置換済み）を `JSON.parse` した文字列が元の入力と厳密一致し、入力オブジェクト自体は置換で変更されていない                 | 非破壊・可逆性                         |
-| TC-109  | locale と webviewMessages の値にも `</script>` を含めて `getHtmlForWebview()` を実行                      | Boundary - 3埋め込みすべてへの適用                                         | `locale` / `webviewMessages` / `viewState` の3埋め込みすべてで literal `</script>` が現れない（一部の埋め込みだけの処理でない）                    | 適用漏れの検出                         |
+| Case ID | Input / Precondition                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                    | Notes                                             |
+| ------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| TC-106  | Run `getHtmlForWebview()` with normal locale / webviewMessages / viewState containing no `<`               | Normal - equivalence for normal values                                     | `JSON.parse` of the embedded JSON string is deep-equal to the original value (the viewState path of the existing TC-019/020/039/044/097 to 099 is kept)                                            | Same output as `JSON.stringify` for normal values |
+| TC-107  | Put `</script><script>alert(1)</script>` in the viewState repo path (the `repos` key and `lastActiveRepo`) | Boundary - prevents splitting the script element                           | The number of nonce-bearing `<script>` elements in the generated HTML equals the normal count, and the literal substring `</script>` does not appear in the embedded JSON (replaced with `\u003c`) | Prevents a malfunction involving HTML injection   |
+| TC-108  | Serialize a string value containing `</script>` with the serializer and restore the output                 | Normal - round-trip equivalence                                            | The string from `JSON.parse` of the serializer output (with `\u003c` replaced) strictly equals the original input, and the input object itself is not changed by the replacement                   | Non-destructive and reversible                    |
+| TC-109  | Also put `</script>` in the locale and webviewMessages values and run `getHtmlForWebview()`                | Boundary - applied to all 3 embeddings                                     | The literal `</script>` appears in none of the 3 embeddings `locale` / `webviewMessages` / `viewState` (not handled for only some embeddings)                                                      | Detects a missed embedding                        |
 
-### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S27）
+### Failure-source inventory (include-or-justify) — added for Feature 045 (S27)
 
-| 失敗源                                                 | 対応ケースまたは除外理由                                                                    |
-| ------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| `</script>` を含む値による script 要素の分断           | TC-107                                                                                      |
-| 一部の埋め込みだけへの適用（locale / messages の漏れ） | TC-109                                                                                      |
-| 置換による値の破壊（復元不能・入力の破壊的変更）       | TC-108                                                                                      |
-| 通常値の直列化退行                                     | TC-106                                                                                      |
-| `<` の単純な HTML エンティティ等への誤置換             | TC-108（`JSON.parse` での復元同値性で検出）                                                 |
-| script 実行への到達                                    | excluded(CSP の nonce 指定 `script-src` により防止済みで本修正の対象外。仕様確定済みの前提) |
+| Failure source                                                                   | Covering case or reason for exclusion                                                                                           |
+| -------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| A value containing `</script>` splits the script element                         | TC-107                                                                                                                          |
+| Applied to only some embeddings (locale / messages missed)                       | TC-109                                                                                                                          |
+| The replacement breaks values (not recoverable, destructive change to the input) | TC-108                                                                                                                          |
+| Regression in serializing normal values                                          | TC-106                                                                                                                          |
+| Wrongly replacing `<` with a plain HTML entity or similar                        | TC-108 (detected by round-trip equivalence through `JSON.parse`)                                                                |
+| Reaching script execution                                                        | excluded(already prevented by the nonce in the CSP `script-src` and out of scope for this fix. A premise of the finalized spec) |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(serializer は任意の JSON 化可能値を受け入れ、拒否分岐を持たない)
-- Exception: excluded(`JSON.stringify` / 文字列置換に throw 分岐を追加しない。循環参照値は viewState 構築契約上発生しない)
-- External: excluded(外部依存なし。HTML 生成は純粋な文字列処理)
-- Boundary: TC-107、TC-109
-- Type: excluded(埋め込み3値の型は TypeScript コンパイル時に保証される)
+- Validation: excluded(the serializer accepts any JSON-serializable value and has no rejection branch)
+- Exception: excluded(no throw branch is added to `JSON.stringify` / the string replacement. Circular values do not occur under the viewState construction contract)
+- External: excluded(no external dependencies; HTML generation is pure string processing)
+- Boundary: TC-107, TC-109
+- Type: excluded(the types of the 3 embedded values are guaranteed at TypeScript compile time)
 
-数値・空値境界（0 / minimum / maximum / +/-1 / empty / NULL）は、本セクションの対象が文字列エスケープ契約であり仕様上意味を持たないため対象外とする（意味のある境界は `</script>` 部分文字列の TC-107/TC-109 で充足）。
+Numeric and empty-value boundaries (0 / minimum / maximum / +/-1 / empty / NULL) are out of scope, because this section targets a string-escaping contract and they have no meaning in the spec (the meaningful boundary is covered by TC-107/TC-109 with the `</script>` substring).
 
-**失敗系/正常系比（煙感知器）**: 正常系2件（TC-106、TC-108）、失敗系2件（TC-107、TC-109）。件数が同数のためインベントリを再導出したが、本変更の失敗源は上表のとおりすべて対応ケースまたは除外理由で充足されており、追加すべき失敗系ケースはないことを確認した（エスケープ契約のため失敗系は Boundary のみとなる）。
+**Failure/normal ratio (smoke detector)**: 2 normal cases (TC-106, TC-108), 2 failure cases (TC-107, TC-109). Since the counts are equal, the inventory was re-derived, confirming that every failure source of this change is covered by a case or an exclusion reason as in the table above and that no failure case needs to be added (because this is an escaping contract, the failure cases are Boundary only).
 
-## S36: createOrShow() rootUri 登録待ちとパネル生成 / reveal / 兄弟登録の最終状態
+## S36: createOrShow() waiting for rootUri registration, and the final state of panel creation / reveal / sibling registration
 
 > Origin: Feature 057 (multi-repo-single-folder-workspace) issue #49
 > Added: 2026-09-12
 > Status: active
 > Supersedes: S6, S23
 > Signature: `public static async createOrShow(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, rootUri?: vscode.Uri): Promise<void>`
-> Target Path: `src/gitGraphView.ts`（`createOrShow()`。現行59-110行。修正後に更新）
+> Target Path: `src/gitGraphView.ts` (`createOrShow()`; currently lines 59-110, to be updated after the fix)
 > Test File: `tests/src/gitGraphView.test.ts`
 
-`rootUri`指定時は`setLastActiveRepo()`→`await registerRepoFromUri()`→`currentPanel`判定の順に進む。`Promise`完了はパネル生成または`reveal`までを表し、HTML完成を含まない。初回HTML生成中の兄弟登録はHTML再生成を許容し、完成後は`loadRepos`のみを送る。`registerRepoFromUri()`内部の判定はrepoManager owner、`git-keizu.view`ハンドラの`rootUri`解決はextension owner、webview側の初期選択は`web/main.ts` ownerの責務で本表には含めない。定数は`SCM_REPO = "/scm/repo/path"`、`TEST_REPO = "/test/repo"`、`SIBLING_REPO = "/scm/sibling"`とする。
+When `rootUri` is given, it proceeds in the order `setLastActiveRepo()` → `await registerRepoFromUri()` → the `currentPanel` check. Completion of the `Promise` covers panel creation or `reveal`, and does not include the finished HTML. A sibling registration during the initial HTML generation is allowed to regenerate the HTML, and after it is finished only `loadRepos` is sent. The decisions inside `registerRepoFromUri()` belong to the repoManager owner, resolving `rootUri` in the `git-keizu.view` handler to the extension owner, and the initial selection on the webview side to the `web/main.ts` owner; they are not part of this table. Constants: `SCM_REPO = "/scm/repo/path"`, `TEST_REPO = "/test/repo"`, `SIBLING_REPO = "/scm/sibling"`.
 
-| Case ID | Input / Precondition                                                                                                                                                                                                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                              | Notes                              |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| TC-376  | `currentPanel`なし、`getRepos()`が`{}`、`rootUri`（`fsPath: SCM_REPO`）指定。`registerRepoFromUri`は手動resolveのdeferredを返し、resolve時に`getRepos()`の戻りを`{ [SCM_REPO]: { columnWidths: null } }`へ切り替える                                                  | Boundary - 登録完了前後のパネル生成                                        | resolve前は`createWebviewPanel`が0回。resolveして`await createOrShow()`が完了した後に1回。`vi.waitFor`で`webview.html`が空でなくなるまで待ち、HTMLに`unableToLoad`を含まず`id="repoSelect"`を含む。埋め込み`viewState.repos`のキーに`SCM_REPO`があり、`viewState.lastActiveRepo`が`SCM_REPO` | 登録前にパネルを作らない           |
-| TC-377  | TC-376と同条件                                                                                                                                                                                                                                                        | Normal - 登録引数                                                          | `registerRepoFromUri`が`rootUri`と同一参照（`toBe`）で1回呼ばれる                                                                                                                                                                                                                            | -                                  |
-| TC-378  | TC-376と同条件                                                                                                                                                                                                                                                        | Normal - lastActiveRepo記録の順序                                          | `setLastActiveRepo`が`SCM_REPO`で1回、`invocationCallOrder`が`registerRepoFromUri`より小さい                                                                                                                                                                                                 | 登録より前に記録                   |
-| TC-379  | `currentPanel`なし、`rootUri`未指定                                                                                                                                                                                                                                   | Boundary - rootUriなし（初回）                                             | `registerRepoFromUri`0回、`setLastActiveRepo`0回、`await createOrShow()`後に`createWebviewPanel`1回                                                                                                                                                                                          | コマンドパレット起動               |
-| TC-380  | `currentPanel`あり（`rootUri`なしで生成）、`rootUri`未指定で再呼び出し                                                                                                                                                                                                | Boundary - rootUriなし（既存パネル）                                       | `registerRepoFromUri`0回、`setLastActiveRepo`0回、`reveal`1回、`selectRepo`メッセージ0件、`createWebviewPanel`の追加呼び出し0回                                                                                                                                                              | 旧S6 TC-018・S23 TC-087相当        |
-| TC-381  | `currentPanel`あり、`getRepos()`が`{ [TEST_REPO], [SCM_REPO] }`（登録済み）、`rootUri`指定。`registerRepoFromUri`はdeferred                                                                                                                                           | Normal - 既存パネルの登録待ちとreveal順序                                  | `setLastActiveRepo`が`SCM_REPO`で1回。`registerRepoFromUri`が1回（登録済みでも呼ぶ）。resolve前は`reveal`0回・`selectRepo`0件。resolve後に`reveal`1回、`{ command: "selectRepo", repo: SCM_REPO }`が1件。`setLastActiveRepo`の`invocationCallOrder`が`reveal`より小さい                      | 旧S6 TC-016・S23 TC-086/TC-088相当 |
-| TC-382  | `currentPanel`あり、`getRepos()`が`{ [TEST_REPO] }`（未登録）、`rootUri`指定。`registerRepoFromUri`はresolve時に`getRepos()`を`{ [TEST_REPO], [SCM_REPO] }`へ切り替える                                                                                               | Normal - 未登録リポジトリの初回登録                                        | `registerRepoFromUri`が合計1回（`selectRepoFromUri()`からの2回目が無い）、`{ command: "selectRepo", repo: SCM_REPO }`が1件                                                                                                                                                                   | 旧S6 TC-017相当                    |
-| TC-383  | `currentPanel`なし、`getRepos()`が`{}`のまま（非リポジトリ）、`rootUri`指定。`registerRepoFromUri`はresolveしても`getRepos()`を変えない                                                                                                                               | Boundary - 登録されなかったrootUri（0件）                                  | `createWebviewPanel`1回。`vi.waitFor`後のHTMLに`unableToLoad`を含む                                                                                                                                                                                                                          | 登録0件                            |
-| TC-384  | `currentPanel`なし、同じ`rootUri`で`createOrShow`を2回連続で呼び、独立したdeferred d1・d2を返す。d1→d2の順にresolve（各resolve時に`getRepos()`を`{ [SCM_REPO] }`へ）                                                                                                  | Boundary - 連打（呼び出し順の完了）                                        | 両`Promise`完了後、`registerRepoFromUri`2回、`createWebviewPanel`1回、`reveal`1回                                                                                                                                                                                                            | パネル二重生成なし                 |
-| TC-385  | TC-384と同条件でd2→d1の順にresolve                                                                                                                                                                                                                                    | Boundary - 連打（逆順の完了）                                              | `registerRepoFromUri`2回、`createWebviewPanel`1回、`reveal`1回                                                                                                                                                                                                                               | 完了順に依存しない                 |
-| TC-386  | `currentPanel`なし、`rootUri`指定。`registerRepoFromUri`が`Error("register failed")`でreject                                                                                                                                                                          | External - 登録reject（初回）                                              | `createOrShow()`が`"register failed"`でreject（`rejects.toThrow`）、`createWebviewPanel`0回                                                                                                                                                                                                  | catchしない                        |
-| TC-387  | `currentPanel`あり、`rootUri`指定。`registerRepoFromUri`が`Error("register failed")`でreject                                                                                                                                                                          | External - 登録reject（既存パネル）                                        | `createOrShow()`が`"register failed"`でreject、`reveal`0回、`selectRepo`0件                                                                                                                                                                                                                  | catchしない                        |
-| TC-388  | `currentPanel`なし、`getRepos()`が`{ [TEST_REPO] }`、非リポジトリの`rootUri`（`SCM_REPO`）指定。`registerRepoFromUri`はresolveしても`getRepos()`を変えない                                                                                                            | Boundary - 非リポジトリrootUriと既存登録1件                                | HTMLに`id="repoSelect"`を含み、埋め込み`viewState.repos`のキーが`[TEST_REPO]`のみ、`viewState.lastActiveRepo`が`SCM_REPO`                                                                                                                                                                    | 未登録パスがlastActiveRepoに残る   |
-| TC-389  | TC-376と同条件で、`loadWebviewMessages`をdeferredで止める。`registerRepoFromUri`のresolve後、`registerViewCallback`で捕捉したcallbackを`({ [SCM_REPO], [SIBLING_REPO] }, 2)`で呼び（`getRepos()`も2件へ切り替え）、その後`loadWebviewMessages`のdeferredをresolveする | Normal - HTML生成中の兄弟登録                                              | `loadWebviewMessages`が2回呼ばれ、`vi.waitFor`で待った最終HTMLの埋め込み`viewState.repos`のキーが`[SCM_REPO, SIBLING_REPO]`（`sort`後の比較）、`postMessage`に`loadRepos`は0件                                                                                                               | HTML再生成を許容                   |
-| TC-390  | TC-376と同条件でHTML完成（`webview.html`が空でない）まで待った後、捕捉したcallbackを`({ [SCM_REPO], [SIBLING_REPO] }, 2)`で呼ぶ                                                                                                                                       | Normal - HTML完成後の兄弟登録                                              | `postMessage`に`{ command: "loadRepos", repos: { [SCM_REPO], [SIBLING_REPO] }, lastActiveRepo: SCM_REPO }`が1件、`loadWebviewMessages`の呼び出し回数は1のまま                                                                                                                                | HTML再生成なし                     |
+| Case ID | Input / Precondition                                                                                                                                                                                                                                                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                                                                      | Notes                                             |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| TC-376  | No `currentPanel`, `getRepos()` returns `{}`, `rootUri` (`fsPath: SCM_REPO`) given. `registerRepoFromUri` returns a manually resolved deferred, and on resolve switches the return of `getRepos()` to `{ [SCM_REPO]: { columnWidths: null } }`                                                              | Boundary - panel creation before and after registration completes          | Before resolve, `createWebviewPanel` is called 0 times; after resolving and completing `await createOrShow()`, once. After waiting with `vi.waitFor` until `webview.html` is non-empty, the HTML does not contain `unableToLoad` and contains `id="repoSelect"`. The embedded `viewState.repos` has the key `SCM_REPO`, and `viewState.lastActiveRepo` is `SCM_REPO` | No panel before registration                      |
+| TC-377  | Same conditions as TC-376                                                                                                                                                                                                                                                                                   | Normal - registration argument                                             | `registerRepoFromUri` is called once with the same reference as `rootUri` (`toBe`)                                                                                                                                                                                                                                                                                   | -                                                 |
+| TC-378  | Same conditions as TC-376                                                                                                                                                                                                                                                                                   | Normal - order of recording lastActiveRepo                                 | `setLastActiveRepo` is called once with `SCM_REPO`, and its `invocationCallOrder` is smaller than that of `registerRepoFromUri`                                                                                                                                                                                                                                      | Recorded before registration                      |
+| TC-379  | No `currentPanel`, no `rootUri`                                                                                                                                                                                                                                                                             | Boundary - no rootUri (first call)                                         | `registerRepoFromUri` 0 times, `setLastActiveRepo` 0 times, `createWebviewPanel` once after `await createOrShow()`                                                                                                                                                                                                                                                   | Launched from the Command Palette                 |
+| TC-380  | `currentPanel` exists (created without `rootUri`), called again without `rootUri`                                                                                                                                                                                                                           | Boundary - no rootUri (existing panel)                                     | `registerRepoFromUri` 0 times, `setLastActiveRepo` 0 times, `reveal` once, 0 `selectRepo` messages, 0 extra calls to `createWebviewPanel`                                                                                                                                                                                                                            | Equivalent to old S6 TC-018 and S23 TC-087        |
+| TC-381  | `currentPanel` exists, `getRepos()` returns `{ [TEST_REPO], [SCM_REPO] }` (registered), `rootUri` given. `registerRepoFromUri` returns a deferred                                                                                                                                                           | Normal - existing panel waits for registration, reveal order               | `setLastActiveRepo` once with `SCM_REPO`. `registerRepoFromUri` once (called even when registered). Before resolve, `reveal` 0 times and 0 `selectRepo`. After resolve, `reveal` once and 1 `{ command: "selectRepo", repo: SCM_REPO }`. The `invocationCallOrder` of `setLastActiveRepo` is smaller than that of `reveal`                                           | Equivalent to old S6 TC-016 and S23 TC-086/TC-088 |
+| TC-382  | `currentPanel` exists, `getRepos()` returns `{ [TEST_REPO] }` (not registered), `rootUri` given. On resolve, `registerRepoFromUri` switches `getRepos()` to `{ [TEST_REPO], [SCM_REPO] }`                                                                                                                   | Normal - first registration of an unregistered repository                  | `registerRepoFromUri` once in total (no second call from `selectRepoFromUri()`), and 1 `{ command: "selectRepo", repo: SCM_REPO }`                                                                                                                                                                                                                                   | Equivalent to old S6 TC-017                       |
+| TC-383  | No `currentPanel`, `getRepos()` stays `{}` (not a repository), `rootUri` given. `registerRepoFromUri` resolves without changing `getRepos()`                                                                                                                                                                | Boundary - rootUri not registered (0 repos)                                | `createWebviewPanel` once. After `vi.waitFor`, the HTML contains `unableToLoad`                                                                                                                                                                                                                                                                                      | 0 registered                                      |
+| TC-384  | No `currentPanel`, call `createOrShow` twice in a row with the same `rootUri`, returning independent deferreds d1 and d2. Resolve d1 → d2 (each resolve switches `getRepos()` to `{ [SCM_REPO] }`)                                                                                                          | Boundary - rapid calls (completing in call order)                          | After both `Promise`s complete, `registerRepoFromUri` twice, `createWebviewPanel` once, `reveal` once                                                                                                                                                                                                                                                                | No duplicate panel                                |
+| TC-385  | Same conditions as TC-384, resolving d2 → d1                                                                                                                                                                                                                                                                | Boundary - rapid calls (completing in reverse order)                       | `registerRepoFromUri` twice, `createWebviewPanel` once, `reveal` once                                                                                                                                                                                                                                                                                                | Does not depend on completion order               |
+| TC-386  | No `currentPanel`, `rootUri` given. `registerRepoFromUri` rejects with `Error("register failed")`                                                                                                                                                                                                           | External - registration rejects (first call)                               | `createOrShow()` rejects with `"register failed"` (`rejects.toThrow`), `createWebviewPanel` 0 times                                                                                                                                                                                                                                                                  | Not caught                                        |
+| TC-387  | `currentPanel` exists, `rootUri` given. `registerRepoFromUri` rejects with `Error("register failed")`                                                                                                                                                                                                       | External - registration rejects (existing panel)                           | `createOrShow()` rejects with `"register failed"`, `reveal` 0 times, 0 `selectRepo`                                                                                                                                                                                                                                                                                  | Not caught                                        |
+| TC-388  | No `currentPanel`, `getRepos()` returns `{ [TEST_REPO] }`, a non-repository `rootUri` (`SCM_REPO`) given. `registerRepoFromUri` resolves without changing `getRepos()`                                                                                                                                      | Boundary - non-repository rootUri with 1 existing registration             | The HTML contains `id="repoSelect"`, the keys of the embedded `viewState.repos` are only `[TEST_REPO]`, and `viewState.lastActiveRepo` is `SCM_REPO`                                                                                                                                                                                                                 | The unregistered path remains in lastActiveRepo   |
+| TC-389  | Same conditions as TC-376, with `loadWebviewMessages` held by a deferred. After `registerRepoFromUri` resolves, call the callback captured from `registerViewCallback` with `({ [SCM_REPO], [SIBLING_REPO] }, 2)` (also switching `getRepos()` to 2 repos), then resolve the `loadWebviewMessages` deferred | Normal - sibling registration during HTML generation                       | `loadWebviewMessages` is called twice, the keys of the embedded `viewState.repos` in the final HTML awaited with `vi.waitFor` are `[SCM_REPO, SIBLING_REPO]` (compared after `sort`), and `postMessage` has 0 `loadRepos`                                                                                                                                            | HTML regeneration allowed                         |
+| TC-390  | Same conditions as TC-376; after waiting until the HTML is finished (`webview.html` non-empty), call the captured callback with `({ [SCM_REPO], [SIBLING_REPO] }, 2)`                                                                                                                                       | Normal - sibling registration after the HTML is finished                   | `postMessage` has 1 `{ command: "loadRepos", repos: { [SCM_REPO], [SIBLING_REPO] }, lastActiveRepo: SCM_REPO }`, and the call count of `loadWebviewMessages` stays at 1                                                                                                                                                                                              | No HTML regeneration                              |
 
-### 失敗源インベントリ（include-or-justify）— Feature 057 追加分（S36）
+### Failure-source inventory (include-or-justify) — added for Feature 057 (S36)
 
-| 失敗源                                                                 | 対応ケースまたは除外理由                                              |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| 登録前のパネル生成（非リポジトリ判定でunable-to-loadページになる）     | TC-376                                                                |
-| 登録引数違い（`rootUri`以外を渡す）                                    | TC-377                                                                |
-| `lastActiveRepo`の記録順序（登録後に記録する）                         | TC-378                                                                |
-| `rootUri`なしで登録・記録が走る                                        | TC-379、TC-380                                                        |
-| 既存パネルの登録漏れ・reveal順序（登録完了前にreveal・selectRepoする） | TC-381、TC-382                                                        |
-| 非リポジトリ`rootUri`                                                  | TC-383、TC-388                                                        |
-| 連打（パネル二重生成・完了順依存）                                     | TC-384、TC-385                                                        |
-| 登録reject（握りつぶし・パネル生成の継続）                             | TC-386、TC-387                                                        |
-| 生成中・完成後の兄弟登録（最終HTML・`loadRepos`の欠落）                | TC-389、TC-390                                                        |
-| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）                  | 0件: TC-383、未指定: TC-379、TC-380、1件: TC-388、2回: TC-384、TC-385 |
+| Failure source                                                                                                        | Covering case or reason for exclusion                                               |
+| --------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Panel created before registration (judged a non-repository, showing the unable-to-load page)                          | TC-376                                                                              |
+| Wrong registration argument (passing something other than `rootUri`)                                                  | TC-377                                                                              |
+| Order of recording `lastActiveRepo` (recorded after registration)                                                     | TC-378                                                                              |
+| Registration or recording runs without `rootUri`                                                                      | TC-379, TC-380                                                                      |
+| Missing registration or wrong reveal order for an existing panel (reveal or selectRepo before registration completes) | TC-381, TC-382                                                                      |
+| Non-repository `rootUri`                                                                                              | TC-383, TC-388                                                                      |
+| Rapid calls (duplicate panel, dependence on completion order)                                                         | TC-384, TC-385                                                                      |
+| Registration rejects (swallowed, panel creation continues)                                                            | TC-386, TC-387                                                                      |
+| Sibling registration during and after generation (final HTML, missing `loadRepos`)                                    | TC-389, TC-390                                                                      |
+| Boundary values (0 / minimum / maximum / +/-1 / empty / NULL)                                                         | 0 repos: TC-383, not given: TC-379, TC-380, 1 repo: TC-388, 2 calls: TC-384, TC-385 |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(`rootUri`は`Uri`型で、拒否分岐を持たない)
-- Exception: excluded(`createOrShow()`内でthrow・catchを追加しない。rejectはExternalで扱う)
-- External: TC-386、TC-387
-- Boundary: TC-376、TC-379、TC-380、TC-383、TC-384、TC-385、TC-388
-- Type: excluded(型はコンパイル時に保証)
-- Normal: TC-377、TC-378、TC-381、TC-382、TC-389、TC-390
+- Validation: excluded(`rootUri` is of type `Uri` and has no rejection branch)
+- Exception: excluded(no throw or catch is added in `createOrShow()`. Rejection is handled under External)
+- External: TC-386, TC-387
+- Boundary: TC-376, TC-379, TC-380, TC-383, TC-384, TC-385, TC-388
+- Type: excluded(types are guaranteed at compile time)
+- Normal: TC-377, TC-378, TC-381, TC-382, TC-389, TC-390
 
-**失敗系/正常系比（煙感知器）**: 正常系6件（TC-377、TC-378、TC-381、TC-382、TC-389、TC-390）、失敗系9件（Boundary 7件 + External 2件）。失敗源は登録待ち・パネル生成・reveal・兄弟登録の4系統を上表で網羅したことを確認した。比率合わせのためのケース追加は行わない。
+**Failure/normal ratio (smoke detector)**: 6 normal cases (TC-377, TC-378, TC-381, TC-382, TC-389, TC-390), 9 failure cases (7 Boundary + 2 External). Confirmed that the table above covers the 4 groups of failure sources: waiting for registration, panel creation, reveal and sibling registration. No cases are added just to adjust the ratio.
 
-## S37: createOrShow() 異なる rootUri の連続呼び出しを呼び出し順に適用する
+## S37: createOrShow() applies successive calls with different rootUris in call order
 
 > Origin: Feature 057 (multi-repo-single-folder-workspace) issue #49 PR #60 レビュー指摘
 > Added: 2026-09-12
 > Status: active
 > Supersedes: -
 > Signature: `public static createOrShow(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, rootUri?: vscode.Uri): Promise<void>`
-> Target Path: `src/gitGraphView.ts`（`createOrShow()`と`open()`）
+> Target Path: `src/gitGraphView.ts` (`createOrShow()` and `open()`)
 > Test File: `tests/src/gitGraphView.test.ts`
 
-登録待ち（`registerRepoFromUri()`）は呼び出しごとに並行して走らせ、その後のパネル生成 / `reveal` / `selectRepo`（適用）だけを呼び出し順に直列化する。先行呼び出しの登録がrejectしても後続の適用は止めない（rejectは先行呼び出しの呼び出し元へ伝播済み）。S36の連打ケース（TC-384 / TC-385）は同一`rootUri`の回数だけを見ており、本セクションは異なる`rootUri`で最後に押したリポジトリが選択・記録されることを固定する。定数はS36と同じ。
+Waiting for registration (`registerRepoFromUri()`) runs concurrently per call, and only the subsequent panel creation / `reveal` / `selectRepo` (applying) is serialized in call order. Even if an earlier call's registration rejects, later applications are not stopped (the rejection has already propagated to the earlier call's caller). The rapid-call cases in S36 (TC-384 / TC-385) only look at counts for the same `rootUri`; this section fixes that, with different `rootUri`s, the last repository clicked is the one selected and recorded. Constants are the same as S36.
 
-| Case ID | Input / Precondition                                                                                                                                                                                                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                            | Notes                              |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| TC-391  | `currentPanel`なし、`getRepos()`が`{}`。`SCM_REPO`の`rootUri`→`SIBLING_REPO`の`rootUri`の順に`createOrShow`を呼び、独立したdeferred d1・d2を返す。d2を先にresolve（`getRepos()`を`{ [SIBLING_REPO] }`へ）、次にd1をresolve（`{ [SCM_REPO], [SIBLING_REPO] }`へ） | Boundary - 逆順の完了（異なるrootUri）                                     | 両`Promise`完了後、`registerRepoFromUri`2回、`createWebviewPanel`1回、`reveal`1回、`selectRepo`メッセージが`{ command: "selectRepo", repo: SIBLING_REPO }`の1件のみ、`getLastActiveRepo()`が`SIBLING_REPO` | 最後に押したリポジトリが選択される |
-| TC-392  | TC-391と同条件でd1→d2の順にresolve（d1で`{ [SCM_REPO] }`、d2で`{ [SCM_REPO], [SIBLING_REPO] }`へ）                                                                                                                                                               | Normal - 呼び出し順の完了（異なるrootUri）                                 | TC-391と同じ                                                                                                                                                                                               | 完了順に依存しない                 |
-| TC-393  | TC-391と同条件でd1を`Error("register failed")`でreject、d2をresolve（`{ [SIBLING_REPO] }`へ）                                                                                                                                                                    | External - 先行呼び出しの登録reject                                        | 1回目の`Promise`が`"register failed"`でreject。2回目は完了し、`createWebviewPanel`1回、`reveal`0回、`getLastActiveRepo()`が`SIBLING_REPO`                                                                  | 先行のrejectで後続を止めない       |
+| Case ID | Input / Precondition                                                                                                                                                                                                                                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                     | Notes                                          |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| TC-391  | No `currentPanel`, `getRepos()` returns `{}`. Call `createOrShow` with the `rootUri` of `SCM_REPO` and then with the `rootUri` of `SIBLING_REPO`, returning independent deferreds d1 and d2. Resolve d2 first (switching `getRepos()` to `{ [SIBLING_REPO] }`), then d1 (to `{ [SCM_REPO], [SIBLING_REPO] }`) | Boundary - completing in reverse order (different rootUris)                | After both `Promise`s complete, `registerRepoFromUri` twice, `createWebviewPanel` once, `reveal` once, exactly 1 `selectRepo` message, `{ command: "selectRepo", repo: SIBLING_REPO }`, and `getLastActiveRepo()` is `SIBLING_REPO` | The last repository clicked is selected        |
+| TC-392  | Same conditions as TC-391, resolving d1 → d2 (d1 to `{ [SCM_REPO] }`, d2 to `{ [SCM_REPO], [SIBLING_REPO] }`)                                                                                                                                                                                                 | Normal - completing in call order (different rootUris)                     | Same as TC-391                                                                                                                                                                                                                      | Does not depend on completion order            |
+| TC-393  | Same conditions as TC-391, rejecting d1 with `Error("register failed")` and resolving d2 (to `{ [SIBLING_REPO] }`)                                                                                                                                                                                            | External - the earlier call's registration rejects                         | The first `Promise` rejects with `"register failed"`. The second completes, with `createWebviewPanel` once, `reveal` 0 times, and `getLastActiveRepo()` is `SIBLING_REPO`                                                           | An earlier rejection does not stop later calls |
 
-### 失敗源インベントリ（include-or-justify）— PR #60 レビュー対応分（S37）
+### Failure-source inventory (include-or-justify) — PR #60 review follow-up (S37)
 
-| 失敗源                                                 | 対応ケースまたは除外理由                                |
-| ------------------------------------------------------ | ------------------------------------------------------- |
-| 完了順で適用し、先に押したリポジトリが最後に選択される | TC-391                                                  |
-| 直列化により呼び出し順の完了で結果が変わる             | TC-392                                                  |
-| 先行呼び出しのrejectが後続の適用を止める               | TC-393                                                  |
-| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）  | 2回: TC-391、TC-392。0回・1回はS36 TC-379〜TC-383が所有 |
+| Failure source                                                                      | Covering case or reason for exclusion                                    |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Applying in completion order, so the repository clicked first ends up selected last | TC-391                                                                   |
+| Serialization changes the result when calls complete in call order                  | TC-392                                                                   |
+| An earlier call's rejection stops later applications                                | TC-393                                                                   |
+| Boundary values (0 / minimum / maximum / +/-1 / empty / NULL)                       | 2 calls: TC-391, TC-392. 0 and 1 calls are owned by S36 TC-379 to TC-383 |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(`rootUri`は`Uri`型で、拒否分岐を持たない)
-- Exception: excluded(追加したcatchは先行呼び出しのrejectを後続へ波及させないためのもので、Externalの TC-393 で検証する)
+- Validation: excluded(`rootUri` is of type `Uri` and has no rejection branch)
+- Exception: excluded(the added catch keeps an earlier call's rejection from spreading to later ones, and is checked by TC-393 under External)
 - External: TC-393
 - Boundary: TC-391
-- Type: excluded(型はコンパイル時に保証)
+- Type: excluded(types are guaranteed at compile time)
 - Normal: TC-392
 
-**失敗系/正常系比（煙感知器）**: 正常系1件（TC-392）、失敗系2件（Boundary 1件 + External 1件）。比率合わせのためのケース追加は行わない。
+**Failure/normal ratio (smoke detector)**: 1 normal case (TC-392), 2 failure cases (1 Boundary + 1 External). No cases are added just to adjust the ratio.
 
-## S38: createOrShow() 登録待ち中に閉じられたパネルを作り直さない
+## S38: createOrShow() does not recreate a panel closed while waiting for registration
 
 > Origin: Feature 057 (multi-repo-single-folder-workspace) issue #49 PR #60 レビュー指摘
 > Added: 2026-09-12
 > Status: active
 > Supersedes: -
 > Signature: `public static createOrShow(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, rootUri?: vscode.Uri): Promise<void>`
-> Target Path: `src/gitGraphView.ts`（`open()`）
+> Target Path: `src/gitGraphView.ts` (`open()`)
 > Test File: `tests/src/gitGraphView.test.ts`
 
-呼び出し時点の`currentPanel`を対象パネルとして記録し、登録待ちの間にそのパネルが閉じられた（`dispose()`で`currentPanel`が対象と一致しなくなった）場合は、パネル生成・`reveal`・`selectRepo`のいずれも行わずに`Promise`を完了させる。閉じた後に始まった呼び出しは対象パネルを持たないため、通常どおりパネルを生成する。定数はS36と同じ。
+The `currentPanel` at call time is recorded as the target panel, and if that panel is closed while waiting for registration (`dispose()` makes `currentPanel` no longer match the target), the `Promise` completes without panel creation, `reveal` or `selectRepo`. A call that starts after the close has no target panel, so it creates a panel as usual. Constants are the same as S36.
 
-| Case ID | Input / Precondition                                                                                                                                                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                           | Notes                            |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------------- |
-| TC-394  | `currentPanel`あり（`getRepos()`が`{ [TEST_REPO] }`）、`SCM_REPO`の`rootUri`指定で`registerRepoFromUri`はdeferred。resolve前に`currentPanel.dispose()`で閉じ、その後resolve（`getRepos()`を`{ [TEST_REPO], [SCM_REPO] }`へ） | Boundary - 登録待ち中のパネル閉鎖                                          | `Promise`完了後、`currentPanel`が`undefined`のまま、`createWebviewPanel`0回、`reveal`0回、`selectRepo`0件 | 閉じたタブを作り直さない         |
-| TC-395  | TC-394と同条件で閉じた直後に`SIBLING_REPO`の`rootUri`で2回目を呼ぶ（deferred d2）。d1→d2の順にresolve（d2で`{ [TEST_REPO], [SCM_REPO], [SIBLING_REPO] }`へ）                                                                 | Normal - 閉鎖後の再呼び出し                                                | `createWebviewPanel`1回（2回目の呼び出しによる）、`reveal`0回、`getLastActiveRepo()`が`SIBLING_REPO`      | 停止した呼び出しは後続を妨げない |
+| Case ID | Input / Precondition                                                                                                                                                                                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                 | Notes                                    |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| TC-394  | `currentPanel` exists (`getRepos()` returns `{ [TEST_REPO] }`), `rootUri` of `SCM_REPO` given, `registerRepoFromUri` returns a deferred. Close with `currentPanel.dispose()` before resolve, then resolve (switching `getRepos()` to `{ [TEST_REPO], [SCM_REPO] }`) | Boundary - panel closed while waiting for registration                     | After the `Promise` completes, `currentPanel` stays `undefined`, `createWebviewPanel` 0 times, `reveal` 0 times, 0 `selectRepo` | Does not recreate a closed tab           |
+| TC-395  | Same conditions as TC-394, making a second call with the `rootUri` of `SIBLING_REPO` right after the close (deferred d2). Resolve d1 → d2 (d2 to `{ [TEST_REPO], [SCM_REPO], [SIBLING_REPO] }`)                                                                     | Normal - calling again after the close                                     | `createWebviewPanel` once (from the second call), `reveal` 0 times, `getLastActiveRepo()` is `SIBLING_REPO`                     | A stopped call does not block later ones |
 
-### 失敗源インベントリ（include-or-justify）— PR #60 レビュー対応分（S38）
+### Failure-source inventory (include-or-justify) — PR #60 review follow-up (S38)
 
-| 失敗源                                                                                     | 対応ケースまたは除外理由                   |
-| ------------------------------------------------------------------------------------------ | ------------------------------------------ |
-| 登録待ち中に閉じたパネルを作り直す                                                         | TC-394                                     |
-| 停止した呼び出しが後続のパネル生成を妨げる、または古い呼び出しが新しいパネルを`reveal`する | TC-395                                     |
-| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）                                      | 閉鎖前に完了する通常経路はS36 TC-381が所有 |
+| Failure source                                                                          | Covering case or reason for exclusion                                |
+| --------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Recreating a panel closed while waiting for registration                                | TC-394                                                               |
+| A stopped call blocks later panel creation, or an old call runs `reveal` on a new panel | TC-395                                                               |
+| Boundary values (0 / minimum / maximum / +/-1 / empty / NULL)                           | The normal path that completes before a close is owned by S36 TC-381 |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(`rootUri`は`Uri`型で、拒否分岐を持たない)
-- Exception: excluded(`open()`内でthrow・catchを追加しない)
-- External: excluded(登録rejectはS36 TC-386 / TC-387とS37 TC-393が所有)
+- Validation: excluded(`rootUri` is of type `Uri` and has no rejection branch)
+- Exception: excluded(no throw or catch is added in `open()`)
+- External: excluded(registration rejection is owned by S36 TC-386 / TC-387 and S37 TC-393)
 - Boundary: TC-394
-- Type: excluded(型はコンパイル時に保証)
+- Type: excluded(types are guaranteed at compile time)
 - Normal: TC-395
 
-**失敗系/正常系比（煙感知器）**: 正常系1件（TC-395）、失敗系1件（Boundary 1件）。比率合わせのためのケース追加は行わない。
+**Failure/normal ratio (smoke detector)**: 1 normal case (TC-395), 1 failure case (1 Boundary). No cases are added just to adjust the ratio.
 
-## S39: createOrShow() 登録rejectを挟んでも適用順の鎖を切らない
+## S39: createOrShow() keeps the apply-order chain intact across a registration rejection
 
 > Origin: Feature 057 (multi-repo-single-folder-workspace) issue #49 PR #60 レビュー指摘
 > Added: 2026-09-12
 > Status: active
 > Supersedes: -
 > Signature: `public static createOrShow(extensionPath: string, dataSource: DataSource, extensionState: ExtensionState, avatarManager: AvatarManager, repoManager: RepoManager, rootUri?: vscode.Uri): Promise<void>`
-> Target Path: `src/gitGraphView.ts`（`createOrShow()`と`settled()`）
+> Target Path: `src/gitGraphView.ts` (`createOrShow()` and `settled()`)
 > Test File: `tests/src/gitGraphView.test.ts`
 
-適用順の鎖（`lastOpen`）は「先行呼び出しがsettleし、かつ自呼び出しがsettleした時点」で進める。登録がrejectした呼び出しは先行の完了を自分では待たないため、その呼び出しを鎖の要素にそのまま使うと、後続がさらに前の呼び出しを追い越してしまう。S37は連続する2呼び出しの順序、本セクションは間に登録rejectを挟んだ3呼び出しの順序を固定する。定数はS36と同じ。
+The apply-order chain (`lastOpen`) advances "when the earlier call has settled and this call has settled". A call whose registration rejects does not itself wait for the earlier call to finish, so using that call directly as a link in the chain would let a later call overtake an even earlier one. S37 fixes the order of 2 successive calls; this section fixes the order of 3 calls with a registration rejection in between. Constants are the same as S36.
 
-| Case ID | Input / Precondition                                                                                                                                                                                                                                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                      | Notes               |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| TC-396  | `currentPanel`なし、`getRepos()`が`{}`。A（`SCM_REPO`）→B（`SCM_REPO`）→C（`SIBLING_REPO`）の順に`createOrShow`を呼び、独立したdeferred d1・d2・d3を返す。d2を`Error("register failed")`でreject、d3をresolve（`{ [SIBLING_REPO] }`へ）、最後にd1をresolve（`{ [SCM_REPO], [SIBLING_REPO] }`へ） | External - 中間呼び出しの登録reject                                        | Bの`Promise`が`"register failed"`でreject。A・C完了後、`createWebviewPanel`1回、`reveal`1回、`selectRepo`メッセージが`{ command: "selectRepo", repo: SIBLING_REPO }`の1件のみ、`getLastActiveRepo()`が`SIBLING_REPO` | Cが最後に適用される |
+| Case ID | Input / Precondition                                                                                                                                                                                                                                                                                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                | Notes             |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------- |
+| TC-396  | No `currentPanel`, `getRepos()` returns `{}`. Call `createOrShow` in the order A (`SCM_REPO`) → B (`SCM_REPO`) → C (`SIBLING_REPO`), returning independent deferreds d1, d2 and d3. Reject d2 with `Error("register failed")`, resolve d3 (to `{ [SIBLING_REPO] }`), and finally resolve d1 (to `{ [SCM_REPO], [SIBLING_REPO] }`) | External - a middle call's registration rejects                            | B's `Promise` rejects with `"register failed"`. After A and C complete, `createWebviewPanel` once, `reveal` once, exactly 1 `selectRepo` message, `{ command: "selectRepo", repo: SIBLING_REPO }`, and `getLastActiveRepo()` is `SIBLING_REPO` | C is applied last |
 
-### 失敗源インベントリ（include-or-justify）— PR #60 レビュー対応分（S39）
+### Failure-source inventory (include-or-justify) — PR #60 review follow-up (S39)
 
-| 失敗源                                                               | 対応ケースまたは除外理由                                |
-| -------------------------------------------------------------------- | ------------------------------------------------------- |
-| rejectした呼び出しを鎖の要素にし、後続がさらに前の呼び出しを追い越す | TC-396                                                  |
-| 先行rejectが後続を止める                                             | S37 TC-393が所有                                        |
-| 境界値（0 / minimum / maximum / +/-1 / empty / NULL）                | 2呼び出しはS37 TC-391 / TC-392が所有。3呼び出し: TC-396 |
+| Failure source                                                                              | Covering case or reason for exclusion                     |
+| ------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Using a rejected call as a link in the chain lets a later call overtake an even earlier one | TC-396                                                    |
+| An earlier rejection stops later calls                                                      | Owned by S37 TC-393                                       |
+| Boundary values (0 / minimum / maximum / +/-1 / empty / NULL)                               | 2 calls are owned by S37 TC-391 / TC-392. 3 calls: TC-396 |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(`rootUri`は`Uri`型で、拒否分岐を持たない)
-- Exception: excluded(`settled()`のcatchは自呼び出しのrejectを鎖へ波及させないためのもので、Externalの TC-396 で検証する)
+- Validation: excluded(`rootUri` is of type `Uri` and has no rejection branch)
+- Exception: excluded(the catch in `settled()` keeps this call's rejection from spreading into the chain, and is checked by TC-396 under External)
 - External: TC-396
-- Boundary: excluded(3呼び出しの順序はExternalのTC-396で扱う)
-- Type: excluded(型はコンパイル時に保証)
-- Normal: excluded(正常順序はS37 TC-392が所有)
+- Boundary: excluded(the order of 3 calls is handled by TC-396 under External)
+- Type: excluded(types are guaranteed at compile time)
+- Normal: excluded(the normal order is owned by S37 TC-392)
 
-**失敗系/正常系比（煙感知器）**: 正常系0件、失敗系1件（External 1件）。正常系はS37が所有するため比率合わせのケース追加は行わない。
+**Failure/normal ratio (smoke detector)**: 0 normal cases, 1 failure case (1 External). The normal cases are owned by S37, so no cases are added to adjust the ratio.

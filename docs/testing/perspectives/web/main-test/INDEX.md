@@ -1,4 +1,4 @@
-# テスト観点表マニフェスト: web/main.ts
+# Test Perspectives Manifest: web/main.ts
 
 > Source: `web/main.ts`
 > Storage Mode: sharded

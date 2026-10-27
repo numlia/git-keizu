@@ -1,62 +1,62 @@
-# テスト観点表: src/extension.ts
+# Test Perspectives: src/extension.ts
 
 > Source: `src/extension.ts`
 > Generated: 2026-03-22T15:15:20Z
 > Language: TypeScript
 > Test Framework: Vitest 4.x
 
-## S1: activate 初期化と依存登録
+## S1: activate initialisation and dependency registration
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `activate(context: vscode.ExtensionContext)`
-**テスト対象パス**: `src/extension.ts:11-64`
+**Signature**: `activate(context: vscode.ExtensionContext)`
+**Target path**: `src/extension.ts:11-64`
 
-| Case ID | Input / Precondition                                                                                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Notes   |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| TC-001  | `vscode` API、`ExtensionState`、`DataSource`、`AvatarManager`、`StatusBarItem`、`RepoManager`、`DiffDocProvider` をすべてモックし、`context.subscriptions.push` が利用可能 | Normal - standard                                                          | `createOutputChannel("Git Keizu")`、各依存のコンストラクタ、`registerCommand("git-keizu.view", ...)`、`registerCommand("git-keizu.clearAvatarCache", ...)`、`registerTextDocumentContentProvider(DiffDocProvider.scheme, provider)`、`onDidChangeConfiguration(...)` が 1 回ずつ呼ばれる。`context.subscriptions.push(...)` は `outputChannel`、2 つのコマンド disposable、content provider disposable、config listener disposable、`repoManager` をまとめて 1 回登録し、最後に `outputChannel.appendLine("Extension activated successfully")` が呼ばれる | L12-L63 |
-| TC-002  | `vscode.window.createOutputChannel` が `Error("output failed")` を送出する                                                                                                 | External - vscode.window.createOutputChannel failure                       | `activate(context)` が同じ `Error("output failed")` を送出し、`ExtensionState` 以降の依存初期化・登録処理は呼ばれない                                                                                                                                                                                                                                                                                                                                                                                                                                     | L12     |
-| TC-003  | `new RepoManager(...)` が `Error("repo init failed")` を送出する                                                                                                           | External - RepoManager constructor failure                                 | `AvatarManager` と `StatusBarItem` までは生成されるが、`context.subscriptions.push(...)` と `outputChannel.appendLine(...)` は呼ばれず、`activate(context)` が同じ `Error("repo init failed")` を送出する                                                                                                                                                                                                                                                                                                                                                 | L15-L17 |
-| TC-004  | すべての初期化は成功するが `context.subscriptions.push` が `Error("push failed")` を送出する                                                                               | External - ExtensionContext.subscriptions.push failure                     | `activate(context)` が同じ `Error("push failed")` を送出し、成功ログは出力されない。登録前に生成済みの依存インスタンスはそのまま残る                                                                                                                                                                                                                                                                                                                                                                                                                      | L19-L61 |
-| TC-005  | 登録処理は成功するが `outputChannel.appendLine` が `Error("log failed")` を送出する                                                                                        | External - OutputChannel.appendLine failure                                | `activate(context)` が同じ `Error("log failed")` を送出する。依存登録は完了済みで、例外は握りつぶされない                                                                                                                                                                                                                                                                                                                                                                                                                                                 | L63     |
+| Case ID | Input / Precondition                                                                                                                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | Notes   |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| TC-001  | The `vscode` API, `ExtensionState`, `DataSource`, `AvatarManager`, `StatusBarItem`, `RepoManager` and `DiffDocProvider` are all mocked, and `context.subscriptions.push` is available | Normal - standard                                                          | `createOutputChannel("Git Keizu")`, each dependency's constructor, `registerCommand("git-keizu.view", ...)`, `registerCommand("git-keizu.clearAvatarCache", ...)`, `registerTextDocumentContentProvider(DiffDocProvider.scheme, provider)` and `onDidChangeConfiguration(...)` are each called once. `context.subscriptions.push(...)` registers `outputChannel`, the 2 command disposables, the content provider disposable, the config listener disposable and `repoManager` together in one call, and finally `outputChannel.appendLine("Extension activated successfully")` is called | L12-L63 |
+| TC-002  | `vscode.window.createOutputChannel` throws `Error("output failed")`                                                                                                                   | External - vscode.window.createOutputChannel failure                       | `activate(context)` throws the same `Error("output failed")`, and dependency initialisation and registration from `ExtensionState` on are not called                                                                                                                                                                                                                                                                                                                                                                                                                                      | L12     |
+| TC-003  | `new RepoManager(...)` throws `Error("repo init failed")`                                                                                                                             | External - RepoManager constructor failure                                 | `AvatarManager` and `StatusBarItem` are created, but `context.subscriptions.push(...)` and `outputChannel.appendLine(...)` are not called, and `activate(context)` throws the same `Error("repo init failed")`                                                                                                                                                                                                                                                                                                                                                                            | L15-L17 |
+| TC-004  | All initialisation succeeds but `context.subscriptions.push` throws `Error("push failed")`                                                                                            | External - ExtensionContext.subscriptions.push failure                     | `activate(context)` throws the same `Error("push failed")`, and the success log is not written. Dependency instances created before registration remain as they are                                                                                                                                                                                                                                                                                                                                                                                                                       | L19-L61 |
+| TC-005  | Registration succeeds but `outputChannel.appendLine` throws `Error("log failed")`                                                                                                     | External - OutputChannel.appendLine failure                                | `activate(context)` throws the same `Error("log failed")`. Dependency registration is already complete, and the exception is not swallowed                                                                                                                                                                                                                                                                                                                                                                                                                                                | L63     |
 
-## S2: activate git-keizu.view コマンドの rootUri 解決
-
-> Origin: test-plan (既存コード分析)
-> Added: 2026-03-22
-> Status: active
-> Supersedes: -
-
-**シグネチャ**: `(arg?: unknown) => Promise<void>`
-**テスト対象パス**: `src/extension.ts:21-41`
-
-| Case ID | Input / Precondition                                                                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                  | Notes            |
-| ------- | ---------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
-| TC-006  | `activate` 実行時に `registerCommand("git-keizu.view", handler)` の `handler` を捕捉し、`arg` に `vscode.Uri.file("/repo")` を渡す | Normal - branch                                                            | `GitKeizuView.createOrShow(context.extensionPath, dataSource, extensionState, avatarManager, repoManager, uri)` が 1 回呼ばれ、`rootUri` 引数に同じ `Uri` インスタンスが渡される | L25-L26, L33-L40 |
-| TC-007  | 捕捉した `handler` に `{ rootUri: vscode.Uri.file("/repo") }` を渡す                                                               | Normal - branch                                                            | object shape guard と `candidate instanceof vscode.Uri` の両方を通過し、`createOrShow(...)` の第 6 引数に `rootUri` プロパティの `Uri` が渡される                                | L27-L30, L33-L40 |
-| TC-008  | 捕捉した `handler` に `{ rootUri: "not-a-uri" }`、`{ rootUri: null }`、`{ rootUri: {} }` を順に渡す                                | Boundary - invalid rootUri shape                                           | `"rootUri" in arg` は成立しても `candidate instanceof vscode.Uri` が偽のため、各呼び出しで `createOrShow(...)` の第 6 引数は `undefined` になる                                  | L27-L32          |
-| TC-009  | 捕捉した `handler` に `undefined`、`null`、`"repo"`、`0`、`false` を順に渡す                                                       | Boundary - nullish or primitive arg                                        | `arg instanceof vscode.Uri` と object shape guard のどちらも通らず、各呼び出しで `createOrShow(...)` の第 6 引数は `undefined` になる                                            | L25-L32          |
-| TC-010  | `GitKeizuView.createOrShow` が `Error("show failed")` を送出するようにして、`handler(vscode.Uri.file("/repo"))` を呼ぶ             | External - GitKeizuView.createOrShow failure                               | コマンドハンドラが同じ `Error("show failed")` を送出する。`activate` 側で追加の try/catch は行われない                                                                           | L33-L40          |
-
-## S3: activate git-keizu.clearAvatarCache コマンド
+## S2: activate rootUri resolution of the git-keizu.view command
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `() => void`
-**テスト対象パス**: `src/extension.ts:42-44`
+**Signature**: `(arg?: unknown) => Promise<void>`
+**Target path**: `src/extension.ts:21-41`
 
-| Case ID | Input / Precondition                                                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                 | Notes   |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | ------- |
-| TC-011  | `activate` 実行時に `registerCommand("git-keizu.clearAvatarCache", handler)` の `handler` を捕捉し、`avatarManager.clearCache` を spy する | Normal - standard                                                          | `handler()` 呼び出しで `avatarManager.clearCache()` が 1 回だけ呼ばれる。戻り値は利用されず、追加の副作用はない | L42-L44 |
-| TC-012  | `avatarManager.clearCache` が `Error("clear failed")` を同期送出する                                                                       | External - AvatarManager.clearCache failure                                | `handler()` が同じ `Error("clear failed")` を送出する。コマンドハンドラは例外を握りつぶさない                   | L43     |
+| Case ID | Input / Precondition                                                                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                 | Notes            |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------- |
+| TC-006  | Capture the `handler` of `registerCommand("git-keizu.view", handler)` during `activate` and pass `vscode.Uri.file("/repo")` as `arg` | Normal - branch                                                            | `GitKeizuView.createOrShow(context.extensionPath, dataSource, extensionState, avatarManager, repoManager, uri)` is called once, and the same `Uri` instance is passed as the `rootUri` argument | L25-L26, L33-L40 |
+| TC-007  | Pass `{ rootUri: vscode.Uri.file("/repo") }` to the captured `handler`                                                               | Normal - branch                                                            | It passes both the object shape guard and `candidate instanceof vscode.Uri`, and the `Uri` of the `rootUri` property is passed as the 6th argument of `createOrShow(...)`                       | L27-L30, L33-L40 |
+| TC-008  | Pass `{ rootUri: "not-a-uri" }`, `{ rootUri: null }`, `{ rootUri: {} }` in turn to the captured `handler`                            | Boundary - invalid rootUri shape                                           | Even though `"rootUri" in arg` holds, `candidate instanceof vscode.Uri` is false, so the 6th argument of `createOrShow(...)` is `undefined` in each call                                        | L27-L32          |
+| TC-009  | Pass `undefined`, `null`, `"repo"`, `0`, `false` in turn to the captured `handler`                                                   | Boundary - nullish or primitive arg                                        | Neither `arg instanceof vscode.Uri` nor the object shape guard passes, so the 6th argument of `createOrShow(...)` is `undefined` in each call                                                   | L25-L32          |
+| TC-010  | Make `GitKeizuView.createOrShow` throw `Error("show failed")` and call `handler(vscode.Uri.file("/repo"))`                           | External - GitKeizuView.createOrShow failure                               | The command handler throws the same `Error("show failed")`. `activate` adds no try/catch                                                                                                        | L33-L40          |
 
-## S4: activate 設定変更イベントのルーティング
+## S3: activate git-keizu.clearAvatarCache command
+
+> Origin: test-plan (既存コード分析)
+> Added: 2026-03-22
+> Status: active
+> Supersedes: -
+
+**Signature**: `() => void`
+**Target path**: `src/extension.ts:42-44`
+
+| Case ID | Input / Precondition                                                                                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                        | Notes   |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| TC-011  | Capture the `handler` of `registerCommand("git-keizu.clearAvatarCache", handler)` during `activate` and spy on `avatarManager.clearCache` | Normal - standard                                                          | Calling `handler()` calls `avatarManager.clearCache()` exactly once. The return value is not used, and there are no other side effects | L42-L44 |
+| TC-012  | `avatarManager.clearCache` throws `Error("clear failed")` synchronously                                                                   | External - AvatarManager.clearCache failure                                | `handler()` throws the same `Error("clear failed")`. The command handler does not swallow the exception                                | L43     |
+
+## S4: activate routing of configuration change events
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
@@ -64,50 +64,50 @@
 > Superseded By: S7
 > Supersedes: -
 
-**シグネチャ**: `(e: vscode.ConfigurationChangeEvent) => void`
-**テスト対象パス**: `src/extension.ts:49-59`
+**Signature**: `(e: vscode.ConfigurationChangeEvent) => void`
+**Target path**: `src/extension.ts:49-59`
 
-| Case ID | Input / Precondition                                                                                                                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                             | Notes   |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| TC-013  | `activate` 実行時に `onDidChangeConfiguration(handler)` の `handler` を捕捉し、`e.affectsConfiguration("git-keizu.showStatusBarItem")` のみ `true` を返すイベントを渡す | Normal - branch                                                            | `statusBarItem.refresh()` が 1 回呼ばれ、`dataSource.generateGitCommandFormats()`、`repoManager.maxDepthOfRepoSearchChanged()`、`dataSource.registerGitPath()` は呼ばれない | L50-L51 |
-| TC-014  | 先頭分岐だけ `false`、`e.affectsConfiguration("git-keizu.dateType")` のみ `true` を返す                                                                                 | Normal - branch                                                            | `dataSource.generateGitCommandFormats()` が 1 回呼ばれ、他の 3 ハンドラは呼ばれない                                                                                         | L52-L53 |
-| TC-015  | 先頭 2 分岐を `false`、`e.affectsConfiguration("git-keizu.maxDepthOfRepoSearch")` のみ `true` を返す                                                                    | Normal - branch                                                            | `repoManager.maxDepthOfRepoSearchChanged()` が 1 回呼ばれ、他の 3 ハンドラは呼ばれない                                                                                      | L54-L55 |
-| TC-016  | 先頭 3 分岐を `false`、`e.affectsConfiguration("git.path")` のみ `true` を返す                                                                                          | Normal - branch                                                            | `dataSource.registerGitPath()` が 1 回呼ばれ、他の 3 ハンドラは呼ばれない                                                                                                   | L56-L57 |
-| TC-017  | 監視対象 4 キーすべてに対して `e.affectsConfiguration(...)` が `false` を返す                                                                                           | Normal - no-op                                                             | 4 つのハンドラはいずれも呼ばれず、リスナーは副作用なしで終了する                                                                                                            | L50-L57 |
-| TC-018  | `e.affectsConfiguration("git-keizu.showStatusBarItem")` と `e.affectsConfiguration("git-keizu.dateType")` の両方が `true` を返す                                        | Boundary - overlapping configuration matches                               | `else if` 連鎖のため `statusBarItem.refresh()` だけが呼ばれ、`dataSource.generateGitCommandFormats()` は呼ばれない。優先順位が先頭条件に固定される                          | L50-L53 |
-| TC-019  | `e.affectsConfiguration("git-keizu.showStatusBarItem")` が `true` で、`statusBarItem.refresh` が `Error("refresh failed")` を送出する                                   | External - configuration handler failure                                   | 設定変更リスナーが同じ `Error("refresh failed")` を送出し、後続の `else if` 分岐は評価されない                                                                              | L50-L51 |
+| Case ID | Input / Precondition                                                                                                                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                       | Notes   |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| TC-013  | Capture the `handler` of `onDidChangeConfiguration(handler)` during `activate` and pass an event where only `e.affectsConfiguration("git-keizu.showStatusBarItem")` returns `true` | Normal - branch                                                            | `statusBarItem.refresh()` is called once, and `dataSource.generateGitCommandFormats()`, `repoManager.maxDepthOfRepoSearchChanged()` and `dataSource.registerGitPath()` are not called | L50-L51 |
+| TC-014  | Only the first branch is `false`, and only `e.affectsConfiguration("git-keizu.dateType")` returns `true`                                                                           | Normal - branch                                                            | `dataSource.generateGitCommandFormats()` is called once, and the other 3 handlers are not called                                                                                      | L52-L53 |
+| TC-015  | The first 2 branches are `false`, and only `e.affectsConfiguration("git-keizu.maxDepthOfRepoSearch")` returns `true`                                                               | Normal - branch                                                            | `repoManager.maxDepthOfRepoSearchChanged()` is called once, and the other 3 handlers are not called                                                                                   | L54-L55 |
+| TC-016  | The first 3 branches are `false`, and only `e.affectsConfiguration("git.path")` returns `true`                                                                                     | Normal - branch                                                            | `dataSource.registerGitPath()` is called once, and the other 3 handlers are not called                                                                                                | L56-L57 |
+| TC-017  | `e.affectsConfiguration(...)` returns `false` for all 4 watched keys                                                                                                               | Normal - no-op                                                             | None of the 4 handlers is called, and the listener ends with no side effects                                                                                                          | L50-L57 |
+| TC-018  | Both `e.affectsConfiguration("git-keizu.showStatusBarItem")` and `e.affectsConfiguration("git-keizu.dateType")` return `true`                                                      | Boundary - overlapping configuration matches                               | Because of the `else if` chain, only `statusBarItem.refresh()` is called and `dataSource.generateGitCommandFormats()` is not. Priority is fixed to the first condition                | L50-L53 |
+| TC-019  | `e.affectsConfiguration("git-keizu.showStatusBarItem")` is `true` and `statusBarItem.refresh` throws `Error("refresh failed")`                                                     | External - configuration handler failure                                   | The configuration change listener throws the same `Error("refresh failed")`, and the following `else if` branches are not evaluated                                                   | L50-L51 |
 
-## S6: activate showRecentActions 設定変更通知
+## S6: activate notification of showRecentActions setting changes
 
 > Origin: Feature 039 (show-recent-actions-runtime-sync) (light-spec-plan)
 > Added: 2026-05-10
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `(e: vscode.ConfigurationChangeEvent) => void`
-**テスト対象パス**: `src/extension.ts:60-62`
+**Signature**: `(e: vscode.ConfigurationChangeEvent) => void`
+**Target path**: `src/extension.ts:60-62`
 
-| Case ID | Input / Precondition                                                                                                                                                                                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                             | Notes   |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
-| TC-021  | `activate` 実行時に `onDidChangeConfiguration(handler)` の `handler` を捕捉し、`GitKeizuView.currentPanel` をモック panel に差し替えた上で、`e.affectsConfiguration("git-keizu.menu.showRecentActions")` のみ `true` を返すイベントを渡す | Normal - branch                                                            | `GitKeizuView.currentPanel.notifyShowRecentActionsChanged()` が 1 回呼ばれる。`statusBarItem.refresh()`、`dataSource.generateGitCommandFormats()`、`repoManager.maxDepthOfRepoSearchChanged()`、`dataSource.registerGitPath()` は呼ばれない | L60-L62 |
-| TC-022  | `e.affectsConfiguration("git-keizu.showStatusBarItem")` と `e.affectsConfiguration("git-keizu.menu.showRecentActions")` の両方が `true` を返し、`GitKeizuView.currentPanel` がモック panel に差し替えられている                           | Boundary - overlapping configuration matches                               | `else if` 連鎖の優先順位通り `statusBarItem.refresh()` が 1 回呼ばれ、その後段の独立 `if` で `notifyShowRecentActionsChanged()` も 1 回呼ばれる                                                                                             | L50-L62 |
-| TC-023  | `GitKeizuView.currentPanel` が `undefined` の状態で `e.affectsConfiguration("git-keizu.menu.showRecentActions")` のみ `true` を返すイベントを渡す                                                                                         | Boundary - panel not opened                                                | `notifyShowRecentActionsChanged()` 呼び出しは `?.` でショートサーキットされ、例外は発生せず副作用もない                                                                                                                                     | L60-L62 |
+| Case ID | Input / Precondition                                                                                                                                                                                                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                 | Notes   |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
+| TC-021  | Capture the `handler` of `onDidChangeConfiguration(handler)` during `activate`, replace `GitKeizuView.currentPanel` with a mock panel, and pass an event where only `e.affectsConfiguration("git-keizu.menu.showRecentActions")` returns `true` | Normal - branch                                                            | `GitKeizuView.currentPanel.notifyShowRecentActionsChanged()` is called once. `statusBarItem.refresh()`, `dataSource.generateGitCommandFormats()`, `repoManager.maxDepthOfRepoSearchChanged()` and `dataSource.registerGitPath()` are not called | L60-L62 |
+| TC-022  | Both `e.affectsConfiguration("git-keizu.showStatusBarItem")` and `e.affectsConfiguration("git-keizu.menu.showRecentActions")` return `true`, and `GitKeizuView.currentPanel` is replaced with a mock panel                                      | Boundary - overlapping configuration matches                               | Following the priority of the `else if` chain, `statusBarItem.refresh()` is called once, and the separate `if` after it also calls `notifyShowRecentActionsChanged()` once                                                                      | L50-L62 |
+| TC-023  | With `GitKeizuView.currentPanel` set to `undefined`, pass an event where only `e.affectsConfiguration("git-keizu.menu.showRecentActions")` returns `true`                                                                                       | Boundary - panel not opened                                                | The `notifyShowRecentActionsChanged()` call short-circuits on `?.`, with no exception and no side effects                                                                                                                                       | L60-L62 |
 
-## S5: deactivate no-op 終了
+## S5: deactivate no-op exit
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `deactivate()`
-**テスト対象パス**: `src/extension.ts:66-66`
+**Signature**: `deactivate()`
+**Target path**: `src/extension.ts:66-66`
 
-| Case ID | Input / Precondition                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                    | Notes |
-| ------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- | ----- |
-| TC-020  | `activate` 実行前後のどちらでも `deactivate()` を 1 回以上呼ぶ | Normal - standard                                                          | `deactivate()` は `undefined` を返し、VS Code API や import 済み依存に対する追加呼び出しを行わない。複数回呼んでも例外は発生しない | L66   |
+| Case ID | Input / Precondition                                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                         | Notes |
+| ------- | ------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| TC-020  | Call `deactivate()` one or more times, either before or after `activate` | Normal - standard                                                          | `deactivate()` returns `undefined` and makes no further calls to the VS Code API or imported dependencies. Calling it several times throws no exception | L66   |
 
-## S7: activate 設定変更イベントのルーティング（独立 if 分解）
+## S7: activate routing of configuration change events (split into independent ifs)
 
 > Origin: フェーズ3 修正 L6 (config-change-independent-if)
 > Added: 2026-07-04T04:29:24Z
@@ -116,113 +116,113 @@
 > Signature: `(e: vscode.ConfigurationChangeEvent) => void`
 > Target Path: `src/extension.ts:49-59`
 
-`showStatusBarItem` / `dateType` / `maxDepthOfRepoSearch` / `git.path` の設定変更ハンドラを `else if` 連鎖から独立した `if` 文の並びへ分解する修正。複数の設定キーが同一の変更イベントで同時に `affectsConfiguration` を満たす場合に、旧 `else if` 連鎖では先頭一致のハンドラのみ実行されていたが、独立 `if` により該当する全ハンドラが実行される。S4 の `else if` 排他前提（TC-018）を置き換える。
+A fix that splits the configuration change handlers for `showStatusBarItem` / `dateType` / `maxDepthOfRepoSearch` / `git.path` from an `else if` chain into a sequence of independent `if` statements. When several setting keys satisfy `affectsConfiguration` in the same change event, the old `else if` chain ran only the first matching handler; with independent `if`s, every matching handler runs. This replaces the `else if` exclusivity assumption of S4 (TC-018).
 
-| Case ID | Input / Precondition                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                    | Notes                 |
-| ------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| TC-024  | `e.affectsConfiguration("git-keizu.showStatusBarItem")` のみ `true`                          | Normal - single key statusBar                                              | `statusBarItem.refresh()` が1回呼ばれ、他3ハンドラは呼ばれない                                                                                     | L50-51                |
-| TC-025  | `e.affectsConfiguration("git-keizu.dateType")` のみ `true`                                   | Normal - single key dateType                                               | `dataSource.generateGitCommandFormats()` が1回呼ばれ、他3ハンドラは呼ばれない                                                                      | L52-53                |
-| TC-026  | `e.affectsConfiguration("git-keizu.maxDepthOfRepoSearch")` のみ `true`                       | Normal - single key maxDepth                                               | `repoManager.maxDepthOfRepoSearchChanged()` が1回呼ばれ、他3ハンドラは呼ばれない                                                                   | L54-55                |
-| TC-027  | `e.affectsConfiguration("git.path")` のみ `true`                                             | Normal - single key gitPath                                                | `dataSource.registerGitPath()` が1回呼ばれ、他3ハンドラは呼ばれない                                                                                | L56-57                |
-| TC-028  | 監視対象4キーすべてに対し `affectsConfiguration` が `false`                                  | Boundary - no matching key                                                 | 4ハンドラいずれも呼ばれず、副作用なしで終了する                                                                                                    | L50-57                |
-| TC-029  | `showStatusBarItem` と `dateType` の両方が `true`                                            | Boundary - overlapping configuration matches                               | 独立 `if` により `statusBarItem.refresh()` と `dataSource.generateGitCommandFormats()` が**両方**1回ずつ呼ばれる（旧 `else if` では refresh のみ） | L50-53。L6 の中核挙動 |
-| TC-030  | 監視対象4キーすべてが `true`                                                                 | Boundary - all keys match                                                  | `refresh()` / `generateGitCommandFormats()` / `maxDepthOfRepoSearchChanged()` / `registerGitPath()` の4ハンドラすべてが1回ずつ呼ばれる             | L50-57                |
-| TC-031  | `showStatusBarItem` が `true` で `statusBarItem.refresh` が `Error("refresh failed")` を送出 | Exception - handler failure propagates                                     | リスナが同じ `Error("refresh failed")` を送出し、後続の独立 `if`（`dateType` 等）は例外伝播により評価されない                                      | L50-51                |
+| Case ID | Input / Precondition                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                       | Notes                        |
+| ------- | ------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| TC-024  | Only `e.affectsConfiguration("git-keizu.showStatusBarItem")` is `true`                     | Normal - single key statusBar                                              | `statusBarItem.refresh()` is called once, and the other 3 handlers are not called                                                                                     | L50-51                       |
+| TC-025  | Only `e.affectsConfiguration("git-keizu.dateType")` is `true`                              | Normal - single key dateType                                               | `dataSource.generateGitCommandFormats()` is called once, and the other 3 handlers are not called                                                                      | L52-53                       |
+| TC-026  | Only `e.affectsConfiguration("git-keizu.maxDepthOfRepoSearch")` is `true`                  | Normal - single key maxDepth                                               | `repoManager.maxDepthOfRepoSearchChanged()` is called once, and the other 3 handlers are not called                                                                   | L54-55                       |
+| TC-027  | Only `e.affectsConfiguration("git.path")` is `true`                                        | Normal - single key gitPath                                                | `dataSource.registerGitPath()` is called once, and the other 3 handlers are not called                                                                                | L56-57                       |
+| TC-028  | `affectsConfiguration` is `false` for all 4 watched keys                                   | Boundary - no matching key                                                 | None of the 4 handlers is called, and it ends with no side effects                                                                                                    | L50-57                       |
+| TC-029  | Both `showStatusBarItem` and `dateType` are `true`                                         | Boundary - overlapping configuration matches                               | With independent `if`s, `statusBarItem.refresh()` and `dataSource.generateGitCommandFormats()` are **both** called once each (the old `else if` called only refresh)  | L50-53. Core behaviour of L6 |
+| TC-030  | All 4 watched keys are `true`                                                              | Boundary - all keys match                                                  | All 4 handlers `refresh()` / `generateGitCommandFormats()` / `maxDepthOfRepoSearchChanged()` / `registerGitPath()` are called once each                               | L50-57                       |
+| TC-031  | `showStatusBarItem` is `true` and `statusBarItem.refresh` throws `Error("refresh failed")` | Exception - handler failure propagates                                     | The listener throws the same `Error("refresh failed")`, and the following independent `if`s (`dateType` and so on) are not evaluated because the exception propagates | L50-51                       |
 
-## S8: activate() 非同期化と初回 git path 解決の待機
+## S8: activate() made async and waits for the first git path resolution
 
 > Origin: Feature 045 (defensive-fixes) (light-spec-plan)
 > Added: 2026-07-19
 > Status: active
 > Supersedes: -
 > Signature: `export async function activate(context: vscode.ExtensionContext): Promise<void>`
-> Target Path: `src/extension.ts:10-61`（現行実装位置。修正後に更新）
+> Target Path: `src/extension.ts:10-61` (current implementation location; update after the fix)
 
-`activate()` を async 化し、初回 `dataSource.registerGitPath()` の resolve 完了を await してから `AvatarManager` / `RepoManager` 等の依存 manager を構築する修正。resolver 完了前に `RepoManager` が Git command を開始しないことを保証する（[1] の activation 境界）。`git.path` 設定変更時の再解決呼び出し（TC-027）は既存 S7 の観点を維持する。
+A fix that makes `activate()` async and awaits the first `dataSource.registerGitPath()` to resolve before building dependent managers such as `AvatarManager` / `RepoManager`. It guarantees that `RepoManager` does not start Git commands before the resolver finishes (the activation boundary of [1]). The re-resolution call on a `git.path` setting change (TC-027) keeps the existing S7 perspective.
 
-| Case ID | Input / Precondition                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                            | Notes                      |
-| ------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| TC-032  | `dataSource.registerGitPath` が resolve する Promise を返すモックで `activate(context)` を await    | Normal - 解決後の依存構築                                                  | `registerGitPath()` の resolve 後に `RepoManager` / `AvatarManager` のコンストラクタが呼ばれ（call order 検証）、`activate` の戻り Promise が resolve する | 初回解決の await           |
-| TC-033  | `dataSource.registerGitPath` が pending（未解決）の Promise を返す状態で `activate(context)` を呼ぶ | Boundary - 解決前は依存未構築                                              | マイクロタスク flush 後も `RepoManager` コンストラクタの呼び出しが 0 回である（resolver 完了前に Git command を開始する manager が構築されない）           | 解決待ちのブロッキング検証 |
+| Case ID | Input / Precondition                                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                       | Notes                                        |
+| ------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| TC-032  | Await `activate(context)` with `dataSource.registerGitPath` mocked to return a Promise that resolves | Normal - dependencies built after resolution                               | The constructors of `RepoManager` / `AvatarManager` are called after `registerGitPath()` resolves (call order check), and the Promise returned by `activate` resolves | Awaits the first resolution                  |
+| TC-033  | Call `activate(context)` with `dataSource.registerGitPath` returning a pending (unresolved) Promise  | Boundary - dependencies not built before resolution                        | Even after flushing microtasks, the `RepoManager` constructor is called 0 times (no manager that starts Git commands is built before the resolver finishes)           | Checks blocking while waiting for resolution |
 
-## S9: DiffDocProvider / AvatarManager の subscriptions 登録
+## S9: DiffDocProvider / AvatarManager registered in subscriptions
 
 > Origin: Feature 045 (defensive-fixes) (light-spec-plan)
 > Added: 2026-07-19
 > Status: active
 > Supersedes: -
-> Signature: `activate()` 内の provider 生成・登録処理
-> Target Path: `src/extension.ts:45-48`（現行 provider 登録位置。修正後に更新）
+> Signature: provider creation and registration inside `activate()`
+> Target Path: `src/extension.ts:45-48` (current provider registration location; update after the fix)
 
-`DiffDocProvider` インスタンスを変数に保持し、provider 本体と `registerTextDocumentContentProvider` が返す登録解除 Disposable の両方を `context.subscriptions` へ登録する。`AvatarManager` も subscriptions へ登録する（[12][13] の extension 側）。manager 内部の dispose 分岐は各 owner（`src/diffDocProvider-test.md` / `src/avatarManager-test.md`）の責務。
+Keeps the `DiffDocProvider` instance in a variable and registers both the provider itself and the unregister Disposable returned by `registerTextDocumentContentProvider` in `context.subscriptions`. `AvatarManager` is also registered in subscriptions (the extension side of [12][13]). The dispose branches inside each manager belong to their owners (`src/diffDocProvider-test.md` / `src/avatarManager-test.md`).
 
-| Case ID | Input / Precondition                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                     | Notes                                |
-| ------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
-| TC-034  | `activate(context)` 完了後の `context.subscriptions`           | Normal - provider 本体の登録                                               | subscriptions に生成された `DiffDocProvider` インスタンスそのもの（同一参照の厳密一致）が含まれる                   | 登録解除 Disposable だけの登録は不可 |
-| TC-035  | 同上                                                           | Normal - 登録解除 Disposable の登録                                        | `registerTextDocumentContentProvider` が返した Disposable が provider 本体とは別要素として subscriptions に含まれる | 両方の登録                           |
-| TC-036  | 同上                                                           | Normal - AvatarManager の登録                                              | subscriptions に `AvatarManager` インスタンス（同一参照の厳密一致）が含まれる                                       | -                                    |
-| TC-037  | `activate` 完了後、subscriptions の全要素の `dispose()` を実行 | Normal - dispose 伝播                                                      | `DiffDocProvider.dispose()` と `AvatarManager.dispose()` が各1回呼ばれる                                            | deactivate 相当での解放              |
+| Case ID | Input / Precondition                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                      | Notes                                                    |
+| ------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------- |
+| TC-034  | `context.subscriptions` after `activate(context)` completes                   | Normal - the provider itself is registered                                 | subscriptions contains the created `DiffDocProvider` instance itself (strict match on the same reference)                            | Registering only the unregister Disposable is not enough |
+| TC-035  | Same as above                                                                 | Normal - the unregister Disposable is registered                           | The Disposable returned by `registerTextDocumentContentProvider` is in subscriptions as an element separate from the provider itself | Both registered                                          |
+| TC-036  | Same as above                                                                 | Normal - AvatarManager is registered                                       | subscriptions contains the `AvatarManager` instance (strict match on the same reference)                                             | -                                                        |
+| TC-037  | After `activate` completes, run `dispose()` on every element of subscriptions | Normal - dispose propagates                                                | `DiffDocProvider.dispose()` and `AvatarManager.dispose()` are each called once                                                       | Release equivalent to deactivate                         |
 
-### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S8〜S9）
+### Failure-source inventory (include-or-justify) — added by Feature 045 (S8 to S9)
 
-| 失敗源                                                  | 対応ケースまたは除外理由                                                                    |
-| ------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| activation が git path 解決を待たない（配列クラッシュ） | TC-032、TC-033                                                                              |
-| resolver 完了前の Git command 開始                      | TC-033                                                                                      |
-| provider 本体の登録漏れ（購読リーク）                   | TC-034、TC-037                                                                              |
-| 登録解除 Disposable の登録漏れ                          | TC-035                                                                                      |
-| AvatarManager の登録漏れ（timer リーク）                | TC-036、TC-037                                                                              |
-| activation 中の依存初期化失敗                           | excluded(既存 S1 TC-002〜TC-005 が External 失敗経路を担保済み。本変更で分岐を追加しない)   |
-| resolver の reject                                      | excluded(resolver は最終フォールバック `git` を返し reject しない契約。gitExecutable owner) |
+| Failure source                                                 | Covering cases or reason for exclusion                                                                          |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Activation does not wait for git path resolution (array crash) | TC-032, TC-033                                                                                                  |
+| Git commands start before the resolver finishes                | TC-033                                                                                                          |
+| The provider itself is not registered (subscription leak)      | TC-034, TC-037                                                                                                  |
+| The unregister Disposable is not registered                    | TC-035                                                                                                          |
+| AvatarManager is not registered (timer leak)                   | TC-036, TC-037                                                                                                  |
+| Dependency initialisation fails during activation              | excluded(the existing S1 TC-002 to TC-005 already cover the External failure paths. This change adds no branch) |
+| The resolver rejects                                           | excluded(the resolver's contract is to return the final fallback `git` and never reject. gitExecutable owner)   |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(S8〜S9 の対象は初期化順序と登録の契約であり、入力検証分岐が存在しない)
-- Exception: excluded(新規 throw 分岐なし。既存の例外伝播は S1 TC-002〜TC-005 で担保済み)
-- External: excluded(vscode API 失敗は既存 S1 の External ケースで担保済み。本変更で失敗モードを追加しない)
+- Validation: excluded(S8 to S9 cover the initialisation order and the registration contract, and there is no input validation branch)
+- Exception: excluded(no new throw branch. Existing exception propagation is covered by S1 TC-002 to TC-005)
+- External: excluded(vscode API failures are covered by the existing External cases of S1. This change adds no failure mode)
 - Boundary: TC-033
-- Type: excluded(登録要素の型は TypeScript コンパイル時に保証され、実行時の型分岐が存在しない)
+- Type: excluded(the types of registered elements are guaranteed by TypeScript at compile time, and there is no runtime type branch)
 
-数値・空値境界（0 / minimum / maximum / +/-1 / empty / NULL）は、本セクションの対象が初期化順序と subscriptions 構成の契約であり仕様上意味を持たないため対象外とする（意味のある境界は「解決前」の TC-033 で充足）。
+Numeric and empty boundaries (0 / minimum / maximum / +/-1 / empty / NULL) are out of scope because this section covers the contract of the initialisation order and the subscriptions makeup, where they have no meaning in the spec (the meaningful boundary, "before resolution", is covered by TC-033).
 
-**失敗系/正常系比（煙感知器）**: 正常系5件（TC-032、TC-034〜TC-037）、失敗系1件（TC-033）。比0.2 と低いためインベントリを再導出したが、本変更の失敗源（await 漏れ・登録漏れ・dispose 未伝播）はいずれも「正常契約の存在検証」で検出される退行であり、独立した失敗分岐は「解決前」（TC-033）のみである。activation 失敗系は既存 S1 の External 4件が担保していることを確認した。
+**Failure/normal ratio (smoke detector)**: 5 normal cases (TC-032, TC-034 to TC-037), 1 failure case (TC-033). The ratio of 0.2 is low, so the inventory was derived again. The failure sources of this change (missing await, missing registration, dispose not propagated) are all regressions detected by "checking that the normal contract exists", and the only independent failure branch is "before resolution" (TC-033). It was confirmed that the 4 existing External cases of S1 cover activation failures.
 
-## S10: activate git-keizu.view コマンドの Promise 返却と reject 伝播
+## S10: activate git-keizu.view command returns a Promise and propagates rejection
 
 > Origin: Feature 057 (multi-repo-single-folder-workspace) issue #49
 > Added: 2026-09-12
 > Status: active
 > Supersedes: -
-> Signature: `(arg?: unknown) => Promise<void>`（`git-keizu.view`ハンドラ）
-> Target Path: `src/extension.ts:24-44`（修正後に更新）
+> Signature: `(arg?: unknown) => Promise<void>` (the `git-keizu.view` handler)
+> Target Path: `src/extension.ts:24-44` (update after the fix)
 > Test File: `tests/src/extension.test.ts`
 
-ハンドラは`return GitKeizuView.createOrShow(...)`とし、try/catchを追加しない。同期throwもrejectもVS Codeのコマンド実行系へそのまま伝播させる。S2 TC-010（同期throwの伝播）は`return`後も成立するため維持する。`createOrShow()`内部の登録待ちはgitGraphView ownerの責務で本表には含めない。
+The handler does `return GitKeizuView.createOrShow(...)` and adds no try/catch. Both a synchronous throw and a rejection propagate unchanged to the VS Code command execution. S2 TC-010 (propagation of a synchronous throw) still holds after the `return`, so it is kept. Waiting for registration inside `createOrShow()` belongs to the gitGraphView owner and is not in this table.
 
-| Case ID | Input / Precondition                                                                                                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                        | Notes                    |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------ |
-| TC-038  | `createOrShow`モックが`Promise.resolve(undefined)`の特定インスタンス`expectedPromise`を返す状態で、捕捉した`handler`を`vscode.Uri.file("/repo")`で呼ぶ | Normal - Promiseの返却                                                     | `handler(...)`の戻り値が`expectedPromise`と`toBe`で同一                                                | 呼び出し側が完了を待てる |
-| TC-039  | `createOrShow`モックが`Promise.reject(new Error("show failed"))`を返す状態で`handler(vscode.Uri.file("/repo"))`を呼ぶ                                  | External - rejectの伝播                                                    | `await expect(handler(...)).rejects.toThrow("show failed")`。`activate`側で追加のtry/catchは行われない | 握りつぶさない           |
+| Case ID | Input / Precondition                                                                                                                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                           | Notes                              |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | ---------------------------------- |
+| TC-038  | With the `createOrShow` mock returning a specific instance `expectedPromise` of `Promise.resolve(undefined)`, call the captured `handler` with `vscode.Uri.file("/repo")` | Normal - returns the Promise                                               | The return value of `handler(...)` is identical to `expectedPromise` with `toBe`          | The caller can wait for completion |
+| TC-039  | With the `createOrShow` mock returning `Promise.reject(new Error("show failed"))`, call `handler(vscode.Uri.file("/repo"))`                                               | External - rejection propagates                                            | `await expect(handler(...)).rejects.toThrow("show failed")`. `activate` adds no try/catch | Not swallowed                      |
 
-### 失敗源インベントリ（include-or-justify）— Feature 057 追加分（S10）
+### Failure-source inventory (include-or-justify) — added by Feature 057 (S10)
 
-| 失敗源                                | 対応ケースまたは除外理由  |
-| ------------------------------------- | ------------------------- |
-| 戻り値の欠落（`return`を付け忘れる）  | TC-038                    |
-| rejectの握りつぶし（try/catchの追加） | TC-039                    |
-| 同期throw                             | S2 TC-010（維持）         |
-| `rootUri`解決                         | S2 TC-006〜TC-009（維持） |
+| Failure source                             | Covering cases or reason for exclusion |
+| ------------------------------------------ | -------------------------------------- |
+| Missing return value (forgetting `return`) | TC-038                                 |
+| Swallowed rejection (try/catch added)      | TC-039                                 |
+| Synchronous throw                          | S2 TC-010 (kept)                       |
+| `rootUri` resolution                       | S2 TC-006 to TC-009 (kept)             |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(引数解決はS2の責務)
-- Exception: excluded(同期throwの伝播はS2 TC-010で担保済み)
+- Validation: excluded(argument resolution is owned by S2)
+- Exception: excluded(propagation of a synchronous throw is covered by S2 TC-010)
 - External: TC-039
-- Boundary: excluded(引数解決はS2の責務)
-- Type: excluded(引数解決はS2の責務)
+- Boundary: excluded(argument resolution is owned by S2)
+- Type: excluded(argument resolution is owned by S2)
 - Normal: TC-038
 
-**失敗系/正常系比（煙感知器）**: 正常系1件（TC-038）、失敗系1件（TC-039）。本変更はハンドラの戻り値契約の追加のみで、失敗源は上表で網羅済みであることを確認した。
+**Failure/normal ratio (smoke detector)**: 1 normal case (TC-038), 1 failure case (TC-039). This change only adds the return value contract of the handler, and it was confirmed that the table above covers the failure sources.
 
 ## S11: Configuration change for `worktreePathTemplate`
 

@@ -1,4 +1,4 @@
-# テスト観点表マニフェスト: src/gitGraphView.ts
+# Test Perspectives Manifest: src/gitGraphView.ts
 
 > Source: `src/gitGraphView.ts`
 > Storage Mode: sharded
