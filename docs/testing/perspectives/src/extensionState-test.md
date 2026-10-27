@@ -1,4 +1,4 @@
-# テスト観点表: src/extensionState.ts
+# Test Perspectives: src/extensionState.ts
 
 > Source: `src/extensionState.ts`
 > Generated: 2026-03-22T13:23:24Z
@@ -12,13 +12,13 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `constructor(context: ExtensionContext)`
-**テスト対象パス**: `src/extensionState.ts:20-26`
+**Signature**: `constructor(context: ExtensionContext)`
+**Target path**: `src/extensionState.ts:20-26`
 
-| Case ID | Input / Precondition                                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                         | Notes                                      |
-| ------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| TC-001  | 有効なExtensionContext (globalState, workspaceState, globalStoragePath を持つ) | Normal - standard                                                          | `globalState`, `workspaceState`, `globalStoragePath` が正しく格納される。`globalStoragePath` は `getPathFromStr` でバックスラッシュがフォワードスラッシュに変換された値 | L21-24                                     |
-| TC-002  | 有効なExtensionContext                                                         | Normal - standard                                                          | コンストラクタ内で `initAvatarStorage()` が呼び出される（fire-and-forget）                                                                                              | L25。awaitされないため非同期完了を待たない |
+| Case ID | Input / Precondition                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                               | Notes                                                          |
+| ------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| TC-001  | Valid ExtensionContext (with globalState, workspaceState, globalStoragePath) | Normal - standard                                                          | `globalState`, `workspaceState`, `globalStoragePath` are stored correctly. `globalStoragePath` is the value with backslashes converted to forward slashes by `getPathFromStr` | L21-24                                                         |
+| TC-002  | Valid ExtensionContext                                                       | Normal - standard                                                          | `initAvatarStorage()` is called inside the constructor (fire-and-forget)                                                                                                      | L25. Not awaited, so it does not wait for the async completion |
 
 ## S2: initAvatarStorage (private)
 
@@ -27,16 +27,16 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `private async initAvatarStorage(): Promise<void>`
-**テスト対象パス**: `src/extensionState.ts:28-41`
+**Signature**: `private async initAvatarStorage(): Promise<void>`
+**Target path**: `src/extensionState.ts:28-41`
 
-| Case ID | Input / Precondition                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                         | Notes  |
-| ------- | -------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- | ------ |
-| TC-003  | アバターディレクトリが既に存在する (fs.stat 成功)              | Normal - standard                                                          | `avatarStorageAvailable` が `true` になる。`fs.mkdir` は呼ばれない                                      | L31-32 |
-| TC-004  | アバターディレクトリが存在しない (fs.stat 失敗)、fs.mkdir 成功 | Normal - standard                                                          | `avatarStorageAvailable` が `true` になる。`fs.mkdir` が `{ recursive: true }` オプション付きで呼ばれる | L33-36 |
-| TC-005  | fs.stat 失敗 かつ fs.mkdir 失敗                                | Validation - rejected precondition                                         | `avatarStorageAvailable` は初期値 `false` のまま。例外は握りつぶされサイレント失敗                      | L37-39 |
-| TC-006  | fs.stat がエラーをスロー                                       | External - fs.stat failure                                                 | 外側catchブロックに入り、fs.mkdir によるフォールバック作成が試みられる                                  | L33    |
-| TC-007  | fs.mkdir がエラーをスロー                                      | External - fs.mkdir failure                                                | 内側catchブロックに入り、`avatarStorageAvailable` は `false` のまま                                     | L37    |
+| Case ID | Input / Precondition                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                               | Notes  |
+| ------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------ |
+| TC-003  | The avatar directory already exists (fs.stat succeeds)                 | Normal - standard                                                          | `avatarStorageAvailable` becomes `true`. `fs.mkdir` is not called                                             | L31-32 |
+| TC-004  | The avatar directory does not exist (fs.stat fails), fs.mkdir succeeds | Normal - standard                                                          | `avatarStorageAvailable` becomes `true`. `fs.mkdir` is called with the `{ recursive: true }` option           | L33-36 |
+| TC-005  | fs.stat fails and fs.mkdir fails                                       | Validation - rejected precondition                                         | `avatarStorageAvailable` stays at its initial value `false`. The exception is swallowed and it fails silently | L37-39 |
+| TC-006  | fs.stat throws an error                                                | External - fs.stat failure                                                 | Enters the outer catch block and tries to create the directory with fs.mkdir as a fallback                    | L33    |
+| TC-007  | fs.mkdir throws an error                                               | External - fs.mkdir failure                                                | Enters the inner catch block, and `avatarStorageAvailable` stays `false`                                      | L37    |
 
 ## S3: getRepos
 
@@ -45,13 +45,13 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `public getRepos(): GitRepoSet`
-**テスト対象パス**: `src/extensionState.ts:44-46`
+**Signature**: `public getRepos(): GitRepoSet`
+**Target path**: `src/extensionState.ts:44-46`
 
-| Case ID | Input / Precondition                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                     | Notes                          |
-| ------- | --------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------ |
-| TC-008  | workspaceState に GitRepoSet が保存されている | Normal - standard                                                          | 保存された GitRepoSet オブジェクトが返される。`workspaceState.get` が `"repoStates"` キーで呼ばれる | L45                            |
-| TC-009  | workspaceState に値なし                       | Boundary - empty                                                           | デフォルト値 `{}` が返される                                                                        | L45。第2引数 `{}` がデフォルト |
+| Case ID | Input / Precondition                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                      | Notes                                        |
+| ------- | ---------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| TC-008  | A GitRepoSet is stored in workspaceState | Normal - standard                                                          | The stored GitRepoSet object is returned. `workspaceState.get` is called with the `"repoStates"` key | L45                                          |
+| TC-009  | No value in workspaceState               | Boundary - empty                                                           | The default value `{}` is returned                                                                   | L45. The second argument `{}` is the default |
 
 ## S4: saveRepos
 
@@ -60,13 +60,13 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `public saveRepos(gitRepoSet: GitRepoSet): void`
-**テスト対象パス**: `src/extensionState.ts:47-49`
+**Signature**: `public saveRepos(gitRepoSet: GitRepoSet): void`
+**Target path**: `src/extensionState.ts:47-49`
 
-| Case ID | Input / Precondition      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                       | Notes |
-| ------- | ------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----- |
-| TC-010  | エントリを持つ GitRepoSet | Normal - standard                                                          | `workspaceState.update` が `("repoStates", gitRepoSet)` で1回呼ばれる | L48   |
-| TC-011  | 空オブジェクト `{}`       | Boundary - empty                                                           | `workspaceState.update` が `("repoStates", {})` で1回呼ばれる         | L48   |
+| Case ID | Input / Precondition      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                          | Notes |
+| ------- | ------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ----- |
+| TC-010  | A GitRepoSet with entries | Normal - standard                                                          | `workspaceState.update` is called once with `("repoStates", gitRepoSet)` | L48   |
+| TC-011  | Empty object `{}`         | Boundary - empty                                                           | `workspaceState.update` is called once with `("repoStates", {})`         | L48   |
 
 ## S5: getLastActiveRepo
 
@@ -75,13 +75,13 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `public getLastActiveRepo(): string | null`
-**テスト対象パス**: `src/extensionState.ts:52-54`
+**Signature**: `public getLastActiveRepo(): string | null`
+**Target path**: `src/extensionState.ts:52-54`
 
-| Case ID | Input / Precondition                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                           | Notes                            |
-| ------- | ----------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------- |
-| TC-012  | workspaceState にリポジトリパスが保存されている | Normal - standard                                                          | 保存された文字列パスが返される。`workspaceState.get` が `"lastActiveRepo"` キーで呼ばれる | L53                              |
-| TC-013  | workspaceState に値なし                         | Boundary - null                                                            | `null` が返される                                                                         | L53。第2引数 `null` がデフォルト |
+| Case ID | Input / Precondition                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                    | Notes                                          |
+| ------- | --------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
+| TC-012  | A repository path is stored in workspaceState | Normal - standard                                                          | The stored string path is returned. `workspaceState.get` is called with the `"lastActiveRepo"` key | L53                                            |
+| TC-013  | No value in workspaceState                    | Boundary - null                                                            | `null` is returned                                                                                 | L53. The second argument `null` is the default |
 
 ## S6: setLastActiveRepo
 
@@ -90,14 +90,14 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `public setLastActiveRepo(repo: string | null): void`
-**テスト対象パス**: `src/extensionState.ts:55-57`
+**Signature**: `public setLastActiveRepo(repo: string | null): void`
+**Target path**: `src/extensionState.ts:55-57`
 
-| Case ID | Input / Precondition                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                | Notes                     |
-| ------- | --------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------- |
-| TC-014  | repo = 有効なパス文字列 (例: "/path/to/repo") | Normal - standard                                                          | `workspaceState.update` が `("lastActiveRepo", "/path/to/repo")` で1回呼ばれる | L56                       |
-| TC-015  | repo = null                                   | Boundary - null                                                            | `workspaceState.update` が `("lastActiveRepo", null)` で1回呼ばれる            | L56                       |
-| TC-016  | repo = "" (空文字列)                          | Boundary - empty                                                           | `workspaceState.update` が `("lastActiveRepo", "")` で1回呼ばれる              | L56。型定義上は許容される |
+| Case ID | Input / Precondition                                     | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                   | Notes                               |
+| ------- | -------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------------- |
+| TC-014  | repo = a valid path string (for example "/path/to/repo") | Normal - standard                                                          | `workspaceState.update` is called once with `("lastActiveRepo", "/path/to/repo")` | L56                                 |
+| TC-015  | repo = null                                              | Boundary - null                                                            | `workspaceState.update` is called once with `("lastActiveRepo", null)`            | L56                                 |
+| TC-016  | repo = "" (empty string)                                 | Boundary - empty                                                           | `workspaceState.update` is called once with `("lastActiveRepo", "")`              | L56. Allowed by the type definition |
 
 ## S7: isAvatarStorageAvailable
 
@@ -106,13 +106,13 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `public isAvatarStorageAvailable(): boolean`
-**テスト対象パス**: `src/extensionState.ts:60-62`
+**Signature**: `public isAvatarStorageAvailable(): boolean`
+**Target path**: `src/extensionState.ts:60-62`
 
-| Case ID | Input / Precondition                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result    | Notes                                           |
-| ------- | ------------------------------------- | -------------------------------------------------------------------------- | ------------------ | ----------------------------------------------- |
-| TC-017  | initAvatarStorage が成功した状態      | Normal - standard                                                          | `true` が返される  | L61。avatarStorageAvailable = true (L32 or L36) |
-| TC-018  | 初期状態 / initAvatarStorage 失敗状態 | Normal - branch                                                            | `false` が返される | L61。初期値 false (L18)                         |
+| Case ID | Input / Precondition                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result     | Notes                                           |
+| ------- | -------------------------------------------- | -------------------------------------------------------------------------- | ------------------- | ----------------------------------------------- |
+| TC-017  | initAvatarStorage has succeeded              | Normal - standard                                                          | `true` is returned  | L61. avatarStorageAvailable = true (L32 or L36) |
+| TC-018  | Initial state / initAvatarStorage has failed | Normal - branch                                                            | `false` is returned | L61. Initial value false (L18)                  |
 
 ## S8: getAvatarStoragePath
 
@@ -121,13 +121,13 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `public getAvatarStoragePath(): string`
-**テスト対象パス**: `src/extensionState.ts:63-65`
+**Signature**: `public getAvatarStoragePath(): string`
+**Target path**: `src/extensionState.ts:63-65`
 
-| Case ID | Input / Precondition                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                           | Notes                                     |
-| ------- | ----------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------- | ----------------------------------------- |
-| TC-019  | globalStoragePath = "/storage/path" | Normal - standard                                                          | `"/storage/path/avatars"` が返される (`path.join` の結果) | L64                                       |
-| TC-020  | globalStoragePath = "" (空文字列)   | Boundary - empty                                                           | `"avatars"` が返される (`path.join("", "avatars")`)       | L64。getPathFromStrに空文字が渡された場合 |
+| Case ID | Input / Precondition                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                   | Notes                                                  |
+| ------- | ------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------ |
+| TC-019  | globalStoragePath = "/storage/path"   | Normal - standard                                                          | `"/storage/path/avatars"` is returned (the result of `path.join`) | L64                                                    |
+| TC-020  | globalStoragePath = "" (empty string) | Boundary - empty                                                           | `"avatars"` is returned (`path.join("", "avatars")`)              | L64. When an empty string was passed to getPathFromStr |
 
 ## S9: getAvatarCache
 
@@ -136,13 +136,13 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `public getAvatarCache(): AvatarCache`
-**テスト対象パス**: `src/extensionState.ts:66-68`
+**Signature**: `public getAvatarCache(): AvatarCache`
+**Target path**: `src/extensionState.ts:66-68`
 
-| Case ID | Input / Precondition                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                    | Notes                          |
-| ------- | ------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- | ------------------------------ |
-| TC-021  | globalState に AvatarCache が保存されている | Normal - standard                                                          | 保存された AvatarCache オブジェクトが返される。`globalState.get` が `"avatarCache"` キーで呼ばれる | L67                            |
-| TC-022  | globalState に値なし                        | Boundary - empty                                                           | デフォルト値 `{}` が返される                                                                       | L67。第2引数 `{}` がデフォルト |
+| Case ID | Input / Precondition                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                     | Notes                                        |
+| ------- | --------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------- |
+| TC-021  | An AvatarCache is stored in globalState | Normal - standard                                                          | The stored AvatarCache object is returned. `globalState.get` is called with the `"avatarCache"` key | L67                                          |
+| TC-022  | No value in globalState                 | Boundary - empty                                                           | The default value `{}` is returned                                                                  | L67. The second argument `{}` is the default |
 
 ## S10: saveAvatar
 
@@ -151,15 +151,15 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `public saveAvatar(email: string, avatar: Avatar): void`
-**テスト対象パス**: `src/extensionState.ts:69-73`
+**Signature**: `public saveAvatar(email: string, avatar: Avatar): void`
+**Target path**: `src/extensionState.ts:69-73`
 
-| Case ID | Input / Precondition                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                              | Notes                                     |
-| ------- | --------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| TC-023  | 新規email、キャッシュが空                           | Normal - standard                                                          | `globalState.update` が `("avatarCache", { [email]: avatar })` で呼ばれる                    | L70-72                                    |
-| TC-024  | 既にキャッシュに同一emailのエントリあり             | Normal - branch                                                            | `globalState.update` が呼ばれ、該当emailのavatarが新しい値で上書きされたキャッシュが渡される | L71。既存エントリを上書き                 |
-| TC-025  | email = "" (空文字列)                               | Boundary - empty                                                           | `globalState.update` が呼ばれ、キー `""` でavatarが保存される                                | L71。空文字列もオブジェクトキーとして有効 |
-| TC-026  | email に特殊文字を含む (例: "user+tag@example.com") | Boundary - special chars                                                   | `globalState.update` が呼ばれ、特殊文字を含むキーでavatarが正しく保存される                  | L71                                       |
+| Case ID | Input / Precondition                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                            | Notes                                           |
+| ------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| TC-023  | New email, empty cache                                                 | Normal - standard                                                          | `globalState.update` is called with `("avatarCache", { [email]: avatar })`                                 | L70-72                                          |
+| TC-024  | The cache already has an entry for the same email                      | Normal - branch                                                            | `globalState.update` is called with a cache in which that email's avatar is overwritten with the new value | L71. Overwrites the existing entry              |
+| TC-025  | email = "" (empty string)                                              | Boundary - empty                                                           | `globalState.update` is called, and the avatar is stored under the key `""`                                | L71. An empty string is also a valid object key |
+| TC-026  | email contains special characters (for example "user+tag@example.com") | Boundary - special chars                                                   | `globalState.update` is called, and the avatar is stored correctly under the key with special characters   | L71                                             |
 
 ## S11: removeAvatarFromCache
 
@@ -168,14 +168,14 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `public removeAvatarFromCache(email: string): void`
-**テスト対象パス**: `src/extensionState.ts:74-78`
+**Signature**: `public removeAvatarFromCache(email: string): void`
+**Target path**: `src/extensionState.ts:74-78`
 
-| Case ID | Input / Precondition                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                               | Notes  |
-| ------- | ----------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ------ |
-| TC-027  | キャッシュに該当emailのエントリあり | Normal - standard                                                          | `globalState.update` が呼ばれ、該当emailが除去されたキャッシュが渡される                                      | L75-77 |
-| TC-028  | キャッシュに該当emailが存在しない   | Validation - rejected precondition                                         | `globalState.update` が呼ばれるが、キャッシュ内容は変化なし。delete演算子は存在しないキーでもエラーにならない | L76    |
-| TC-029  | キャッシュが空 `{}`                 | Boundary - empty                                                           | `globalState.update` が `("avatarCache", {})` で呼ばれる                                                      | L75-77 |
+| Case ID | Input / Precondition                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                            | Notes  |
+| ------- | ------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ------ |
+| TC-027  | The cache has an entry for the email | Normal - standard                                                          | `globalState.update` is called with a cache from which the email is removed                                                | L75-77 |
+| TC-028  | The email is not in the cache        | Validation - rejected precondition                                         | `globalState.update` is called, but the cache contents do not change. The delete operator does not throw for a missing key | L76    |
+| TC-029  | Empty cache `{}`                     | Boundary - empty                                                           | `globalState.update` is called with `("avatarCache", {})`                                                                  | L75-77 |
 
 ## S12: clearAvatarCache
 
@@ -184,18 +184,18 @@
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `public async clearAvatarCache(): Promise<void>`
-**テスト対象パス**: `src/extensionState.ts:79-88`
+**Signature**: `public async clearAvatarCache(): Promise<void>`
+**Target path**: `src/extensionState.ts:79-88`
 
-| Case ID | Input / Precondition                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                     | Notes                                    |
-| ------- | --------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| TC-030  | アバターディレクトリにファイルが存在する            | Normal - standard                                                          | `globalState.update("avatarCache", {})` が呼ばれ、`fs.readdir` → 各ファイルに対して `fs.unlink` が呼ばれる          | L80, L83-84                              |
-| TC-031  | clearAvatarCache実行時の処理順序                    | Normal - standard                                                          | `globalState.update` (L80) が `fs.readdir` (L83) より先に実行される。ファイル削除失敗でもキャッシュは常にクリア済み | L80がtry外                               |
-| TC-032  | アバターディレクトリにファイルなし (空ディレクトリ) | Boundary - empty                                                           | `globalState.update("avatarCache", {})` が呼ばれ、`fs.readdir` は `[]` を返し、`fs.unlink` は呼ばれない             | L83-84。Promise.all([]) は即座に解決     |
-| TC-033  | fs.readdir がエラー (ディレクトリ不存在等)          | External - fs.readdir failure                                              | キャッシュは `globalState.update({})` でクリア済み。ファイル削除はスキップされサイレント失敗                        | L85-87。キャッシュとFSの不整合は許容     |
-| TC-034  | fs.unlink が一部ファイルで失敗                      | External - fs.unlink failure                                               | 他のファイルの `fs.unlink` は引き続き実行される (`Promise.all` + 個別 `.catch`)。キャッシュはクリア済み             | L84。`.catch(() => {})` で個別握りつぶし |
+| Case ID | Input / Precondition                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                     | Notes                                                                   |
+| ------- | -------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| TC-030  | Files exist in the avatar directory                | Normal - standard                                                          | `globalState.update("avatarCache", {})` is called, then `fs.readdir`, then `fs.unlink` for each file                | L80, L83-84                                                             |
+| TC-031  | Order of operations when running clearAvatarCache  | Normal - standard                                                          | `globalState.update` (L80) runs before `fs.readdir` (L83). The cache is always cleared even if deleting files fails | L80 is outside the try                                                  |
+| TC-032  | No files in the avatar directory (empty directory) | Boundary - empty                                                           | `globalState.update("avatarCache", {})` is called, `fs.readdir` returns `[]`, and `fs.unlink` is not called         | L83-84. Promise.all([]) resolves immediately                            |
+| TC-033  | fs.readdir errors (directory missing and the like) | External - fs.readdir failure                                              | The cache has been cleared by `globalState.update({})`. Deleting files is skipped and fails silently                | L85-87. Inconsistency between the cache and the file system is accepted |
+| TC-034  | fs.unlink fails for some files                     | External - fs.unlink failure                                               | `fs.unlink` still runs for the other files (`Promise.all` + an individual `.catch`). The cache has been cleared     | L84. Each failure is swallowed by `.catch(() => {})`                    |
 
-## S13: saveRepos recentActions 正規化
+## S13: saveRepos recentActions normalization
 
 > Origin: Feature 034 (context-menu-recent-actions) Task 2
 > Added: 2026-05-02
@@ -204,13 +204,13 @@
 > Signature: `public saveRepos(gitRepoSet: GitRepoSet): void`
 > Target Path: `src/extensionState.ts`
 
-| Case ID | Input / Precondition                                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                | Notes                    |
-| ------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------ |
-| TC-035  | `recentActions = ["commit.createBranch", "commit.createWorktree", "commit.createBranch", "ref.push"]` | Normal - dedupe order                                                      | `workspaceState.update("repoStates", ...)` に渡る `recentActions` が `["commit.createBranch", "commit.createWorktree", "ref.push"]` へ畳まれる | 先頭優先                 |
-| TC-036  | `recentActions` が 6 件以上のユニーク値を持つ                                                         | Boundary - max length                                                      | 永続化前に先頭 5 件へ切り詰められる                                                                                                            | `MAX_RECENT_ACTIONS = 5` |
-| TC-037  | repo A は `recentActions` 未定義、repo B は空配列、他の state あり                                    | Validation - empty and undefined                                           | `commitOrdering` / `fileViewType` / `columnWidths` など他フィールドは変わらず、未定義・空配列の repo state もそのまま保存できる                | 既存 state への影響なし  |
+| Case ID | Input / Precondition                                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                | Notes                       |
+| ------- | ----------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| TC-035  | `recentActions = ["commit.createBranch", "commit.createWorktree", "commit.createBranch", "ref.push"]` | Normal - dedupe order                                                      | The `recentActions` passed to `workspaceState.update("repoStates", ...)` is collapsed to `["commit.createBranch", "commit.createWorktree", "ref.push"]`        | The first occurrence wins   |
+| TC-036  | `recentActions` has 6 or more unique values                                                           | Boundary - max length                                                      | It is truncated to the first 5 before being persisted                                                                                                          | `MAX_RECENT_ACTIONS = 5`    |
+| TC-037  | repo A has `recentActions` undefined, repo B has an empty array, and there is other state             | Validation - empty and undefined                                           | Other fields such as `commitOrdering` / `fileViewType` / `columnWidths` do not change, and repo states with undefined or empty arrays can be saved as they are | No effect on existing state |
 
-## S14: waitForAvatarStorage() 初期化 Promise の完了待ち
+## S14: waitForAvatarStorage() waiting for the initialization Promise
 
 > Origin: フェーズ3 修正 L8 (avatar-storage-init-await)
 > Added: 2026-07-04T04:29:24Z
@@ -219,12 +219,12 @@
 > Signature: `constructor(context: ExtensionContext)` / `public waitForAvatarStorage(): Promise<void>`
 > Target Path: `src/extensionState.ts:20-26, 61-63`
 
-コンストラクタで fire-and-forget していた `initAvatarStorage()` の戻り Promise を `this.avatarStorageInit` に保持し、`waitForAvatarStorage()` で同 Promise を公開する修正。呼び出し側（`gitGraphView.getHtmlForWebview`）が `await` することでアバターストレージ初期化の完了後に `isAvatarStorageAvailable()` を評価できるようにする。`initAvatarStorage()` は内部で例外を握りつぶすため、返る Promise は常に resolve し reject しない。
+A fix that keeps the Promise returned by `initAvatarStorage()`, which the constructor used to fire and forget, in `this.avatarStorageInit`, and exposes that Promise through `waitForAvatarStorage()`. When the caller (`gitGraphView.getHtmlForWebview`) uses `await` on it, it can evaluate `isAvatarStorageAvailable()` after avatar storage initialization has finished. `initAvatarStorage()` swallows exceptions internally, so the returned Promise always resolves and never rejects.
 
-| Case ID | Input / Precondition                                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                             | Notes                              |
-| ------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
-| TC-038  | インスタンス生成後に `waitForAvatarStorage()` を呼ぶ                                  | Normal - returns retained promise                                          | コンストラクタで `avatarStorageInit` に代入された Promise と同一の Promise インスタンスが返る                               | `initAvatarStorage()` の戻り値保持 |
-| TC-039  | `fs.mkdir` 成功で `initAvatarStorage` が完了する状態で `await waitForAvatarStorage()` | Normal - resolves after init completes                                     | await 解決後に `isAvatarStorageAvailable()` が `true` を返す                                                                | 完了待ちによる状態確定             |
-| TC-040  | `waitForAvatarStorage()` を複数回呼ぶ                                                 | Boundary - idempotent single init                                          | 毎回同一 Promise インスタンスが返り、`initAvatarStorage`（fs.stat/mkdir）は生成時の1回のみで再実行されない                  | 初期化の単一性                     |
-| TC-041  | `fs.stat` 失敗かつ `fs.mkdir` 失敗の状態で `await waitForAvatarStorage()`             | External - init failure still resolves                                     | 返る Promise は reject せず resolve（`undefined`）し、await が throw しない。`isAvatarStorageAvailable()` は `false` のまま | 例外握りつぶしの検証               |
-| TC-042  | `initAvatarStorage` 完了後に `waitForAvatarStorage()` を呼び await                    | Boundary - already settled promise                                         | 既に settle 済みの Promise が即座に resolve し、追加の副作用（fs 呼び出し）は発生しない                                     | settle 後の再 await                |
+| Case ID | Input / Precondition                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                         | Notes                                           |
+| ------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| TC-038  | Call `waitForAvatarStorage()` after creating an instance                                      | Normal - returns retained promise                                          | The same Promise instance that the constructor assigned to `avatarStorageInit` is returned                                              | Keeps the return value of `initAvatarStorage()` |
+| TC-039  | `await waitForAvatarStorage()` where `initAvatarStorage` completes with `fs.mkdir` succeeding | Normal - resolves after init completes                                     | After the await resolves, `isAvatarStorageAvailable()` returns `true`                                                                   | State is settled by waiting for completion      |
+| TC-040  | Call `waitForAvatarStorage()` several times                                                   | Boundary - idempotent single init                                          | The same Promise instance is returned every time, and `initAvatarStorage` (fs.stat/mkdir) runs only once at creation and is not rerun   | Initialization happens only once                |
+| TC-041  | `await waitForAvatarStorage()` where `fs.stat` fails and `fs.mkdir` fails                     | External - init failure still resolves                                     | The returned Promise resolves (`undefined`) without rejecting, and the await does not throw. `isAvatarStorageAvailable()` stays `false` | Checks that exceptions are swallowed            |
+| TC-042  | Call and await `waitForAvatarStorage()` after `initAvatarStorage` has completed               | Boundary - already settled promise                                         | The already settled Promise resolves immediately, and no extra side effects (fs calls) occur                                            | Awaiting again after settling                   |

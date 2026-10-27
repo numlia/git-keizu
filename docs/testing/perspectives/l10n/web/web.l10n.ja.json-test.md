@@ -1,4 +1,4 @@
-# テスト観点表: l10n/web/web.l10n.ja.json
+# Test Perspectives: l10n/web/web.l10n.ja.json
 
 > Source: `l10n/web/web.l10n.ja.json`
 > Generated: 2026-05-17T00:00:00Z
@@ -6,7 +6,7 @@
 > Test Framework: Vitest
 > Storage Mode: single-file
 
-## S1: commit 起点 Create Branch ダイアログ翻訳 (Feature 040)
+## S1: Translation of the commit-based Create Branch dialog (Feature 040)
 
 > Origin: Feature 040 (settings-and-copy-polish) (light-spec-plan)
 > Added: 2026-05-17
@@ -15,14 +15,14 @@
 > Target Path: `l10n/web/web.l10n.ja.json`
 > Test File: `tests/web/i18n.test.ts`
 
-commit 起点の Create Branch ダイアログ翻訳キーが追加され、既存の stash 起点キーが維持されていることを検証する。
+Verifies that the translation key of the commit-based Create Branch dialog is added and the existing stash-based key is kept.
 
-| Case ID | Input / Precondition                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                        | Notes                |
-| ------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------ | -------------------- |
-| TC-001  | `Enter the name of the branch you would like to create from commit {0}:` を読み込み | Normal - new key                                                           | 「コミット」を含み `{0}` placeholder を残す日本語訳    | commit 起点キー追加  |
-| TC-002  | `Enter the name of the branch you would like to create from {0}:` を読み込み        | Normal - existing key                                                      | `{0} から作成するブランチ名を入力してください:` を返す | stash 起点キーは保護 |
+| Case ID | Input / Precondition                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                              | Notes                            |
+| ------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | -------------------------------- |
+| TC-001  | Load `Enter the name of the branch you would like to create from commit {0}:` | Normal - new key                                                           | A Japanese translation that contains 「コミット」 ("commit") and keeps the `{0}` placeholder | Commit-based key added           |
+| TC-002  | Load `Enter the name of the branch you would like to create from {0}:`        | Normal - existing key                                                      | Returns `{0} から作成するブランチ名を入力してください:`                                      | The stash-based key is protected |
 
-## S2: worktree 操作エラーの日本語翻訳キー (Feature 045)
+## S2: Japanese translation keys for worktree operation errors (Feature 045)
 
 > Origin: Feature 045 (defensive-fixes) (light-spec-plan)
 > Added: 2026-07-19
@@ -31,409 +31,409 @@ commit 起点の Create Branch ダイアログ翻訳キーが追加され、既�
 > Target Path: `l10n/web/web.l10n.ja.json`
 > Test File: `tests/web/i18n.test.ts`
 
-worktree の Open/Reveal 失敗表示に使う専用エラーキー `error.openWorktreeInNewWindow` / `error.revealWorktreeInOS` が ja bundle に追加されていることを検証する。キーの利用分岐は `web/messageHandler-test.md` S11 の責務。
+Verifies that the dedicated error keys `error.openWorktreeInNewWindow` / `error.revealWorktreeInOS`, used to show worktree Open/Reveal failures, are added to the ja bundle. The branches that use the keys are owned by `web/messageHandler-test.md` S11.
 
-| Case ID | Input / Precondition                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                            | Notes                     |
-| ------- | --------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------- | ------------------------- |
-| TC-003  | ja bundle から `error.openWorktreeInNewWindow` を読み込み | Normal - new key                                                           | キーが存在し、値が非空（`length > 0`）の日本語文字列である | Open 失敗の専用キー追加   |
-| TC-004  | ja bundle から `error.revealWorktreeInOS` を読み込み      | Normal - new key                                                           | キーが存在し、値が非空（`length > 0`）の日本語文字列である | Reveal 失敗の専用キー追加 |
+| Case ID | Input / Precondition                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                            | Notes                                  |
+| ------- | ------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------- |
+| TC-003  | Load `error.openWorktreeInNewWindow` from the ja bundle | Normal - new key                                                           | The key exists and its value is a non-empty (`length > 0`) Japanese string | Dedicated key for Open failure added   |
+| TC-004  | Load `error.revealWorktreeInOS` from the ja bundle      | Normal - new key                                                           | The key exists and its value is a non-empty (`length > 0`) Japanese string | Dedicated key for Reveal failure added |
 
-### 失敗源インベントリ（include-or-justify）— Feature 045 追加分（S2）
+### Failure-source inventory (include-or-justify) — added by Feature 045 (S2)
 
-| 失敗源                                  | 対応ケースまたは除外理由                                                       |
-| --------------------------------------- | ------------------------------------------------------------------------------ |
-| ja 側のキー欠落（片 locale のみの追加） | TC-003、TC-004（en 側は `web.l10n.en.json-test.md` TC-001〜TC-002 と対で担保） |
-| 空文字の訳値                            | TC-003、TC-004（非空検証を含む）                                               |
-| キーの利用分岐の欠落                    | excluded(`web/messageHandler-test.md` S11 TC-033/TC-035 で担保)                |
+| Failure source                                        | Case or reason for exclusion                                                                     |
+| ----------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Key missing on the ja side (added to only one locale) | TC-003, TC-004 (the en side is covered as a pair by `web.l10n.en.json-test.md` TC-001 to TC-002) |
+| Empty translated value                                | TC-003, TC-004 (include the non-empty check)                                                     |
+| Missing branch that uses the key                      | excluded(covered by `web/messageHandler-test.md` S11 TC-033/TC-035)                              |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: excluded(JSON bundle は静的データで検証分岐が存在しない。欠落・空値の検出は TC-003/TC-004 の存在・非空検証に含まれる)
-- Exception: excluded(JSON 読み込みの失敗はビルド/テスト基盤で検出され、bundle 自体に例外分岐はない)
-- External: excluded(外部依存なし)
-- Boundary: excluded(数値境界が存在しない。empty は TC-003/TC-004 の非空検証で充足)
-- Type: excluded(値は JSON string で型分岐が存在しない)
+- Validation: excluded(the JSON bundle is static data with no validation branch; missing or empty values are detected by the existence and non-empty checks of TC-003/TC-004)
+- Exception: excluded(JSON load failures are detected by the build/test infrastructure; the bundle itself has no exception branch)
+- External: excluded(no external dependency)
+- Boundary: excluded(no numeric boundary; empty is covered by the non-empty check of TC-003/TC-004)
+- Type: excluded(values are JSON strings with no type branch)
 
-**失敗系/正常系比（煙感知器）**: 正常系2件（TC-003、TC-004）、失敗系0件。静的 JSON データの存在・非空検証のみで実行分岐を持たないため、失敗系0件はインベントリ欠落ではないことを確認した。
+**Failure/normal ratio (smoke detector)**: 2 normal cases (TC-003, TC-004), 0 failure cases. Only existence and non-empty checks of static JSON data with no execution branch, so 0 failure cases was confirmed not to be a gap in the inventory.
 
-## S3: 安全な checkout と Push 先選択の日本語翻訳キー (Feature 047)
+## S3: Japanese translation keys for safe checkout and push target selection (Feature 047)
 
 > Origin: Feature 047 (safe-remote-checkout-and-explicit-push) (light-spec-plan)
 > Added: 2026-08-03
 > Status: active
 > Supersedes: -
-> Signature: 追加キー集合 `error.checkoutBranchExists` / `error.checkoutInvalidRef` / `error.pushNoRemotes` / `push.selectRemote` / `push.selectRemoteAction`
+> Signature: Added key set `error.checkoutBranchExists` / `error.checkoutInvalidRef` / `error.pushNoRemotes` / `push.selectRemote` / `push.selectRemoteAction`
 > Target Path: `l10n/web/web.l10n.ja.json`
 > Test File: `tests/web/i18n.test.ts`
 
-remote checkout の拒否理由と二段階 Push の選択 UI に使う 5 キー（`error.checkoutBranchExists` / `error.checkoutInvalidRef` / `error.pushNoRemotes` / `push.selectRemote` / `push.selectRemoteAction`）が ja bundle に追加されていることを検証する。キーの利用分岐は `web/messageHandler-test.md` S12 と `web/refMenu-test/01-branch-actions-01.md` S17 の責務。
+Verifies that the 5 keys used for remote checkout rejection reasons and the two-step Push selection UI (`error.checkoutBranchExists` / `error.checkoutInvalidRef` / `error.pushNoRemotes` / `push.selectRemote` / `push.selectRemoteAction`) are added to the ja bundle. The branches that use the keys are owned by `web/messageHandler-test.md` S12 and `web/refMenu-test/01-branch-actions-01.md` S17.
 
-| Case ID | Input / Precondition                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                   | Notes                         |
-| ------- | --------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ----------------------------- |
-| TC-005  | ja bundle から `error.checkoutBranchExists` を読み込み    | Normal - new key                                                           | キーが存在し、値が非空（`length > 0`）の日本語文字列である                                        | 既存 branch の拒否理由        |
-| TC-006  | ja bundle から `error.checkoutInvalidRef` を読み込み      | Normal - new key                                                           | キーが存在し、値が非空（`length > 0`）の日本語文字列である                                        | 不正 ref の拒否理由           |
-| TC-007  | ja bundle から `error.pushNoRemotes` を読み込み           | Normal - new key                                                           | キーが存在し、値が非空（`length > 0`）の日本語文字列である                                        | 登録済み remote なし          |
-| TC-008  | ja bundle から `push.selectRemote` を読み込み             | Normal - new key                                                           | キーが存在し、値が非空（`length > 0`）の日本語文字列である                                        | 選択ダイアログの prompt       |
-| TC-009  | ja bundle から `push.selectRemoteAction` を読み込み       | Normal - new key                                                           | キーが存在し、値が非空（`length > 0`）の日本語文字列である                                        | 選択ダイアログの action label |
-| TC-010  | ja / en 両 bundle を読み込み、上記 5 キーの集合と値を比較 | Validation - locale parity と raw key fallback の不在                      | en bundle に欠落しているキーが 0 件であり、5 キーの ja 値がいずれもキー文字列そのものと一致しない | 未翻訳の素通しを検出          |
+| Case ID | Input / Precondition                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                 | Notes                                   |
+| ------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | --------------------------------------- |
+| TC-005  | Load `error.checkoutBranchExists` from the ja bundle                               | Normal - new key                                                           | The key exists and its value is a non-empty (`length > 0`) Japanese string                      | Rejection reason for an existing branch |
+| TC-006  | Load `error.checkoutInvalidRef` from the ja bundle                                 | Normal - new key                                                           | The key exists and its value is a non-empty (`length > 0`) Japanese string                      | Rejection reason for an invalid ref     |
+| TC-007  | Load `error.pushNoRemotes` from the ja bundle                                      | Normal - new key                                                           | The key exists and its value is a non-empty (`length > 0`) Japanese string                      | No registered remote                    |
+| TC-008  | Load `push.selectRemote` from the ja bundle                                        | Normal - new key                                                           | The key exists and its value is a non-empty (`length > 0`) Japanese string                      | Prompt of the selection dialog          |
+| TC-009  | Load `push.selectRemoteAction` from the ja bundle                                  | Normal - new key                                                           | The key exists and its value is a non-empty (`length > 0`) Japanese string                      | Action label of the selection dialog    |
+| TC-010  | Load both the ja and en bundles and compare the set and values of the 5 keys above | Validation - locale parity and absence of raw key fallback                 | 0 keys are missing from the en bundle, and none of the 5 ja values equals the key string itself | Detects untranslated pass-through       |
 
-### 失敗源インベントリ（include-or-justify）— Feature 047 追加分（S3）
+### Failure-source inventory (include-or-justify) — added by Feature 047 (S3)
 
-| 失敗源                                                  | 対応ケースまたは除外理由                                                                                                            |
-| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| ja 側のキー欠落                                         | TC-005〜TC-009                                                                                                                      |
-| 片 locale だけの追加（parity 崩れ）                     | TC-010（en 側は `web.l10n.en.json-test.md` TC-008 と対で担保）                                                                      |
-| 空文字の訳値                                            | TC-005〜TC-009（非空検証を含む）                                                                                                    |
-| 未翻訳（キー文字列がそのまま値になる raw key fallback） | TC-010                                                                                                                              |
-| キーの利用分岐の欠落                                    | excluded(`web/messageHandler-test.md` S12 TC-036 / TC-037 / TC-041 と `web/refMenu-test/01-branch-actions-01.md` S17 TC-084 で担保) |
-| 境界値（0 / minimum / maximum / +/-1 / NULL）           | excluded(静的 JSON に数値境界が存在しない。empty は非空検証で充足)                                                                  |
-| 外部依存の失敗・例外送出                                | excluded(bundle は静的データで外部依存も throw 経路も持たない)                                                                      |
+| Failure source                                                         | Case or reason for exclusion                                                                                                             |
+| ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| Key missing on the ja side                                             | TC-005 to TC-009                                                                                                                         |
+| Added to only one locale (broken parity)                               | TC-010 (the en side is covered as a pair by `web.l10n.en.json-test.md` TC-008)                                                           |
+| Empty translated value                                                 | TC-005 to TC-009 (include the non-empty check)                                                                                           |
+| Untranslated (raw key fallback where the key string becomes the value) | TC-010                                                                                                                                   |
+| Missing branch that uses the key                                       | excluded(covered by `web/messageHandler-test.md` S12 TC-036 / TC-037 / TC-041 and `web/refMenu-test/01-branch-actions-01.md` S17 TC-084) |
+| Boundary values (0 / minimum / maximum / +/-1 / NULL)                  | excluded(static JSON has no numeric boundary; empty is covered by the non-empty check)                                                   |
+| External dependency failure / exception thrown                         | excluded(the bundle is static data with no external dependency or throw path)                                                            |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
 - Validation: TC-010
-- Exception: excluded(JSON 読み込みの失敗はテスト基盤で検出され、bundle 自体に例外分岐はない)
-- External: excluded(外部依存なし)
-- Boundary: excluded(数値境界が存在しない。empty は TC-005〜TC-009 の非空検証で充足)
-- Type: excluded(値は JSON string で型分岐が存在しない)
+- Exception: excluded(JSON load failures are detected by the test infrastructure; the bundle itself has no exception branch)
+- External: excluded(no external dependency)
+- Boundary: excluded(no numeric boundary; empty is covered by the non-empty check of TC-005 to TC-009)
+- Type: excluded(values are JSON strings with no type branch)
 
-**失敗系/正常系比（煙感知器）**: 正常系5件（TC-005〜TC-009）、失敗系1件（TC-010）。静的 JSON データの存在・非空検証が中心で実行分岐を持たないため、失敗系が少ないことはインベントリ欠落ではないことを確認した。
+**Failure/normal ratio (smoke detector)**: 5 normal cases (TC-005 to TC-009), 1 failure case (TC-010). The checks are mainly existence and non-empty checks of static JSON data with no execution branch, so the low number of failure cases was confirmed not to be a gap in the inventory.
 
-## S4: 同名 remote checkout＋pull の日本語 prompt / error
+## S4: Japanese prompt / error for same-name remote checkout + pull
 
 > Origin: Feature 051 (remote-checkout-pull) (light-spec-plan)
 > Added: 2026-08-06
 > Status: active
 > Supersedes: -
-> Signature: 追加キー `Enter the local branch name for checking out {0}. If a branch with the same name already exists, the selected remote branch will be pulled after checkout:` / `error.checkoutRemoteNotFound`
+> Signature: Added keys `Enter the local branch name for checking out {0}. If a branch with the same name already exists, the selected remote branch will be pulled after checkout:` / `error.checkoutRemoteNotFound`
 > Target Path: `l10n/web/web.l10n.ja.json`
 > Test File: `tests/web/i18n.test.ts`
 
-| Case ID | Input / Precondition                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                | Notes                 |
-| ------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | --------------------- |
-| TC-011  | ja bundle から Feature 051 prompt source key を読み込む           | Normal - checkout＋pull prompt                                             | key が存在し、値が非空の日本語文字列で「選択したリモートブランチ」と同名既存時の pull を明示し、`{0}` placeholder をちょうど 1 個含む          | 利用者説明            |
-| TC-012  | ja bundle から `error.checkoutRemoteNotFound` を読み込む          | Normal - remote not found error                                            | key が存在し、値が非空の日本語文字列で、値が raw key `error.checkoutRemoteNotFound` と一致しない                                               | raw fallback 防止     |
-| TC-013  | ja / en 両 bundle で prompt と error key 集合・placeholder を比較 | Validation - locale parity / raw fallback                                  | en bundle で欠落している key が 0 件、prompt の placeholder 集合が両 locale で `{0}` と一致し、ja の 2 値がいずれも key 文字列そのものではない | parity と未翻訳を検出 |
+| Case ID | Input / Precondition                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                           | Notes                                         |
+| ------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| TC-011  | Load the Feature 051 prompt source key from the ja bundle                            | Normal - checkout + pull prompt                                            | The key exists, its value is a non-empty Japanese string that states 「選択したリモートブランチ」 ("the selected remote branch") and the pull when a same-name branch exists, and it contains exactly 1 `{0}` placeholder | Explanation for the user                      |
+| TC-012  | Load `error.checkoutRemoteNotFound` from the ja bundle                               | Normal - remote not found error                                            | The key exists, its value is a non-empty Japanese string, and the value does not equal the raw key `error.checkoutRemoteNotFound`                                                                                         | Prevents raw fallback                         |
+| TC-013  | Compare the prompt and error key sets and placeholders in both the ja and en bundles | Validation - locale parity / raw fallback                                  | 0 keys are missing from the en bundle, the prompt's placeholder set equals `{0}` in both locales, and neither of the 2 ja values is the key string itself                                                                 | Detects parity issues and untranslated values |
 
-### 失敗源インベントリ（include-or-justify）— Feature 051 追加分（S4）
+### Failure-source inventory (include-or-justify) — added by Feature 051 (S4)
 
-| 失敗源                                                | 対応ケースまたは除外理由                                                                                                                |
-| ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
-| ja prompt key の欠落・空値                            | TC-011                                                                                                                                  |
-| ja remoteNotFound key の欠落・空値                    | TC-012                                                                                                                                  |
-| raw key fallback / 未翻訳                             | TC-012、TC-013                                                                                                                          |
-| 片 locale だけの追加 / placeholder 不一致             | TC-013                                                                                                                                  |
-| UI での prompt / error 利用分岐                       | excluded(`web/refMenu-test/01-branch-actions-01.md` S20 TC-100 / `web/messageHandler-test/03-git-operation-responses-01.md` S15 の責務) |
-| 境界値（0 / minimum / maximum / +/-1 / NULL / empty） | excluded(静的 JSON に数値境界がなく、empty は TC-011 / TC-012 の非空検証で充足)                                                         |
-| 外部依存の失敗・例外送出                              | excluded(bundle は静的データで外部依存と throw 経路を持たない)                                                                          |
-| 不正な型・形式                                        | excluded(JSON string の型は parse / TypeScript で保証し、placeholder 形式は TC-011 / TC-013 で検証)                                     |
+| Failure source                                                | Case or reason for exclusion                                                                                                              |
+| ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| ja prompt key missing or empty                                | TC-011                                                                                                                                    |
+| ja remoteNotFound key missing or empty                        | TC-012                                                                                                                                    |
+| raw key fallback / untranslated                               | TC-012, TC-013                                                                                                                            |
+| Added to only one locale / placeholder mismatch               | TC-013                                                                                                                                    |
+| Branches that use the prompt / error in the UI                | excluded(owned by `web/refMenu-test/01-branch-actions-01.md` S20 TC-100 / `web/messageHandler-test/03-git-operation-responses-01.md` S15) |
+| Boundary values (0 / minimum / maximum / +/-1 / NULL / empty) | excluded(static JSON has no numeric boundary; empty is covered by the non-empty checks of TC-011 / TC-012)                                |
+| External dependency failure / exception thrown                | excluded(the bundle is static data with no external dependency or throw path)                                                             |
+| Invalid type / format                                         | excluded(the JSON string type is guaranteed by parse / TypeScript, and the placeholder format is verified by TC-011 / TC-013)             |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
 - Validation: TC-013
-- Exception: excluded(throw 経路なし)
-- External: excluded(外部依存なし)
-- Boundary: excluded(数値境界なし。empty は TC-011 / TC-012 で検証)
-- Type: excluded(bundle 値は string の静的データ)
+- Exception: excluded(no throw path)
+- External: excluded(no external dependency)
+- Boundary: excluded(no numeric boundary; empty is verified by TC-011 / TC-012)
+- Type: excluded(bundle values are static string data)
 
-**失敗系/正常系比（煙感知器）**: 正常系2件（TC-011、TC-012）、失敗系1件（TC-013）。件数が近いため再導出し、静的 locale の失敗源が欠落・空値・parity・placeholder・raw fallback に限られることを確認した。
+**Failure/normal ratio (smoke detector)**: 2 normal cases (TC-011, TC-012), 1 failure case (TC-013). As the counts are close, the inventory was re-derived and the failure sources of a static locale were confirmed to be limited to missing, empty, parity, placeholder and raw fallback.
 
-## S5: deleteBranch not fully merged 説明の日本語4キー
+## S5: 4 Japanese keys explaining deleteBranch not fully merged
 
 > Origin: Feature 055-01 (light-spec-plan)
 > Added: 2026-08-23
 > Status: superseded
 > Superseded By: S7
 > Supersedes: -
-> Signature: 追加キー集合 `error.deleteBranchNotFullyMerged.summary` / `error.deleteBranchNotFullyMerged.reason` / `error.deleteBranchNotFullyMerged.guidance` / `dialog.originalGitOutput`
+> Signature: Added key set `error.deleteBranchNotFullyMerged.summary` / `error.deleteBranchNotFullyMerged.reason` / `error.deleteBranchNotFullyMerged.guidance` / `dialog.originalGitOutput`
 > Target Path: `l10n/web/web.l10n.ja.json`
 > Test File: `tests/web/i18n.test.ts`
 
-`deleteBranch` の `not fully merged` 説明ダイアログに使う4キーが ja bundle に追加され、値が確定仕様の固定文言（`notes/features/055/01/memo-確定仕様.md` §4.4 の日本語列）と完全一致することを検証する。キーの利用分岐は `web/messageHandler-test/01-basic-responses-01.md` S16 と `web/dialogs-test.md` S7 の責務であり、`web/i18n.ts` の `t()` 分岐は本セクションに含めない。
+Verifies that the 4 keys used in the `not fully merged` explanation dialog of `deleteBranch` are added to the ja bundle and that their values exactly match the fixed text of the finalized spec (the Japanese column of §4.4 in `notes/features/055/01/memo-確定仕様.md`). The branches that use the keys are owned by `web/messageHandler-test/01-basic-responses-01.md` S16 and `web/dialogs-test.md` S7, and the `t()` branch of `web/i18n.ts` is not part of this section.
 
-| Case ID | Input / Precondition                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                        | Notes                                          |
-| ------- | ------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- |
-| TC-014  | ja bundle から上記4キーを読み込む                       | Normal - 固定4値                                                           | 4キーがすべて存在し、各値が memo-確定仕様 §4.4 の日本語4値と `toBe` で完全一致し（完全一致により非空も担保）、各値から `{数字}` 形式の placeholder を抽出した結果が空で、各値がキー文字列そのものと一致しない（raw key fallback 不在） | 断定表現を避けた固定文言。未翻訳の素通しを検出 |
-| TC-015  | ja / en 両 bundle を読み込み、上記4キーの集合を比較する | Validation - locale parity                                                 | en bundle に欠落しているキーが0件である（ja 4キー集合との差集合が空）                                                                                                                                                                  | 片 locale だけの追加を検出                     |
+| Case ID | Input / Precondition                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                  | Notes                                                                       |
+| ------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------- |
+| TC-014  | Load the 4 keys above from the ja bundle                                | Normal - 4 fixed values                                                    | All 4 keys exist, each value exactly matches the 4 Japanese values of §4.4 of the finalized spec memo with `toBe` (exact match also ensures non-empty), extracting `{digit}`-style placeholders from each value yields an empty result, and no value equals its key string (no raw key fallback) | Fixed text that avoids assertive wording. Detects untranslated pass-through |
+| TC-015  | Load both the ja and en bundles and compare the set of the 4 keys above | Validation - locale parity                                                 | 0 keys are missing from the en bundle (the difference from the ja 4-key set is empty)                                                                                                                                                                                                            | Detects additions to only one locale                                        |
 
-### 失敗源インベントリ（include-or-justify）— Feature 055-01 追加分（S5）
+### Failure-source inventory (include-or-justify) — added by Feature 055-01 (S5)
 
-| 失敗源                                                  | 対応ケースまたは除外理由                                                                            |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| ja 側のキー欠落・固定文言からの drift                   | TC-014                                                                                              |
-| 空文字の訳値                                            | TC-014（固定値との完全一致で担保）                                                                  |
-| placeholder の混入（4キーは placeholder なし）          | TC-014                                                                                              |
-| 未翻訳（キー文字列がそのまま値になる raw key fallback） | TC-014                                                                                              |
-| 片 locale だけの追加（parity 崩れ）                     | TC-015（en 側は `web.l10n.en.json-test.md` TC-013 と対で担保）                                      |
-| キーの利用分岐の欠落                                    | excluded(`web/messageHandler-test/01-basic-responses-01.md` S16 と `web/dialogs-test.md` S7 で担保) |
-| 境界値（0 / minimum / maximum / +/-1 / NULL）           | excluded(静的 JSON に数値境界が存在しない。empty は TC-014 の固定値完全一致で充足)                  |
-| 外部依存の失敗・例外送出                                | excluded(bundle は静的データで外部依存も throw 経路も持たない)                                      |
-| 不正な型・形式                                          | excluded(値は JSON string で型分岐が存在しない)                                                     |
+| Failure source                                                         | Case or reason for exclusion                                                                             |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Key missing on the ja side / drift from the fixed text                 | TC-014                                                                                                   |
+| Empty translated value                                                 | TC-014 (covered by the exact match with the fixed values)                                                |
+| Placeholder mixed in (the 4 keys have no placeholder)                  | TC-014                                                                                                   |
+| Untranslated (raw key fallback where the key string becomes the value) | TC-014                                                                                                   |
+| Added to only one locale (broken parity)                               | TC-015 (the en side is covered as a pair by `web.l10n.en.json-test.md` TC-013)                           |
+| Missing branch that uses the key                                       | excluded(covered by `web/messageHandler-test/01-basic-responses-01.md` S16 and `web/dialogs-test.md` S7) |
+| Boundary values (0 / minimum / maximum / +/-1 / NULL)                  | excluded(static JSON has no numeric boundary; empty is covered by the exact fixed-value match of TC-014) |
+| External dependency failure / exception thrown                         | excluded(the bundle is static data with no external dependency or throw path)                            |
+| Invalid type / format                                                  | excluded(values are JSON strings with no type branch)                                                    |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
 - Validation: TC-015
-- Exception: excluded(JSON 読み込みの失敗はテスト基盤で検出され、bundle 自体に例外分岐はない)
-- External: excluded(外部依存なし)
-- Boundary: excluded(数値境界が存在しない。empty は TC-014 の固定値完全一致で充足)
-- Type: excluded(値は JSON string で型分岐が存在しない)
+- Exception: excluded(JSON load failures are detected by the test infrastructure; the bundle itself has no exception branch)
+- External: excluded(no external dependency)
+- Boundary: excluded(no numeric boundary; empty is covered by the exact fixed-value match of TC-014)
+- Type: excluded(values are JSON strings with no type branch)
 
-**失敗系/正常系比（煙感知器）**: 正常系1件（TC-014）、失敗系1件（TC-015）。件数が同数のため再導出したが、静的 JSON データの失敗源は欠落・drift・空値・placeholder・raw fallback・parity に限られ、上表のとおりすべて充足されていることを確認した。
+**Failure/normal ratio (smoke detector)**: 1 normal case (TC-014), 1 failure case (TC-015). As the counts are equal, the inventory was re-derived; the failure sources of static JSON data are limited to missing, drift, empty, placeholder, raw fallback and parity, and all are covered as shown above.
 
-## S6: branch cleanup panel の日本語キー集合
+## S6: Japanese key set for the branch cleanup panel
 
 > Origin: Feature 055-03 (light-spec-plan)
 > Added: 2026-08-25
 > Status: active
 > Supersedes: -
-> Signature: 追加キー集合: panel title / comparison / 列名 / known・unknown・notSelected 状態 / loading・error・empty / show・delete action（キー名は Task 4 実装時に確定）
+> Signature: Added key set: panel title / comparison / column names / known, unknown and notSelected states / loading, error and empty / show and delete actions (key names finalized during the Task 4 implementation)
 > Target Path: `l10n/web/web.l10n.ja.json`
 > Test File: `tests/web/i18n.test.ts`
 
-branch cleanup panel の表示に使う日本語キー集合が ja bundle へ en と同じ集合で追加されていることを検証する（対応プラン §4 Task 4 実装内容 7）。キーの利用分岐は `web/branchCleanupPanel-test.md` S3 の責務。
+Verifies that the Japanese key set used to display the branch cleanup panel is added to the ja bundle as the same set as en (implementation plan §4 Task 4 implementation item 7). The branches that use the keys are owned by `web/branchCleanupPanel-test.md` S3.
 
-| Case ID | Input / Precondition                                                  | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                        | Notes                      |
-| ------- | --------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | -------------------------- |
-| TC-016  | ja bundle から panel キー集合の全キーを読み込む                       | Normal - キー集合の存在                                                    | 全キーが存在し、各値が非空（`length > 0`）の日本語文字列である                                                         | 集合は Task 4 実装で確定   |
-| TC-017  | ja bundle の panel キー全値をキー文字列と比較する                     | Normal - raw key fallback 不在                                             | いずれの値もキー文字列そのものと一致せず、unknown 用と notSelected 用の値が互いに一致しない                            | 未翻訳・同一値化を検出     |
-| TC-018  | ja / en 両 bundle を読み込み、panel キー集合と placeholder を比較する | Validation - locale parity                                                 | en bundle に欠落しているキーが 0 件で（双方向の差集合が空）、placeholder を含むキーは `{N}` 集合が両 locale で一致する | 片 locale だけの追加を検出 |
+| Case ID | Input / Precondition                                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                          | Notes                                             |
+| ------- | ------------------------------------------------------------------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------- |
+| TC-016  | Load every key of the panel key set from the ja bundle                         | Normal - key set exists                                                    | Every key exists and each value is a non-empty (`length > 0`) Japanese string                                                                            | The set is finalized in the Task 4 implementation |
+| TC-017  | Compare every panel key value in the ja bundle with its key string             | Normal - no raw key fallback                                               | No value equals its key string, and the values for unknown and notSelected differ from each other                                                        | Detects untranslated and identical values         |
+| TC-018  | Load both the ja and en bundles and compare the panel key set and placeholders | Validation - locale parity                                                 | 0 keys are missing from the en bundle (the difference is empty in both directions), and for keys with placeholders the `{N}` set matches in both locales | Detects additions to only one locale              |
 
-### 失敗源インベントリ（include-or-justify）— Feature 055-03 追加分（S6）
+### Failure-source inventory (include-or-justify) — added by Feature 055-03 (S6)
 
-| 失敗源                                                     | 対応ケースまたは除外理由                                                     |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| ja 側のキー欠落・空値                                      | TC-016                                                                       |
-| 未翻訳（raw key fallback）・unknown / notSelected 同一値化 | TC-017                                                                       |
-| 片 locale だけの追加 / placeholder 不一致                  | TC-018（en 側は `web.l10n.en.json-test.md` S5 TC-016 と対で担保）            |
-| キーの利用分岐の欠落                                       | excluded(`web/branchCleanupPanel-test.md` S3 の責務)                         |
-| 境界値（0 / minimum / maximum / +/-1 / NULL）              | excluded(静的 JSON に数値境界が存在しない。empty は TC-016 の非空検証で充足) |
-| 外部依存の失敗・例外送出                                   | excluded(bundle は静的データで外部依存も throw 経路も持たない)               |
-| 不正な型・形式                                             | excluded(値は JSON string で型分岐が存在しない)                              |
+| Failure source                                                                 | Case or reason for exclusion                                                                     |
+| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------ |
+| Key missing or empty on the ja side                                            | TC-016                                                                                           |
+| Untranslated (raw key fallback) / identical values for unknown and notSelected | TC-017                                                                                           |
+| Added to only one locale / placeholder mismatch                                | TC-018 (the en side is covered as a pair by `web.l10n.en.json-test.md` S5 TC-016)                |
+| Missing branch that uses the key                                               | excluded(owned by `web/branchCleanupPanel-test.md` S3)                                           |
+| Boundary values (0 / minimum / maximum / +/-1 / NULL)                          | excluded(static JSON has no numeric boundary; empty is covered by the non-empty check of TC-016) |
+| External dependency failure / exception thrown                                 | excluded(the bundle is static data with no external dependency or throw path)                    |
+| Invalid type / format                                                          | excluded(values are JSON strings with no type branch)                                            |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
 - Validation: TC-018
-- Exception: excluded(JSON 読み込みの失敗はテスト基盤で検出され、bundle 自体に例外分岐はない)
-- External: excluded(外部依存なし)
-- Boundary: excluded(数値境界が存在しない。empty は TC-016 の非空検証で充足)
-- Type: excluded(値は JSON string で型分岐が存在しない)
-- Normal: TC-016、TC-017
+- Exception: excluded(JSON load failures are detected by the test infrastructure; the bundle itself has no exception branch)
+- External: excluded(no external dependency)
+- Boundary: excluded(no numeric boundary; empty is covered by the non-empty check of TC-016)
+- Type: excluded(values are JSON strings with no type branch)
+- Normal: TC-016, TC-017
 
-**失敗系/正常系比（煙感知器）**: 正常系2件（TC-016、TC-017）、失敗系1件（TC-018）。差1のためインベントリを再導出したが、静的 locale の失敗源は欠落・空値・raw fallback・同一値化・parity・placeholder に限られることを確認した。
+**Failure/normal ratio (smoke detector)**: 2 normal cases (TC-016, TC-017), 1 failure case (TC-018). With a difference of 1 the inventory was re-derived, and the failure sources of a static locale were confirmed to be limited to missing, empty, raw fallback, identical values, parity and placeholder.
 
-## S7: deleteBranch not fully merged 説明の日本語固定値（055-03 改訂）
+## S7: Japanese fixed values explaining deleteBranch not fully merged (055-03 revision)
 
 > Origin: Feature 055-03 follow-up
 > Added: 2026-08-29
 > Status: active
 > Supersedes: S5
-> Signature: 更新キー `error.deleteBranchNotFullyMerged.summary` / `error.deleteBranchNotFullyMerged.reason`（不変キー `error.deleteBranchNotFullyMerged.guidance` / `dialog.originalGitOutput` を含む4キー集合）
+> Signature: Updated keys `error.deleteBranchNotFullyMerged.summary` / `error.deleteBranchNotFullyMerged.reason` (a 4-key set including the unchanged keys `error.deleteBranchNotFullyMerged.guidance` / `dialog.originalGitOutput`)
 > Target Path: `l10n/web/web.l10n.ja.json`
 > Test File: `tests/web/i18n.test.ts`
 
-`not fully merged` 説明の summary / reason を、upstream と upstream 未設定時の現在ブランチの条件関係、パネル比較先との差を説明する固定文言（対応プラン §3.3 の日本語列）へ改訂する契約。S5 の「055-01 確定仕様 §4.4 との完全一致」を本 section の固定値へ置き換えるため replacement とする。guidance と `dialog.originalGitOutput` は 055-01 の値から変更しない。キーの利用分岐は `web/messageHandler-test/01-basic-responses-01.md` S16 と `web/dialogs-test.md` S7 の責務。
+Contract: the summary / reason of the `not fully merged` explanation are revised to fixed text (the Japanese column of implementation plan §3.3) that explains the conditional relation of the upstream and, when no upstream is set, the current branch, and the difference from the panel's comparison target. This is a replacement because it replaces S5's "exact match with §4.4 of the 055-01 finalized spec" with the fixed values of this section. guidance and `dialog.originalGitOutput` keep their 055-01 values. The branches that use the keys are owned by `web/messageHandler-test/01-basic-responses-01.md` S16 and `web/dialogs-test.md` S7.
 
-| Case ID | Input / Precondition                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                       | Notes                             |
-| ------- | ------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- |
-| TC-019  | ja bundle から上記4キーを読み込む                       | Normal - 改訂後の固定4値                                                   | summary / reason が対応プラン §3.3 の日本語固定値と `toBe` で完全一致し、guidance と `dialog.originalGitOutput` が 055-01 確定仕様 §4.4 の既存日本語値と `toBe` で完全一致し（変更なしを固定）、4値から `{数字}` 形式 placeholder を抽出した結果が空で、各値がキー文字列そのものと一致しない（raw key fallback 不在） | 値の drift と不変キーの改変を検出 |
-| TC-020  | ja / en 両 bundle を読み込み、上記4キーの集合を比較する | Validation - locale parity                                                 | en bundle に欠落しているキーが0件である（ja 4キー集合との差集合が空）                                                                                                                                                                                                                                                 | 片 locale だけの改訂を検出        |
+| Case ID | Input / Precondition                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                                                                                                                     | Notes                                                 |
+| ------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| TC-019  | Load the 4 keys above from the ja bundle                                | Normal - 4 revised fixed values                                            | summary / reason exactly match the Japanese fixed values of implementation plan §3.3 with `toBe`, guidance and `dialog.originalGitOutput` exactly match the existing Japanese values of §4.4 of the 055-01 finalized spec with `toBe` (pinning that they are unchanged), extracting `{digit}`-style placeholders from the 4 values yields an empty result, and no value equals its key string (no raw key fallback) | Detects value drift and changes to the unchanged keys |
+| TC-020  | Load both the ja and en bundles and compare the set of the 4 keys above | Validation - locale parity                                                 | 0 keys are missing from the en bundle (the difference from the ja 4-key set is empty)                                                                                                                                                                                                                                                                                                                               | Detects revisions to only one locale                  |
 
-### 失敗源インベントリ（include-or-justify）— Feature 055-03 follow-up 追加分（S7）
+### Failure-source inventory (include-or-justify) — added by Feature 055-03 follow-up (S7)
 
-| 失敗源                                                  | 対応ケースまたは除外理由                                                                            |
-| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| summary / reason の改訂漏れ・固定値からの drift         | TC-019                                                                                              |
-| guidance / `dialog.originalGitOutput` の誤改変          | TC-019（既存固定値との完全一致で担保）                                                              |
-| 空文字の訳値・placeholder の混入                        | TC-019（固定値完全一致と placeholder 抽出空で担保)                                                  |
-| 未翻訳（キー文字列がそのまま値になる raw key fallback） | TC-019                                                                                              |
-| 片 locale だけの改訂（parity 崩れ）                     | TC-020（en 側は `web.l10n.en.json-test.md` S6 TC-018 と対で担保）                                   |
-| キーの利用分岐の欠落                                    | excluded(`web/messageHandler-test/01-basic-responses-01.md` S16 と `web/dialogs-test.md` S7 で担保) |
-| 境界値（0 / minimum / maximum / +/-1 / NULL）           | excluded(静的 JSON に数値境界が存在しない。empty は TC-019 の固定値完全一致で充足)                  |
-| 外部依存の失敗・例外送出                                | excluded(bundle は静的データで外部依存も throw 経路も持たない)                                      |
-| 不正な型・形式                                          | excluded(値は JSON string で型分岐が存在しない)                                                     |
+| Failure source                                                         | Case or reason for exclusion                                                                             |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| summary / reason not revised / drift from the fixed values             | TC-019                                                                                                   |
+| guidance / `dialog.originalGitOutput` changed by mistake               | TC-019 (covered by the exact match with the existing fixed values)                                       |
+| Empty translated value / placeholder mixed in                          | TC-019 (covered by the exact fixed-value match and the empty placeholder extraction)                     |
+| Untranslated (raw key fallback where the key string becomes the value) | TC-019                                                                                                   |
+| Revised in only one locale (broken parity)                             | TC-020 (the en side is covered as a pair by `web.l10n.en.json-test.md` S6 TC-018)                        |
+| Missing branch that uses the key                                       | excluded(covered by `web/messageHandler-test/01-basic-responses-01.md` S16 and `web/dialogs-test.md` S7) |
+| Boundary values (0 / minimum / maximum / +/-1 / NULL)                  | excluded(static JSON has no numeric boundary; empty is covered by the exact fixed-value match of TC-019) |
+| External dependency failure / exception thrown                         | excluded(the bundle is static data with no external dependency or throw path)                            |
+| Invalid type / format                                                  | excluded(values are JSON strings with no type branch)                                                    |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
 - Validation: TC-020
-- Exception: excluded(JSON 読み込みの失敗はテスト基盤で検出され、bundle 自体に例外分岐はない)
-- External: excluded(外部依存なし)
-- Boundary: excluded(数値境界が存在しない。empty は TC-019 の固定値完全一致で充足)
-- Type: excluded(値は JSON string で型分岐が存在しない)
+- Exception: excluded(JSON load failures are detected by the test infrastructure; the bundle itself has no exception branch)
+- External: excluded(no external dependency)
+- Boundary: excluded(no numeric boundary; empty is covered by the exact fixed-value match of TC-019)
+- Type: excluded(values are JSON strings with no type branch)
 - Normal: TC-019
 
-**失敗系/正常系比（煙感知器）**: 正常系1件（TC-019）、失敗系1件（TC-020）。件数が同数のため再導出したが、静的 JSON データの失敗源は drift・誤改変・空値・placeholder・raw fallback・parity に限られ、上表のとおりすべて充足されていることを確認した。
+**Failure/normal ratio (smoke detector)**: 1 normal case (TC-019), 1 failure case (TC-020). As the counts are equal, the inventory was re-derived; the failure sources of static JSON data are limited to drift, mistaken changes, empty, placeholder, raw fallback and parity, and all are covered as shown above.
 
-## S8: 比較先自動解決 label の日本語キー
+## S8: Japanese key for the auto-resolved comparison label
 
 > Origin: Feature 055-03 follow-up
 > Added: 2026-08-29
 > Status: active
 > Supersedes: -
-> Signature: 追加キー `cleanup.comparison.autoResolved`（値 `自動 ({0})`、placeholder 集合 `{0}`）
+> Signature: Added key `cleanup.comparison.autoResolved` (value `自動 ({0})`, placeholder set `{0}`)
 > Target Path: `l10n/web/web.l10n.ja.json`
 > Test File: `tests/web/i18n.test.ts`
 
-比較先ドロップダウンの auto option へ解決済み branch 名を埋め込む新キー `cleanup.comparison.autoResolved` が ja bundle に追加され、値が対応プラン §3.3 の固定値と完全一致することを検証する additive section。キーの利用分岐（自動／明示・loaded／loading／failed の label 決定）は `web/branchCleanupPanel-test.md` S5 の責務。
+Additive section verifying that the new key `cleanup.comparison.autoResolved`, which embeds the resolved branch name into the auto option of the comparison dropdown, is added to the ja bundle and its value exactly matches the fixed value of implementation plan §3.3. The branches that use the key (label decisions for automatic / explicit and loaded / loading / failed) are owned by `web/branchCleanupPanel-test.md` S5.
 
-| Case ID | Input / Precondition                                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                   | Notes                         |
-| ------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| TC-021  | ja bundle から `cleanup.comparison.autoResolved` を読み込む               | Normal - 新キーの固定値                                                    | キーが存在し、値が `自動 ({0})` と `toBe` で完全一致し、値から抽出した `{数字}` 形式 placeholder 集合が `{0}` のみで、値がキー文字列そのものと一致しない（raw key fallback 不在） | 完全一致により非空も担保      |
-| TC-022  | ja / en 両 bundle を読み込み、当該キーの存在と placeholder 集合を比較する | Validation - locale parity                                                 | en bundle に `cleanup.comparison.autoResolved` が存在し（欠落0件）、placeholder 集合が両 locale とも `{0}` で一致する                                                             | 片 locale / placeholder drift |
+| Case ID | Input / Precondition                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                       | Notes                               |
+| ------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- |
+| TC-021  | Load `cleanup.comparison.autoResolved` from the ja bundle                           | Normal - fixed value of the new key                                        | The key exists, its value exactly matches `自動 ({0})` with `toBe`, the set of `{digit}`-style placeholders extracted from the value is only `{0}`, and the value does not equal the key string (no raw key fallback) | Exact match also ensures non-empty  |
+| TC-022  | Load both the ja and en bundles and compare the key's existence and placeholder set | Validation - locale parity                                                 | `cleanup.comparison.autoResolved` exists in the en bundle (0 missing), and the placeholder set is `{0}` in both locales                                                                                               | One locale only / placeholder drift |
 
-### 失敗源インベントリ（include-or-justify）— Feature 055-03 follow-up 追加分（S8）
+### Failure-source inventory (include-or-justify) — added by Feature 055-03 follow-up (S8)
 
-| 失敗源                                                  | 対応ケースまたは除外理由                                                           |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| ja 側のキー欠落・固定値からの drift                     | TC-021                                                                             |
-| placeholder の欠落・過剰（`{0}` 以外の混入）            | TC-021                                                                             |
-| 未翻訳（キー文字列がそのまま値になる raw key fallback） | TC-021                                                                             |
-| 片 locale だけの追加 / placeholder 不一致               | TC-022（en 側は `web.l10n.en.json-test.md` S7 TC-020 と対で担保）                  |
-| キーの利用分岐の欠落                                    | excluded(`web/branchCleanupPanel-test.md` S5 の責務)                               |
-| 境界値（0 / minimum / maximum / +/-1 / NULL）           | excluded(静的 JSON に数値境界が存在しない。empty は TC-021 の固定値完全一致で充足) |
-| 外部依存の失敗・例外送出                                | excluded(bundle は静的データで外部依存も throw 経路も持たない)                     |
-| 不正な型・形式                                          | excluded(値は JSON string で型分岐が存在しない)                                    |
+| Failure source                                                         | Case or reason for exclusion                                                                             |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Key missing on the ja side / drift from the fixed value                | TC-021                                                                                                   |
+| Placeholder missing or extra (anything other than `{0}`)               | TC-021                                                                                                   |
+| Untranslated (raw key fallback where the key string becomes the value) | TC-021                                                                                                   |
+| Added to only one locale / placeholder mismatch                        | TC-022 (the en side is covered as a pair by `web.l10n.en.json-test.md` S7 TC-020)                        |
+| Missing branch that uses the key                                       | excluded(owned by `web/branchCleanupPanel-test.md` S5)                                                   |
+| Boundary values (0 / minimum / maximum / +/-1 / NULL)                  | excluded(static JSON has no numeric boundary; empty is covered by the exact fixed-value match of TC-021) |
+| External dependency failure / exception thrown                         | excluded(the bundle is static data with no external dependency or throw path)                            |
+| Invalid type / format                                                  | excluded(values are JSON strings with no type branch)                                                    |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
 - Validation: TC-022
-- Exception: excluded(JSON 読み込みの失敗はテスト基盤で検出され、bundle 自体に例外分岐はない)
-- External: excluded(外部依存なし)
-- Boundary: excluded(数値境界が存在しない。empty は TC-021 の固定値完全一致で充足)
-- Type: excluded(値は JSON string で型分岐が存在しない)
+- Exception: excluded(JSON load failures are detected by the test infrastructure; the bundle itself has no exception branch)
+- External: excluded(no external dependency)
+- Boundary: excluded(no numeric boundary; empty is covered by the exact fixed-value match of TC-021)
+- Type: excluded(values are JSON strings with no type branch)
 - Normal: TC-021
 
-**失敗系/正常系比（煙感知器）**: 正常系1件（TC-021）、失敗系1件（TC-022）。件数が同数のため再導出したが、単一キーの静的 locale の失敗源は欠落・drift・placeholder・raw fallback・parity に限られ、上表のとおり充足されていることを確認した。
+**Failure/normal ratio (smoke detector)**: 1 normal case (TC-021), 1 failure case (TC-022). As the counts are equal, the inventory was re-derived; the failure sources of a single key in a static locale are limited to missing, drift, placeholder, raw fallback and parity, and all are covered as shown above.
 
-## S9: file history の日本語キー 9 件
+## S9: 9 Japanese keys for file history
 
 > Origin: Feature 055-07 (light-spec-plan)
 > Added: 2026-09-08
 > Status: active
 > Supersedes: -
-> Signature: 追加キー `context.highlightFileHistory` / `fileHistory.loading` / `fileHistory.position` / `fileHistory.previous` / `fileHistory.next` / `fileHistory.exit` / `fileHistory.notInFirstParentDiff` / `fileHistory.noResults` / `error.fileHistory`
+> Signature: Added keys `context.highlightFileHistory` / `fileHistory.loading` / `fileHistory.position` / `fileHistory.previous` / `fileHistory.next` / `fileHistory.exit` / `fileHistory.notInFirstParentDiff` / `fileHistory.noResults` / `error.fileHistory`
 > Target Path: `l10n/web/web.l10n.ja.json`
 > Test File: `tests/web/i18n.test.ts`
 
-対応プラン §3.10 の 9 key が ja bundle に存在し、値が固定値と完全一致し、raw key fallback が無く、placeholder 集合が en と一致することを検証する additive section。キーの利用箇所は `web.l10n.en.json-test.md` S8 と同じ owner の責務。
+Additive section verifying that the 9 keys of implementation plan §3.10 exist in the ja bundle, their values exactly match the fixed values, there is no raw key fallback, and the placeholder sets match en. Where the keys are used is owned by the same owner as `web.l10n.en.json-test.md` S8.
 
-| Case ID | Input / Precondition                                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                             | Notes                                        |
-| ------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------- |
-| TC-023  | ja bundle から 9 key を読み込む                                         | Normal - 9 key の固定値                                                    | 9 key がすべて存在し、値が `ファイル履歴を強調` / `ファイル履歴を読み込み中 ...` / `{0} / {1}` / `前の一致` / `次の一致` / `解除` / `このファイルの変更は第 1 親との差分にはありません` / `このファイルの履歴が見つかりません` / `ファイル履歴を読み込めません` と `toEqual` で完全一致する | 完全一致により非空も担保                     |
-| TC-024  | `fileHistory.position` の値から `{数字}` 形式 placeholder を抽出する    | Normal - placeholder 集合                                                  | 集合が `{0}` と `{1}` の 2 件で、他の 8 key の placeholder 集合が空である                                                                                                                                                                                                                   | 区切りは `/`                                 |
-| TC-025  | 9 key の値とキー文字列を比較する                                        | Validation - raw key fallback 不在                                         | 9 key とも値がキー文字列そのものと一致しない（未翻訳 0 件）                                                                                                                                                                                                                                 | `src/i18n.ts` の fallback merge に依存しない |
-| TC-026  | ja / en 両 bundle を読み込み、9 key の存在と placeholder 集合を比較する | Validation - locale parity                                                 | en bundle に 9 key がすべて存在し（欠落 0 件）、key ごとの placeholder 集合が両 locale で一致する                                                                                                                                                                                           | 片 locale / placeholder drift                |
+| Case ID | Input / Precondition                                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                   | Notes                                                |
+| ------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| TC-023  | Load the 9 keys from the ja bundle                                                           | Normal - fixed values of the 9 keys                                        | All 9 keys exist and the values exactly match `ファイル履歴を強調` / `ファイル履歴を読み込み中 ...` / `{0} / {1}` / `前の一致` / `次の一致` / `解除` / `このファイルの変更は第 1 親との差分にはありません` / `このファイルの履歴が見つかりません` / `ファイル履歴を読み込めません` with `toEqual` | Exact match also ensures non-empty                   |
+| TC-024  | Extract `{digit}`-style placeholders from the value of `fileHistory.position`                | Normal - placeholder set                                                   | The set has 2 entries, `{0}` and `{1}`, and the placeholder sets of the other 8 keys are empty                                                                                                                                                                                                    | The separator is `/`                                 |
+| TC-025  | Compare the values of the 9 keys with the key strings                                        | Validation - no raw key fallback                                           | No value of the 9 keys equals its key string (0 untranslated)                                                                                                                                                                                                                                     | Does not rely on the fallback merge in `src/i18n.ts` |
+| TC-026  | Load both the ja and en bundles and compare the existence and placeholder sets of the 9 keys | Validation - locale parity                                                 | All 9 keys exist in the en bundle (0 missing), and the placeholder set of each key matches in both locales                                                                                                                                                                                        | One locale only / placeholder drift                  |
 
-### 失敗源インベントリ（include-or-justify）— Feature 055-07 追加分（S9）
+### Failure-source inventory (include-or-justify) — added by Feature 055-07 (S9)
 
-| 失敗源                                                  | 対応ケースまたは除外理由                                                           |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| ja 側のキー欠落・固定値からの drift                     | TC-023                                                                             |
-| placeholder の欠落・過剰                                | TC-024                                                                             |
-| 未翻訳（キー文字列がそのまま値になる raw key fallback） | TC-025                                                                             |
-| 片 locale だけの追加 / placeholder 不一致               | TC-026（en 側は `web.l10n.en.json-test.md` S8 TC-023 と対で担保）                  |
-| キーの利用分岐の欠落                                    | excluded(利用 owner の責務。`web.l10n.en.json-test.md` S8 参照)                    |
-| 境界値（0 / minimum / maximum / +/-1 / NULL）           | excluded(静的 JSON に数値境界が存在しない。empty は TC-023 の固定値完全一致で充足) |
-| 外部依存の失敗・例外送出                                | excluded(bundle は静的データで外部依存も throw 経路も持たない)                     |
-| 不正な型・形式                                          | excluded(値は JSON string で型分岐が存在しない)                                    |
+| Failure source                                                         | Case or reason for exclusion                                                                             |
+| ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Key missing on the ja side / drift from the fixed values               | TC-023                                                                                                   |
+| Placeholder missing or extra                                           | TC-024                                                                                                   |
+| Untranslated (raw key fallback where the key string becomes the value) | TC-025                                                                                                   |
+| Added to only one locale / placeholder mismatch                        | TC-026 (the en side is covered as a pair by `web.l10n.en.json-test.md` S8 TC-023)                        |
+| Missing branch that uses the key                                       | excluded(owned by the user of the keys; see `web.l10n.en.json-test.md` S8)                               |
+| Boundary values (0 / minimum / maximum / +/-1 / NULL)                  | excluded(static JSON has no numeric boundary; empty is covered by the exact fixed-value match of TC-023) |
+| External dependency failure / exception thrown                         | excluded(the bundle is static data with no external dependency or throw path)                            |
+| Invalid type / format                                                  | excluded(values are JSON strings with no type branch)                                                    |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: TC-025、TC-026
-- Exception: excluded(JSON 読み込みの失敗はテスト基盤で検出され、bundle 自体に例外分岐はない)
-- External: excluded(外部依存なし)
-- Boundary: excluded(数値境界が存在しない。empty は TC-023 の固定値完全一致で充足)
-- Type: excluded(値は JSON string で型分岐が存在しない)
-- Normal: TC-023、TC-024
+- Validation: TC-025, TC-026
+- Exception: excluded(JSON load failures are detected by the test infrastructure; the bundle itself has no exception branch)
+- External: excluded(no external dependency)
+- Boundary: excluded(no numeric boundary; empty is covered by the exact fixed-value match of TC-023)
+- Type: excluded(values are JSON strings with no type branch)
+- Normal: TC-023, TC-024
 
-**失敗系/正常系比（煙感知器）**: 正常系2件（TC-023、TC-024）、失敗系2件（TC-025、TC-026）。件数が同数のため再導出したが、静的 locale の失敗源は欠落・drift・placeholder・raw fallback・parity に限られ、上表のとおり充足されていることを確認した。
+**Failure/normal ratio (smoke detector)**: 2 normal cases (TC-023, TC-024), 2 failure cases (TC-025, TC-026). As the counts are equal, the inventory was re-derived; the failure sources of a static locale are limited to missing, drift, placeholder, raw fallback and parity, and all are covered as shown above.
 
-## S10: detached worktree 削除確認の日本語キー
+## S10: Japanese key for the detached worktree removal confirmation
 
 > Origin: Feature 053 (detached-worktree-menu) (light-spec-plan)
 > Added: 2026-09-13
 > Status: active
 > Supersedes: -
-> Signature: 追加キー `Are you sure you want to remove the worktree at {0}?`
+> Signature: Added key `Are you sure you want to remove the worktree at {0}?`
 > Target Path: `l10n/web/web.l10n.ja.json:270`
 > Test File: `tests/web/i18n.test.ts`
 
-| Case ID | Input / Precondition                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                      | Notes                                      |
-| ------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------ | ------------------------------------------ |
-| TC-027  | `l10n/web/web.l10n.ja.json`の同キー（`Are you sure you want to remove the worktree at {0}?`） | Normal - key present                                                       | 値が`string`で長さ1以上、`{0}`を含む | en側は`web.l10n.en.json-test.md` S9 TC-025 |
+| Case ID | Input / Precondition                                                                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                | Notes                                         |
+| ------- | ---------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------- | --------------------------------------------- |
+| TC-027  | The same key in `l10n/web/web.l10n.ja.json` (`Are you sure you want to remove the worktree at {0}?`) | Normal - key present                                                       | The value is a `string` of length 1 or more and contains `{0}` | en side: `web.l10n.en.json-test.md` S9 TC-025 |
 
-### 失敗源インベントリ（include-or-justify）— Feature 053 追加分（S10）
+### Failure-source inventory (include-or-justify) — added by Feature 053 (S10)
 
-| 失敗源                                                            | 対応ケースまたは除外理由     |
-| ----------------------------------------------------------------- | ---------------------------- |
-| キー欠落／空文字                                                  | TC-027                       |
-| placeholder欠落                                                   | TC-027                       |
-| 他category（Validation / Exception / External / Boundary / Type） | excluded(静的JSONの存在検証) |
+| Failure source                                                         | Case or reason for exclusion             |
+| ---------------------------------------------------------------------- | ---------------------------------------- |
+| Key missing / empty string                                             | TC-027                                   |
+| Placeholder missing                                                    | TC-027                                   |
+| Other categories (Validation / Exception / External / Boundary / Type) | excluded(existence check of static JSON) |
 
-## S11: 隠れたバッジcounterの日本語キー
+## S11: Japanese key for the hidden badge counter
 
 > Origin: Feature 059-02 (light-spec-plan)
 > Added: 2026-09-24
 > Status: active
 > Supersedes: -
-> Signature: 追加キー `refs.showHidden`（値 `非表示のバッジ {0} 件を表示`、placeholder 集合 `{0}`）
+> Signature: Added key `refs.showHidden` (value `非表示のバッジ {0} 件を表示`, placeholder set `{0}`)
 > Target Path: `l10n/web/web.l10n.ja.json`
 > Test File: `tests/web/i18n.test.ts`
 
-counterのtitle/aria-labelに使う新キーが ja bundle に追加され、値が対応プラン §3.5 の固定値と完全一致し、raw key fallback が無いことを検証する additive section。件数の差込みは `web/i18n-test.md` S2 の責務。
+Additive section verifying that the new key used for the counter's title/aria-label is added to the ja bundle, its value exactly matches the fixed value of implementation plan §3.5, and there is no raw key fallback. Inserting the count is owned by `web/i18n-test.md` S2.
 
-| Case ID | Input / Precondition                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                              | Notes                                             |
-| ------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- |
-| TC-028  | ja bundle から `refs.showHidden` を読み込む                                         | Normal - 新キーの固定値                                                    | キーが存在し、値が `非表示のバッジ {0} 件を表示` と `toBe` で完全一致し、placeholder 集合が `{0}` のみである | AC-18                                             |
-| TC-029  | `refs.showHidden` の値とキー文字列を比較する                                        | Validation - raw key fallback 不在                                         | 値がキー文字列 `refs.showHidden` と一致しない                                                                | 未翻訳の検出                                      |
-| TC-030  | ja / en 両 bundle を読み込み、`refs.showHidden` の存在と placeholder 集合を比較する | Validation - locale parity                                                 | en bundle に `refs.showHidden` が存在し、placeholder 集合が両 locale とも `{0}` で一致する                   | en側は `web.l10n.en.json-test.md` S10 TC-027 と対 |
+| Case ID | Input / Precondition                                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                            | Notes                                                            |
+| ------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| TC-028  | Load `refs.showHidden` from the ja bundle                                                          | Normal - fixed value of the new key                                        | The key exists, its value exactly matches `非表示のバッジ {0} 件を表示` with `toBe`, and the placeholder set is only `{0}` | AC-18                                                            |
+| TC-029  | Compare the value of `refs.showHidden` with the key string                                         | Validation - no raw key fallback                                           | The value does not equal the key string `refs.showHidden`                                                                  | Detects untranslated value                                       |
+| TC-030  | Load both the ja and en bundles and compare the existence and placeholder set of `refs.showHidden` | Validation - locale parity                                                 | `refs.showHidden` exists in the en bundle, and the placeholder set is `{0}` in both locales                                | Paired with `web.l10n.en.json-test.md` S10 TC-027 on the en side |
 
-### 失敗源インベントリ（include-or-justify）— Feature 059-02 追加分（S11）
+### Failure-source inventory (include-or-justify) — added by Feature 059-02 (S11)
 
-| 失敗源                                    | 対応ケースまたは除外理由                                                 |
-| ----------------------------------------- | ------------------------------------------------------------------------ |
-| ja 側のキー欠落・固定値からの drift       | TC-028                                                                   |
-| placeholder の欠落・過剰                  | TC-028                                                                   |
-| 未翻訳（raw key fallback）                | TC-029                                                                   |
-| 片 locale だけの追加 / placeholder 不一致 | TC-030                                                                   |
-| 英語値                                    | excluded(`web.l10n.en.json-test.md` S10 の責務)                          |
-| 境界値・外部依存・例外・型                | excluded(静的 JSON に数値境界・外部依存・throw 経路・型分岐が存在しない) |
+| Failure source                                          | Case or reason for exclusion                                                                  |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Key missing on the ja side / drift from the fixed value | TC-028                                                                                        |
+| Placeholder missing or extra                            | TC-028                                                                                        |
+| Untranslated (raw key fallback)                         | TC-029                                                                                        |
+| Added to only one locale / placeholder mismatch         | TC-030                                                                                        |
+| English value                                           | excluded(owned by `web.l10n.en.json-test.md` S10)                                             |
+| Boundary / external dependency / exception / type       | excluded(static JSON has no numeric boundary, external dependency, throw path or type branch) |
 
-### Feature 059-02 テスト対応（S11）
+### Feature 059-02 test mapping (S11)
 
-- テストファイル: `tests/web/i18n.test.ts` の describe `hidden ref badge counter label (Feature 059-02)`。TC-028〜TC-030 は各 `it`（名前に `ja l10n TC-0NN` を付記）
+- Test file: describe `hidden ref badge counter label (Feature 059-02)` in `tests/web/i18n.test.ts`. TC-028 to TC-030 are one `it` each (with `ja l10n TC-0NN` added to the name)
 
-## S12: キーボード操作・読み上げ用 a11y キー 12 件の日本語辞書
+## S12: Japanese dictionary for 12 a11y keys for keyboard operation and screen readers
 
 > Origin: Feature 061-05 (light-spec-plan)
 > Added: 2026-10-07
 > Status: active
 > Supersedes: -
-> Signature: 追加キー `a11y.commitHistory` / `a11y.operationTarget` / `a11y.detailsOpen` / `a11y.compareBase` / `a11y.compareTarget` / `a11y.head` / `a11y.workingTree` / `a11y.stash` / `a11y.actionFor` / `a11y.commitsLoaded` / `a11y.noCommits` / `a11y.commitOrdering`
+> Signature: Added keys `a11y.commitHistory` / `a11y.operationTarget` / `a11y.detailsOpen` / `a11y.compareBase` / `a11y.compareTarget` / `a11y.head` / `a11y.workingTree` / `a11y.stash` / `a11y.actionFor` / `a11y.commitsLoaded` / `a11y.noCommits` / `a11y.commitOrdering`
 > Target Path: `l10n/web/web.l10n.ja.json`
 > Test File: `tests/web/i18n.test.ts`
 
-対応プラン Task 11 実装内容 4 の表の日本語値。raw key fallback が無いことを含めて検証する additive section。
+The Japanese values of the table in implementation plan Task 11 implementation item 4. Additive section that also verifies there is no raw key fallback.
 
-| Case ID | Input / Precondition                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                 | Notes                                              |
-| ------- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------- |
-| TC-101  | ja bundle から 12 キーを読み込む                                                                    | Normal - キー集合の存在                                                    | 12 キーがすべて存在し、値が非空で、値がキー文字列そのものと一致しない（raw key fallback 不在）                                                                                                                                  | K45                                                |
-| TC-102  | 12 キーの値を Task 11 の表と比較                                                                    | Normal - 固定値の一致                                                      | `コミット履歴` / `操作対象` / `詳細表示中` / `比較の起点` / `比較対象` / `HEAD` / `作業ツリー` / `スタッシュ` / `{0}: {1}` / `{0}件のコミットを読み込みました` / `表示するコミットはありません` / `コミットの並び順` と完全一致 | K45。`HEAD` と `{0}: {1}` は英日同値               |
-| TC-103  | `a11y.actionFor` と `a11y.commitsLoaded` の placeholder を抽出                                      | Validation - 引数の一致                                                    | en と同じ placeholder 集合（`{0}` `{1}` / `{0}`）、他 10 キーに placeholder が無い                                                                                                                                              | K45                                                |
-| TC-104  | en / ja 両 bundle の `a11y.` 接頭辞のキー集合を比較                                                 | Validation - locale parity                                                 | 差集合が双方向とも空                                                                                                                                                                                                            | en 側は `web.l10n.en.json-test.md` S11 TC-104 と対 |
-| TC-105  | 実画面（ja locale の VS Code）で `M` の行とファイル操作 button の名前をアクセシビリティツリーで確認 | Normal - 実画面と辞書の整合（手動）                                        | 行の説明が `操作対象` / `詳細表示中` / `HEAD`、ファイル操作の名前が `<操作名>: <path>` の形で辞書と一致。記録: VS Code 版、OS、locale                                                                                           | K45 / A8.3-6。手動。「実画面と辞書整合を別Case化」 |
+| Case ID | Input / Precondition                                                                                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                    | Notes                                                                           |
+| ------- | --------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| TC-101  | Load the 12 keys from the ja bundle                                                                                               | Normal - key set exists                                                    | All 12 keys exist, the values are non-empty, and no value equals its key string (no raw key fallback)                                                                                                                              | K45                                                                             |
+| TC-102  | Compare the values of the 12 keys with the Task 11 table                                                                          | Normal - fixed values match                                                | Exactly match `コミット履歴` / `操作対象` / `詳細表示中` / `比較の起点` / `比較対象` / `HEAD` / `作業ツリー` / `スタッシュ` / `{0}: {1}` / `{0}件のコミットを読み込みました` / `表示するコミットはありません` / `コミットの並び順` | K45. `HEAD` and `{0}: {1}` have the same value in English and Japanese          |
+| TC-103  | Extract the placeholders of `a11y.actionFor` and `a11y.commitsLoaded`                                                             | Validation - arguments match                                               | The same placeholder sets as en (`{0}` `{1}` / `{0}`), and the other 10 keys have no placeholder                                                                                                                                   | K45                                                                             |
+| TC-104  | Compare the key sets with the `a11y.` prefix in both the en and ja bundles                                                        | Validation - locale parity                                                 | The difference is empty in both directions                                                                                                                                                                                         | Paired with `web.l10n.en.json-test.md` S11 TC-104 on the en side                |
+| TC-105  | In the real UI (VS Code with the ja locale), check the names of the `M` row and the file action buttons in the accessibility tree | Normal - real UI consistent with the dictionary (manual)                   | The row description is `操作対象` / `詳細表示中` / `HEAD`, and the file action name has the form `<action name>: <path>`, matching the dictionary. Record: VS Code version, OS, locale                                             | K45 / A8.3-6. Manual. "Make real UI vs. dictionary consistency a separate case" |
 
-### 失敗源インベントリ（include-or-justify）— Feature 061-05 追加分（S12）
+### Failure-source inventory (include-or-justify) — added by Feature 061-05 (S12)
 
-| 失敗源                                 | 対応ケースまたは除外理由                            |
-| -------------------------------------- | --------------------------------------------------- |
-| キー欠落・空値・raw key fallback・誤値 | TC-101、TC-102                                      |
-| placeholder の不一致                   | TC-103                                              |
-| 片 locale だけの追加                   | TC-104                                              |
-| 実画面との不整合                       | TC-105（手動）                                      |
-| 外部依存・例外・型                     | excluded(静的 JSON で外部依存・throw・型分岐が無い) |
+| Failure source                                             | Case or reason for exclusion                                            |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Key missing / empty value / raw key fallback / wrong value | TC-101, TC-102                                                          |
+| Placeholder mismatch                                       | TC-103                                                                  |
+| Added to only one locale                                   | TC-104                                                                  |
+| Inconsistency with the real UI                             | TC-105 (manual)                                                         |
+| External dependency / exception / type                     | excluded(static JSON with no external dependency, throw or type branch) |
 
-### Task 12 テスト対応（Feature 061-05）— S12
+### Task 12 test mapping (Feature 061-05) — S12
 
-- テスト: `tests/web/i18n.test.ts`。TC-101 `Japanese bundle holds the twelve keys without raw key fallback (ja l10n TC-101)` / TC-102 `Japanese bundle holds exactly the fixed values of the Task 11 table (ja l10n TC-102)` / TC-103 `Japanese placeholders match the English sets (ja l10n TC-103)` / TC-104 `keeps the a11y key sets of both locales in parity (en l10n TC-104 / ja l10n TC-104)`
-- 手動 Case TC-105（ja locale のアクセシビリティツリー）: **未実施**。理由・影響・代替確認・残る手順は `web/main-test/13-keyboard-accessibility-01.md` 冒頭の手動一覧（スクリーンリーダーの行）。代替確認: TC-101〜TC-104 と `web/main-test/13-keyboard-accessibility-02.md` S79（旧 S77）TC-735〜TC-737 の属性（en 辞書）
-- 実行結果（2026-10-07）: 4 件 pass
+- Tests: `tests/web/i18n.test.ts`. TC-101 `Japanese bundle holds the twelve keys without raw key fallback (ja l10n TC-101)` / TC-102 `Japanese bundle holds exactly the fixed values of the Task 11 table (ja l10n TC-102)` / TC-103 `Japanese placeholders match the English sets (ja l10n TC-103)` / TC-104 `keeps the a11y key sets of both locales in parity (en l10n TC-104 / ja l10n TC-104)`
+- Manual case TC-105 (accessibility tree in the ja locale): **not run**. The reason, impact, alternative check and remaining steps are in the manual list at the top of `web/main-test/13-keyboard-accessibility-01.md` (the screen reader row). Alternative check: TC-101 to TC-104 and the attributes (en dictionary) of `web/main-test/13-keyboard-accessibility-02.md` S79 (formerly S77) TC-735 to TC-737
+- Execution result (2026-10-07): 4 passed

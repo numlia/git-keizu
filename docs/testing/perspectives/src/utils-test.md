@@ -1,26 +1,26 @@
-# テスト観点表: src/utils.ts
+# Test Perspectives: src/utils.ts
 
 > Source: `src/utils.ts`
 > Generated: 2026-04-04T12:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 
-## S1: doesFileExist() ファイル存在チェック
+## S1: doesFileExist() file existence check
 
 > Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
 > Added: 2026-04-04
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `doesFileExist(path: string): Promise<boolean>`
-**テスト対象パス**: `src/utils.ts`
+**Signature**: `doesFileExist(path: string): Promise<boolean>`
+**Target path**: `src/utils.ts`
 
-| Case ID | Input / Precondition                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result  | Notes                            |
-| ------- | ------------------------------------ | -------------------------------------------------------------------------- | ---------------- | -------------------------------- |
-| TC-001  | fs.access が正常解決するパス         | Normal - standard                                                          | true が返される  | fs.access(path, F_OK) のモック   |
-| TC-002  | fs.access が ENOENT で拒否されるパス | Normal - non-existent path                                                 | false が返される | エラーを catch して false を返す |
+| Case ID | Input / Precondition                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result | Notes                               |
+| ------- | ---------------------------------------------- | -------------------------------------------------------------------------- | --------------- | ----------------------------------- |
+| TC-001  | A path for which fs.access resolves normally   | Normal - standard                                                          | Returns true    | Mock of fs.access(path, F_OK)       |
+| TC-002  | A path for which fs.access rejects with ENOENT | Normal - non-existent path                                                 | Returns false   | Catches the error and returns false |
 
-## S2: openFile() パストラバーサル検証
+## S2: openFile() path traversal check
 
 > Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
 > Added: 2026-04-04
@@ -28,62 +28,62 @@
 > Superseded By: S6
 > Supersedes: -
 
-**シグネチャ**: `openFile(repo: string, filePath: string, commitHash: string, dataSource: DataSource, viewColumn: vscode.ViewColumn): Promise<string | null>`
-**テスト対象パス**: `src/utils.ts`
+**Signature**: `openFile(repo: string, filePath: string, commitHash: string, dataSource: DataSource, viewColumn: vscode.ViewColumn): Promise<string | null>`
+**Target path**: `src/utils.ts`
 
-| Case ID | Input / Precondition                                                   | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                               | Notes                          |
-| ------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------- | ------------------------------ |
-| TC-003  | filePath に ".." セグメントを含む（例: "../etc/passwd"）               | Validation - path traversal                                                | エラーメッセージ文字列が返される。vscode.commands.executeCommand が呼ばれない | 第一段チェック                 |
-| TC-004  | path.resolve(repo, filePath) が repo プレフィックスを持たない          | Validation - prefix escape                                                 | エラーメッセージ文字列が返される。vscode.commands.executeCommand が呼ばれない | 第二段チェック                 |
-| TC-005  | ファイル不在 + リネーム先取得 + 新パスが repo プレフィックスを持たない | Validation - renamed path traversal                                        | エラーメッセージ文字列が返される                                              | リネーム先にも prefix 検証適用 |
+| Case ID | Input / Precondition                                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                   | Notes                                              |
+| ------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------- |
+| TC-003  | filePath contains a ".." segment (e.g. "../etc/passwd")                         | Validation - path traversal                                                | An error message string is returned. vscode.commands.executeCommand is not called | First-stage check                                  |
+| TC-004  | path.resolve(repo, filePath) does not have the repo prefix                      | Validation - prefix escape                                                 | An error message string is returned. vscode.commands.executeCommand is not called | Second-stage check                                 |
+| TC-005  | File missing + rename target found + the new path does not have the repo prefix | Validation - renamed path traversal                                        | An error message string is returned                                               | The prefix check also applies to the rename target |
 
-## S3: openFile() 正常ファイルオープン
-
-> Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
-> Added: 2026-04-04
-> Status: active
-> Supersedes: -
-
-**シグネチャ**: `openFile(repo: string, filePath: string, commitHash: string, dataSource: DataSource, viewColumn: vscode.ViewColumn): Promise<string | null>`
-**テスト対象パス**: `src/utils.ts`
-
-| Case ID | Input / Precondition                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                 | Notes                       |
-| ------- | -------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| TC-006  | ファイルが存在する                           | Normal - standard                                                          | null が返される。vscode.commands.executeCommand が "vscode.open", Uri, { preview: true, viewColumn } で呼ばれる | preview: true の検証        |
-| TC-007  | ファイルが存在し viewColumn = ViewColumn.One | Normal - viewColumn pass-through                                           | vscode.open の第3引数に viewColumn: ViewColumn.One が含まれる                                                   | viewColumn パススルーの検証 |
-
-## S4: openFile() リネーム追跡
+## S3: openFile() normal file open
 
 > Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
 > Added: 2026-04-04
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `openFile(repo: string, filePath: string, commitHash: string, dataSource: DataSource, viewColumn: vscode.ViewColumn): Promise<string | null>`
-**テスト対象パス**: `src/utils.ts`
+**Signature**: `openFile(repo: string, filePath: string, commitHash: string, dataSource: DataSource, viewColumn: vscode.ViewColumn): Promise<string | null>`
+**Target path**: `src/utils.ts`
 
-| Case ID | Input / Precondition                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                | Notes                                |
-| ------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------ | ------------------------------------ |
-| TC-008  | ファイル不在 + getNewPathOfRenamedFile が新パスを返す + 新パスのファイルが存在する | Normal - rename success                                                    | null が返される。vscode.open が新パスの URI で呼ばれる                         | リネーム追跡成功フロー               |
-| TC-009  | ファイル不在 + getNewPathOfRenamedFile が null を返す                              | Exception - no rename found                                                | "The file ... doesn't currently exist in this repository." が返される          | リネーム情報なし                     |
-| TC-010  | ファイル不在 + リネーム先パスのファイルも存在しない                                | Exception - renamed path missing                                           | "The file ... doesn't currently exist in this repository." が返される          | リネーム先も不在                     |
-| TC-011  | ファイル不在 + commitHash が UNCOMMITTED_CHANGES_HASH                              | Normal - uncommitted skip                                                  | エラーメッセージが返される。getNewPathOfRenamedFile が呼ばれないことを検証する | 未コミット変更はリネーム追跡スキップ |
+| Case ID | Input / Precondition                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                               | Notes                              |
+| ------- | ----------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- | ---------------------------------- |
+| TC-006  | The file exists                                 | Normal - standard                                                          | Returns null. vscode.commands.executeCommand is called with "vscode.open", Uri, { preview: true, viewColumn } | Checks preview: true               |
+| TC-007  | The file exists and viewColumn = ViewColumn.One | Normal - viewColumn pass-through                                           | The third argument of vscode.open contains viewColumn: ViewColumn.One                                         | Checks the viewColumn pass-through |
 
-## S5: openFile() エラーハンドリング
+## S4: openFile() rename tracking
 
 > Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
 > Added: 2026-04-04
 > Status: active
 > Supersedes: -
 
-**シグネチャ**: `openFile(repo: string, filePath: string, commitHash: string, dataSource: DataSource, viewColumn: vscode.ViewColumn): Promise<string | null>`
-**テスト対象パス**: `src/utils.ts`
+**Signature**: `openFile(repo: string, filePath: string, commitHash: string, dataSource: DataSource, viewColumn: vscode.ViewColumn): Promise<string | null>`
+**Target path**: `src/utils.ts`
 
-| Case ID | Input / Precondition                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                        | Notes                    |
-| ------- | ------------------------------------------------------------------ | -------------------------------------------------------------------------- | ------------------------------------------------------ | ------------------------ |
-| TC-012  | ファイルが存在する + vscode.commands.executeCommand が例外をスロー | Exception - vscode.open failure                                            | "Visual Studio Code was unable to open ..." が返される | try-catch でのエラー変換 |
+| Case ID | Input / Precondition                                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                   | Notes                                              |
+| ------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------- |
+| TC-008  | File missing + getNewPathOfRenamedFile returns a new path + the file at the new path exists | Normal - rename success                                                    | Returns null. vscode.open is called with the URI of the new path                  | Successful rename tracking flow                    |
+| TC-009  | File missing + getNewPathOfRenamedFile returns null                                         | Exception - no rename found                                                | Returns "The file ... doesn't currently exist in this repository."                | No rename information                              |
+| TC-010  | File missing + the file at the rename target path does not exist either                     | Exception - renamed path missing                                           | Returns "The file ... doesn't currently exist in this repository."                | The rename target is also missing                  |
+| TC-011  | File missing + commitHash is UNCOMMITTED_CHANGES_HASH                                       | Normal - uncommitted skip                                                  | An error message is returned. Verifies that getNewPathOfRenamedFile is not called | Rename tracking is skipped for uncommitted changes |
 
-## S6: openFile() path.relative ベースのパストラバーサル検証
+## S5: openFile() error handling
+
+> Origin: Feature 026 (commit-detail-open-file) (aidd-spec-tasks-test)
+> Added: 2026-04-04
+> Status: active
+> Supersedes: -
+
+**Signature**: `openFile(repo: string, filePath: string, commitHash: string, dataSource: DataSource, viewColumn: vscode.ViewColumn): Promise<string | null>`
+**Target path**: `src/utils.ts`
+
+| Case ID | Input / Precondition                                    | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                     | Notes                         |
+| ------- | ------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------- | ----------------------------- |
+| TC-012  | The file exists + vscode.commands.executeCommand throws | Exception - vscode.open failure                                            | Returns "Visual Studio Code was unable to open ..." | Error conversion in try-catch |
+
+## S6: openFile() path traversal check based on path.relative
 
 > Origin: フェーズ3 修正 L12 (path-relative-traversal-guard)
 > Added: 2026-07-04T04:29:24Z
@@ -92,65 +92,65 @@
 > Signature: `openFile(repo: string, filePath: string, commitHash: string, dataSource: DataSource, viewColumn: vscode.ViewColumn): Promise<string | null>`
 > Target Path: `src/utils.ts:70-99`
 
-パストラバーサル検証を、旧2段方式（`filePath.split("/").includes("..")` の第1段 + `!resolvedPath.startsWith(repo)` の第2段）から、`path.relative(repo, path.resolve(repo, filePath))` の結果が `".."` で始まる、または `path.isAbsolute` である場合に拒否する単一方式へ置き換える修正。リネーム先パスにも同じ relative 方式を適用する。旧 `startsWith(repo)` は `repo="/a"` と `resolvedPath="/ab/x"` のような接頭辞共有の兄弟ディレクトリを誤って許可していたが、relative 方式はこれを `"../ab/x"` として確実に拒否する。S2 の split-includes + startsWith 前提を置き換える。
+A fix that replaces the old two-stage path traversal check (first stage `filePath.split("/").includes("..")` + second stage `!resolvedPath.startsWith(repo)`) with a single check that rejects the path when the result of `path.relative(repo, path.resolve(repo, filePath))` starts with `".."` or is `path.isAbsolute`. The same relative check applies to the rename target path. The old `startsWith(repo)` wrongly allowed sibling directories that share the prefix, such as `repo="/a"` and `resolvedPath="/ab/x"`, while the relative check reliably rejects this as `"../ab/x"`. Replaces the split-includes + startsWith premise of S2.
 
-| Case ID | Input / Precondition                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                        | Notes                                                                                      |
-| ------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| TC-013  | repo=`/repo`、filePath=`src/a.ts`（repo 内）                                 | Normal - inside repo allowed                                               | `path.relative` が `"src/a.ts"`（`".."` 始まりでも絶対でもない）でガードを通過し、ファイルオープン処理へ進む                           | 正常パス                                                                                   |
-| TC-014  | repo=`/repo`、filePath=`../etc/passwd`                                       | Validation - relative escape rejected                                      | `path.relative` が `"../etc/passwd"` で `".."` 始まりのため `PATH_TRAVERSAL_ERROR` を返し、`vscode.commands.executeCommand` を呼ばない | 相対的な脱出                                                                               |
-| TC-015  | repo=`/repo`、filePath=`/etc/passwd`（絶対パス）                             | Type - absolute path rejected                                              | `path.resolve` 後の `path.relative` 判定で拒否され、`PATH_TRAVERSAL_ERROR` を返す（`..` 始まり／`isAbsolute` いずれかで捕捉）          | 絶対パス。`isAbsolute` 分岐は Windows のドライブ跨ぎで顕在化、POSIX では `..` 始まりで捕捉 |
-| TC-016  | ファイル不在 + `getNewPathOfRenamedFile` が repo 外へ脱出する新パスを返す    | Validation - renamed path escape rejected                                  | リネーム先の `path.relative` が `".."` 始まりのため `PATH_TRAVERSAL_ERROR` を返す                                                      | リネーム先にも relative 検証適用                                                           |
-| TC-017  | repo=`/repo`、filePath=`""`（repo ルート自身に解決）                         | Boundary - repo root allowed                                               | `path.relative(repo, repo)` が `""` で `".."` 始まりでも絶対でもないためガードを通過する                                               | repo ルート境界                                                                            |
-| TC-018  | repo=`/repo`、resolvedPath が `/repo-evil/x`（接頭辞共有の兄弟ディレクトリ） | Boundary - sibling prefix rejected                                         | `path.relative` が `"../repo-evil/x"` で `".."` 始まりのため拒否される（旧 `startsWith("/repo")` は誤許可していた）                    | L12 の中核回帰                                                                             |
+| Case ID | Input / Precondition                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                          | Notes                                                                                                             |
+| ------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| TC-013  | repo=`/repo`, filePath=`src/a.ts` (inside the repo)                                 | Normal - inside repo allowed                                               | `path.relative` is `"src/a.ts"` (neither starting with `".."` nor absolute), so it passes the guard and proceeds to opening the file                     | Normal path                                                                                                       |
+| TC-014  | repo=`/repo`, filePath=`../etc/passwd`                                              | Validation - relative escape rejected                                      | `path.relative` is `"../etc/passwd"`, which starts with `".."`, so `PATH_TRAVERSAL_ERROR` is returned and `vscode.commands.executeCommand` is not called | Relative escape                                                                                                   |
+| TC-015  | repo=`/repo`, filePath=`/etc/passwd` (absolute path)                                | Type - absolute path rejected                                              | Rejected by the `path.relative` check after `path.resolve`, returning `PATH_TRAVERSAL_ERROR` (caught by either the `..` start or `isAbsolute`)           | Absolute path. The `isAbsolute` branch shows up across drives on Windows; on POSIX it is caught by the `..` start |
+| TC-016  | File missing + `getNewPathOfRenamedFile` returns a new path that escapes the repo   | Validation - renamed path escape rejected                                  | The `path.relative` of the rename target starts with `".."`, so `PATH_TRAVERSAL_ERROR` is returned                                                       | The relative check also applies to the rename target                                                              |
+| TC-017  | repo=`/repo`, filePath=`""` (resolves to the repo root itself)                      | Boundary - repo root allowed                                               | `path.relative(repo, repo)` is `""`, neither starting with `".."` nor absolute, so it passes the guard                                                   | repo root boundary                                                                                                |
+| TC-018  | repo=`/repo`, resolvedPath is `/repo-evil/x` (sibling directory sharing the prefix) | Boundary - sibling prefix rejected                                         | `path.relative` is `"../repo-evil/x"`, which starts with `".."`, so it is rejected (the old `startsWith("/repo")` wrongly allowed it)                    | Core regression of L12                                                                                            |
 
-## S7: isValidCommitHash() コミットハッシュ値域の共有 helper
+## S7: isValidCommitHash() shared helper for the commit hash value range
 
 > Origin: Feature 052 (detached-worktree-display) (light-spec-plan)
 > Added: 2026-08-08
 > Status: active
 > Supersedes: -
 > Signature: `isValidCommitHash(hash: string): boolean`
-> Target Path: `src/utils.ts`（`isValidCommitHash()`。実装後に行範囲へ更新）
+> Target Path: `src/utils.ts` (`isValidCommitHash()`; update to a line range after implementation)
 > Test File: `tests/src/utils.test.ts`
 
-`src/dataSource.ts` の非公開 helper（`/^[0-9a-f]{4,40}$/i`）を `src/utils.ts` へ移して export し、DataSource と `src/worktree.ts` が同じ規則を使えるようにする追加。値域は現行のまま変えず、SHA-256 の 64 文字 object ID は本対応の対象外として拒否されることを固定する。移動元の各 call site の振る舞いは `src/dataSource-test/` の既存 section が担保し、本 section は helper 単体の値域だけを対象とする。
+An addition that moves the private helper of `src/dataSource.ts` (`/^[0-9a-f]{4,40}$/i`) to `src/utils.ts` and exports it, so that DataSource and `src/worktree.ts` use the same rule. The value range stays as it is, and it fixes that 64-character SHA-256 object IDs are rejected as out of scope for this change. The behavior of each call site at the original location is covered by the existing sections of `src/dataSource-test/`; this section covers only the value range of the helper itself.
 
-| Case ID | Input / Precondition                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result         | Notes                                    |
-| ------- | --------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------- | ---------------------------------------- |
-| TC-019  | `hash` = 40 文字の小文字 16 進文字列                | Normal - full length hash                                                  | 戻り値が `true` である  | 通常の完全ハッシュ。最大長の境界も兼ねる |
-| TC-020  | `hash` = `"ABCD1234"`（大文字 16 進）               | Normal - case insensitive                                                  | 戻り値が `true` である  | `/i` フラグの維持                        |
-| TC-021  | `hash` = `"abcd"`（4 文字）                         | Boundary - minimum length                                                  | 戻り値が `true` である  | 短縮ハッシュの下限                       |
-| TC-022  | `hash` = `"abc"`（3 文字）                          | Boundary - minimum minus one                                               | 戻り値が `false` である | 下限 -1                                  |
-| TC-023  | `hash` = 41 文字の 16 進文字列                      | Boundary - maximum plus one                                                | 戻り値が `false` である | 上限 +1                                  |
-| TC-024  | `hash` = `""`（空文字列）                           | Boundary - empty                                                           | 戻り値が `false` である | 空入力                                   |
-| TC-025  | `hash` = 64 文字の 16 進文字列（SHA-256 object ID） | Boundary - sha-256 length rejected                                         | 戻り値が `false` である | 6 章の対象外契約を明示的に固定する       |
-| TC-026  | `hash` = `"zzzz"`（16 進外の英字）                  | Type - non-hex character                                                   | 戻り値が `false` である | 文字種の検証                             |
-| TC-027  | `hash` = `"abcd\n"`（末尾改行付き）                 | Validation - trailing newline rejected                                     | 戻り値が `false` である | `$` が複数行境界にならないことの確認     |
-| TC-028  | `hash` = `" abcd"`（先頭空白付き）                  | Validation - surrounding whitespace rejected                               | 戻り値が `false` である | trim せずに拒否する                      |
-| TC-029  | `hash` = `"-abcd"`（option 形式の文字列）           | Validation - option-like argument rejected                                 | 戻り値が `false` である | Git 引数へ option を渡さない担保         |
+| Case ID | Input / Precondition                                 | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result | Notes                                                        |
+| ------- | ---------------------------------------------------- | -------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------ |
+| TC-019  | `hash` = 40-character lowercase hex string           | Normal - full length hash                                                  | Returns `true`  | Normal full hash. Also serves as the maximum length boundary |
+| TC-020  | `hash` = `"ABCD1234"` (uppercase hex)                | Normal - case insensitive                                                  | Returns `true`  | Keeps the `/i` flag                                          |
+| TC-021  | `hash` = `"abcd"` (4 characters)                     | Boundary - minimum length                                                  | Returns `true`  | Lower limit of a short hash                                  |
+| TC-022  | `hash` = `"abc"` (3 characters)                      | Boundary - minimum minus one                                               | Returns `false` | Lower limit -1                                               |
+| TC-023  | `hash` = 41-character hex string                     | Boundary - maximum plus one                                                | Returns `false` | Upper limit +1                                               |
+| TC-024  | `hash` = `""` (empty string)                         | Boundary - empty                                                           | Returns `false` | Empty input                                                  |
+| TC-025  | `hash` = 64-character hex string (SHA-256 object ID) | Boundary - sha-256 length rejected                                         | Returns `false` | Explicitly fixes the out-of-scope contract of chapter 6      |
+| TC-026  | `hash` = `"zzzz"` (non-hex letters)                  | Type - non-hex character                                                   | Returns `false` | Character class check                                        |
+| TC-027  | `hash` = `"abcd\n"` (trailing newline)               | Validation - trailing newline rejected                                     | Returns `false` | Confirms that `$` does not act as a multiline boundary       |
+| TC-028  | `hash` = `" abcd"` (leading space)                   | Validation - surrounding whitespace rejected                               | Returns `false` | Rejected without trimming                                    |
+| TC-029  | `hash` = `"-abcd"` (option-like string)              | Validation - option-like argument rejected                                 | Returns `false` | Ensures no option is passed to Git arguments                 |
 
-### 失敗源インベントリ（include-or-justify）— Feature 052 追加分（S7）
+### Failure-source inventory (include-or-justify) — Feature 052 additions (S7)
 
-| 失敗源                                         | 対応ケースまたは除外理由                                                                                                                        |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| 移設時に長さ下限・上限が変わる                 | TC-019、TC-021、TC-022、TC-023                                                                                                                  |
-| 大文字ハッシュを誤って拒否する                 | TC-020                                                                                                                                          |
-| 16 進以外の文字を通す                          | TC-026                                                                                                                                          |
-| 前後の空白・改行を許して部分一致にする         | TC-027、TC-028                                                                                                                                  |
-| option 形式の文字列を Git 引数へ通す           | TC-029                                                                                                                                          |
-| SHA-256 の 64 文字を追加してしまう             | TC-025                                                                                                                                          |
-| 境界値（0 / minimum / maximum / +/-1 / empty） | TC-021（minimum）、TC-022（minimum-1）、TC-019（maximum）、TC-023（maximum+1）、TC-024（empty）。長さ 0 は TC-024 と同一入力のため統合した      |
-| 境界値（NULL）                                 | excluded(引数が `string` 型で `null` / `undefined` を取り得ない。空文字は TC-024 で検証)                                                        |
-| 外部依存の失敗                                 | excluded(正規表現判定のみで外部依存を持たない)                                                                                                  |
-| 例外送出                                       | excluded(戻り値が `boolean` の純関数で throw 経路を持たない)                                                                                    |
-| DataSource 各 call site の振る舞い変化         | excluded(`src/dataSource-test/01-history-diff-01.md` S27 TC-162 ほか既存 section が call site 単位で担保する。本対応は helper の値域を変えない) |
+| Failure source                                                            | Covering case or reason for exclusion                                                                                                                                    |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| The minimum or maximum length changes in the move                         | TC-019, TC-021, TC-022, TC-023                                                                                                                                           |
+| Uppercase hashes wrongly rejected                                         | TC-020                                                                                                                                                                   |
+| Non-hex characters accepted                                               | TC-026                                                                                                                                                                   |
+| Leading / trailing whitespace or newlines allowed, giving a partial match | TC-027, TC-028                                                                                                                                                           |
+| Option-like strings passed to Git arguments                               | TC-029                                                                                                                                                                   |
+| 64-character SHA-256 accidentally added                                   | TC-025                                                                                                                                                                   |
+| Boundary values (0 / minimum / maximum / +/-1 / empty)                    | TC-021 (minimum), TC-022 (minimum-1), TC-019 (maximum), TC-023 (maximum+1), TC-024 (empty). Length 0 is the same input as TC-024, so they were merged                    |
+| Boundary values (NULL)                                                    | excluded(the argument is of type `string` and cannot be `null` / `undefined`. The empty string is verified by TC-024)                                                    |
+| External dependency failure                                               | excluded(regular expression check only, with no external dependency)                                                                                                     |
+| Exception thrown                                                          | excluded(a pure function returning `boolean` with no throw path)                                                                                                         |
+| Behavior change at each DataSource call site                              | excluded(covered per call site by existing sections such as `src/dataSource-test/01-history-diff-01.md` S27 TC-162. This change does not alter the helper's value range) |
 
-**失敗カテゴリ網羅（diversity floor）**:
+**Failure-category coverage (diversity floor)**:
 
-- Validation: TC-027、TC-028、TC-029
-- Exception: excluded(throw 経路なし)
-- External: excluded(外部依存なし)
-- Boundary: TC-021、TC-022、TC-023、TC-024、TC-025
+- Validation: TC-027, TC-028, TC-029
+- Exception: excluded(no throw path)
+- External: excluded(no external dependency)
+- Boundary: TC-021, TC-022, TC-023, TC-024, TC-025
 - Type: TC-026
 
-**失敗系/正常系比（煙感知器）**: 正常系 2 件（TC-019、TC-020）、失敗系 9 件（TC-021〜TC-029。`Perspective` が `Boundary` / `Type` / `Validation` で始まるものを失敗系として数える）。比 4.5 で近接（差 1 以内）ではないため、インベントリ再導出は不要と判断した。
+**Failure/normal ratio (smoke detector)**: 2 normal cases (TC-019, TC-020), 9 failure cases (TC-021 to TC-029; cases whose `Perspective` starts with `Boundary` / `Type` / `Validation` are counted as failure cases). The ratio is 4.5 and not close (within a difference of 1), so re-deriving the inventory was judged unnecessary.
