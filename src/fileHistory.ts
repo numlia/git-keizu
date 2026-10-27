@@ -281,6 +281,31 @@ export function applyLineageRules(
   return { entries, historicalPaths, boundary: null };
 }
 
+/** The rename entry at `index` in lineage order, or null when the lineage has no more renames. */
+export function findLineageRename(lineage: LineageResult, index: number): FileHistoryEntry | null {
+  const renames = lineage.entries.filter((entry) => entry.type === STATUS_RENAMED);
+  return renames[index] ?? null;
+}
+
+/**
+ * Keep the lineage groups up to and including the rename commit and replace
+ * the rest with the continuation groups (the lineage query on the old path)
+ * after it. `--follow` disables pruning, so every lineage query from the same
+ * anchor walks the same `--topo-order` commit list, and the rename commit (a
+ * `D` of the old path) marks the same position in both. Returns null when
+ * either list lacks the rename commit.
+ */
+export function spliceLineageContinuation(
+  groups: readonly FileHistoryRecordGroup[],
+  renameHash: string,
+  continuationGroups: readonly FileHistoryRecordGroup[]
+): FileHistoryRecordGroup[] | null {
+  const renameIndex = groups.findIndex((group) => group.hash === renameHash);
+  const continuationIndex = continuationGroups.findIndex((group) => group.hash === renameHash);
+  if (renameIndex < 0 || continuationIndex < 0) return null;
+  return [...groups.slice(0, renameIndex + 1), ...continuationGroups.slice(continuationIndex + 1)];
+}
+
 /**
  * Fold each `--diff-merges=separate` group into one merge entry chosen from the
  * first record touching a historical path. A group whose every parent record

@@ -5942,6 +5942,12 @@ describe("getFileHistory spawn orchestration (S49)", () => {
     fileHistoryRecord(similar.updLeg, [similar.base], ["M", LEG]),
     fileHistoryRecord(similar.base, [], ["A", LEG])
   ].join("");
+  /** The continuation lineage query on the legacy path: the rename commit shows as D legacy. */
+  const similarContinuation = [
+    fileHistoryRecord(similar.ren, [similar.updLeg], ["D", LEG]),
+    fileHistoryRecord(similar.updLeg, [similar.base], ["M", LEG]),
+    fileHistoryRecord(similar.base, [], ["A", LEG])
+  ].join("");
   const similarMerge = fileHistoryRecord(
     similar.mergeHash,
     [similar.docs, similar.upd],
@@ -6077,13 +6083,17 @@ describe("getFileHistory spawn orchestration (S49)", () => {
   it("passes the historical path set in insertion order (TC-333)", async () => {
     // Case: TC-333
     // Given: the similar lineage containing a rename
-    installSpawnSequence([{ stdout: similarLineage }, { stdout: similarMerge }]);
+    installSpawnSequence([
+      { stdout: similarLineage },
+      { stdout: similarContinuation },
+      { stdout: similarMerge }
+    ]);
 
     // When: the history is requested
     await ds.getFileHistory(REPO, ANCHOR, CUR);
 
-    // Then: everything after -- is [current, legacy]
-    const mergeArgs = spawnArgs(1);
+    // Then: everything after -- of the merge query (after the continuation) is [current, legacy]
+    const mergeArgs = spawnArgs(2);
     expect(mergeArgs.slice(mergeArgs.indexOf("--") + 1)).toEqual([CUR, LEG]);
   });
 
@@ -6212,14 +6222,20 @@ describe("getFileHistory spawn orchestration (S49)", () => {
       `${x} ${init}`,
       init
     ].join("\n");
-    installSpawnSequence([{ stdout: lineage }, { stdout: merge }, { stdout: ancestry }]);
+    const continuation = fileHistoryRecord(ren, [birth], ["D", LEG]);
+    installSpawnSequence([
+      { stdout: lineage },
+      { stdout: continuation },
+      { stdout: merge },
+      { stdout: ancestry }
+    ]);
 
     // When: the history is requested
     const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
 
-    // Then: the third spawn is rev-list --parents <anchor> with no ^ and three entries return
-    expect(spawnMock).toHaveBeenCalledTimes(3);
-    expect(spawnArgs(2)).toEqual(["rev-list", "--parents", ANCHOR]);
+    // Then: the fourth spawn (after the continuation) is rev-list --parents <anchor> with no ^
+    expect(spawnMock).toHaveBeenCalledTimes(4);
+    expect(spawnArgs(3)).toEqual(["rev-list", "--parents", ANCHOR]);
     expect(result).toHaveLength(3);
   });
 
@@ -6246,13 +6262,17 @@ describe("getFileHistory spawn orchestration (S49)", () => {
   it("skips the ancestry query when there is no birth candidate (TC-343)", async () => {
     // Case: TC-343
     // Given: the similar shape with six entries and no candidate
-    installSpawnSequence([{ stdout: similarLineage }, { stdout: similarMerge }]);
+    installSpawnSequence([
+      { stdout: similarLineage },
+      { stdout: similarContinuation },
+      { stdout: similarMerge }
+    ]);
 
     // When: the history is requested
     const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
 
-    // Then: two spawns and the plain lineage + merge concatenation
-    expect(spawnMock).toHaveBeenCalledTimes(2);
+    // Then: three spawns (lineage, continuation, merge) and the plain lineage + merge concatenation
+    expect(spawnMock).toHaveBeenCalledTimes(3);
     const lineage = applyLineageRules(parseFileHistoryRecords(similarLineage)!, ANCHOR, CUR)!;
     const merge = applyMergeRules(
       parseFileHistoryRecords(similarMerge)!,
@@ -6320,5 +6340,146 @@ describe("getFileHistory spawn orchestration (S49)", () => {
     });
     expect(result).toEqual(expected);
     expect(result!.map((e) => e.hash)).toEqual([ANCHOR, ce3.recreate]);
+  });
+
+  // @see docs/testing/perspectives/src/dataSource-test/07-file-history-01.md
+  describe("lineage continuation after a rename (S52)", () => {
+    /** The Git 2.56 lineage shape: --follow stops after the rename on a shared ancestor. */
+    const truncatedLineage = [
+      fileHistoryRecord(ANCHOR, [similar.mergeHash], ["M", CUR]),
+      fileHistoryRecord(similar.upd, [similar.ren], ["M", CUR]),
+      fileHistoryRecord(similar.ren, [similar.updLeg], ["R100", LEG, CUR])
+    ].join("");
+
+    it("runs the continuation lineage query on the old path of the rename (TC-791)", async () => {
+      // Case: TC-791
+      // Given: a lineage containing the rename legacy -> current
+      installSpawnSequence([
+        { stdout: similarLineage },
+        { stdout: similarContinuation },
+        { stdout: similarMerge }
+      ]);
+
+      // When: the history is requested
+      await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+      // Then: the second spawn is the lineage query for the legacy path from the same anchor
+      expect(spawnArgs(1)).toEqual(buildLineageQueryArgs(ANCHOR, LEG));
+    });
+
+    it("recovers the pre-rename entries that the lineage query dropped (TC-792)", async () => {
+      // Case: TC-792
+      // Given: a lineage truncated after the rename and a continuation holding the legacy entries
+      installSpawnSequence([
+        { stdout: truncatedLineage },
+        { stdout: similarContinuation },
+        { stdout: similarMerge }
+      ]);
+
+      // When: the history is requested
+      const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+      // Then: the same six entries as the untruncated lineage (TC-343)
+      expect(result).not.toBeNull();
+      expect(result!.map((e) => [e.hash, e.type, e.historicalPath])).toEqual([
+        [ANCHOR, "M", CUR],
+        [similar.upd, "M", CUR],
+        [similar.ren, "R", CUR],
+        [similar.updLeg, "M", LEG],
+        [similar.base, "A", LEG],
+        [similar.mergeHash, "R", CUR]
+      ]);
+    });
+
+    it("follows each rename of a chain with one continuation query (TC-793)", async () => {
+      // Case: TC-793
+      // Given: oldest -> legacy at ren2 and legacy -> current at ren1, each continuation truncated
+      const OLDEST = "src/oldest-name.txt";
+      const ren1 = FH(0x91);
+      const ren2 = FH(0x92);
+      const root = FH(0x93);
+      installSpawnSequence([
+        {
+          stdout: [
+            fileHistoryRecord(ANCHOR, [ren1], ["M", CUR]),
+            fileHistoryRecord(ren1, [ren2], ["R100", LEG, CUR])
+          ].join("")
+        },
+        {
+          stdout: [
+            fileHistoryRecord(ren1, [ren2], ["D", LEG]),
+            fileHistoryRecord(ren2, [root], ["R100", OLDEST, LEG])
+          ].join("")
+        },
+        {
+          stdout: [
+            fileHistoryRecord(ren2, [root], ["D", OLDEST]),
+            fileHistoryRecord(root, [], ["A", OLDEST])
+          ].join("")
+        },
+        { stdout: "" }
+      ]);
+
+      // When: the history is requested
+      const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+      // Then: one continuation per old path, then the merge query over all three paths
+      expect(spawnMock).toHaveBeenCalledTimes(4);
+      expect(spawnArgs(1)).toEqual(buildLineageQueryArgs(ANCHOR, LEG));
+      expect(spawnArgs(2)).toEqual(buildLineageQueryArgs(ANCHOR, OLDEST));
+      expect(spawnArgs(3)).toEqual(buildMergeQueryArgs(ANCHOR, root, [CUR, LEG, OLDEST]));
+      expect(result!.map((e) => [e.hash, e.type, e.historicalPath])).toEqual([
+        [ANCHOR, "M", CUR],
+        [ren1, "R", CUR],
+        [ren2, "R", LEG],
+        [root, "A", OLDEST]
+      ]);
+    });
+
+    it("returns null after two spawns when the continuation query fails (TC-794)", async () => {
+      // Case: TC-794
+      // Given: a lineage with a rename and exit 1 for the continuation query
+      installSpawnSequence([{ stdout: similarLineage }, { stdout: "", exitCode: 1 }]);
+
+      // When: the history is requested
+      const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+      // Then: null after the continuation, and the merge query never runs
+      expect(result).toBeNull();
+      expect(spawnMock).toHaveBeenCalledTimes(2);
+      expect(spawnArgs(1)).toEqual(buildLineageQueryArgs(ANCHOR, LEG));
+    });
+
+    it("returns null after two spawns when the continuation output is malformed (TC-795)", async () => {
+      // Case: TC-795
+      // Given: a lineage with a rename and malformed continuation stdout
+      installSpawnSequence([{ stdout: similarLineage }, { stdout: "x" }]);
+
+      // When: the history is requested
+      const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+      // Then: null after the continuation, and the merge query never runs
+      expect(result).toBeNull();
+      expect(spawnMock).toHaveBeenCalledTimes(2);
+      expect(spawnArgs(1)).toEqual(buildLineageQueryArgs(ANCHOR, LEG));
+    });
+
+    it("returns null after two spawns when the continuation lacks the rename commit (TC-796)", async () => {
+      // Case: TC-796
+      // Given: a continuation whose groups do not include the rename commit
+      const continuation = [
+        fileHistoryRecord(similar.updLeg, [similar.base], ["M", LEG]),
+        fileHistoryRecord(similar.base, [], ["A", LEG])
+      ].join("");
+      installSpawnSequence([{ stdout: truncatedLineage }, { stdout: continuation }]);
+
+      // When: the history is requested
+      const result = await ds.getFileHistory(REPO, ANCHOR, CUR);
+
+      // Then: null rather than a lineage spliced at an unknown position
+      expect(result).toBeNull();
+      expect(spawnMock).toHaveBeenCalledTimes(2);
+      expect(spawnArgs(1)).toEqual(buildLineageQueryArgs(ANCHOR, LEG));
+    });
   });
 });

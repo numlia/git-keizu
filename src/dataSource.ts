@@ -20,11 +20,13 @@ import {
   buildLineageQueryArgs,
   buildMergeQueryArgs,
   FileHistoryRecordGroup,
+  findLineageRename,
   LineageResult,
   normalizeFileHistoryPath,
   parseAncestryGraph,
   parseFileHistoryRecords,
-  resolveFileHistoryEntries
+  resolveFileHistoryEntries,
+  spliceLineageContinuation
 } from "./fileHistory";
 import { DEFAULT_GIT_PATH, resolveGitExecutable } from "./gitExecutable";
 import { isSafeRemoteName, isValidRefName } from "./refValidation";
@@ -1094,11 +1096,12 @@ export class DataSource {
   }
 
   /**
-   * Resolve the history of one file from an anchor commit with up to three Git
-   * queries (lineage, merge, ancestry). The merge query runs even when the
-   * lineage has no entries, and the ancestry query only when a birth-merge
-   * candidate exists among at least two entries. Any Git failure, malformed
-   * output or rule violation yields null rather than a partial result.
+   * Resolve the history of one file from an anchor commit with the lineage
+   * query (plus one continuation query per rename), then the merge and
+   * ancestry queries. The merge query runs even when the lineage has no
+   * entries, and the ancestry query only when a birth-merge candidate exists
+   * among at least two entries. Any Git failure, malformed output or rule
+   * violation yields null rather than a partial result.
    */
   public async getFileHistory(
     repo: string,
@@ -1108,12 +1111,7 @@ export class DataSource {
     const requestedPath = normalizeFileHistoryPath(filePath);
     if (!isValidCommitHash(anchorHash) || requestedPath === null) return null;
 
-    const lineageGroups = await this.queryFileHistoryRecords(
-      buildLineageQueryArgs(anchorHash, requestedPath),
-      repo
-    );
-    if (lineageGroups === null) return null;
-    const lineage = applyLineageRules(lineageGroups, anchorHash, requestedPath);
+    const lineage = await this.queryFileHistoryLineage(repo, anchorHash, requestedPath);
     if (lineage === null) return null;
 
     const boundaryHash = lineage.boundary === null ? null : lineage.boundary.hash;
@@ -1135,6 +1133,41 @@ export class DataSource {
     if (needsAncestry && ancestry === null) return null;
 
     return resolveFileHistoryEntries({ requestedPath, lineage, merge, ancestry });
+  }
+
+  /**
+   * Run the lineage query, then for each rename it follows one lineage query
+   * on the old path whose groups after the rename replace the earlier ones.
+   * Since Git 2.56, `--follow` keeps one path per commit and a commit reached
+   * from two history lines takes the path of the line walked last, so the
+   * history before a rename can be dropped; the continuation query recovers
+   * it on every Git version. Each rename lies further along the shared walk,
+   * so the loop ends after one query per rename.
+   */
+  private async queryFileHistoryLineage(
+    repo: string,
+    anchorHash: string,
+    requestedPath: string
+  ): Promise<LineageResult | null> {
+    let groups = await this.queryFileHistoryRecords(
+      buildLineageQueryArgs(anchorHash, requestedPath),
+      repo
+    );
+    let followedRenames = 0;
+    while (groups !== null) {
+      const lineage = applyLineageRules(groups, anchorHash, requestedPath);
+      if (lineage === null) return null;
+      const rename = findLineageRename(lineage, followedRenames);
+      if (rename === null) return lineage;
+      const continuation = await this.queryFileHistoryRecords(
+        buildLineageQueryArgs(anchorHash, rename.oldFilePath),
+        repo
+      );
+      groups =
+        continuation === null ? null : spliceLineageContinuation(groups, rename.hash, continuation);
+      followedRenames++;
+    }
+    return null;
   }
 
   private async queryFileHistoryRecords(

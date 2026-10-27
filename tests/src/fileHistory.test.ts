@@ -14,12 +14,14 @@ import {
   buildMergeQueryArgs,
   type FileHistoryRecordEntry,
   type FileHistoryRecordGroup,
+  findLineageRename,
   type LineageResult,
   type MergeResult,
   normalizeFileHistoryPath,
   parseAncestryGraph,
   parseFileHistoryRecords,
-  resolveFileHistoryEntries
+  resolveFileHistoryEntries,
+  spliceLineageContinuation
 } from "../../src/fileHistory";
 import type { FileHistoryEntry } from "../../src/types";
 
@@ -1478,5 +1480,120 @@ describe("measured fixture composition (S8)", () => {
     for (const excluded of [ce3.addF, ce3.delMerge]) {
       expect(result.entries.map((e) => e.hash)).not.toContain(excluded);
     }
+  });
+});
+
+/* ------------------------------------------------------------------ */
+/* S9: findLineageRename() / spliceLineageContinuation()              */
+/* ------------------------------------------------------------------ */
+
+// @see docs/testing/perspectives/src/fileHistory-test.md
+describe("findLineageRename / spliceLineageContinuation (S9)", () => {
+  const OLDEST = "src/oldest-name.txt";
+  const fix = H(0x96);
+  const ren1 = H(0x95);
+  const ren2 = H(0x94);
+  const upd = H(0x93);
+  const base = H(0x92);
+
+  /** The groups walked so far: anchor, rename, and a group past it that the splice drops. */
+  function walkedGroups(): FileHistoryRecordGroup[] {
+    return [
+      group(fix, [ren1], [entryOf("M", CUR)]),
+      group(ren1, [upd], [entryOf("R", LEG, CUR)]),
+      group(H(0x90), [base], [entryOf("M", OTHER)])
+    ];
+  }
+
+  it("returns the renames in lineage order by index (TC-797)", () => {
+    // Case: TC-797
+    // Given: a lineage with two renames among other entries
+    const lineage = lineageOf(
+      [
+        fileEntry(fix, "M", CUR),
+        fileEntry(ren1, "R", CUR, { oldFilePath: LEG }),
+        fileEntry(upd, "M", LEG),
+        fileEntry(ren2, "R", LEG, { oldFilePath: OLDEST })
+      ],
+      [CUR, LEG, OLDEST]
+    );
+
+    // When: the renames at index 0 and 1 are requested
+    const first = findLineageRename(lineage, 0);
+    const second = findLineageRename(lineage, 1);
+
+    // Then: ren1 then ren2, each with its old path
+    expect(first).toEqual(lineage.entries[1]);
+    expect(second).toEqual(lineage.entries[3]);
+    expect(second!.oldFilePath).toBe(OLDEST);
+  });
+
+  it("returns null once every rename has been followed (TC-798)", () => {
+    // Case: TC-798
+    // Given: a lineage with one rename and one without any
+    const withRename = lineageOf(
+      [fileEntry(fix, "M", CUR), fileEntry(ren1, "R", CUR, { oldFilePath: LEG })],
+      [CUR, LEG]
+    );
+    const withoutRename = lineageOf([fileEntry(fix, "M", CUR)], [CUR]);
+
+    // When / Then: index 1 of the first and index 0 of the second are null
+    expect(findLineageRename(withRename, 1)).toBeNull();
+    expect(findLineageRename(withoutRename, 0)).toBeNull();
+  });
+
+  it("keeps the groups through the rename and appends the continuation after it (TC-799)", () => {
+    // Case: TC-799
+    // Given: walked groups and a continuation starting before the rename
+    const groups = walkedGroups();
+    const continuation = [
+      group(fix, [ren1], [entryOf("D", LEG)]),
+      group(ren1, [upd], [entryOf("D", LEG)]),
+      group(upd, [base], [entryOf("M", LEG)]),
+      group(base, [], [entryOf("A", LEG)])
+    ];
+    const groupsBefore = structuredClone(groups);
+    const continuationBefore = structuredClone(continuation);
+
+    // When: the continuation is spliced at ren1
+    const result = spliceLineageContinuation(groups, ren1, continuation);
+
+    // Then: fix and ren1 from the walk, then upd and base from the continuation; inputs unchanged
+    expect(result).toEqual([groups[0], groups[1], continuation[2], continuation[3]]);
+    expect(groups).toEqual(groupsBefore);
+    expect(continuation).toEqual(continuationBefore);
+  });
+
+  it("returns only the groups through the rename when the continuation ends at it (TC-800)", () => {
+    // Case: TC-800
+    // Given: a continuation whose last group is the rename commit
+    const groups = walkedGroups();
+    const continuation = [group(ren1, [upd], [entryOf("D", LEG)])];
+
+    // When: the continuation is spliced at ren1
+    const result = spliceLineageContinuation(groups, ren1, continuation);
+
+    // Then: fix and ren1 only
+    expect(result).toEqual([groups[0], groups[1]]);
+  });
+
+  it("returns null when the continuation lacks the rename commit (TC-801)", () => {
+    // Case: TC-801
+    // Given: a continuation without ren1 and an empty continuation
+    const groups = walkedGroups();
+    const continuation = [group(upd, [base], [entryOf("M", LEG)])];
+
+    // When / Then: both splices are null
+    expect(spliceLineageContinuation(groups, ren1, continuation)).toBeNull();
+    expect(spliceLineageContinuation(groups, ren1, [])).toBeNull();
+  });
+
+  it("returns null when the walked groups lack the rename commit (TC-802)", () => {
+    // Case: TC-802
+    // Given: a rename hash that is not among the walked groups
+    const continuation = [group(ren2, [base], [entryOf("D", LEG)])];
+
+    // When / Then: the splice is null
+    expect(spliceLineageContinuation(walkedGroups(), ren2, continuation)).toBeNull();
   });
 });
