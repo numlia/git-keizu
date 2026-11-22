@@ -8302,7 +8302,7 @@ describe("installing an ordinary history page", () => {
     isRepo: true
   };
   let api: typeof vscode;
-  let firstId: number | undefined;
+  let firstId: string | undefined;
   function requests() {
     return vi
       .mocked(api.postMessage)
@@ -8312,7 +8312,7 @@ describe("installing an ordinary history page", () => {
   function savedCommits() {
     return (vi.mocked(api.setState).mock.lastCall![0] as WebViewState).commits;
   }
-  beforeEach(async () => {
+  async function openWebview() {
     vi.resetModules();
     dropdownCallCount = 0;
     setupTestDOM();
@@ -8323,7 +8323,10 @@ describe("installing an ordinary history page", () => {
     vi.mocked(api.getState).mockReturnValueOnce(null);
     await import("../../web/main");
     dispatchMessage(branches);
-    firstId = requests().at(-1)!.requestId;
+    return requests().at(-1)!.requestId;
+  }
+  beforeEach(async () => {
+    firstId = await openWebview();
     dispatchMessage({ ...fullResponse, requestId: firstId });
     vi.mocked(api.postMessage).mockClear();
   });
@@ -8433,6 +8436,22 @@ describe("installing an ordinary history page", () => {
       expect(document.getElementById("loadMoreCommitsBtn")).toBeNull();
     }
   );
+
+  // Case: TC-794
+  it("keeps the current history when a previous webview replies after reopening (TC-794)", async () => {
+    const previousId = await openWebview();
+    const currentId = await openWebview();
+    const staleResponse = {
+      ...fullResponse,
+      requestId: previousId,
+      commits: MOCK_COMMITS.slice(1)
+    };
+    dispatchMessage(staleResponse);
+    expect(document.querySelectorAll("#commitTable tr.commit")).toHaveLength(0);
+    dispatchMessage({ ...fullResponse, requestId: currentId });
+    dispatchMessage(staleResponse);
+    expect(savedCommits()).toEqual(MOCK_COMMITS);
+  });
 
   // Case: TC-794
   it("keeps the outstanding page through wrong repo, token, count and old replacement responses (TC-794)", () => {

@@ -411,9 +411,8 @@ class GitKeizuView {
   private pendingLoadBranchesAndCommitsForceRender: boolean | null = null;
   private pendingLoadCommits: PendingCommitLoad | null = null;
   private historyGeneration = 0;
-  private historyRequestId = 0;
   private activeHistoryRequest?: {
-    id: number;
+    id: string;
     generation: number;
     repo: string;
     pageToken?: number;
@@ -1087,7 +1086,7 @@ class GitKeizuView {
       return;
     }
     this.loadCommitsCallback = loadedCallback;
-    const requestId = ++this.historyRequestId;
+    const requestId = crypto.randomUUID();
     const pageToken = append ? this.pageToken : undefined;
     this.activeHistoryRequest = {
       id: requestId,

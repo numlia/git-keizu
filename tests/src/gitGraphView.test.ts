@@ -2407,7 +2407,7 @@ describe("GitKeizuView loadCommits authorFilter (S10)", () => {
     const request = {
       command: "loadCommits",
       repo: TEST_REPO,
-      requestId: 19,
+      requestId: "history-request",
       branches: ["main"],
       authors: [],
       maxCommits: 400,
@@ -2443,7 +2443,7 @@ describe("GitKeizuView loadCommits authorFilter (S10)", () => {
         expect(mocks.getCommits).toHaveBeenCalledTimes(1);
         expect(mocks.postMessage).toHaveBeenCalledWith({
           command: "loadCommits",
-          requestId: 19,
+          requestId: request.requestId,
           hard: true,
           ...history
         });

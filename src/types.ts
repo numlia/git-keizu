@@ -466,7 +466,7 @@ export interface ResponseLoadBranches {
 
 export interface RequestLoadCommits {
   command: "loadCommits";
-  requestId?: number;
+  requestId?: string;
   pageToken?: number;
   repo: string;
   branches: string[];
@@ -478,7 +478,7 @@ export interface RequestLoadCommits {
 }
 export interface ResponseLoadCommits {
   command: "loadCommits";
-  requestId?: number;
+  requestId?: string;
   pageToken?: number;
   commits: GitCommitNode[];
   head: string | null;
