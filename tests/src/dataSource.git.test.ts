@@ -335,6 +335,38 @@ describe("continuing ordinary Git history", () => {
   );
 
   // Case: TC-385
+  it.each([true, false])(
+    "reloads the full range when core.useReplaceRefs changes from %s (TC-385)",
+    async (initialMode) => {
+      const { repo, root } = fixture;
+      const [five, four, , two] = git(repo, ["rev-list", "HEAD^"]).split("\n");
+      git(repo, ["replace", "--graft", five, two]);
+      const config = path.join(root, "replacement.config");
+      git(repo, ["config", "--file", config, "core.useReplaceRefs", String(initialMode)]);
+      git(repo, ["config", "include.path", config]);
+      const refs = listRefs(repo);
+
+      const first = await full(1);
+      const second = await ds.getNextHistoryPage(query(2, first.pageToken));
+      expect(second?.commits.map((row) => [row.hash, ...row.parentHashes])).toEqual([
+        [five, initialMode ? two : four]
+      ]);
+      expect(second?.pageToken).toBeTypeOf("number");
+
+      git(repo, ["config", "--file", config, "core.useReplaceRefs", String(!initialMode)]);
+      expect(listRefs(repo)).toBe(refs);
+      const requestedCount = 4;
+      expect(await ds.getNextHistoryPage(query(requestedCount, second!.pageToken))).toBeUndefined();
+      const refreshed = await full(requestedCount);
+      const expected = git(repo, ["log", "--date-order", "--format=%H %P"]).split("\n");
+      expect(refreshed.commits.map((row) => [row.hash, ...row.parentHashes])).toEqual(
+        expected.slice(0, requestedCount).map((line) => line.trimEnd().split(" "))
+      );
+      expect(refreshed.moreCommitsAvailable).toBe(expected.length > requestedCount);
+    }
+  );
+
+  // Case: TC-385
   it("replaces history when deepening a shallow clone changes parents without moving refs (TC-385)", async () => {
     const clone = path.join(fixture.root, "shallow");
     git(fixture.root, ["clone", "--depth=3", pathToFileURL(fixture.repo).href, clone]);

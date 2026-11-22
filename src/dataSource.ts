@@ -78,7 +78,7 @@ const TAB_SEPARATOR = "\t";
 const VALID_FILE_CHANGE_TYPES: ReadonlySet<string> = new Set(["A", "M", "D", "R"]);
 const BRANCH_COMPARISON_MAX_PARALLEL = 3;
 const FILE_HISTORY_ANCESTRY_MIN_ENTRIES = 2;
-const MAILMAP_CONFIG_PATTERN = "^(mailmap\\.(file|blob)|log\\.mailmap)$";
+const HISTORY_CONFIG_PATTERN = "^(core\\.usereplacerefs|mailmap\\.(file|blob)|log\\.mailmap)$";
 const GIT_CONFIG_NO_MATCH = 1;
 
 export const COMMIT_ORDER_FLAGS: Readonly<Record<CommitOrdering, string>> = {
@@ -1313,22 +1313,22 @@ export class DataSource {
   }
 
   private async getRefs(repo: string, showRemoteBranches: boolean) {
-    const [data, shallowRoots, mailmap] = await Promise.all([
+    const [data, shallowRoots, historyConfig] = await Promise.all([
       this.readRefs(repo, showRemoteBranches),
       this.getShallowRoots(repo),
-      this.getMailmapSnapshot(repo)
+      this.getHistoryConfigSnapshot(repo)
     ]);
-    // Shallow roots affect the walk. Mailmaps also affect the unfiltered author menu.
+    // Shallow roots and replacement mode affect parents. Mailmaps also affect the author menu.
     const snapshot =
-      data.snapshot !== null && shallowRoots !== null && mailmap !== null
-        ? JSON.stringify([data.snapshot, shallowRoots, mailmap])
+      data.snapshot !== null && shallowRoots !== null && historyConfig !== null
+        ? JSON.stringify([data.snapshot, shallowRoots, historyConfig])
         : null;
     return { ...data, snapshot };
   }
 
-  private async getMailmapSnapshot(repo: string): Promise<string | null> {
+  private async getHistoryConfigSnapshot(repo: string): Promise<string | null> {
     const config = await this.spawnGitProcess(
-      ["config", "--null", "--get-regexp", MAILMAP_CONFIG_PATTERN],
+      ["config", "--null", "--get-regexp", HISTORY_CONFIG_PATTERN],
       repo
     );
     if (config.kind !== "exit" || (config.code !== 0 && config.code !== GIT_CONFIG_NO_MATCH)) {
