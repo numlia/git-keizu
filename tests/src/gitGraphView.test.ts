@@ -4034,6 +4034,7 @@ describe("GitKeizuView loadBranches watcher orchestration", () => {
     await mocks.messageHandler.current!({
       command: "loadBranches",
       repo: repoA,
+      requestId: "open-a",
       showRemoteBranches: true,
       hard: false
     });
@@ -4051,6 +4052,7 @@ describe("GitKeizuView loadBranches watcher orchestration", () => {
       command: "loadBranches",
       branches: ["main"],
       head: "main",
+      requestId: "open-a",
       hard: false,
       isRepo: true
     });
@@ -4070,6 +4072,7 @@ describe("GitKeizuView loadBranches watcher orchestration", () => {
     await mocks.messageHandler.current!({
       command: "loadBranches",
       repo: repoA,
+      requestId: "open-a",
       showRemoteBranches: false,
       hard: false
     });
@@ -4079,6 +4082,7 @@ describe("GitKeizuView loadBranches watcher orchestration", () => {
     await mocks.messageHandler.current!({
       command: "loadBranches",
       repo: repoA,
+      requestId: "refresh-a",
       showRemoteBranches: false,
       hard: true
     });
@@ -4092,6 +4096,7 @@ describe("GitKeizuView loadBranches watcher orchestration", () => {
       command: "loadBranches",
       branches: ["main"],
       head: "main",
+      requestId: "refresh-a",
       hard: true,
       isRepo: true
     });
@@ -4120,6 +4125,7 @@ describe("GitKeizuView loadBranches watcher orchestration", () => {
     await mocks.messageHandler.current!({
       command: "loadBranches",
       repo: repoB,
+      requestId: "open-b",
       showRemoteBranches: false,
       hard: false
     });
@@ -4134,6 +4140,7 @@ describe("GitKeizuView loadBranches watcher orchestration", () => {
       command: "loadBranches",
       branches: [],
       head: null,
+      requestId: "open-b",
       hard: false,
       isRepo: false
     });

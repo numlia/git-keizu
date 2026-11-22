@@ -6,6 +6,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from "vites
 
 import type { GitCommitNode, GitFileChange, GitRef } from "../../src/types";
 import { vscode } from "../../web/utils";
+import { dispatchHostMessage as dispatch } from "./setup";
 
 /*
  * Integration of web/main.ts with the real Graph, both menu builders, the real context menu,
@@ -176,10 +177,6 @@ const FILE_CHANGE: GitFileChange = {
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
 /* ------------------------------------------------------------------ */
-
-function dispatch(data: Record<string, unknown>): void {
-  window.dispatchEvent(new MessageEvent("message", { data }));
-}
 
 function loadCommits(commits: GitCommitNode[]): void {
   dispatch({ command: "loadCommits", commits, head: "N", moreCommitsAvailable: false, hard: true });

@@ -22,6 +22,7 @@ import type {
   RequestMessage
 } from "../../src/types";
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
+import { dispatchHostMessage as dispatchMessage } from "./setup";
 
 /* ------------------------------------------------------------------ */
 /* Hoisted mocks (shared references for mock factories + assertions)  */
@@ -1079,10 +1080,6 @@ function setupViewState(): void {
       removeWorktree: { deleteBranch: true }
     }
   };
-}
-
-function dispatchMessage(data: Record<string, unknown>): void {
-  window.dispatchEvent(new MessageEvent("message", { data }));
 }
 
 function loadTestCommits(): void {
@@ -5954,17 +5951,23 @@ describe("Multi-select filter state management", () => {
   /* S25: Branch dropdown constants                                    */
   /* ---------------------------------------------------------------- */
 
+  function refreshBranchOptions(branches: string[], head: string | null): void {
+    document.getElementById("refreshBtn")!.click();
+    dispatchMessage({ command: "loadBranches", branches, head, hard: true, isRepo: true });
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+  }
+
   describe("Branch dropdown constants (S25)", () => {
     it("ALL_BRANCHES_LABEL is 'Show All' (TC-151)", () => {
       // Given/When: loadBranches response is dispatched
       vi.clearAllMocks();
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["main"],
-        head: "main",
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["main"], "main");
 
       // Then: first option name is "Show All"
       const call = mockBranchDropdownInstance.setOptions.mock.calls[0];
@@ -5976,13 +5979,7 @@ describe("Multi-select filter state management", () => {
     it("ALL_BRANCHES_VALUE is empty string (TC-152)", () => {
       // Given/When: loadBranches response is dispatched
       vi.clearAllMocks();
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["main"],
-        head: "main",
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["main"], "main");
 
       // Then: first option value is ""
       const call = mockBranchDropdownInstance.setOptions.mock.calls[0];
@@ -5994,13 +5991,7 @@ describe("Multi-select filter state management", () => {
     it("REMOTE_BRANCH_PREFIX strips 'remotes/' from display name (TC-153)", () => {
       // Given: branch list includes a remote branch
       vi.clearAllMocks();
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["main", "remotes/origin/feature"],
-        head: "main",
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["main", "remotes/origin/feature"], "main");
 
       // Then: remote branch display name strips "remotes/" prefix
       const call = mockBranchDropdownInstance.setOptions.mock.calls[0];
@@ -6013,13 +6004,7 @@ describe("Multi-select filter state management", () => {
     it("uses REMOTE_BRANCH_PREFIX.length instead of magic number 8 (TC-154)", () => {
       // Given: branch list includes a remote branch with long prefix
       vi.clearAllMocks();
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["remotes/upstream/main"],
-        head: null,
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["remotes/upstream/main"], null);
 
       // Then: display name correctly strips "remotes/" (8 chars) via constant
       const call = mockBranchDropdownInstance.setOptions.mock.calls[0];
@@ -6049,13 +6034,7 @@ describe("Multi-select filter state management", () => {
       vi.clearAllMocks();
 
       // When: loadBranches response includes both branches
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["main", "dev", "feature"],
-        head: "main",
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["main", "dev", "feature"], "main");
 
       // Then: branchDropdown.setOptions is called with selectedBranches=["main","dev"]
       expect(mockBranchDropdownInstance.setOptions).toHaveBeenCalledWith(expect.any(Array), [
@@ -6077,13 +6056,7 @@ describe("Multi-select filter state management", () => {
       vi.clearAllMocks();
 
       // When: loadBranches response excludes "deleted-branch"
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["main", "dev"],
-        head: "main",
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["main", "dev"], "main");
 
       // Then: branchDropdown.setOptions is called with only ["main"]
       expect(mockBranchDropdownInstance.setOptions).toHaveBeenCalledWith(expect.any(Array), [
@@ -6105,13 +6078,7 @@ describe("Multi-select filter state management", () => {
 
       // When: loadBranches response has none of the selected branches
       // (showCurrentBranchByDefault=false in setupViewState)
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["main", "dev"],
-        head: "main",
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["main", "dev"], "main");
 
       // Then: branchDropdown.setOptions is called with [] (empty = Show All fallback)
       expect(mockBranchDropdownInstance.setOptions).toHaveBeenCalledWith(expect.any(Array), []);
@@ -8312,7 +8279,7 @@ describe("installing an ordinary history page", () => {
   function savedCommits() {
     return (vi.mocked(api.setState).mock.lastCall![0] as WebViewState).commits;
   }
-  async function openWebview() {
+  async function startWebview(savedState: WebViewState | null = null) {
     vi.resetModules();
     dropdownCallCount = 0;
     setupTestDOM();
@@ -8320,9 +8287,16 @@ describe("installing an ordinary history page", () => {
     viewState.repos[otherRepo] = { columnWidths: null };
     viewState.initialLoadCommits = MOCK_COMMITS.length;
     api = (await import("../../web/utils")).vscode;
-    vi.mocked(api.getState).mockReturnValueOnce(null);
+    vi.mocked(api.getState).mockReturnValueOnce(savedState);
     await import("../../web/main");
-    dispatchMessage(branches);
+    return vi
+      .mocked(api.postMessage)
+      .mock.calls.map(([msg]) => msg as RequestMessage)
+      .find((msg) => msg.command === "loadBranches")!.requestId;
+  }
+  async function openWebview() {
+    const requestId = await startWebview();
+    dispatchMessage({ ...branches, requestId });
     return requests().at(-1)!.requestId;
   }
   beforeEach(async () => {
@@ -8452,6 +8426,49 @@ describe("installing an ordinary history page", () => {
     dispatchMessage(staleResponse);
     expect(savedCommits()).toEqual(MOCK_COMMITS);
   });
+
+  // Case: TC-808
+  it.each(["before", "after"])(
+    "keeps the restored branch when an old reply arrives %s the current one (TC-808)",
+    async (order) => {
+      const saved = {
+        ...MOCK_PREV_STATE,
+        gitBranches: ["main", "topic"],
+        selectedBranches: ["topic"]
+      };
+      const previousId = await startWebview(saved);
+      const currentId = await startWebview(saved);
+      const stale = { ...branches, requestId: previousId };
+      const current = {
+        ...branches,
+        branches: [...saved.gitBranches, "release"],
+        requestId: currentId
+      };
+      const expectRestored = (expectedBranches: string[]) => {
+        expect(vi.mocked(api.setState).mock.lastCall![0]).toMatchObject({
+          gitBranches: expectedBranches,
+          selectedBranches: ["topic"]
+        });
+        expect(mockBranchDropdownInstance.setOptions).toHaveBeenLastCalledWith(expect.any(Array), [
+          "topic"
+        ]);
+      };
+      if (order === "before") {
+        dispatchMessage(stale);
+        dispatchMessage({ ...branches, requestId: undefined });
+        expect(requests()).toEqual([]);
+        expectRestored(saved.gitBranches);
+      }
+      dispatchMessage(current);
+      if (order === "after") dispatchMessage(stale);
+      expectRestored(current.branches);
+      expect(requests()).toEqual([
+        expect.objectContaining({ branches: ["topic"], requestId: expect.any(String) })
+      ]);
+      expect(currentId).toEqual(expect.any(String));
+      expect(currentId).not.toBe(previousId);
+    }
+  );
 
   // Case: TC-794
   it("keeps the outstanding page through wrong repo, token, count and old replacement responses (TC-794)", () => {
@@ -9548,6 +9565,7 @@ describe("Branch cleanup panel wiring (S49)", () => {
     expect(branchRequests).toHaveLength(1);
     expect(branchRequests[0]).toEqual({
       command: "loadBranches",
+      requestId: expect.any(String),
       repo: TEST_REPO,
       showRemoteBranches: true,
       hard: false

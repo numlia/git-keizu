@@ -1,10 +1,21 @@
 import { vi } from "vitest";
 
+import type { RequestMessage } from "../../src/types";
+
+let branchRequestId: string | undefined;
+
+export function dispatchHostMessage(data: Record<string, unknown>): void {
+  const response = data.command === "loadBranches" ? { requestId: branchRequestId, ...data } : data;
+  window.dispatchEvent(new MessageEvent("message", { data: response }));
+}
+
 vi.stubGlobal(
   "acquireVsCodeApi",
   vi.fn(() => ({
     getState: vi.fn(() => null),
-    postMessage: vi.fn(),
+    postMessage: vi.fn((message: RequestMessage) => {
+      if (message.command === "loadBranches") branchRequestId = message.requestId;
+    }),
     setState: vi.fn()
   }))
 );

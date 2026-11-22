@@ -15,6 +15,7 @@ import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 import { getCommitDate } from "../../web/dates";
 import { captureFocusOrigin, moveFocusPast } from "../../web/keyboardNavigation";
 import { vscode } from "../../web/utils";
+import { dispatchHostMessage as dispatch } from "./setup";
 
 /*
  * Keyboard integration of web/main.ts with the real Dropdown, context menu, dialogs, FindWidget,
@@ -168,10 +169,6 @@ function cleanupRow(branchName: string): BranchCleanupRow {
 /* ------------------------------------------------------------------ */
 /* Helpers                                                            */
 /* ------------------------------------------------------------------ */
-
-function dispatch(data: Record<string, unknown>): void {
-  window.dispatchEvent(new MessageEvent("message", { data }));
-}
 
 function loadCommits(
   commits: GitCommitNode[],

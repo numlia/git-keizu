@@ -427,6 +427,7 @@ export class GitKeizuView {
                 : true;
               this.sendMessage({
                 command: "loadBranches",
+                requestId: msg.requestId,
                 branches: branchData.branches,
                 head: branchData.head,
                 hard: msg.hard,

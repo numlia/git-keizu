@@ -411,8 +411,10 @@ class GitKeizuView {
   private branchCleanupPanel: BranchCleanupPanel;
   private pendingBranchScroll: string | null = null;
 
-  private loadBranchesCallback: ((changes: boolean, isRepo: boolean) => void) | null = null;
-  private leftBranchRequestRepo = false;
+  private activeBranchRequest: {
+    id: string;
+    onLoaded: ((changes: boolean, isRepo: boolean) => void) | null;
+  } | null = null;
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
   private pendingLoadBranchesAndCommitsForceRender: boolean | null = null;
   private pendingLoadCommits: PendingCommitLoad | null = null;
@@ -631,7 +633,7 @@ class GitKeizuView {
         );
         this.expandedCommit = prevState.expandedCommit;
         this.avatars = prevState.avatars;
-        this.loadBranches(prevState.gitBranches, prevState.gitBranchHead, true, true);
+        this.updateBranches(prevState.gitBranches, prevState.gitBranchHead, true);
         this.loadCommits(
           prevState.commits,
           prevState.commitHead,
@@ -742,29 +744,29 @@ class GitKeizuView {
     this.findWidget.show(true);
   }
 
-  public loadBranches(
+  public receiveBranches(response: GG.ResponseLoadBranches) {
+    const active = this.activeBranchRequest;
+    if (active === null || response.requestId !== active.id) return;
+    this.activeBranchRequest = null;
+    if (active.onLoaded !== null) {
+      const changed =
+        response.isRepo && this.updateBranches(response.branches, response.head, response.hard);
+      active.onLoaded(changed, response.isRepo);
+    }
+    this.flushPendingLoadBranchesAndCommits();
+  }
+
+  private updateBranches(
     branchOptions: string[],
     branchHead: string | null,
-    forceRender: boolean,
-    isRepo: boolean
-  ) {
-    if (this.leftBranchRequestRepo) {
-      this.leftBranchRequestRepo = false;
-      this.loadBranchesCallback = null;
-      this.flushPendingLoadBranchesAndCommits();
-      return;
-    }
-    if (!isRepo) {
-      this.triggerLoadBranchesCallback(false, isRepo);
-      return;
-    }
+    forceRender: boolean
+  ): boolean {
     if (
       !forceRender &&
       arraysEqual(this.gitBranches, branchOptions, (a, b) => a === b) &&
       this.gitBranchHead === branchHead
     ) {
-      this.triggerLoadBranchesCallback(false, isRepo);
-      return;
+      return false;
     }
 
     this.gitBranches = branchOptions;
@@ -785,7 +787,7 @@ class GitKeizuView {
 
     this.syncBranchDropdownOptions();
 
-    this.triggerLoadBranchesCallback(true, isRepo);
+    return true;
   }
   private syncBranchDropdownOptions() {
     const options = [{ name: ALL_BRANCHES_LABEL, value: ALL_BRANCHES_VALUE }];
@@ -798,14 +800,6 @@ class GitKeizuView {
       });
     }
     this.branchDropdown.setOptions(options, this.selectedBranches);
-  }
-  private triggerLoadBranchesCallback(changes: boolean, isRepo: boolean) {
-    const callback = this.loadBranchesCallback;
-    this.loadBranchesCallback = null;
-    if (callback !== null) {
-      callback(changes, isRepo);
-    }
-    this.flushPendingLoadBranchesAndCommits();
   }
 
   public receiveCommits(response: GG.ResponseLoadCommits) {
@@ -1043,9 +1037,11 @@ class GitKeizuView {
     forceRender: boolean,
     loadedCallback: (changes: boolean, isRepo: boolean) => void
   ) {
-    this.loadBranchesCallback = loadedCallback;
+    const requestId = crypto.randomUUID();
+    this.activeBranchRequest = { id: requestId, onLoaded: loadedCallback };
     sendMessage({
       command: "loadBranches",
+      requestId,
       repo: this.currentRepo!,
       showRemoteBranches: this.showRemoteBranches,
       hard: forceRender
@@ -1123,7 +1119,7 @@ class GitKeizuView {
     return this.commitOrdering;
   }
   private requestLoadBranchesAndCommits(forceRender: boolean) {
-    if (this.loadBranchesCallback !== null) {
+    if (this.activeBranchRequest !== null) {
       this.queueLoadBranchesAndCommits(forceRender);
       return;
     }
@@ -2317,7 +2313,9 @@ class GitKeizuView {
   /* Row Target and Tab Stops */
   private leaveRepository(): void {
     this.displayedAuthors = null;
-    this.leftBranchRequestRepo = this.loadBranchesCallback !== null;
+    if (this.activeBranchRequest !== null) {
+      this.activeBranchRequest = { ...this.activeBranchRequest, onLoaded: null };
+    }
     if (isContextMenuActive()) hideContextMenu("repository");
     this.rowTarget = null;
   }

@@ -452,12 +452,14 @@ export interface ResponseLoadBranchCleanup {
 
 export interface RequestLoadBranches {
   command: "loadBranches";
+  requestId: string;
   repo: string;
   showRemoteBranches: boolean;
   hard: boolean;
 }
 export interface ResponseLoadBranches {
   command: "loadBranches";
+  requestId: string;
   branches: string[];
   head: string | null;
   hard: boolean;

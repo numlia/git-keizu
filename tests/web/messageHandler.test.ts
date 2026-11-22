@@ -26,7 +26,7 @@ function createMockGitKeizuView(): GitKeizuViewAPI {
     showCompareResult: vi.fn(),
     loadAvatar: vi.fn(),
     loadBranchCleanup: vi.fn(),
-    loadBranches: vi.fn(),
+    receiveBranches: vi.fn(),
     receiveCommits: vi.fn(),
     appendCommits: vi.fn(),
     loadFileHistory: vi.fn(),

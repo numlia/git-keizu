@@ -5,6 +5,7 @@ import type {
   ResponseAppendCommits,
   ResponseFileHistory,
   ResponseLoadBranchCleanup,
+  ResponseLoadBranches,
   ResponseLoadCommits,
   ResponseMessage,
   WorktreePathViewState
@@ -23,7 +24,7 @@ export interface GitKeizuViewAPI {
   showCompareResult(fileChanges: GitFileChange[], fromHash: string, toHash: string): void;
   loadAvatar(email: string, image: string): void;
   loadBranchCleanup(response: ResponseLoadBranchCleanup): void;
-  loadBranches(branches: string[], head: string | null, hard: boolean, isRepo: boolean): void;
+  receiveBranches(response: ResponseLoadBranches): void;
   receiveCommits(response: ResponseLoadCommits): void;
   appendCommits(response: ResponseAppendCommits): void;
   loadFileHistory(response: ResponseFileHistory): void;
@@ -149,7 +150,7 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       gitKeizu.loadBranchCleanup(msg);
       break;
     case "loadBranches":
-      gitKeizu.loadBranches(msg.branches, msg.head, msg.hard, msg.isRepo);
+      gitKeizu.receiveBranches(msg);
       break;
     case "loadCommits":
       gitKeizu.receiveCommits(msg);
