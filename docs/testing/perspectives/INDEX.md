@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-11-22T11:46:57+09:00
+> Auto-generated: 2026-11-22T13:38:42+09:00
 > Total sources: 59
 > Total physical files: 105
 > Total sections: 635
-> Total cases: 3798
+> Total cases: 3802
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -25,7 +25,7 @@
 | `src/config.ts` | single-file | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md` | 1 | 14 | 79 | 2026-05-02 |
 | `src/config.ts` | sharded | `src/config-test/INDEX.md` | 5 | 20 | 101 | 2026-10-27 |
 | `src/dataSource.ts` | single-file | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md` | 1 | 25 | 149 | 2026-04-04 |
-| `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 9 | 47 | 330 | 2026-11-22 |
+| `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 9 | 47 | 331 | 2026-11-22 |
 | `src/diffDocProvider.ts` | single-file | `src/diffDocProvider-test.md` | 1 | 7 | 33 | 2026-07-04 |
 | `src/extension.ts` | single-file | `src/extension-test.md` | 1 | 10 | 33 | 2026-10-27 |
 | `src/extensionState.ts` | single-file | `src/extensionState-test.md` | 1 | 14 | 42 | 2026-07-04 |
@@ -57,7 +57,7 @@
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 3 | 11 | 2026-10-03 |
 | `web/keyboardNavigation.ts` | single-file | `web/keyboardNavigation-test.md` | 1 | 4 | 54 | 2026-10-07 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 19 | 64 | 464 | 2026-11-22 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 19 | 64 | 467 | 2026-11-22 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
 | `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 19 | 70 | 2026-11-22 |
 | `web/pathHighlight.ts` | single-file | `web/pathHighlight-test.md` | 1 | 3 | 21 | 2026-10-03 |
