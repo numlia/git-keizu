@@ -869,7 +869,11 @@ class GitKeizuView {
         commits,
         (a, b) =>
           a.hash === b.hash &&
-          (a.date === b.date || a.hash === UNCOMMITTED_CHANGES_HASH) &&
+          (a.hash === UNCOMMITTED_CHANGES_HASH ||
+            (a.date === b.date &&
+              a.message === b.message &&
+              a.author === b.author &&
+              a.email === b.email)) &&
           arraysEqual(a.refs, b.refs, (a, b) => a.name === b.name && a.type === b.type) &&
           arraysEqual(a.parentHashes, b.parentHashes, (a, b) => a === b)
       )

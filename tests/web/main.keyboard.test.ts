@@ -1037,17 +1037,33 @@ describe("viewport coverage and offscreen keyboard targets (S88)", () => {
 });
 
 // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
-describe("dates in paged history (S88)", () => {
+describe("commit metadata in paged history (S88)", () => {
   const authorDate = Date.UTC(2000, 0, 1) / 1000;
   const commitDate = Date.UTC(2021, 0, 1) / 1000;
   const displayedDate = (hash: string) => row(hash).querySelector("td:nth-child(3)")!.textContent;
 
+  function expectDisplayedCommit(commit: GitCommitNode): void {
+    const element = row(commit.hash);
+    const author = element.querySelector<HTMLTableCellElement>("td:nth-child(4)")!;
+    expect(element.querySelector(".commitMessage")!.textContent).toBe(commit.message);
+    expect(displayedDate(commit.hash)).toBe(getCommitDate(commit.date).value);
+    expect(author.textContent).toBe(commit.author);
+    expect(author.title).toBe(`${commit.author} <${commit.email}>`);
+  }
+
   // Case: TC-804
-  it("updates retained dates on a soft refresh before appending the next page (TC-804)", () => {
+  it.each([
+    ["date", { date: commitDate }],
+    ["subject", { message: "Corrected subject" }],
+    ["author", { author: "Ada" }],
+    ["email", { email: "ada@example.org" }]
+  ] as const)("updates a retained %s on soft refresh and append (TC-804)", (_, change) => {
     const first = node("M", ["R"], { date: authorDate });
+    const refreshed = { ...first, ...change };
+    const next = node("R", [], { date: commitDate });
     const full = { command: "loadCommits", head: "M", moreCommitsAvailable: true };
     dispatch({ ...full, commits: [first], hard: true, pageToken: 1 });
-    expect(displayedDate("M")).toBe(getCommitDate(authorDate).value);
+    expectDisplayedCommit(first);
 
     dispatch({ command: "refresh" });
     loadBranches(false);
@@ -1056,12 +1072,12 @@ describe("dates in paged history (S88)", () => {
     const refreshedToken = 2;
     dispatch({
       ...full,
-      commits: [{ ...first, date: commitDate }],
+      commits: [refreshed],
       hard: false,
       requestId: request.requestId,
       pageToken: refreshedToken
     });
-    expect(displayedDate("M")).toBe(getCommitDate(commitDate).value);
+    expectDisplayedCommit(refreshed);
 
     document.getElementById("loadMoreCommitsBtn")!.click();
     expect(posts("loadCommits").at(-1)!.pageToken).toBe(refreshedToken);
@@ -1070,23 +1086,29 @@ describe("dates in paged history (S88)", () => {
       repo: REPO,
       from: refreshedToken,
       baseCount: 1,
-      commits: [node("R", [], { date: commitDate })],
+      commits: [next],
       moreCommitsAvailable: false
     });
-    expect([displayedDate("M"), displayedDate("R")]).toEqual([
-      getCommitDate(commitDate).value,
-      getCommitDate(commitDate).value
-    ]);
+    expectDisplayedCommit(refreshed);
+    expectDisplayedCommit(next);
   });
 
   // Case: TC-804
-  it("updates only the working tree row when its timestamp changes (TC-804)", () => {
-    const first = node(UNCOMMITTED_CHANGES_HASH, ["M"], { date: authorDate });
+  it.each([
+    ["timestamp", { date: commitDate }],
+    ["change count", { message: "Uncommitted Changes (2)" }]
+  ] as const)("updates only the working tree row when its %s changes (TC-804)", (_, change) => {
+    const first = node(UNCOMMITTED_CHANGES_HASH, ["M"], {
+      date: authorDate,
+      message: "Uncommitted Changes (1)"
+    });
+    const refreshed = { ...first, ...change };
     const commit = node("M", []);
     loadCommits([first, commit]);
     const mountedCommit = row("M");
-    loadCommits([{ ...first, date: commitDate }, commit], { hard: false });
-    expect(displayedDate(UNCOMMITTED_CHANGES_HASH)).toBe(getCommitDate(commitDate).value);
+    loadCommits([refreshed, commit], { hard: false });
+    expect(displayedDate(first.hash)).toBe(getCommitDate(refreshed.date).value);
+    expect(row(first.hash).querySelector("td:nth-child(2)")!.textContent).toBe(refreshed.message);
     expect(row("M")).toBe(mountedCommit);
   });
 });
