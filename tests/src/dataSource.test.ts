@@ -3337,7 +3337,7 @@ describe("getGitLog/getCommits authors array parameter (S18)", () => {
     expect(logArgs).toContain("--author=Bob");
   });
 
-  it("does not include --author when authors is empty (TC-107)", async () => {
+  it("omits author and matching mode arguments when authors is empty (TC-107)", async () => {
     // Given: authors=[]
     const logOutput = makeCommitLine("abc111", "", "Alice", "a@t.com", 1700000001, "msg") + "\n";
     setupSpawnForCommits({ logOutput, stashOutput: "" });
@@ -3350,6 +3350,7 @@ describe("getGitLog/getCommits authors array parameter (S18)", () => {
     expect(logCall).toBeDefined();
     const logArgs = logCall![1] as string[];
     expect(logArgs.some((a) => a.startsWith("--author"))).toBe(false);
+    expect(logArgs).not.toContain("--fixed-strings");
   });
 
   it("safely passes special characters via spawnGit (TC-108)", async () => {
@@ -4000,7 +4001,7 @@ describe("getWorktrees collection and pinned detached commits (S47)", () => {
     expect(pinnedAuthorArgs).toEqual(normalAuthorArgs);
   });
 
-  it("escapes regex metacharacters in the pinned author filter (TC-299)", async () => {
+  it("uses the same literal author filter for pinned and ordinary commits (TC-299)", async () => {
     // Case: TC-299
     // Given: one detached worktree and an author name containing regex metacharacters
     const spawn = setupDetachedSpawn({
@@ -4012,11 +4013,10 @@ describe("getWorktrees collection and pinned detached commits (S47)", () => {
     // When: getCommits is called with authors=["a.b+c"]
     await ds.getCommits(REPO, [], 10, false, ["a.b+c"], "date");
 
-    // Then: the escaped value matches the one handed to the normal log
-    const pinnedAuthorArgs = spawn.pinnedCalls()[0].filter((arg) => arg.startsWith("--author="));
-    const normalAuthorArgs = spawn.normalLogArgs()!.filter((arg) => arg.startsWith("--author="));
-    expect(pinnedAuthorArgs).toEqual(["--author=a\\.b\\+c"]);
-    expect(pinnedAuthorArgs).toEqual(normalAuthorArgs);
+    const isAuthorArg = (arg: string) => arg === "--fixed-strings" || arg.startsWith("--author=");
+    const expected = ["--fixed-strings", "--author=a.b+c"];
+    expect(spawn.pinnedCalls()[0].filter(isAuthorArg)).toEqual(expected);
+    expect(spawn.normalLogArgs()!.filter(isAuthorArg)).toEqual(expected);
   });
 
   it("never applies the branch filter to the pinned query (TC-300)", async () => {
@@ -5027,95 +5027,31 @@ describe("spawn output buffer concat decoding (S28)", () => {
   });
 });
 
-describe("getGitLog --author regex meta character escaping (S29)", () => {
-  let ds: DataSource;
-  const spawnMock = vi.mocked(cp.spawn);
-
+describe("literal Git author filters (S29)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    ds = new DataSource();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
   });
 
-  function getLogAuthorArgs(): string[] {
-    const logCall = spawnMock.mock.calls.find((c) => (c[1] as string[])[0] === "log");
-    expect(logCall).toBeDefined();
-    return logCall![1] as string[];
-  }
-
-  it("escapes bracket meta characters in a bot author (TC-173)", async () => {
-    // Case: TC-173
-    // Given: authors contains a bracketed bot name
+  // Case: TC-173, TC-174, TC-175, TC-176, TC-177, TC-178
+  it.each([
+    ["TC-173", "dependabot[bot]"],
+    ["TC-174", "Jane O'Brien"],
+    ["TC-175", "a.b*c"],
+    ["TC-176", "a\\b"],
+    ["TC-177", ""],
+    ["TC-178", "(a|b)"]
+  ])("passes the selected name to Git as a fixed string (%s)", async (_id, author) => {
     setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
+    await new DataSource().getCommits(REPO, [], 10, false, [author], "date");
 
-    // When: getCommits is called with authors=["dependabot[bot]"]
-    await ds.getCommits(REPO, [], 10, false, ["dependabot[bot]"], "date");
-
-    // Then: git log args include --author with [ and ] backslash-escaped
-    expect(getLogAuthorArgs()).toContain("--author=dependabot\\[bot\\]");
-  });
-
-  it("leaves an author without meta characters unchanged (TC-174)", async () => {
-    // Case: TC-174
-    // Given: authors contains only apostrophe and space (outside the meta set)
-    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
-
-    // When: getCommits is called with authors=["Jane O'Brien"]
-    await ds.getCommits(REPO, [], 10, false, ["Jane O'Brien"], "date");
-
-    // Then: git log args include the exact --author string
-    expect(getLogAuthorArgs()).toContain("--author=Jane O'Brien");
-  });
-
-  it("escapes dot and star meta characters (TC-175)", async () => {
-    // Case: TC-175
-    // Given: authors contains a dot and star
-    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
-
-    // When: getCommits is called with authors=["a.b*c"]
-    await ds.getCommits(REPO, [], 10, false, ["a.b*c"], "date");
-
-    // Then: . and * are backslash-escaped
-    expect(getLogAuthorArgs()).toContain("--author=a\\.b\\*c");
-  });
-
-  it("doubles a backslash in the author (TC-176)", async () => {
-    // Case: TC-176
-    // Given: authors contains a single backslash
-    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
-
-    // When: getCommits is called with authors=["a\\b"]
-    await ds.getCommits(REPO, [], 10, false, ["a\\b"], "date");
-
-    // Then: the backslash is doubled to \\
-    expect(getLogAuthorArgs()).toContain("--author=a\\\\b");
-  });
-
-  it("passes an empty author as --author= without throwing (TC-177)", async () => {
-    // Case: TC-177
-    // Given: authors contains an empty string
-    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
-
-    // When: getCommits is called with authors=[""]
-    await ds.getCommits(REPO, [], 10, false, [""], "date");
-
-    // Then: git log args include --author= (empty value) with no meta replacement
-    expect(getLogAuthorArgs()).toContain("--author=");
-  });
-
-  it("escapes group and alternation meta characters (TC-178)", async () => {
-    // Case: TC-178
-    // Given: authors contains parentheses and a pipe
-    setupSpawnForCommits({ logOutput: "\n", stashOutput: "" });
-
-    // When: getCommits is called with authors=["(a|b)"]
-    await ds.getCommits(REPO, [], 10, false, ["(a|b)"], "date");
-
-    // Then: (, ) and | are backslash-escaped
-    expect(getLogAuthorArgs()).toContain("--author=\\(a\\|b\\)");
+    const logCall = vi
+      .mocked(cp.spawn)
+      .mock.calls.find((call) => (call[1] as string[])[0] === "log");
+    expect(logCall?.[1]).toEqual(expect.arrayContaining(["--fixed-strings", `--author=${author}`]));
   });
 });
 

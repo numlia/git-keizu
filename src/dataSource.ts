@@ -61,7 +61,6 @@ import { parseWorktreeList } from "./worktree";
 
 const eolRegex = /\r\n|\r|\n/g;
 const headRegex = /^\(HEAD detached (at|from) .+\)$/;
-const REGEX_META_CHARS = /[.*+?^${}()|[\]\\]/g;
 const gitLogSeparator = "XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb";
 const NO_QUOTE_PATH_CONFIG = ["-c", "core.quotePath=false"];
 const LOG_FORMAT_FIELD_COUNT = 6;
@@ -102,18 +101,13 @@ const COMMIT_DETAILS_FIELD = {
   COMMITTER_EMAIL: 6
 } as const;
 
-function escapeRegExp(str: string): string {
-  return str.replace(REGEX_META_CHARS, "\\$&");
-}
-
 function splitNullSeparatedFields(stdout: string): string[] {
   return stdout.split(NULL_BYTE_SEPARATOR);
 }
 
-function appendAuthorArgs(args: string[], authors: string[]) {
-  for (const author of authors) {
-    args.push(`--author=${escapeRegExp(author)}`);
-  }
+function authorFilterArgs(authors: string[]): string[] {
+  if (authors.length === 0) return [];
+  return ["--fixed-strings", ...authors.map((author) => `--author=${author}`)];
 }
 
 function buildMergeArgs(
@@ -1557,9 +1551,9 @@ export class DataSource {
       "log",
       `--max-count=${num}`,
       `--format=${this.gitLogFormat}`,
-      COMMIT_ORDER_FLAGS[commitOrdering]
+      COMMIT_ORDER_FLAGS[commitOrdering],
+      ...authorFilterArgs(authors)
     ];
-    appendAuthorArgs(args, authors);
     if (branches.length > 0) {
       args.push(...branches);
     } else {
@@ -1578,9 +1572,13 @@ export class DataSource {
   private getPinnedDetachedCommits(repo: string, heads: string[], authors: string[]) {
     if (heads.length === 0) return Promise.resolve<GitCommit[]>([]);
 
-    const args = ["log", NO_WALK_SORTED_OPTION, `--format=${this.gitLogFormat}`];
-    appendAuthorArgs(args, authors);
-    args.push(...heads);
+    const args = [
+      "log",
+      NO_WALK_SORTED_OPTION,
+      `--format=${this.gitLogFormat}`,
+      ...authorFilterArgs(authors),
+      ...heads
+    ];
 
     return this.spawnGit<GitCommit[]>(args, repo, parseGitLogCommits, []);
   }

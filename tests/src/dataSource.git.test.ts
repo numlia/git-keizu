@@ -175,6 +175,37 @@ describe("continuing ordinary Git history", () => {
     }
   });
 
+  // Case: TC-389
+  it("keeps a literal author filter across a Git pattern mode change (TC-389)", async () => {
+    const { repo, root } = fixture;
+    const authors = ["Build[bot]"];
+    const config = path.join(root, "author-filter.config");
+    await fs.writeFile(config, "[grep]\n\tpatternType = basic\n");
+    git(repo, ["config", "include.path", config]);
+    for (const subject of ["bot 1", "bot 2", "bot 3", "bot 4", "bot 5"]) {
+      git(repo, [
+        "commit",
+        "--allow-empty",
+        "--author=Build[bot] <bot@example.com>",
+        "-m",
+        subject
+      ]);
+    }
+    git(repo, ["commit", "--allow-empty", "--author=Buildb <other@example.com>", "-m", "other"]);
+
+    const first = await full(2, "date", authors);
+    expect(first.commits.map((row) => row.message)).toEqual(["bot 5", "bot 4"]);
+    await fs.writeFile(config, "[grep]\n\tpatternType = fixed\n");
+    expect(git(repo, ["config", "--get", "grep.patternType"])).toBe("fixed");
+    const page = await ds.getNextHistoryPage({ ...query(4, first.pageToken), authors });
+    const fresh = await full(4, "date", authors);
+
+    expect(page?.commits.map((row) => row.message)).toEqual(["bot 3", "bot 2"]);
+    expect(first.commits.concat(page!.commits)).toEqual(fresh.commits);
+    expect(page!.moreCommitsAvailable).toBe(true);
+    expect(fresh.moreCommitsAvailable).toBe(true);
+  });
+
   // Case: TC-386
   it.each(["worktree", "external", "index blob"])(
     "invalidates the author-filtered page when the %s mailmap changes (TC-386)",
