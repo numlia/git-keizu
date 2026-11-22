@@ -424,6 +424,7 @@ class GitKeizuView {
 
   private commitOrdering: GG.CommitOrdering;
   private selectedAuthors: string[] = [];
+  private displayedAuthors: { authors: string[]; selected: string[] } | null = null;
 
   private stashNavigationIndex: number = -1;
   private stashNavigationTimer: ReturnType<typeof setTimeout> | null = null;
@@ -642,11 +643,7 @@ class GitKeizuView {
         this.findWidget.restoreState(prevState.findWidgetState);
       }
       if (this.selectedAuthors.length > 0) {
-        const { options, selected } = buildAuthorOptions(
-          this.selectedAuthors,
-          this.selectedAuthors
-        );
-        this.authorDropdown.setOptions(options, selected);
+        this.updateAuthorMenu(this.selectedAuthors, false);
       }
     }
     const refreshedDuringLoadRepos = this.loadRepos(this.gitRepos, lastActiveRepo);
@@ -912,7 +909,8 @@ class GitKeizuView {
       this.commits.map((commit) => commit.hash),
       this.commitHead
     );
-    this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup);
+    if (appending) this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup, true);
+    else this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup);
     this.mutedRows = this.graph.getMutedCommits(this.commitHead);
 
     const expandedCommitVisible =
@@ -934,14 +932,30 @@ class GitKeizuView {
 
     const authorList =
       authors !== undefined ? authors : [...new Set(this.commits.map((c) => c.author))].sort();
-    const { options, selected } = buildAuthorOptions(authorList, this.selectedAuthors);
-    this.authorDropdown.setOptions(options, selected);
+    this.updateAuthorMenu(authorList, appending);
 
     this.consumePendingBranchScroll();
     this.triggerLoadCommitsCallback(true);
     this.fetchAvatars(avatarsNeeded);
     this.updateCurrentBtnState();
   }
+  private updateAuthorMenu(authors: string[], appending: boolean) {
+    const previous = this.displayedAuthors;
+    const equal = (left: string, right: string) => left === right;
+    if (
+      appending &&
+      previous !== null &&
+      !this.authorDropdown.isOpen() &&
+      arraysEqual(previous.authors, authors, equal) &&
+      arraysEqual(previous.selected, this.selectedAuthors, equal)
+    )
+      return;
+
+    const { options, selected } = buildAuthorOptions(authors, this.selectedAuthors);
+    this.authorDropdown.setOptions(options, selected);
+    this.displayedAuthors = { authors, selected };
+  }
+
   private triggerLoadCommitsCallback(changes: boolean) {
     this.activeHistoryRequest = undefined;
     const callback = this.loadCommitsCallback;
