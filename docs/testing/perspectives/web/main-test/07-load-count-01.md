@@ -65,3 +65,16 @@ TC-791 also has a desktop regression check. Build the extension, configure the [
 | Case ID | Input / Precondition                                                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                 | Notes                                           |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------- |
 | TC-801  | While a page request is pending, open Authors and check a name. Deliver more rows with the same author choices and applied filters. | Boundary - editing during a page response                                  | The menu stays open with the name checked. Applying sends one history request with that author. | Exercise both an append and a full replacement. |
+
+## S90: Opening hidden labels after scrolling their row out of view
+
+> Origin: Feature 061-02 (large history browsing)
+> Added: 2026-11-22
+> Status: active
+> Supersedes: -
+> Target Path: `web/main.ts` (renderTable and handleParkedMenuKey)
+> Test File: `tests/web/main.keyboard.test.ts`
+
+| Case ID | Input / Precondition                                                             | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                  | Notes                                                                   |
+| ------- | -------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------- |
+| TC-805  | Focus the +N button, scroll until its row is removed, then press Enter or Space. | Boundary - activation after row removal                                    | The hidden-label list stays open through the remount's scroll event with focus on its first label. Escape returns to the same counter. Moving the counter by scrolling closes the reopened list. | Commit details stay closed. TC-803 covers activation on the row itself. |
