@@ -1179,6 +1179,75 @@ describe("author choices during history updates", () => {
     }
   );
 
+  // Case: TC-807
+  it.each(["apply", "cancel"])(
+    "keeps pending author edits by name until %s after another author is renamed (TC-807)",
+    (action) => {
+      const full = {
+        command: "loadCommits",
+        commits: [node("M", [], { author: "Ada" })],
+        authors: ["Ada", "Bob", "Zoe"],
+        head: "M",
+        moreCommitsAvailable: false,
+        hard: true
+      };
+      const menu = document.getElementById("authorSelect")!;
+      const option = (name: string) =>
+        menu.querySelector<HTMLElement>(`[role="option"][title="${name}"]`)!;
+      const apply = () => fire(menu.querySelector(".dropdownHint button")!, "click");
+      dispatch(full);
+      openDropdown("authorSelect");
+      fire(option("Ada"), "click");
+      apply();
+      expect(posts("loadCommits").at(-1)).toMatchObject({ authors: ["Ada"] });
+      dispatch(full);
+      openDropdown("authorSelect");
+      fire(option("Ada"), "click");
+      fire(option("Zoe"), "click");
+
+      clearPosts();
+      dispatch({ command: "refresh" });
+      loadBranches(false);
+      const [request] = posts("loadCommits");
+      expect(request).toMatchObject({
+        authors: ["Ada"],
+        hard: false,
+        requestId: expect.any(String)
+      });
+      dispatch({
+        ...full,
+        authors: ["Ada", "Zoe", "Zora"],
+        hard: request.hard,
+        requestId: request.requestId
+      });
+      expect(dropdownIsOpen("authorSelect")).toBe(true);
+      expect(option("Bob")).toBeNull();
+      expect(option("Zora").getAttribute("aria-selected")).toBe("false");
+      expect(option("Ada").getAttribute("aria-selected")).toBe("false");
+      expect(option("Zoe").getAttribute("aria-selected")).toBe("true");
+
+      clearPosts();
+      if (action === "apply") {
+        apply();
+        expect(posts("loadCommits")).toEqual([expect.objectContaining({ authors: ["Zoe"] })]);
+        dispatch(full);
+      } else {
+        pressEscape();
+        expect(posts("loadCommits")).toEqual([]);
+      }
+      openDropdown("authorSelect");
+      expect(option("Ada").getAttribute("aria-selected")).toBe(
+        action === "cancel" ? "true" : "false"
+      );
+      expect(option("Zoe").getAttribute("aria-selected")).toBe(
+        action === "apply" ? "true" : "false"
+      );
+      fire(option("All Authors"), "click");
+      apply();
+      loadCommits(standardCommits());
+    }
+  );
+
   // Case: TC-801
   it.each(["append", "full"])(
     "keeps a pending author edit when a history request completes (%s) (TC-801)",

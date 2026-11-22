@@ -953,17 +953,15 @@ class GitKeizuView {
   private updateAuthorMenu(authors: string[], forceRender: boolean) {
     const previous = this.displayedAuthors;
     const equal = (left: string, right: string) => left === right;
-    // A background branch update can force a redraw while the user is editing this menu.
-    if (
-      (!forceRender || this.authorDropdown.isOpen()) &&
-      previous !== null &&
-      arraysEqual(previous.authors, authors, equal) &&
-      arraysEqual(previous.selected, this.selectedAuthors, equal)
-    )
+    const sameFilter =
+      previous !== null && arraysEqual(previous.selected, this.selectedAuthors, equal);
+    const editing = sameFilter && this.authorDropdown.isOpen();
+    if (sameFilter && (!forceRender || editing) && arraysEqual(previous.authors, authors, equal))
       return;
 
     const { options, selected } = buildAuthorOptions(authors, this.selectedAuthors);
-    this.authorDropdown.setOptions(options, selected);
+    if (editing) this.authorDropdown.setOptions(options, selected, true);
+    else this.authorDropdown.setOptions(options, selected);
     this.displayedAuthors = { authors, selected };
   }
 
