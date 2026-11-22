@@ -7,17 +7,17 @@
 > Test Framework: Vitest
 > Total Shards: 9
 > Total Sections: 48
-> Total Cases: 333
+> Total Cases: 334
 
 ## Shards
 
 | Shard File                  | Responsibility     | Sections | Cases | Last Updated |
 | --------------------------- | ------------------ | -------- | ----- | ------------ |
-| 01-history-diff-01.md       | history-diff       | 11       | 69    | 2026-11-22   |
+| 01-history-diff-01.md       | history-diff       | 11       | 70    | 2026-11-22   |
 | 02-branch-worktree-01.md    | branch-worktree    | 9        | 47    | 2026-09-13   |
 | 02-branch-worktree-02.md    | branch-worktree    | 5        | 49    | 2026-08-06   |
-| 02-branch-worktree-03.md    | branch-worktree    | 1        | 26    | 2026-09-12   |
-| 03-author-watch-paths-01.md | author-watch-paths | 8        | 38    | 2026-07-04   |
+| 02-branch-worktree-03.md    | branch-worktree    | 1        | 26    | 2026-11-22   |
+| 03-author-watch-paths-01.md | author-watch-paths | 8        | 38    | 2026-11-22   |
 | 04-spawn-refname-diff-01.md | spawn-refname-diff | 8        | 40    | 2026-07-19   |
 | 05-git-path-01.md           | git-path           | 1        | 3     | 2026-07-19   |
 | 06-branch-cleanup-01.md     | branch-cleanup     | 1        | 14    | 2026-08-25   |
