@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   getBranchCleanup: vi.fn(),
   getFileHistory: vi.fn(),
   getCommits: vi.fn(),
+  getNextHistoryPage: vi.fn(),
   executeCommand: vi.fn(),
   encodeDiffDocUri: vi.fn(),
   mute: vi.fn(),
@@ -2352,6 +2353,7 @@ describe("GitKeizuView loadCommits authorFilter (S10)", () => {
     });
 
     const mockDataSource = {
+      getNextHistoryPage: mocks.getNextHistoryPage,
       applyStash: mocks.applyStash,
       popStash: mocks.popStash,
       dropStash: mocks.dropStash,
@@ -2398,6 +2400,73 @@ describe("GitKeizuView loadCommits authorFilter (S10)", () => {
   afterEach(() => {
     GitKeizuView.currentPanel?.dispose();
     GitKeizuView.currentPanel = undefined;
+  });
+
+  // @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md (S45)
+  describe("history continuations", () => {
+    const request = {
+      command: "loadCommits",
+      repo: TEST_REPO,
+      requestId: 19,
+      branches: ["main"],
+      authors: [],
+      maxCommits: 400,
+      showRemoteBranches: false,
+      commitOrdering: "date",
+      hard: true
+    };
+    const row = {
+      hash: "head",
+      author: "A",
+      email: "a@example.com",
+      date: 0,
+      message: "top",
+      parentHashes: [],
+      refs: [],
+      stash: null
+    };
+    // Case: TC-421
+    it.each([{}, { pageToken: 12 }])(
+      "relays the complete replacement for initial and incompatible requests (TC-421)",
+      async (fields) => {
+        const history = {
+          commits: [row],
+          head: row.hash,
+          moreCommitsAvailable: true,
+          pageToken: 13,
+          authors: ["A"],
+          worktrees: { branches: {}, detached: [] }
+        };
+        mocks.getCommits.mockResolvedValue(history);
+        mocks.getNextHistoryPage.mockResolvedValue(undefined);
+        await mocks.messageHandler.current!({ ...request, ...fields });
+        expect(mocks.getCommits).toHaveBeenCalledTimes(1);
+        expect(mocks.postMessage).toHaveBeenCalledWith({
+          command: "loadCommits",
+          requestId: 19,
+          hard: true,
+          ...history
+        });
+      }
+    );
+    // Case: TC-422
+    it("relays one 100-commit page without reading or transferring the prefix (TC-422)", async () => {
+      const message = { ...request, pageToken: 12 };
+      const page = {
+        command: "appendCommits",
+        repo: TEST_REPO,
+        from: 12,
+        baseCount: 300,
+        commits: Array.from({ length: 100 }, (_, i) => ({ ...row, hash: String(300 + i) })),
+        moreCommitsAvailable: true,
+        pageToken: 13
+      };
+      mocks.getNextHistoryPage.mockResolvedValue(page);
+      await mocks.messageHandler.current!(message);
+      expect(mocks.getNextHistoryPage).toHaveBeenCalledWith(message);
+      expect(mocks.getCommits).not.toHaveBeenCalled();
+      expect(mocks.postMessage.mock.calls.map(([response]) => response)).toEqual([page]);
+    });
   });
 
   it("passes authors array to dataSource.getCommits when specified (TC-029)", async () => {

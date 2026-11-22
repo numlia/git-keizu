@@ -1,12 +1,12 @@
 import type {
   GitCommitDetails,
-  GitCommitNode,
   GitFileChange,
   GitRepoSet,
+  ResponseAppendCommits,
   ResponseFileHistory,
   ResponseLoadBranchCleanup,
+  ResponseLoadCommits,
   ResponseMessage,
-  WorktreeCollection,
   WorktreePathViewState
 } from "../src/types";
 import { hideDialog, showErrorDialog } from "./dialogs";
@@ -24,14 +24,8 @@ export interface GitKeizuViewAPI {
   loadAvatar(email: string, image: string): void;
   loadBranchCleanup(response: ResponseLoadBranchCleanup): void;
   loadBranches(branches: string[], head: string | null, hard: boolean, isRepo: boolean): void;
-  loadCommits(
-    commits: GitCommitNode[],
-    head: string | null,
-    moreAvailable: boolean,
-    hard: boolean,
-    authors?: string[],
-    worktrees?: WorktreeCollection
-  ): void;
+  receiveCommits(response: ResponseLoadCommits): void;
+  appendCommits(response: ResponseAppendCommits): void;
   loadFileHistory(response: ResponseFileHistory): void;
   loadRepos(repos: GitRepoSet, lastActiveRepo: string | null): void;
   refresh(mode: RefreshMode): void;
@@ -158,14 +152,10 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       gitKeizu.loadBranches(msg.branches, msg.head, msg.hard, msg.isRepo);
       break;
     case "loadCommits":
-      gitKeizu.loadCommits(
-        msg.commits,
-        msg.head,
-        msg.moreCommitsAvailable,
-        msg.hard,
-        msg.authors,
-        msg.worktrees
-      );
+      gitKeizu.receiveCommits(msg);
+      break;
+    case "appendCommits":
+      gitKeizu.appendCommits(msg);
       break;
     case "loadRepos":
       gitKeizu.loadRepos(msg.repos, msg.lastActiveRepo);

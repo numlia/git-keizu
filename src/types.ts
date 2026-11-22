@@ -466,6 +466,8 @@ export interface ResponseLoadBranches {
 
 export interface RequestLoadCommits {
   command: "loadCommits";
+  requestId?: number;
+  pageToken?: number;
   repo: string;
   branches: string[];
   maxCommits: number;
@@ -476,12 +478,24 @@ export interface RequestLoadCommits {
 }
 export interface ResponseLoadCommits {
   command: "loadCommits";
+  requestId?: number;
+  pageToken?: number;
   commits: GitCommitNode[];
   head: string | null;
   moreCommitsAvailable: boolean;
   hard: boolean;
   authors?: string[];
   worktrees?: WorktreeCollection;
+}
+
+export interface ResponseAppendCommits {
+  command: "appendCommits";
+  repo: string;
+  from: number;
+  baseCount: number;
+  commits: GitCommitNode[];
+  moreCommitsAvailable: boolean;
+  pageToken?: number;
 }
 
 export interface RequestLoadRepos {
@@ -853,6 +867,7 @@ export type RequestMessage =
 
 export type ResponseMessage =
   | ResponseAddTag
+  | ResponseAppendCommits
   | ResponseApplyStash
   | ResponseBranchFromStash
   | ResponseCheckoutBranch

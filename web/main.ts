@@ -183,6 +183,7 @@ const COMMIT_ROW_SELECTOR = ".commit";
 
 type PendingCommitLoad = {
   forceRender: boolean;
+  append: boolean;
   callbacks: ((changes: boolean) => void)[];
 };
 
@@ -400,9 +401,20 @@ class GitKeizuView {
   private pendingBranchScroll: string | null = null;
 
   private loadBranchesCallback: ((changes: boolean, isRepo: boolean) => void) | null = null;
+  private leftBranchRequestRepo = false;
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
   private pendingLoadBranchesAndCommitsForceRender: boolean | null = null;
   private pendingLoadCommits: PendingCommitLoad | null = null;
+  private historyGeneration = 0;
+  private historyRequestId = 0;
+  private activeHistoryRequest?: {
+    id: number;
+    generation: number;
+    repo: string;
+    pageToken?: number;
+  };
+  private pageToken?: number;
+  private historyAuthors?: string[];
   private worktrees: GG.WorktreeCollection = EMPTY_WORKTREE_COLLECTION;
 
   private commitOrdering: GG.CommitOrdering;
@@ -726,6 +738,12 @@ class GitKeizuView {
     forceRender: boolean,
     isRepo: boolean
   ) {
+    if (this.leftBranchRequestRepo) {
+      this.leftBranchRequestRepo = false;
+      this.loadBranchesCallback = null;
+      this.flushPendingLoadBranchesAndCommits();
+      return;
+    }
     if (!isRepo) {
       this.triggerLoadBranchesCallback(false, isRepo);
       return;
@@ -780,13 +798,55 @@ class GitKeizuView {
     this.flushPendingLoadBranchesAndCommits();
   }
 
-  public loadCommits(
+  public receiveCommits(response: GG.ResponseLoadCommits) {
+    const active = this.activeHistoryRequest;
+    if (response.requestId !== undefined) {
+      if (!active || response.requestId !== active.id) return;
+      if (active.generation !== this.historyGeneration || active.repo !== this.currentRepo) {
+        this.triggerLoadCommitsCallback(false);
+        return;
+      }
+    }
+    this.pageToken = response.pageToken;
+    this.historyAuthors = response.authors;
+    this.loadCommits(
+      response.commits,
+      response.head,
+      response.moreCommitsAvailable,
+      response.hard,
+      response.authors,
+      response.worktrees
+    );
+  }
+
+  public appendCommits(response: GG.ResponseAppendCommits) {
+    const active = this.activeHistoryRequest;
+    if (!active || response.repo !== active.repo || response.from !== active.pageToken) return;
+    if (active.generation !== this.historyGeneration || response.repo !== this.currentRepo) {
+      this.triggerLoadCommitsCallback(false);
+      return;
+    }
+    if (response.baseCount !== this.commits.length || response.from !== this.pageToken) return;
+    this.pageToken = response.pageToken;
+    this.loadCommits(
+      this.commits.concat(response.commits),
+      this.commitHead,
+      response.moreCommitsAvailable,
+      true,
+      this.historyAuthors,
+      this.worktrees,
+      true
+    );
+  }
+
+  private loadCommits(
     commits: GG.GitCommitNode[],
     commitHead: string | null,
     moreAvailable: boolean,
     forceRender: boolean,
     authors?: string[],
-    worktrees?: GG.WorktreeCollection
+    worktrees?: GG.WorktreeCollection,
+    appending = false
   ) {
     if (
       !forceRender &&
@@ -813,17 +873,18 @@ class GitKeizuView {
       return;
     }
 
+    const firstChangedRow = appending ? this.commits.length : 0;
     this.moreCommitsAvailable = moreAvailable;
     this.commits = commits;
     this.commitHead = commitHead;
     this.worktrees = worktrees ?? EMPTY_WORKTREE_COLLECTION;
     this.rememberMainWorktree();
-    this.commitLookup = {};
+    if (!appending) this.commitLookup = {};
     this.saveState();
 
     let i: number,
       avatarsNeeded: { [email: string]: string[] } = {};
-    for (i = 0; i < this.commits.length; i++) {
+    for (i = firstChangedRow; i < this.commits.length; i++) {
       this.commitLookup[this.commits[i].hash] = i;
       if (
         this.config.fetchAvatars &&
@@ -874,6 +935,7 @@ class GitKeizuView {
     this.updateCurrentBtnState();
   }
   private triggerLoadCommitsCallback(changes: boolean) {
+    this.activeHistoryRequest = undefined;
     const callback = this.loadCommitsCallback;
     this.loadCommitsCallback = null;
     if (callback !== null) {
@@ -937,6 +999,7 @@ class GitKeizuView {
 
   /* Refresh */
   public refresh(mode: RefreshMode) {
+    this.invalidateHistory();
     if (mode === "hard") {
       if (this.expandedCommit !== null) {
         this.expandedCommit = null;
@@ -964,6 +1027,7 @@ class GitKeizuView {
     });
   }
   private resetFilterAndReload() {
+    this.invalidateHistory();
     this.maxCommits = this.config.initialLoadCommits;
     this.expandedCommit = null;
     this.saveState();
@@ -971,14 +1035,52 @@ class GitKeizuView {
     this.requestLoadCommits(true, () => {});
   }
 
-  private requestLoadCommits(forceRender: boolean, loadedCallback: (changes: boolean) => void) {
+  private invalidateHistory() {
+    this.historyGeneration++;
+    this.pageToken = undefined;
+  }
+
+  private requestMoreCommits(manual: boolean) {
+    this.isLoadingMoreCommits = true;
+    this.maxCommits = normalizeCommitLoadCount(
+      this.maxCommits + this.config.loadMoreCommits,
+      this.config.initialLoadCommits
+    );
+    if (manual) {
+      this.hideCommitDetails();
+      this.saveState();
+    }
+    this.requestLoadCommits(
+      true,
+      () => {
+        this.isLoadingMoreCommits = false;
+      },
+      true
+    );
+  }
+
+  private requestLoadCommits(
+    forceRender: boolean,
+    loadedCallback: (changes: boolean) => void,
+    append = false
+  ) {
     if (this.loadCommitsCallback !== null) {
-      this.queueLoadCommits(forceRender, loadedCallback);
+      this.queueLoadCommits(forceRender, loadedCallback, append);
       return;
     }
     this.loadCommitsCallback = loadedCallback;
+    const requestId = ++this.historyRequestId;
+    const pageToken = append ? this.pageToken : undefined;
+    this.activeHistoryRequest = {
+      id: requestId,
+      generation: this.historyGeneration,
+      repo: this.currentRepo,
+      pageToken
+    };
     sendMessage({
       command: "loadCommits",
+      requestId,
+      ...(pageToken === undefined ? {} : { pageToken }),
       repo: this.currentRepo!,
       branches: this.selectedBranches,
       maxCommits: normalizeCommitLoadCount(this.maxCommits, this.config.initialLoadCommits),
@@ -1027,23 +1129,32 @@ class GitKeizuView {
     this.pendingLoadBranchesAndCommitsForceRender = null;
     this.requestLoadBranchesAndCommits(forceRender);
   }
-  private queueLoadCommits(forceRender: boolean, loadedCallback: (changes: boolean) => void) {
+  private queueLoadCommits(
+    forceRender: boolean,
+    loadedCallback: (changes: boolean) => void,
+    append: boolean
+  ) {
     if (this.pendingLoadCommits === null) {
-      this.pendingLoadCommits = { forceRender, callbacks: [loadedCallback] };
+      this.pendingLoadCommits = { forceRender, append, callbacks: [loadedCallback] };
       return;
     }
     this.pendingLoadCommits.forceRender = this.pendingLoadCommits.forceRender || forceRender;
+    this.pendingLoadCommits.append = this.pendingLoadCommits.append && append;
     this.pendingLoadCommits.callbacks.push(loadedCallback);
   }
   private flushPendingLoadCommits() {
     if (this.pendingLoadCommits === null) return;
     const pending = this.pendingLoadCommits;
     this.pendingLoadCommits = null;
-    this.requestLoadCommits(pending.forceRender, (changes: boolean) => {
-      for (const cb of pending.callbacks) {
-        cb(changes);
-      }
-    });
+    this.requestLoadCommits(
+      pending.forceRender,
+      (changes: boolean) => {
+        for (const cb of pending.callbacks) {
+          cb(changes);
+        }
+      },
+      pending.append
+    );
   }
   private fetchAvatars(avatars: { [email: string]: string[] }) {
     let emails = Object.keys(avatars);
@@ -1234,17 +1345,12 @@ class GitKeizuView {
       const loadMoreElem = document.getElementById(LOAD_MORE_BUTTON_ID)!;
       markFocusTarget(loadMoreElem, { kind: "control", id: LOAD_MORE_BUTTON_ID });
       loadMoreElem.addEventListener("click", () => {
+        if (this.isLoadingMoreCommits) return;
         const loadMoreFocusUpdate = beginFocusUpdate(this.footerElem);
         (<HTMLElement>(
           document.getElementById(LOAD_MORE_BUTTON_ID)!.parentNode!
         )).innerHTML = `<h2 id="loadingHeader">${svgIcons.loading}${t("loading.label")}</h2>`;
-        this.maxCommits = normalizeCommitLoadCount(
-          this.maxCommits + this.config.loadMoreCommits,
-          this.config.initialLoadCommits
-        );
-        this.hideCommitDetails();
-        this.saveState();
-        this.requestLoadCommits(true, () => {});
+        this.requestMoreCommits(true);
         this.finishListFocusUpdate(loadMoreFocusUpdate);
       });
     }
@@ -1721,6 +1827,7 @@ class GitKeizuView {
           commitOrdering: value
         };
         this.gitRepos[this.currentRepo] = updatedRepo;
+        this.invalidateHistory();
         sendMessage({
           command: "saveRepoState",
           repo: this.currentRepo,
@@ -1828,6 +1935,7 @@ class GitKeizuView {
     }).observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
   }
   private observeWebviewScroll() {
+    let previousTop = this.scrollContainerElem.scrollTop;
     let active = this.scrollContainerElem.scrollTop > 0;
     this.scrollShadowElem.className = active ? "active" : "";
     this.scrollContainerElem.addEventListener("scroll", () => {
@@ -1838,20 +1946,16 @@ class GitKeizuView {
       }
 
       const { scrollTop, clientHeight, scrollHeight } = this.scrollContainerElem;
+      const movingDown = scrollTop > previousTop;
+      previousTop = scrollTop;
       if (
+        movingDown &&
         this.config.loadMoreCommitsAutomatically &&
         this.moreCommitsAvailable &&
         !this.isLoadingMoreCommits &&
         scrollTop + clientHeight >= scrollHeight - SCROLL_AUTO_LOAD_THRESHOLD
       ) {
-        this.isLoadingMoreCommits = true;
-        this.maxCommits = normalizeCommitLoadCount(
-          this.maxCommits + this.config.loadMoreCommits,
-          this.config.initialLoadCommits
-        );
-        this.requestLoadCommits(true, () => {
-          this.isLoadingMoreCommits = false;
-        });
+        this.requestMoreCommits(false);
       }
     });
   }
@@ -2062,6 +2166,7 @@ class GitKeizuView {
 
   /* Row Target and Tab Stops */
   private leaveRepository(): void {
+    this.leftBranchRequestRepo = this.loadBranchesCallback !== null;
     if (isContextMenuActive()) hideContextMenu("repository");
     this.rowTarget = null;
   }

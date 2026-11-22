@@ -4531,6 +4531,8 @@ describe("GitKeizuView frontend integration", () => {
       vi.clearAllMocks();
       // Ensure moreCommitsAvailable=true and config.loadMoreCommitsAutomatically=true
       loadCommitsWithMore(true);
+      setScrollMetrics(0, 500, 1000);
+      fireScroll();
       vi.clearAllMocks();
     });
 
@@ -4645,7 +4647,7 @@ describe("GitKeizuView frontend integration", () => {
       vi.clearAllMocks();
 
       // Then: next scroll can trigger auto-load again (isLoadingMoreCommits reset)
-      setScrollMetrics(475, 500, 1000);
+      setScrollMetrics(476, 500, 1000);
       fireScroll();
       expect(vscode.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -8270,6 +8272,123 @@ describe("highlightFileHistory icon wiring and click handler (S54)", () => {
 /* S40: ロード要求の保留と再送 (Feature 041)                          */
 /* ------------------------------------------------------------------ */
 
+// @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
+describe("installing an ordinary history page", () => {
+  const initialToken = 41;
+  const otherRepo = "/other";
+  const page = {
+    command: "appendCommits",
+    repo: TEST_REPO,
+    from: initialToken,
+    baseCount: MOCK_COMMITS.length,
+    commits: Array.from({ length: 100 }, (_, i) => ({ ...MOCK_COMMITS[0], hash: `page-${i}` })),
+    moreCommitsAvailable: false
+  };
+  const fullResponse = {
+    command: "loadCommits",
+    head: COMMIT_HASH_1,
+    commits: MOCK_COMMITS,
+    moreCommitsAvailable: true,
+    hard: true,
+    pageToken: initialToken
+  };
+  const branches = {
+    command: "loadBranches",
+    branches: ["main"],
+    head: "main",
+    hard: true,
+    isRepo: true
+  };
+  let api: typeof vscode;
+  let firstId: number | undefined;
+  function requests() {
+    return vi
+      .mocked(api.postMessage)
+      .mock.calls.map(([msg]) => msg as RequestMessage)
+      .filter((msg) => msg.command === "loadCommits");
+  }
+  function savedCommits() {
+    return (vi.mocked(api.setState).mock.lastCall![0] as WebViewState).commits;
+  }
+  beforeEach(async () => {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+    viewState.repos[otherRepo] = { columnWidths: null };
+    viewState.initialLoadCommits = MOCK_COMMITS.length;
+    api = (await import("../../web/utils")).vscode;
+    vi.mocked(api.getState).mockReturnValueOnce(null);
+    await import("../../web/main");
+    dispatchMessage(branches);
+    firstId = requests().at(-1)!.requestId;
+    dispatchMessage({ ...fullResponse, requestId: firstId });
+    vi.mocked(api.postMessage).mockClear();
+  });
+
+  // Case: TC-793
+  it.each(["button", "scroll"])(
+    "appends 100 rows once and preserves the reading offset on %s (TC-793)",
+    (trigger) => {
+      const scroller = document.getElementById("scrollContainer")!;
+      scroller.scrollTop = 72;
+      if (trigger === "button") document.getElementById("loadMoreCommitsBtn")!.click();
+      else {
+        Object.defineProperty(scroller, "clientHeight", { value: 240, configurable: true });
+        Object.defineProperty(scroller, "scrollHeight", { value: 320, configurable: true });
+        scroller.dispatchEvent(new Event("scroll"));
+        document.getElementById("loadMoreCommitsBtn")!.click();
+      }
+      expect(requests()).toHaveLength(1);
+      expect(requests()[0]).toMatchObject({ pageToken: initialToken, maxCommits: 103 });
+      dispatchMessage(page);
+      dispatchMessage(page);
+      expect(savedCommits()).toEqual([...MOCK_COMMITS, ...page.commits]);
+      expect(scroller.scrollTop).toBe(72);
+      expect(document.getElementById("loadMoreCommitsBtn")).toBeNull();
+    }
+  );
+
+  // Case: TC-794
+  it("keeps the outstanding page through wrong repo, token, count and old replacement responses (TC-794)", () => {
+    document.getElementById("loadMoreCommitsBtn")!.click();
+    for (const stale of [
+      { ...page, repo: otherRepo },
+      { ...page, from: -1 },
+      { ...page, baseCount: 0 },
+      { ...fullResponse, requestId: firstId, commits: [] }
+    ]) {
+      dispatchMessage(stale);
+      expect(savedCommits()).toEqual(MOCK_COMMITS);
+    }
+    dispatchMessage(page);
+    expect(savedCommits()).toEqual([...MOCK_COMMITS, ...page.commits]);
+    expect(requests()).toHaveLength(1);
+  });
+  // Case: TC-794
+  it.each(["refresh", "switch away and back"])(
+    "drops a late page after %s and installs the current replacement (TC-794)",
+    (action) => {
+      document.getElementById("loadMoreCommitsBtn")!.click();
+      if (action === "refresh") document.getElementById("refreshBtn")!.click();
+      else {
+        dispatchMessage({ command: "selectRepo", repo: otherRepo });
+        dispatchMessage({ command: "selectRepo", repo: TEST_REPO });
+        dispatchMessage(branches);
+      }
+      dispatchMessage(branches);
+      dispatchMessage(page);
+      expect(savedCommits()).toEqual(MOCK_COMMITS);
+      const current = requests().at(-1)!;
+      expect(current.pageToken).toBeUndefined();
+      const commits = MOCK_COMMITS.slice(1);
+      dispatchMessage({ ...fullResponse, requestId: current.requestId, commits });
+      dispatchMessage(page);
+      expect(savedCommits()).toEqual(commits);
+    }
+  );
+});
+
 describe("request queue / refresh contention (S40)", () => {
   let liveVscode: typeof vscode;
 
@@ -8440,6 +8559,7 @@ describe("request queue / refresh contention (S40)", () => {
     vi.clearAllMocks();
 
     // Then: isLoadingMoreCommits has been reset; another scroll re-fires auto Load More
+    container.scrollTop++;
     container.dispatchEvent(new Event("scroll", { bubbles: true }));
     expect(postedCommands("loadCommits")).toHaveLength(1);
 

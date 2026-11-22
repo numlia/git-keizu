@@ -27,7 +27,8 @@ function createMockGitKeizuView(): GitKeizuViewAPI {
     loadAvatar: vi.fn(),
     loadBranchCleanup: vi.fn(),
     loadBranches: vi.fn(),
-    loadCommits: vi.fn(),
+    receiveCommits: vi.fn(),
+    appendCommits: vi.fn(),
     loadFileHistory: vi.fn(),
     loadRepos: vi.fn(),
     refresh: vi.fn(),
@@ -36,6 +37,44 @@ function createMockGitKeizuView(): GitKeizuViewAPI {
     setWorktreePath: vi.fn()
   };
 }
+
+// @see docs/testing/perspectives/web/messageHandler-test/01-basic-responses-01.md (S23)
+describe("dispatching history pages", () => {
+  // Case: TC-091
+  it.each([{}, { pageToken: 15 }])(
+    "forwards the full history and optional continuation (TC-091)",
+    (fields) => {
+      const view = createMockGitKeizuView();
+      const response = {
+        command: "loadCommits" as const,
+        commits: [],
+        head: null,
+        hard: true,
+        authors: [],
+        moreCommitsAvailable: "pageToken" in fields,
+        ...fields
+      };
+      handleMessage(response, view);
+      expect(vi.mocked(view.receiveCommits).mock.calls).toEqual([[response]]);
+      expect(view.appendCommits).not.toHaveBeenCalled();
+    }
+  );
+  // Case: TC-092
+  it("routes the terminal page to the incremental handler only (TC-092)", () => {
+    const view = createMockGitKeizuView();
+    const response = {
+      command: "appendCommits" as const,
+      repo: "/project",
+      from: 15,
+      baseCount: 3,
+      commits: [],
+      moreCommitsAvailable: false
+    };
+    handleMessage(response, view);
+    expect(vi.mocked(view.appendCommits).mock.calls).toEqual([[response]]);
+    expect(view.receiveCommits).not.toHaveBeenCalled();
+  });
+});
 
 // S13: pull レスポンス処理の維持
 // @see docs/testing/perspectives/web/messageHandler-test/03-git-operation-responses-01.md
@@ -694,15 +733,8 @@ describe("handleMessage loadCommits authors pass-through (S5)", () => {
     handleMessage(msg, gitKeizu);
 
     // Then: gitKeizu.loadCommits is called with authors forwarded
-    expect(gitKeizu.loadCommits).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.loadCommits).toHaveBeenCalledWith(
-      [],
-      null,
-      false,
-      false,
-      ["Alice", "Bob"],
-      undefined
-    );
+    expect(gitKeizu.receiveCommits).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.receiveCommits).toHaveBeenCalledWith(msg);
   });
 
   it("passes undefined when authors field is absent (TC-014)", () => {
@@ -719,8 +751,8 @@ describe("handleMessage loadCommits authors pass-through (S5)", () => {
     handleMessage(msg, gitKeizu);
 
     // Then: gitKeizu.loadCommits is called with authors as undefined
-    expect(gitKeizu.loadCommits).toHaveBeenCalledTimes(1);
-    expect(gitKeizu.loadCommits).toHaveBeenCalledWith([], null, false, false, undefined, undefined);
+    expect(gitKeizu.receiveCommits).toHaveBeenCalledTimes(1);
+    expect(gitKeizu.receiveCommits).toHaveBeenCalledWith(msg);
   });
 });
 
