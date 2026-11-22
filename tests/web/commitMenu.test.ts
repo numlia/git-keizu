@@ -1226,25 +1226,32 @@ describe("merge parent option plain text generation (S10)", () => {
   });
 
   // Case: TC-047
-  it("cherry-pick and revert share the same parent option generator output (TC-047)", () => {
-    // Given: identical inputs for both flows
-    const commits = [
-      { message: "msg-a" },
-      { message: "msg-b" }
-    ] as unknown as import("../../src/types").GitCommitNode[];
-    const lookup = { parent1234567890: 0, parent2234567890: 1 };
+  it("keeps ordered parent choices for both actions when a page arrives after opening the menu (TC-047)", () => {
+    const commits = [{ message: "msg-a" }] as import("../../src/types").GitCommitNode[];
+    const lookup: Record<string, number> = { parent1234567890: 0 };
+    const items = buildCommitContextMenuItems(
+      REPO,
+      HASH,
+      MERGE_PARENT_HASHES,
+      commits,
+      lookup,
+      createMockElement()
+    );
 
-    // When: cherry-pick and revert are invoked for the same merge commit
-    getCherryPickItem(MERGE_PARENT_HASHES, commits, lookup).onClick();
+    // The next page extends the shared index while the open menu still owns the earlier rows.
+    lookup.parent2234567890 = 1;
+    findTopLevelMenuItem(items, "Cherry Pick&#8230;").onClick();
     const cherryInputs = vi.mocked(showFormDialog).mock.calls[0][1];
     const cherrySelect = cherryInputs[0] as DialogSelectInput;
 
-    vi.clearAllMocks();
-    getRevertItem(MERGE_PARENT_HASHES, commits, lookup).onClick();
+    findSubmenuItem(items, "Revert&#8230;").onClick();
     const revertOptions = vi.mocked(showSelectDialog).mock.calls[0][2];
-
-    // Then: both option arrays are deep-equal (helper reuse)
-    expect(revertOptions).toEqual(cherrySelect.options);
+    const expected = [
+      { name: "parent12: msg-a", value: "1" },
+      { name: "parent22", value: "2" }
+    ];
+    expect(cherrySelect.options).toEqual(expected);
+    expect(revertOptions).toEqual(expected);
   });
 });
 
