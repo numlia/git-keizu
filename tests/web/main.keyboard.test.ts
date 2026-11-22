@@ -825,6 +825,89 @@ describe("row target initialisation, maintenance and repository switch (S69)", (
 
 // @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-01.md
 describe("row keys per state (S70)", () => {
+  // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
+  // Case: TC-795
+  it("mounts a keyboard target beyond the window and preserves it through details (TC-795)", () => {
+    const commits = Array.from({ length: 160 }, (_, i) =>
+      node(String(i), i === 159 ? [] : [String(i + 1)])
+    );
+    vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (
+      this: HTMLElement
+    ) {
+      return this.matches("tr.commit") ? HEADER_HEIGHT + Number(this.dataset.id) * ROW_HEIGHT : 0;
+    });
+    loadCommits(commits, { head: "0" });
+    const mounted = table().querySelectorAll<HTMLElement>("tr.commit");
+    const last = mounted[mounted.length - 1];
+    const next = String(Number(last.dataset.id) + 1);
+    expect(table().querySelector(`tr[data-hash="${next}"]`)).toBeNull();
+    press(focusRow(last.dataset.hash!), "ArrowDown");
+    expect(document.activeElement).toBe(row(next));
+    expect(rowsWithTabStop()).toEqual([next]);
+    press(row(next), "Enter");
+    expect(posts("commitDetails")).toEqual([expect.objectContaining({ commitHash: next })]);
+    respondDetails(next);
+    expect(detailsOwner()).toBe(next);
+    expect(table().querySelectorAll("tr.commit")).toHaveLength(commits.length);
+    pressEscape();
+    expect(details()).toBeNull();
+    expect(rowsWithTabStop()).toEqual([next]);
+    expect(table().querySelectorAll("tr.commit").length).toBeLessThan(commits.length);
+  });
+
+  // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
+  // Case: TC-796
+  it("keeps the closed author menu intact and opens it with the current selection (TC-796)", () => {
+    const menu = document.getElementById("authorSelect")!;
+    const options = () => Array.from(menu.querySelectorAll<HTMLElement>('[role="option"]'));
+    const first = [node("M", ["R"], { author: "Ada" })];
+    const full = {
+      command: "loadCommits",
+      commits: first,
+      authors: ["Ada", "Ben"],
+      head: "M",
+      hard: true,
+      moreCommitsAvailable: true,
+      pageToken: 8
+    };
+    dispatch(full);
+    openDropdown("authorSelect");
+    fire(
+      options().find((o) => o.title === "Ben")!,
+      "click"
+    );
+    fire(menu.querySelector(".dropdownHint button")!, "click");
+    expect(posts("loadCommits").at(-1)).toMatchObject({ authors: ["Ben"] });
+    dispatch({ ...full, authors: ["Ada", "Ben", "Cora"] });
+    const before = options();
+    const builder = vi.spyOn(Dropdown.prototype, "setOptions");
+    fire(document.getElementById("loadMoreCommitsBtn")!, "click");
+    dispatch({
+      command: "appendCommits",
+      repo: REPO,
+      from: 8,
+      baseCount: 1,
+      commits: [node("R", [], { author: "Ada" })],
+      moreCommitsAvailable: false
+    });
+    expect(table().querySelectorAll("tr.commit")).toHaveLength(2);
+    expect(builder).not.toHaveBeenCalled();
+    expect(options()[0]).toBe(before[0]);
+    openDropdown("authorSelect");
+    expect(options().map((o) => o.title)).toEqual(["All Authors", "Ada", "Ben", "Cora"]);
+    expect(
+      options()
+        .filter((o) => o.getAttribute("aria-selected") === "true")
+        .map((o) => o.title)
+    ).toEqual(["Ben"]);
+    pressEscape();
+    // Restore the shared webview's author filter through the same control.
+    openDropdown("authorSelect");
+    fire(options()[0], "click");
+    fire(menu.querySelector(".dropdownHint button")!, "click");
+    loadCommits(standardCommits());
+  });
+
   it("moves only the target on ArrowDown without details (TC-658)", () => {
     // Case: TC-658 (K07 / A8.1-1 main regression: pre-implementation nothing moved)
     focusRow("M");

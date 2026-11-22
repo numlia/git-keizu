@@ -44,6 +44,7 @@ const {
     request: vi.fn(),
     handleResponse: vi.fn(),
     onCommitsRendered: vi.fn(),
+    paintMountedRows: vi.fn(),
     onRepositoryChanged: vi.fn(),
     handleCommitRowClick: vi.fn(),
     navigate: vi.fn<(delta: -1 | 1, useExpandedCommit?: boolean) => string | null>(() => null),
@@ -82,6 +83,7 @@ const {
       close: vi.fn(),
       isVisible: vi.fn(() => false),
       refresh: vi.fn(),
+      repaintMountedMatches: vi.fn(),
       setInputEnabled: vi.fn(),
       getState: vi.fn(() => ({
         text: "",
@@ -8324,6 +8326,84 @@ describe("installing an ordinary history page", () => {
     firstId = requests().at(-1)!.requestId;
     dispatchMessage({ ...fullResponse, requestId: firstId });
     vi.mocked(api.postMessage).mockClear();
+  });
+
+  // Case: TC-791
+  it("keeps the full history height and resizes the deep row window (TC-791)", async () => {
+    const count = 100_000;
+    const pitch = 24;
+    const depth = 90_000;
+    const scroller = document.getElementById("scrollContainer")!;
+    const commits = Array.from({ length: count }, (_, i) => ({
+      ...MOCK_COMMITS[0],
+      hash: String(i)
+    }));
+    const longTag = `release/${"subproject-".repeat(12)}candidate`;
+    commits[depth] = {
+      ...commits[depth],
+      refs: [{ hash: String(depth), type: "tag", name: longTag }]
+    };
+    const resize = (height: number) => {
+      Object.defineProperty(scroller, "clientHeight", { value: height, configurable: true });
+      window.dispatchEvent(new Event("resize"));
+    };
+    const verifyWindow = () => {
+      const table = scroller.querySelector("table")!;
+      const rows = Array.from(table.querySelectorAll<HTMLElement>("tr.commit"));
+      expect(table.getAttribute("aria-rowcount")).toBe(String(count + 1));
+      expect(rows.some((r) => r.dataset.hash === String(depth))).toBe(true);
+      expect(table.querySelector(`tr[data-id="${depth}"] .gitRef.tag`)?.textContent).toContain(
+        longTag
+      );
+      const skippedHeight = Array.from(
+        table.querySelectorAll<HTMLElement>("tr[data-skipped-start] td")
+      ).reduce((sum, td) => sum + parseFloat(td.style.height), 0);
+      expect(skippedHeight + pitch * rows.length).toBe(count * pitch);
+      const first = Number(rows[0].dataset.id);
+      expect(rows.map((r) => r.dataset.id)).toEqual(rows.map((_, i) => String(first + i)));
+      expect(mockGraphHighlight.render).toHaveBeenLastCalledWith(null, first, first + rows.length);
+      return rows.length;
+    };
+    const labels =
+      await vi.importActual<typeof import("../../web/branchLabels")>("../../web/branchLabels");
+    await vi.mocked(getBranchLabels).withImplementation(labels.getBranchLabels, () => {
+      resize(pitch * 10);
+      scroller.scrollTop = 1000 * pitch;
+      dispatchMessage({ ...fullResponse, head: "0", commits: commits.slice(0, 2000) });
+      const smallHistoryRows = scroller.querySelectorAll("tr.commit").length;
+      scroller.scrollTop = depth * pitch;
+      dispatchMessage({ ...fullResponse, head: "0", commits });
+      const short = verifyWindow();
+      expect(short).toBe(smallHistoryRows);
+      resize(pitch * 30);
+      const tall = verifyWindow();
+      expect(tall).toBeGreaterThan(short);
+      expect(requests()).toEqual([]);
+    });
+  });
+
+  // Case: TC-792
+  it("moves 100 rows up and down inside loaded history without a request (TC-792)", async () => {
+    const commits = Array.from({ length: 800 }, (_, i) => ({
+      ...MOCK_COMMITS[0],
+      hash: String(i)
+    }));
+    const scroller = document.getElementById("scrollContainer")!;
+    Object.defineProperties(scroller, {
+      clientHeight: { value: 240, configurable: true },
+      scrollHeight: { value: 24 * commits.length, configurable: true }
+    });
+    dispatchMessage({ ...fullResponse, commits, head: "0" });
+    for (const firstVisible of [400, 300, 400]) {
+      scroller.scrollTop = firstVisible * 24;
+      scroller.dispatchEvent(new Event("scroll"));
+      await new Promise(requestAnimationFrame);
+      const rows = Array.from(scroller.querySelectorAll<HTMLElement>("tr.commit"));
+      expect(rows.map((r) => r.dataset.hash)).toContain(String(firstVisible));
+      const first = Number(rows[0].dataset.id);
+      expect(mockGraphHighlight.render).toHaveBeenLastCalledWith(null, first, first + rows.length);
+      expect(requests()).toEqual([]);
+    }
   });
 
   // Case: TC-793

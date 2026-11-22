@@ -2055,3 +2055,204 @@ describe("Graph.setPathHighlight() logical connection rendering (S21)", () => {
     ]);
   });
 });
+
+// @see docs/testing/perspectives/web/graph-test.md (S22)
+describe("rendering windows of an extended graph", () => {
+  const initial = 5000;
+  function graph() {
+    containerElement = createMockElement("div");
+    return new Graph("testGraph", DEFAULT_CONFIG);
+  }
+  function load(graph: Graph, rows: GitCommitNode[], append = false) {
+    graph.loadCommits(
+      rows,
+      rows[0].hash,
+      Object.fromEntries(rows.map((row, i) => [row.hash, i])),
+      append
+    );
+  }
+  function shapes(graph: Graph, first: number, end: number) {
+    allCreatedElements = [];
+    graph.render(null, first, end);
+    return allCreatedElements
+      .filter(
+        (el) => el.tagName === "circle" || el.getAttribute("class")?.split(" ").includes("line")
+      )
+      .map((el) => Object.fromEntries(el.attributes));
+  }
+  function mergeHistory(count: number) {
+    return Array.from({ length: count }, (_, i) => {
+      const parents = i % 20 === 0 ? [i + 1, i + 2] : [i % 20 === 1 ? i + 2 : i + 1];
+      return makeCommit(String(i), parents.filter((p) => p < count).map(String), null);
+    });
+  }
+  beforeEach(() => vi.restoreAllMocks());
+
+  // Case: TC-090
+  it.each([false, true])(
+    "draws a through edge in its original color with highlight set to %s (TC-090)",
+    (selected) => {
+      const rows = Array.from({ length: 15 }, (_, i) =>
+        makeCommit(String(i), i === 0 ? ["14"] : [], null)
+      );
+      const g = graph();
+      load(g, rows);
+      if (selected)
+        g.setPathHighlight({
+          targetFound: true,
+          hashes: new Set(["0", "14"]),
+          edgeKeys: new Set(['["0","14"]']),
+          boundaries: []
+        });
+      const fullLine = shapes(g, 0, rows.length).find((shape) =>
+        shape.d?.startsWith("M8,12.0L8,348.0")
+      )!;
+      expect(fullLine.stroke).toBe(DEFAULT_CONFIG.graphColours[0]);
+      const window = shapes(g, 4, 7);
+      expect(window.filter((s) => s["data-hash"]).map((s) => s["data-hash"])).toEqual([
+        "4",
+        "5",
+        "6"
+      ]);
+      const line = window.find((s) => s.stroke === fullLine.stroke && s.d);
+      expect(line?.class).toBe(selected ? "line pathHighlightSelected" : "line");
+      const points = Array.from(line!.d.matchAll(/[ML]8,(-?[\d.]+)/g), ([, y]) => Number(y));
+      expect(Math.min(...points)).toBeLessThanOrEqual(0);
+      expect(Math.max(...points)).toBeGreaterThanOrEqual(3 * DEFAULT_CONFIG.grid.y);
+      for (const first of [0, 12]) {
+        const edgeWindow = shapes(g, first, first + 3);
+        const endpoint = first === 0 ? "0" : "14";
+        expect(edgeWindow.filter((s) => ["0", "14"].includes(s["data-hash"]))).toHaveLength(1);
+        const node = edgeWindow.find((s) => s["data-hash"] === endpoint)!;
+        const edge = edgeWindow.find((s) => s.stroke === fullLine.stroke && s.d)!;
+        expect(edge.class).toBe(fullLine.class);
+        const ys = Array.from(edge.d.matchAll(/[ML]8,(-?[\d.]+)/g), ([, y]) => Number(y));
+        expect(ys).toContain(Number(node.cy));
+        if (first === 0) expect(Math.max(...ys)).toBeGreaterThanOrEqual(3 * DEFAULT_CONFIG.grid.y);
+        else expect(Math.min(...ys)).toBeLessThanOrEqual(0);
+      }
+    }
+  );
+
+  // Case: TC-091
+  it("projects nodes of adjacent half-open windows to the full graph coordinates (TC-091)", () => {
+    const rows = mergeHistory(20);
+    const g = graph();
+    load(g, rows);
+    const full = shapes(g, 0, rows.length).filter((s) => s["data-hash"]);
+    const width = g.getWidth();
+    expect(new Set(full.map((s) => s.cx)).size).toBeGreaterThan(1);
+    for (const [start, end] of [
+      [0, 2],
+      [2, 6]
+    ]) {
+      const edge = [String(start), String(start + 1)];
+      g.setPathHighlight({
+        targetFound: true,
+        hashes: new Set(edge),
+        edgeKeys: new Set([JSON.stringify(edge)]),
+        boundaries: []
+      });
+      const selected = (s: Record<string, string>) => s.class === "line pathHighlightSelected";
+      const reference = shapes(g, 0, rows.length).filter(selected);
+      expect(reference.length).toBeGreaterThan(0);
+      const window = shapes(g, start, end);
+      const lines = window.filter(selected).map((s) => ({
+        ...s,
+        d: s.d.replace(
+          /,(-?[\d.]+)/g,
+          (_, y) => `,${(Number(y) + start * DEFAULT_CONFIG.grid.y).toFixed(1)}`
+        )
+      }));
+      expect(lines).toEqual(reference);
+      const nodes = window.filter((s) => s["data-hash"]);
+      expect(
+        nodes.map((s) => ({ ...s, cy: String(Number(s.cy) + start * DEFAULT_CONFIG.grid.y) }))
+      ).toEqual(full.slice(start, end));
+      expect(g.getWidth()).toBe(width);
+    }
+  });
+
+  function checkAppend(
+    g: Graph,
+    rows: GitCommitNode[],
+    length: number,
+    oldEnd: number,
+    reuses: boolean
+  ) {
+    const page = rows.slice(0, length);
+    // A full placement assigns row zero to its lane again. A reused prefix is never visited.
+    const assign = vi.spyOn(Vertex.prototype, "addToBranch");
+    load(g, page, true);
+    expect(assign.mock.contexts.some((vertex) => vertex.getId() === 0)).toBe(!reuses);
+    assign.mockRestore();
+    const full = graph();
+    load(full, page);
+    expect(g.getWidth()).toBe(full.getWidth());
+    for (const start of [0, initial - 4096 - 2, length - 4096 - 2, oldEnd - 5, length - 10]) {
+      const end = Math.min(start + 10, length);
+      expect(shapes(g, start, end)).toEqual(shapes(full, start, end));
+    }
+  }
+
+  // Case: TC-092
+  it("reuses a stable prefix across eight merge-history pages with full-placement geometry (TC-092)", () => {
+    const rows = mergeHistory(initial + 800);
+    const g = graph();
+    load(g, rows.slice(0, initial));
+    for (let size = initial + 100; size <= rows.length; size += 100) {
+      checkAppend(g, rows, size, size - 100, true);
+    }
+  });
+
+  // Case: TC-093
+  it("renews the checkpoint one row beyond the 8192-row tail and reuses the new prefix (TC-093)", () => {
+    const limit = initial - 4096 + 8192;
+    const rows = mergeHistory(limit + 101);
+    const g = graph();
+    load(g, rows.slice(0, initial));
+    checkAppend(g, rows, limit, initial, true);
+    checkAppend(g, rows, limit + 1, limit, false);
+    checkAppend(g, rows, rows.length, limit + 1, true);
+  });
+
+  // Case: TC-094
+  it("replaces the old lane when a merge and its first parent acquire the same second parent (TC-094)", () => {
+    // Rows 3 and 5 share a parent just beyond the old page; row 6 occupies the affected lane.
+    const parent = String(initial + 2);
+    const count = initial + 100;
+    const rows = Array.from({ length: count }, (_, i) => {
+      if (i === 3) return makeCommit("3", ["5", parent], null);
+      if (i === 5) return makeCommit("5", [parent], null);
+      return makeCommit(String(i), i < 7 || i === count - 1 ? [] : [String(i + 1)], null);
+    });
+    const g = graph();
+    load(g, rows.slice(0, initial));
+    const before = shapes(g, 6, 7).find((s) => s["data-hash"] === "6")!;
+    checkAppend(g, rows, count, initial, false);
+    const after = shapes(g, 6, 7).find((s) => s["data-hash"] === "6")!;
+    expect(after.cx).not.toBe(before.cx);
+    expect(after.fill).not.toBe(before.fill);
+  });
+
+  // Case: TC-094
+  it.each(["prefix parent", "out-of-order parent", "stash", "uncommitted"])(
+    "falls back to the reference geometry for a %s (TC-094)",
+    (reason) => {
+      const rows = mergeHistory(initial + 100);
+      if (reason === "prefix parent")
+        rows[5] = { ...rows[5], parentHashes: ["6", String(initial + 2)] };
+      if (reason === "out-of-order parent")
+        rows[initial + 1] = { ...rows[initial + 1], parentHashes: ["2"] };
+      if (reason === "stash")
+        rows[initial + 1] = {
+          ...rows[initial + 1],
+          stash: { selector: "stash@{0}", baseHash: String(initial + 2), untrackedFilesHash: null }
+        };
+      if (reason === "uncommitted") rows[0] = { ...rows[0], hash: "*" };
+      const g = graph();
+      load(g, rows.slice(0, initial));
+      checkAppend(g, rows, rows.length, initial, false);
+    }
+  );
+});

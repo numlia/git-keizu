@@ -540,6 +540,41 @@ beforeEach(() => {
 
 // @see docs/testing/perspectives/web/main-test/12-path-highlight-01.md
 describe("path highlighting through the real commit menu (S68)", () => {
+  // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
+  // Case: TC-797
+  it("keeps the selected path when its endpoints leave the window and restores their marks (TC-797)", async () => {
+    const scroller = document.getElementById("scrollContainer")!;
+    const last = "far-parent";
+    const commits = [
+      node("N", [last]),
+      ...Array.from({ length: 160 }, (_, i) => node(String(i), [])),
+      node(last, [])
+    ];
+    scroller.scrollTop = 0;
+    loadCommits(commits);
+    row("N").focus();
+    highlightThroughMenu("N", DIRECT_TITLE);
+    const selectedAtStart = selectedLines();
+    const ringsAtStart = ringCentres();
+    expect(selectedAtStart.length).toBeGreaterThan(0);
+    expect(ringsAtStart).toHaveLength(1);
+    const scrollTo = async (index: number) => {
+      scroller.scrollTop = index * ROW_HEIGHT;
+      scroller.dispatchEvent(new Event("scroll"));
+      await new Promise(requestAnimationFrame);
+    };
+    await scrollTo(90);
+    expect(scroller.querySelector('tr[data-hash="N"]')).toBeNull();
+    expect(scroller.querySelector(`tr[data-hash="${last}"]`)).toBeNull();
+    expect(barState()).toMatchObject({ active: true, hashTitle: "N" });
+    expect(ringCentres()).toEqual([]);
+    expect(selectedLines().length).toBeGreaterThan(0);
+    await scrollTo(0);
+    expect(selectedLines()).toEqual(selectedAtStart);
+    expect(ringCentres()).toEqual(ringsAtStart);
+    expect(row("N").tabIndex).toBe(0);
+  });
+
   it("highlights the Direct connections of M from the context menu without a host request (TC-630)", () => {
     // Case: TC-630
     // Given: the standard fixture drawn by the real Graph
