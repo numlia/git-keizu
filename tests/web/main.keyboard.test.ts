@@ -1113,8 +1113,43 @@ describe("commit metadata in paged history (S88)", () => {
   });
 });
 
-describe("editing the author filter while loading more history", () => {
-  // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S89)
+// @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S89)
+describe("author choices during history updates", () => {
+  // Case: TC-806
+  it("refreshes renamed author choices and preserves a pending edit on the next soft refresh (TC-806)", () => {
+    const full = {
+      command: "loadCommits",
+      commits: [node("M", [], { author: "Alias" })],
+      head: "M",
+      moreCommitsAvailable: false
+    };
+    const refreshAuthors = (authors: string[]) => {
+      clearPosts();
+      dispatch({ command: "refresh" });
+      loadBranches(false);
+      const requests = posts("loadCommits");
+      expect(requests).toHaveLength(1);
+      const [request] = requests;
+      expect(request).toMatchObject({ hard: false, requestId: expect.any(String) });
+      dispatch({ ...full, hard: false, requestId: request.requestId, authors });
+    };
+
+    dispatch({ ...full, hard: true, authors: ["Alias"] });
+    const mountedRow = row("M");
+    refreshAuthors(["Canonical"]);
+    openDropdown("authorSelect");
+    const menu = document.getElementById("authorSelect")!;
+    const options = () => Array.from(menu.querySelectorAll<HTMLElement>('[role="option"]'));
+    expect(options().map((option) => option.title)).toEqual(["All Authors", "Canonical"]);
+    expect(row("M")).toBe(mountedRow);
+
+    fire(options()[1], "click");
+    refreshAuthors(["Canonical"]);
+    expect(dropdownIsOpen("authorSelect")).toBe(true);
+    expect(options()[1].getAttribute("aria-selected")).toBe("true");
+    pressEscape();
+  });
+
   // Case: TC-801
   it.each(["append", "full"])(
     "keeps a pending author edit when a history request completes (%s) (TC-801)",

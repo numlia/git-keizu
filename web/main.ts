@@ -649,7 +649,7 @@ class GitKeizuView {
         this.findWidget.restoreState(prevState.findWidgetState);
       }
       if (this.selectedAuthors.length > 0) {
-        this.updateAuthorMenu(this.selectedAuthors);
+        this.updateAuthorMenu(this.selectedAuthors, true);
       }
     }
     const refreshedDuringLoadRepos = this.loadRepos(this.gitRepos, lastActiveRepo);
@@ -858,6 +858,9 @@ class GitKeizuView {
     worktrees?: GG.WorktreeCollection,
     appending = false
   ) {
+    const authorList = authors ?? [...new Set(commits.map((commit) => commit.author))].sort();
+    this.updateAuthorMenu(authorList, forceRender && !this.isLoadingMoreCommits);
+
     if (
       !forceRender &&
       this.tableElem.querySelector("table") !== null &&
@@ -942,20 +945,16 @@ class GitKeizuView {
         : t(STATUS_KEY_COMMITS_LOADED, this.commits.length)
     );
 
-    const authorList =
-      authors !== undefined ? authors : [...new Set(this.commits.map((c) => c.author))].sort();
-    this.updateAuthorMenu(authorList);
-
     this.consumePendingBranchScroll();
     this.triggerLoadCommitsCallback(true);
     this.fetchAvatars(avatarsNeeded);
     this.updateCurrentBtnState();
   }
-  private updateAuthorMenu(authors: string[]) {
+  private updateAuthorMenu(authors: string[], forceRender: boolean) {
     const previous = this.displayedAuthors;
     const equal = (left: string, right: string) => left === right;
     if (
-      this.isLoadingMoreCommits &&
+      !forceRender &&
       previous !== null &&
       arraysEqual(previous.authors, authors, equal) &&
       arraysEqual(previous.selected, this.selectedAuthors, equal)
