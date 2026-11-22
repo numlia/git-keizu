@@ -433,6 +433,7 @@ class GitKeizuView {
   private rowTarget: RowTarget | null = null;
   private readonly keydownListener = (e: KeyboardEvent) => this.handleKeyboardShortcut(e);
   private readonly disposeFocusContext: () => void;
+  private viewportResizeObserver?: ResizeObserver;
 
   constructor(
     repos: GG.GitRepoSet,
@@ -854,6 +855,7 @@ class GitKeizuView {
   ) {
     if (
       !forceRender &&
+      this.tableElem.querySelector("table") !== null &&
       this.moreCommitsAvailable === moreAvailable &&
       this.commitHead === commitHead &&
       worktreeCollectionsEqual(this.worktrees, worktrees ?? EMPTY_WORKTREE_COLLECTION) &&
@@ -1983,6 +1985,11 @@ class GitKeizuView {
 
   /* Observers */
   private observeWindowSizeChanges() {
+    if (typeof ResizeObserver === "function") {
+      // Opening or closing a panel changes the history height within the same window.
+      this.viewportResizeObserver = new ResizeObserver(() => this.redrawViewport());
+      this.viewportResizeObserver.observe(this.scrollContainerElem);
+    }
     let windowWidth = window.outerWidth,
       windowHeight = window.outerHeight;
     window.addEventListener("resize", () => {
@@ -2103,17 +2110,10 @@ class GitKeizuView {
       this.handleListTab(e);
       return;
     }
-    // A wheel can park focus on the list when its target leaves the mounted rows.
-    if (
-      e.target === this.tableElem &&
-      this.rowTarget !== null &&
-      (e.key === KEY_ARROW_UP || e.key === KEY_ARROW_DOWN || e.key === KEY_ENTER)
-    ) {
-      const row = this.mountRow(this.rowTarget.hash);
-      if (row !== null && this.handleRowKey(e, row, true)) return;
-    }
     const focused = this.resolveFocusedRow(e.target);
-    if (focused !== null && this.handleRowKey(e, focused.row, focused.onRow)) return;
+    // A wheel can park focus on the list while its logical target is offscreen.
+    const hash = e.target === this.tableElem ? this.rowTarget?.hash : focused?.row.dataset.hash;
+    if (hash !== undefined && this.handleRowKey(e, hash, focused?.onRow ?? true)) return;
     this.handleConfiguredShortcut(e, focused !== null || this.isListScopeTarget(e.target));
   }
 
@@ -2136,15 +2136,16 @@ class GitKeizuView {
   }
 
   // Returns true when the key belonged to the list, whether or not it moved anything.
-  private handleRowKey(e: KeyboardEvent, row: HTMLElement, onRow: boolean): boolean {
+  private handleRowKey(e: KeyboardEvent, hash: string, onRow: boolean): boolean {
     if (e.altKey) return false;
-    const hash = row.dataset.hash;
-    const index = hash === undefined ? undefined : this.commitLookup[hash];
-    if (hash === undefined || typeof index !== "number") return false;
+    const index = this.commitLookup[hash];
+    if (typeof index !== "number") return false;
     const ctrlOrCmd = e.ctrlKey || e.metaKey;
     if (e.key === KEY_ENTER) {
       // Ref labels and the overflow counter own their Enter; Shift / Alt + Enter are unassigned.
       if (!onRow || e.shiftKey) return false;
+      const row = this.mountRow(hash);
+      if (row === null) return false;
       consumeKey(e);
       if (ctrlOrCmd) {
         this.handleCommitRowActivation(hash, row, true);
@@ -2452,6 +2453,7 @@ class GitKeizuView {
   }
 
   public dispose(): void {
+    this.viewportResizeObserver?.disconnect();
     document.removeEventListener("keydown", this.keydownListener);
     this.disposeFocusContext();
   }

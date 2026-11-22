@@ -531,6 +531,7 @@ let Graph: GraphClass;
 /* ------------------------------------------------------------------ */
 
 const clientHeightGetter = Object.getOwnPropertyDescriptor(Element.prototype, "clientHeight")!.get!;
+const resizeNotifications = new WeakMap<Element, () => void>();
 
 beforeAll(async () => {
   document.body.innerHTML = [
@@ -580,8 +581,13 @@ beforeAll(async () => {
   vi.stubGlobal(
     "ResizeObserver",
     class {
-      observe(): void {}
-      unobserve(): void {}
+      constructor(private readonly notify: () => void) {}
+      observe(element: Element): void {
+        resizeNotifications.set(element, this.notify);
+      }
+      unobserve(element: Element): void {
+        resizeNotifications.delete(element);
+      }
       disconnect(): void {}
     }
   );
@@ -816,6 +822,77 @@ describe("row target initialisation, maintenance and repository switch (S69)", (
     loadCommits(standardCommits());
     expect(document.activeElement).toBe(document.body);
     expect(focusSpy).not.toHaveBeenCalled();
+  });
+});
+
+// @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
+describe("viewport coverage and offscreen keyboard targets (S88)", () => {
+  let savedScrollTop: number;
+  beforeEach(() => {
+    savedScrollTop = scrollContainer().scrollTop;
+    scrollContainer().scrollTop = 0;
+  });
+  afterEach(() => {
+    scrollContainer().scrollTop = savedScrollTop;
+  });
+
+  // Case: TC-799
+  it("fills the larger viewport when Branch Cleanup closes without a window resize (TC-799)", () => {
+    const panel = document.getElementById("branchCleanupPanel")!;
+    const toggle = document.getElementById("branchCleanupBtn")!;
+    const scroller = scrollContainer();
+    const expandedHeight = 672;
+    const readingPosition = 103 * ROW_HEIGHT;
+    vi.spyOn(scroller, "clientHeight", "get").mockImplementation(() =>
+      panel.hidden ? expandedHeight : 386
+    );
+    toggle.click();
+    expect(panel.hidden).toBe(false);
+    scroller.scrollTop = readingPosition;
+    loadCommits(
+      Array.from({ length: 300 }, (_, i) => node(String(i), [])),
+      { head: "0" }
+    );
+    clearPosts();
+
+    toggle.click();
+    expect(panel.hidden).toBe(true);
+    resizeNotifications.get(scroller)?.();
+    const bottomRow = Math.floor(
+      (readingPosition + expandedHeight - HEADER_HEIGHT - 1) / ROW_HEIGHT
+    );
+    expect(table().querySelector(`tr.commit[data-hash="${bottomRow}"]`)).not.toBeNull();
+    expect(document.querySelector(`#commitGraph circle[data-hash="${bottomRow}"]`)).not.toBeNull();
+    expect(scroller.scrollTop).toBe(readingPosition);
+    expect(posts("loadCommits")).toEqual([]);
+  });
+
+  // Case: TC-800
+  it("keeps the reading position for unassigned keys when the target is offscreen (TC-800)", async () => {
+    const scroller = scrollContainer();
+    loadCommits(
+      Array.from({ length: 300 }, (_, i) => node(String(i), [])),
+      { head: "0" }
+    );
+    focusRow("0");
+    const readingPosition = 100 * ROW_HEIGHT;
+    scroller.scrollTop = readingPosition;
+    scroller.dispatchEvent(new Event("scroll"));
+    await new Promise(requestAnimationFrame);
+    table().focus({ preventScroll: true });
+    expect(table().querySelector('tr[data-hash="0"]')).toBeNull();
+
+    for (const [key, modifiers] of [
+      ["Enter", { shiftKey: true }],
+      ["ArrowDown", { altKey: true }]
+    ] as const) {
+      expect(press(table(), key, modifiers).defaultPrevented).toBe(false);
+      expect(scroller.scrollTop).toBe(readingPosition);
+      expect(document.activeElement).toBe(table());
+      expect(table().querySelector('tr[data-hash="0"]')).toBeNull();
+    }
+    press(table(), "ArrowDown");
+    expect(document.activeElement).toBe(row("1"));
   });
 });
 

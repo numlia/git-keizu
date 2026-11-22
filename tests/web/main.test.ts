@@ -8467,6 +8467,27 @@ describe("installing an ordinary history page", () => {
       expect(savedCommits()).toEqual(commits);
     }
   );
+
+  // Case: TC-798
+  it("restores unchanged rows when a soft refresh supersedes a hard refresh (TC-798)", () => {
+    document.getElementById("refreshBtn")!.click();
+    dispatchMessage(branches);
+    const hardRequest = requests().at(-1)!;
+    expect(hardRequest.hard).toBe(true);
+
+    dispatchMessage({ command: "refresh" });
+    dispatchMessage({ ...branches, hard: false });
+    dispatchMessage({ ...fullResponse, requestId: hardRequest.requestId });
+    expect(document.querySelector("#commitTable #loadingHeader")).not.toBeNull();
+
+    const softRequest = requests().at(-1)!;
+    expect(softRequest.requestId).not.toBe(hardRequest.requestId);
+    expect(softRequest.hard).toBe(false);
+    dispatchMessage({ ...fullResponse, hard: false, requestId: softRequest.requestId });
+    const rows = document.querySelectorAll<HTMLElement>("#commitTable .commit");
+    expect(Array.from(rows, (row) => row.dataset.hash)).toEqual(MOCK_COMMITS.map((c) => c.hash));
+    expect(document.querySelector("#commitTable #loadingHeader")).toBeNull();
+  });
 });
 
 describe("request queue / refresh contention (S40)", () => {
