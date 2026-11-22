@@ -941,7 +941,11 @@ describe("viewport coverage and offscreen keyboard targets (S88)", () => {
   // Case: TC-803
   it.each([
     { key: "F10", part: 0, name: "feature" },
-    { key: "ContextMenu", part: 1, name: "origin/feature" }
+    { key: "ContextMenu", part: 1, name: "origin/feature" },
+    { key: "Enter", part: 0, name: "feature" },
+    { key: "Enter", part: 1, name: "origin/feature" },
+    { key: " ", part: 0, name: "feature" },
+    { key: " ", part: 1, name: "origin/feature" }
   ])("opens the offscreen $name label's menu with $key (TC-803)", async ({ key, part, name }) => {
     vi.spyOn(document, "hasFocus").mockReturnValue(true);
     const history = Array.from({ length: 300 }, (_, i) => node(String(i), []));
@@ -950,8 +954,12 @@ describe("viewport coverage and offscreen keyboard targets (S88)", () => {
     const launch = async () => {
       await scrollAwayFrom(label());
       expect(press(table(), key, { shiftKey: key === "F10" }).defaultPrevented).toBe(true);
-      expect(fire(table(), "contextmenu").defaultPrevented).toBe(true);
+      if (key === "F10" || key === "ContextMenu") {
+        expect(fire(table(), "contextmenu").defaultPrevented).toBe(true);
+      }
       expect(menuTitles()).toContain("Copy Branch Name to Clipboard");
+      expect(posts("commitDetails")).toEqual([]);
+      expect(posts("checkoutBranch")).toEqual([]);
     };
     await launch();
     pressEscape(document.activeElement!);
@@ -963,6 +971,22 @@ describe("viewport coverage and offscreen keyboard targets (S88)", () => {
     expect(posts("copyToClipboard")).toEqual([
       { command: "copyToClipboard", type: "Branch Name", data: name }
     ]);
+  });
+
+  it("leaves Space unassigned and opens details on Enter for an offscreen row (TC-803)", async () => {
+    const history = Array.from({ length: 300 }, (_, i) => node(String(i), []));
+    loadCommits([...menuLaunchCommits(), ...history]);
+    await scrollAwayFrom(row("M"));
+
+    expect(press(table(), " ").defaultPrevented).toBe(false);
+    expect(table().querySelector('tr[data-hash="M"]')).toBeNull();
+    expect(menuIsActive()).toBe(false);
+    expect(posts("commitDetails")).toEqual([]);
+
+    expect(press(table(), "Enter").defaultPrevented).toBe(true);
+    expect(posts("commitDetails")).toEqual([expect.objectContaining({ commitHash: "M" })]);
+    expect(detailsOwner()).toBe("M");
+    expect(menuIsActive()).toBe(false);
   });
 });
 

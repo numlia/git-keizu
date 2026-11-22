@@ -42,6 +42,7 @@ import {
   finishFocusUpdate,
   type FocusKey,
   type FocusUpdate,
+  getParkedFocusKeys,
   installKeyboardGuards,
   isKeyboardActionBlocked,
   markFocusTarget,
@@ -327,11 +328,15 @@ function activeContainer(element: Element | null): Element | null {
   return element !== null && element.classList.contains(CLASS_ACTIVE) ? element : null;
 }
 
+function isContextMenuKey(e: KeyboardEvent): boolean {
+  return e.key === KEY_CONTEXT_MENU || (e.key === KEY_F10 && e.shiftKey);
+}
+
 // ContextMenu / Shift+F10 open the target's own menu; inputs keep the browser's edit menu and
 // repeat / keyup / IME presses never launch. A consumed launch stops at the innermost target.
 function consumeContextMenuLaunch(e: Event): e is KeyboardEvent {
   if (!(e instanceof KeyboardEvent) || e.defaultPrevented) return false;
-  if (e.key !== KEY_CONTEXT_MENU && !(e.key === KEY_F10 && e.shiftKey)) return false;
+  if (!isContextMenuKey(e)) return false;
   if (isEditableEventTarget(e.target) || isKeyboardActionBlocked(e)) return false;
   e.preventDefault();
   e.stopPropagation();
@@ -2138,22 +2143,32 @@ class GitKeizuView {
     return target === document.body || target === document || target === this.tableElem;
   }
 
+  private handleParkedMenuKey(e: KeyboardEvent, hash: string): boolean {
+    const menuKey = isContextMenuKey(e);
+    if (!menuKey) {
+      if (e.key !== KEY_ENTER && e.key !== KEY_SPACE) return false;
+      const [origin] = getParkedFocusKeys(this.tableElem, this.currentRepo);
+      if (origin?.kind !== "ref" || origin.hash !== hash) return false;
+    }
+
+    consumeKey(e);
+    const row = this.mountRow(hash);
+    // Remounting restores focus to the original label, but the key event still targets the list.
+    const part = document.activeElement;
+    const badge = part?.closest<HTMLElement>(REF_BADGE_SELECTOR);
+    if (part instanceof HTMLElement && badge && row?.contains(badge)) {
+      this.showRefBadgeContextMenu(e, badge, undefined, part);
+    } else if (menuKey && row !== null) {
+      this.showCommitRowContextMenu(e, row);
+    }
+    return true;
+  }
+
   // Returns true when the key belonged to the list, whether or not it moved anything.
   private handleRowKey(e: KeyboardEvent, hash: string, onRow: boolean): boolean {
     const index = this.commitLookup[hash];
     if (typeof index !== "number") return false;
-    if (e.target === this.tableElem && consumeContextMenuLaunch(e)) {
-      const row = this.mountRow(hash);
-      // Remounting restores focus to the original label, but the key event still targets the list.
-      const part = document.activeElement;
-      const badge = part?.closest<HTMLElement>(REF_BADGE_SELECTOR);
-      if (part instanceof HTMLElement && badge && row?.contains(badge)) {
-        this.showRefBadgeContextMenu(e, badge, undefined, part);
-      } else if (row !== null) {
-        this.showCommitRowContextMenu(e, row);
-      }
-      return true;
-    }
+    if (e.target === this.tableElem && this.handleParkedMenuKey(e, hash)) return true;
     if (e.altKey) return false;
     const ctrlOrCmd = e.ctrlKey || e.metaKey;
     if (e.key === KEY_ENTER) {

@@ -508,21 +508,11 @@ function ownsPopupOrigin(root: HTMLElement, origin: FocusOrigin, context: FocusC
   );
 }
 
-// Keys parked while the root showed the loading placeholder survive into the next ticket.
-function withParkedKeys(
-  root: HTMLElement,
-  origin: FocusOrigin,
-  context: FocusContext
-): FocusOrigin {
-  if (
-    parked === null ||
-    parked.root !== root ||
-    parked.epoch !== tracking.epoch ||
-    parked.repo !== context.getRepo()
-  ) {
-    return origin;
-  }
-  return { ...origin, keys: parked.keys.reduce(addKey, origin.keys) };
+/** Focus parked on a container belongs to its former target until the user moves or changes repos. */
+export function getParkedFocusKeys(root: HTMLElement, repo: string | null): readonly FocusKey[] {
+  return parked?.root === root && parked.epoch === tracking.epoch && parked.repo === repo
+    ? parked.keys
+    : [];
 }
 
 /**
@@ -541,7 +531,10 @@ export function beginFocusUpdate(root: HTMLElement): FocusUpdate | null {
   const generation = (generations.get(root) ?? 0) + 1;
   generations.set(root, generation);
   return {
-    origin: withParkedKeys(root, captured, context),
+    origin: {
+      ...captured,
+      keys: getParkedFocusKeys(root, context.getRepo()).reduce(addKey, captured.keys)
+    },
     root,
     generation,
     focusEpoch: tracking.epoch
