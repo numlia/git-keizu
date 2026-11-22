@@ -98,7 +98,10 @@ class Branch {
     svg: SVGElement,
     config: Config,
     expandAt: number,
-    highlightedEdgeKeys: ReadonlySet<string> | null
+    highlightedEdgeKeys: ReadonlySet<string> | null,
+    first: number,
+    end: number,
+    fullRange: boolean
   ) {
     let colour = config.graphColours[this.colour % config.graphColours.length],
       i,
@@ -115,6 +118,7 @@ class Branch {
 
     // Convert branch lines into pixel coordinates, respecting expanded commit extensions
     for (i = 0; i < this.lines.length; i++) {
+      if (this.lines[i].p2.y < first || this.lines[i].p1.y >= end) continue;
       x1 = this.lines[i].p1.x * config.grid.x + config.grid.offsetX;
       y1 = this.lines[i].p1.y * config.grid.y + config.grid.offsetY;
       x2 = this.lines[i].p2.x * config.grid.x + config.grid.offsetX;
@@ -232,7 +236,9 @@ class Branch {
       }
     }
 
-    this.drawPath(svg, curPath, curColour, curSelected); // Draw the remaining path
+    if (curPath !== "" || (fullRange && this.lines.length === 0)) {
+      this.drawPath(svg, curPath, curColour, curSelected);
+    }
   }
   private drawPath(svg: SVGElement, path: string, colour: string, selected: boolean) {
     const highlightClass = selected ? CLASS_PATH_HIGHLIGHT_SELECTED : null;
@@ -466,6 +472,7 @@ export class Graph {
   private svgGradientStop1: SVGStopElement;
   private svgGradientStop2: SVGStopElement;
   private maxWidth: number = -1;
+  private layoutColumns = 0;
 
   private vertices: Vertex[] = [];
   private branches: Branch[] = [];
@@ -546,6 +553,10 @@ export class Graph {
     while ((i = this.findStart()) !== -1) {
       this.determinePath(i);
     }
+    this.layoutColumns = this.vertices.reduce(
+      (width, vertex) => Math.max(width, vertex.getNextPoint().x),
+      0
+    );
   }
 
   public setFileHistoryHighlight(highlight: GraphFileHistoryHighlight | null): void {
@@ -567,18 +578,21 @@ export class Graph {
   private drawPathHighlightMarks(
     group: SVGGElement,
     highlight: PathHighlightResult,
-    expandedCommit: ExpandedCommit | null
+    expandedCommit: ExpandedCommit | null,
+    config: Config,
+    first: number,
+    end: number
   ) {
     // One square per child, however many unloaded parents it has.
     const boundaryChildren = new Set(highlight.boundaries.map((boundary) => boundary.childHash));
-    for (let i = 0; i < this.vertices.length; i++) {
+    for (let i = first; i < end; i++) {
       const hash = this.commits[i].hash;
       const ring = highlight.hashes.has(hash);
       const boundary = boundaryChildren.has(hash);
       if (!ring && !boundary) continue;
       this.vertices[i].drawPathHighlightMarks(
         group,
-        this.config,
+        config,
         expandedCommit !== null && i > expandedCommit.id,
         ring,
         boundary
@@ -593,7 +607,15 @@ export class Graph {
     return highlight.matchHashes.has(hash) ? CLASS_FILE_HISTORY_MATCH : CLASS_FILE_HISTORY_DIM;
   }
 
-  public render(expandedCommit: ExpandedCommit | null) {
+  public render(expandedCommit: ExpandedCommit | null, first = 0, end = this.vertices.length) {
+    end = Math.min(end, this.vertices.length);
+    first = Math.min(first, end);
+    const offset = first * this.config.grid.y;
+    const config = {
+      ...this.config,
+      grid: { ...this.config.grid, offsetY: this.config.grid.offsetY - offset }
+    };
+    this.svg.setAttribute("style", `position:relative;top:${offset}px`);
     let group = <SVGGElement>document.createElementNS("http://www.w3.org/2000/svg", "g"),
       i,
       width = this.getWidth();
@@ -604,29 +626,35 @@ export class Graph {
     for (i = 0; i < this.branches.length; i++) {
       this.branches[i].draw(
         group,
-        this.config,
+        config,
         expandedCommit !== null ? expandedCommit.id : -1,
-        highlightedEdgeKeys
+        highlightedEdgeKeys,
+        first,
+        end,
+        first === 0 && end === this.vertices.length
       );
     }
-    for (i = 0; i < this.vertices.length; i++) {
+    for (i = first; i < end; i++) {
       const hash = this.commits[i].hash;
       this.vertices[i].draw(
         group,
-        this.config,
+        config,
         expandedCommit !== null && i > expandedCommit.id,
         hash,
         this.getFileHistoryHighlightClass(hash)
       );
     }
     if (this.pathHighlight !== null) {
-      this.drawPathHighlightMarks(group, this.pathHighlight, expandedCommit);
+      this.drawPathHighlightMarks(group, this.pathHighlight, expandedCommit, config, first, end);
     }
 
     if (this.svgGroup !== null) this.svg.removeChild(this.svgGroup);
     this.svg.appendChild(group);
     this.svgGroup = group;
-    this.setDimensions(width, this.getHeight(expandedCommit));
+    this.setDimensions(
+      width,
+      this.getHeight(expandedCommit) - (this.vertices.length - end + first) * this.config.grid.y
+    );
     this.applyMaxWidth(width);
   }
 
@@ -634,19 +662,13 @@ export class Graph {
     if (this.svgGroup !== null) {
       this.svg.removeChild(this.svgGroup);
       this.svgGroup = null;
+      this.svg.setAttribute("style", "");
       this.setDimensions(0, 0);
     }
   }
 
   public getWidth() {
-    let x = 0,
-      i,
-      p;
-    for (i = 0; i < this.vertices.length; i++) {
-      p = this.vertices[i].getNextPoint();
-      if (p.x > x) x = p.x;
-    }
-    return x * this.config.grid.x;
+    return this.layoutColumns * this.config.grid.x;
   }
 
   public getHeight(expandedCommit: ExpandedCommit | null) {

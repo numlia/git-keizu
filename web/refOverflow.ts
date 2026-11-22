@@ -1,4 +1,5 @@
 import { hideContextMenu } from "./contextMenu";
+import type { RefBadgeCounts } from "./historyColumnSizing";
 import { t } from "./i18n";
 import {
   beginFocusUpdate,
@@ -407,6 +408,8 @@ export class RefOverflowController {
   private header: HTMLTableCellElement | null = null;
   private headerObserver: ResizeObserver | null = null;
   private lastHeaderWidth: number | null = null;
+  private historyBadges: RefBadgeCounts | null = null;
+  private historyMinimum: { key: string; width: number } | null = null;
   private generation = 0;
   private frameId: number | null = null;
   private disposed = false;
@@ -447,8 +450,9 @@ export class RefOverflowController {
     }
   }
 
-  public attachTable(table: HTMLTableElement): void {
+  public attachTable(table: HTMLTableElement, historyBadges: RefBadgeCounts | null = null): void {
     this.releaseTable();
+    this.historyBadges = historyBadges;
     this.table = table;
     this.header = getDescriptionHeader(table);
     if (this.header !== null && typeof ResizeObserver === "function") {
@@ -557,22 +561,68 @@ export class RefOverflowController {
     return this.table === table && generation === this.generation && table.isConnected;
   }
 
+  // Folded labels reserve space for their counter and for the message. The widest required
+  // counter can belong to a row far outside the viewport.
+  private getHistoryMinimum(table: HTMLTableElement): number | null {
+    const counts = this.historyBadges;
+    if (counts === null || counts.maximum === 0) return null;
+    const cell = table.querySelector<HTMLTableCellElement>("tr[data-id] td:nth-child(2)");
+    if (cell === null) return null;
+    const style = getComputedStyle(cell);
+    const key = `${counts.atHead}/${counts.maximum}/${style.font}/${style.letterSpacing}`;
+    if (this.historyMinimum?.key === key) return this.historyMinimum.width;
+    const probe = document.createElement("div");
+    probe.className = CLASS_MEASURE;
+    copyRowAppearance(probe, cell);
+    const head = document.createElement("span");
+    head.className = CLASS_HEAD_DOT;
+    const counters = Array.from({ length: counts.maximum }, (_, i) => createCounterElement(i + 1));
+    probe.append(head, ...counters);
+    document.body.appendChild(probe);
+    try {
+      const widths = counters.map(getOuterWidth);
+      const base = {
+        paddingWidth: getHorizontalSum(style, "padding-left", "padding-right"),
+        emWidth: parseFloat(style.fontSize),
+        headWidth: 0,
+        maxCounterWidth: Math.max(...widths)
+      };
+      const width = calculateMinimumDescriptionWidth(
+        counts.atHead === 0
+          ? [base]
+          : [
+              base,
+              {
+                ...base,
+                headWidth: getOuterWidth(head),
+                maxCounterWidth: Math.max(...widths.slice(0, counts.atHead))
+              }
+            ]
+      );
+      if (width !== null) this.historyMinimum = { key, width };
+      return width;
+    } finally {
+      probe.remove();
+    }
+  }
+
   private layout(): void {
     const table = this.table;
     const generation = this.generation;
     if (table === null || !table.isConnected) return;
 
     const rows = collectRows(table);
+    const historyMinimum = this.getHistoryMinimum(table);
     if (rows.length === 0) {
       this.recordHeaderWidth();
-      this.options.onMinimumWidth(null);
+      this.options.onMinimumWidth(historyMinimum);
       return;
     }
 
     const measurements = measureRows(rows);
     const minimum = calculateMinimumDescriptionWidth(measurements.map((m) => m.minimumInput));
     if (minimum !== null) {
-      this.options.onMinimumWidth(minimum);
+      this.options.onMinimumWidth(Math.max(minimum, historyMinimum ?? 0));
       if (!this.isCurrent(table, generation)) return;
     }
 
