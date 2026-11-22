@@ -90,6 +90,16 @@ function getCircleElements(): MockElement[] {
   return allCreatedElements.filter((e) => e.tagName === "circle");
 }
 
+function descendants(elem: MockElement, tagName?: string): MockElement[] {
+  const found: MockElement[] = [];
+  const walk = (current: MockElement): void => {
+    if (tagName === undefined || current.tagName === tagName) found.push(current);
+    current.children.forEach(walk);
+  };
+  walk(elem);
+  return found;
+}
+
 /* ------------------------------------------------------------------ */
 /* Tests                                                              */
 /* ------------------------------------------------------------------ */
@@ -1722,16 +1732,6 @@ describe("Graph.setPathHighlight() logical connection rendering (S21)", () => {
     return { graph, svg: containerElement.children[0] };
   }
 
-  function descendants(elem: MockElement, tagName: string): MockElement[] {
-    const found: MockElement[] = [];
-    const walk = (current: MockElement): void => {
-      if (current.tagName === tagName) found.push(current);
-      current.children.forEach(walk);
-    };
-    walk(elem);
-    return found;
-  }
-
   function classesOf(elem: MockElement): string[] {
     return (elem.getAttribute("class") ?? "").split(" ").filter((name) => name !== "");
   }
@@ -2061,7 +2061,7 @@ describe("rendering windows of an extended graph", () => {
   const initial = 5000;
   function graph() {
     containerElement = createMockElement("div");
-    return new Graph("testGraph", DEFAULT_CONFIG);
+    return Object.assign(new Graph("testGraph", DEFAULT_CONFIG), { container: containerElement });
   }
   function load(graph: Graph, rows: GitCommitNode[], append = false) {
     graph.loadCommits(
@@ -2071,10 +2071,10 @@ describe("rendering windows of an extended graph", () => {
       append
     );
   }
-  function shapes(graph: Graph, first: number, end: number) {
+  function shapes(g: ReturnType<typeof graph>, first: number, end: number) {
     allCreatedElements = [];
-    graph.render(null, first, end);
-    return allCreatedElements
+    g.render(null, first, end);
+    return descendants(g.container)
       .filter(
         (el) => el.tagName === "circle" || el.getAttribute("class")?.split(" ").includes("line")
       )
@@ -2174,7 +2174,7 @@ describe("rendering windows of an extended graph", () => {
   });
 
   function checkAppend(
-    g: Graph,
+    g: ReturnType<typeof graph>,
     rows: GitCommitNode[],
     length: number,
     oldEnd: number,
