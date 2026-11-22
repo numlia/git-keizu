@@ -30,6 +30,7 @@ Verifies the `normalizeCommitLoadCount` helper, which keeps the payload of `requ
 
 > Origin: Feature 061-02 (large history browsing)
 > Added: 2026-11-22
+> Updated: 2026-11-23
 > Status: active
 > Supersedes: -
 > Target Path: `web/main.ts` (loadCommits, scrollToCommit and history rendering)
@@ -50,6 +51,7 @@ Verifies the `normalizeCommitLoadCount` helper, which keeps the payload of `requ
 | TC-802  | Focus a row, scroll it offscreen, then press Shift+F10 or Context Menu from the list.                  | Boundary - keyboard menu for an offscreen row                              | The row's right-click menu opens and stays open through the browser's contextmenu event. Copy uses the selected commit hash. Closing the menu returns focus to the row.                                               | Include stash and uncommitted rows with their own menus.              |
 | TC-803  | Focus a branch label, scroll it offscreen, then press Enter, Space, Shift+F10 or Context Menu.         | Boundary - keyboard menu for an offscreen label                            | The branch menu opens. Escape returns focus to the same label and Copy Branch Name uses its full name. On the commit row itself, Space stays unassigned and Enter opens that commit's details.                        | Exercise both parts of a combined local and remote badge.             |
 | TC-804  | Soft-refresh the same commits with a changed date, subject, author name or email, then load more.      | Boundary - commit metadata across a refresh and append                     | The corrected value appears on refresh and remains visible after the next page loads. A change to the working tree timestamp or change count updates only that row.                                                   | Change one field at a time, keeping hashes, parents and refs fixed.   |
+| TC-808  | Reopen with topic selected. Deliver the old branch list before or after the current reply.             | Boundary - branch replies across Webview instances                         | The dropdown and saved state keep topic. Only the current reply updates the list and triggers one history request filtered to topic.                                                                                  | Also deliver a reply with no request ID while waiting.                |
 
 TC-791 also has a desktop regression check. Build the extension, configure the [VS Code and Playwright capture environment](../../../../../scripts/readme-media/README.md), and open a workspace whose repository has at least 100,000 commits with `git-keizu.initialLoadCommits` set to 100,000. Run `node tests/browser/history-viewport.mjs /absolute/path/to/workspace.code-workspace` from the repository root. It compares the center of every fully visible commit row to its SVG node at two window heights around row 90,000. TC-795 checks that opening details uses native table row counts and closing them restores the partial table’s indices.
 
