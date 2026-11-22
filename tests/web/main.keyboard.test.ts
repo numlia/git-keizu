@@ -1116,39 +1116,68 @@ describe("commit metadata in paged history (S88)", () => {
 // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S89)
 describe("author choices during history updates", () => {
   // Case: TC-806
-  it("refreshes renamed author choices and preserves a pending edit on the next soft refresh (TC-806)", () => {
-    const full = {
-      command: "loadCommits",
-      commits: [node("M", [], { author: "Alias" })],
-      head: "M",
-      moreCommitsAvailable: false
-    };
-    const refreshAuthors = (authors: string[]) => {
+  it.each([{ newBranches: [] }, { newBranches: ["topic"] }])(
+    "preserves a pending author edit when a soft refresh adds $newBranches (TC-806)",
+    ({ newBranches }) => {
+      const full = {
+        command: "loadCommits",
+        commits: [node("M", [], { author: "Alias" })],
+        head: "M",
+        moreCommitsAvailable: false
+      };
+      const refreshAuthors = (authors: string[], extraBranches: string[] = []) => {
+        clearPosts();
+        dispatch({ command: "refresh" });
+        expect(posts("loadBranches")).toEqual([expect.objectContaining({ hard: false })]);
+        dispatch({
+          command: "loadBranches",
+          branches: ["feature", "hotfix", ...extraBranches],
+          head: "feature",
+          hard: false,
+          isRepo: true
+        });
+        const requests = posts("loadCommits");
+        expect(requests).toHaveLength(1);
+        const [request] = requests;
+        expect(request).toMatchObject({
+          hard: extraBranches.length > 0,
+          requestId: expect.any(String)
+        });
+        const refs = extraBranches.map((name) => ref("M", name, "head"));
+        dispatch({
+          ...full,
+          commits: [{ ...full.commits[0], refs }],
+          hard: request.hard,
+          requestId: request.requestId,
+          authors
+        });
+      };
+
+      dispatch({ ...full, hard: true, authors: ["Alias"] });
+      const mountedRow = row("M");
+      refreshAuthors(["Canonical"]);
+      openDropdown("authorSelect");
+      const menu = document.getElementById("authorSelect")!;
+      const options = () => Array.from(menu.querySelectorAll<HTMLElement>('[role="option"]'));
+      expect(options().map((option) => option.title)).toEqual(["All Authors", "Canonical"]);
+      expect(row("M")).toBe(mountedRow);
+
+      fire(options()[1], "click");
+      refreshAuthors(["Canonical"], newBranches);
+      expect(labelsOf("M").map((label) => label.textContent)).toEqual(newBranches);
+      expect(dropdownIsOpen("authorSelect")).toBe(true);
+      expect(options()[1].getAttribute("aria-selected")).toBe("true");
       clearPosts();
-      dispatch({ command: "refresh" });
-      loadBranches(false);
-      const requests = posts("loadCommits");
-      expect(requests).toHaveLength(1);
-      const [request] = requests;
-      expect(request).toMatchObject({ hard: false, requestId: expect.any(String) });
-      dispatch({ ...full, hard: false, requestId: request.requestId, authors });
-    };
+      fire(menu.querySelector(".dropdownHint button")!, "click");
+      expect(posts("loadCommits")).toEqual([expect.objectContaining({ authors: ["Canonical"] })]);
 
-    dispatch({ ...full, hard: true, authors: ["Alias"] });
-    const mountedRow = row("M");
-    refreshAuthors(["Canonical"]);
-    openDropdown("authorSelect");
-    const menu = document.getElementById("authorSelect")!;
-    const options = () => Array.from(menu.querySelectorAll<HTMLElement>('[role="option"]'));
-    expect(options().map((option) => option.title)).toEqual(["All Authors", "Canonical"]);
-    expect(row("M")).toBe(mountedRow);
-
-    fire(options()[1], "click");
-    refreshAuthors(["Canonical"]);
-    expect(dropdownIsOpen("authorSelect")).toBe(true);
-    expect(options()[1].getAttribute("aria-selected")).toBe("true");
-    pressEscape();
-  });
+      dispatch({ ...full, authors: ["Canonical"], hard: true });
+      openDropdown("authorSelect");
+      fire(options()[0], "click");
+      fire(menu.querySelector(".dropdownHint button")!, "click");
+      loadCommits(standardCommits());
+    }
+  );
 
   // Case: TC-801
   it.each(["append", "full"])(
