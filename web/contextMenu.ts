@@ -74,7 +74,8 @@ let activeSession: MenuSession | null = null;
 // keyup is cancelled and a contextmenu inside the menu counts as the same press. Only a new key
 // press or pointer press counts as an independent input.
 interface KeyboardLaunch {
-  readonly target: HTMLElement;
+  readonly source: HTMLElement;
+  readonly keyTarget: EventTarget | null;
   readonly key: string;
   readonly dispose: () => void;
 }
@@ -413,7 +414,11 @@ function suppressFollowingContextMenu(event: Event): void {
   clearKeyboardLaunch();
   if (launch === null) return;
   const target = event.target;
-  if ((target instanceof Node && launch.target.contains(target)) || isInsideMenu(target)) {
+  if (
+    target === launch.keyTarget ||
+    (target instanceof Node && launch.source.contains(target)) ||
+    isInsideMenu(target)
+  ) {
     event.preventDefault();
     event.stopPropagation();
   }
@@ -426,7 +431,7 @@ function suppressLaunchKeyup(event: KeyboardEvent): void {
   document.removeEventListener(EVENT_KEYUP, suppressLaunchKeyup, CAPTURE);
 }
 
-function trackKeyboardLaunch(target: HTMLElement, key: string): void {
+function trackKeyboardLaunch(source: HTMLElement, event: KeyboardEvent): void {
   clearKeyboardLaunch();
   document.addEventListener(EVENT_CONTEXTMENU, suppressFollowingContextMenu, CAPTURE);
   document.addEventListener(EVENT_KEYUP, suppressLaunchKeyup, CAPTURE);
@@ -434,8 +439,9 @@ function trackKeyboardLaunch(target: HTMLElement, key: string): void {
     document.addEventListener(type, clearKeyboardLaunch, CAPTURE);
   });
   pendingKeyboardLaunch = {
-    target,
-    key,
+    source,
+    keyTarget: event.target,
+    key: event.key,
     dispose: () => {
       document.removeEventListener(EVENT_CONTEXTMENU, suppressFollowingContextMenu, CAPTURE);
       document.removeEventListener(EVENT_KEYUP, suppressLaunchKeyup, CAPTURE);
@@ -685,7 +691,7 @@ export function showContextMenu(
   activeSession = session;
 
   if (fromKeyboard) {
-    trackKeyboardLaunch(sourceElem, event.key);
+    trackKeyboardLaunch(sourceElem, event);
     focusMenuItem(menuItemsOf(contextMenu)[0]);
   }
 }

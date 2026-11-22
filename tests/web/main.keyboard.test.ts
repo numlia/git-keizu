@@ -894,6 +894,44 @@ describe("viewport coverage and offscreen keyboard targets (S88)", () => {
     press(table(), "ArrowDown");
     expect(document.activeElement).toBe(row("1"));
   });
+
+  // Case: TC-802
+  it.each([
+    ["F10", "M"],
+    ["ContextMenu", "M"],
+    ["ContextMenu", STASH_HASH],
+    ["ContextMenu", UNCOMMITTED_CHANGES_HASH]
+  ])("opens the offscreen row's menu with %s for %s (TC-802)", async (key, hash) => {
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    const scroller = scrollContainer();
+    const history = Array.from({ length: 300 }, (_, i) => node(String(i), []));
+    loadCommits([...menuLaunchCommits(), ...history], { head: "N" });
+    const selected = focusRow(hash);
+    fire(selected, "contextmenu");
+    const expectedTitles = menuTitles();
+    fire(document, "click");
+
+    scroller.scrollTop = 100 * ROW_HEIGHT;
+    scroller.dispatchEvent(new Event("scroll"));
+    await new Promise(requestAnimationFrame);
+    expect(selected.isConnected).toBe(false);
+    expect(document.activeElement).toBe(table());
+
+    expect(press(table(), key, { shiftKey: key === "F10" }).defaultPrevented).toBe(true);
+    expect(fire(table(), "contextmenu").defaultPrevented).toBe(true);
+    expect(menuIsActive()).toBe(true);
+    expect(menuTitles()).toEqual(expectedTitles);
+    expect(row(hash).classList.contains("contextMenuActive")).toBe(true);
+    expect(document.activeElement).toBe(contextMenuElem().querySelector("li.contextMenuItem"));
+    if (hash === "M") {
+      menuItem(COPY_HASH_TITLE).focus();
+      press(document.activeElement!, "Enter");
+      expect(posts("copyToClipboard")).toEqual([expect.objectContaining({ data: hash })]);
+    } else {
+      pressEscape(document.activeElement!);
+    }
+    expect(document.activeElement).toBe(row(hash));
+  });
 });
 
 describe("editing the author filter while loading more history", () => {

@@ -1520,14 +1520,14 @@ class GitKeizuView {
     });
     addListenerToClass("unsavedChanges", "contextmenu", (e: Event) => {
       e.stopPropagation();
-      this.showUncommittedContextMenu(
+      this.showCommitRowContextMenu(
         <MouseEvent>e,
         <HTMLElement>(<Element>e.target).closest(".unsavedChanges")!
       );
     });
     addListenerToClass("unsavedChanges", "keydown", (e: Event) => {
       if (!consumeContextMenuLaunch(e)) return;
-      this.showUncommittedContextMenu(e, <HTMLElement>e.currentTarget);
+      this.showCommitRowContextMenu(e, <HTMLElement>e.currentTarget);
     });
     addListenerToClass("gitRef", "contextmenu", (e: Event) => {
       this.showRefBadgeContextMenu(<MouseEvent>e, <HTMLElement>e.currentTarget);
@@ -1559,7 +1559,16 @@ class GitKeizuView {
   }
   // Pointer and keyboard launches share these builders, so a row's menu is the same either way.
   private showCommitRowContextMenu(event: ContextMenuTrigger, sourceElem: HTMLElement): void {
-    let hash = sourceElem.dataset.hash!;
+    const hash = sourceElem.dataset.hash!;
+    if (hash === UNCOMMITTED_CHANGES_HASH) {
+      showContextMenu(
+        event,
+        buildUncommittedContextMenuItems(this.currentRepo, sourceElem),
+        sourceElem,
+        this.getCurrentRepoRecentActions()
+      );
+      return;
+    }
     let commit = this.commits[this.commitLookup[hash]];
     if (commit.stash !== null) {
       let selector = commit.stash.selector;
@@ -1584,14 +1593,6 @@ class GitKeizuView {
         sourceElem,
         (mode) => this.pathHighlight.select({ kind: "commit", repo, hash, name: subject, mode })
       ),
-      sourceElem,
-      this.getCurrentRepoRecentActions()
-    );
-  }
-  private showUncommittedContextMenu(event: ContextMenuTrigger, sourceElem: HTMLElement): void {
-    showContextMenu(
-      event,
-      buildUncommittedContextMenuItems(this.currentRepo, sourceElem),
       sourceElem,
       this.getCurrentRepoRecentActions()
     );
@@ -2138,9 +2139,14 @@ class GitKeizuView {
 
   // Returns true when the key belonged to the list, whether or not it moved anything.
   private handleRowKey(e: KeyboardEvent, hash: string, onRow: boolean): boolean {
-    if (e.altKey) return false;
     const index = this.commitLookup[hash];
     if (typeof index !== "number") return false;
+    if (e.target === this.tableElem && consumeContextMenuLaunch(e)) {
+      const row = this.mountRow(hash);
+      if (row !== null) this.showCommitRowContextMenu(e, row);
+      return true;
+    }
+    if (e.altKey) return false;
     const ctrlOrCmd = e.ctrlKey || e.metaKey;
     if (e.key === KEY_ENTER) {
       // Ref labels and the overflow counter own their Enter; Shift / Alt + Enter are unassigned.
