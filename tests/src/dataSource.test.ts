@@ -3126,8 +3126,12 @@ describe("getAuthors", () => {
     // When: getAuthors is called
     await ds.getAuthors(REPO);
 
-    // Then: spawn is called with ["shortlog", "-s", "HEAD"] and correct cwd
-    expect(spawnMock).toHaveBeenCalledWith("git", ["shortlog", "-s", "HEAD"], SPAWN_OPTS);
+    // Then: author names are requested in the encoding used by the extension.
+    expect(spawnMock).toHaveBeenCalledWith(
+      "git",
+      ["shortlog", "--encoding=UTF-8", "-s", "HEAD"],
+      SPAWN_OPTS
+    );
   });
 });
 
@@ -3947,10 +3951,16 @@ describe("getWorktrees collection and pinned detached commits (S47)", () => {
     // Then: the duplicated head appears exactly once in the pinned revision arguments
     const pinnedArgs = spawn.pinnedCalls()[0];
     expect(pinnedArgs.filter((arg) => arg === HASH_D)).toHaveLength(1);
-    expect(pinnedArgs).toEqual(["log", NO_WALK_SORTED, `--format=${GIT_LOG_FORMAT}`, HASH_D]);
+    expect(pinnedArgs).toEqual([
+      "log",
+      NO_WALK_SORTED,
+      "--encoding=UTF-8",
+      `--format=${GIT_LOG_FORMAT}`,
+      HASH_D
+    ]);
   });
 
-  it("builds the pinned query from format and revisions only (TC-297)", async () => {
+  it("reads pinned revisions in UTF-8 without filtering the history window (TC-297)", async () => {
     // Case: TC-297
     // Given: two detached worktrees with different heads and no author filter
     const spawn = setupDetachedSpawn({
@@ -3971,6 +3981,7 @@ describe("getWorktrees collection and pinned detached commits (S47)", () => {
     expect(pinnedCalls[0]).toEqual([
       "log",
       NO_WALK_SORTED,
+      "--encoding=UTF-8",
       `--format=${GIT_LOG_FORMAT}`,
       HASH_C,
       HASH_D

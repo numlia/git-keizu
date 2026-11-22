@@ -74,10 +74,12 @@ const NULL_BYTE_SEPARATOR = "\0";
 const NAME_STATUS_OPTION = "--name-status";
 const NUMSTAT_OPTION = "--numstat";
 const NO_WALK_SORTED_OPTION = "--no-walk=sorted";
+const UTF8_OUTPUT_OPTION = "--encoding=UTF-8";
 const TAB_SEPARATOR = "\t";
 const VALID_FILE_CHANGE_TYPES: ReadonlySet<string> = new Set(["A", "M", "D", "R"]);
 const BRANCH_COMPARISON_MAX_PARALLEL = 3;
 const FILE_HISTORY_ANCESTRY_MIN_ENTRIES = 2;
+const HISTORY_ANCESTRY_FILES = ["shallow", "info/grafts"];
 const HISTORY_CONFIG_PATTERN = "^(core\\.usereplacerefs|mailmap\\.(file|blob)|log\\.mailmap)$";
 const GIT_CONFIG_NO_MATCH = 1;
 
@@ -1313,15 +1315,15 @@ export class DataSource {
   }
 
   private async getRefs(repo: string, showRemoteBranches: boolean) {
-    const [data, shallowRoots, historyConfig] = await Promise.all([
+    const [data, ancestryFiles, historyConfig] = await Promise.all([
       this.readRefs(repo, showRemoteBranches),
-      this.getShallowRoots(repo),
+      this.getHistoryAncestryFiles(repo),
       this.getHistoryConfigSnapshot(repo)
     ]);
-    // Shallow roots and replacement mode affect parents. Mailmaps also affect the author menu.
+    // Git can change parents and canonical author names without moving any ref.
     const snapshot =
-      data.snapshot !== null && shallowRoots !== null && historyConfig !== null
-        ? JSON.stringify([data.snapshot, shallowRoots, historyConfig])
+      data.snapshot !== null && ancestryFiles !== null && historyConfig !== null
+        ? JSON.stringify([data.snapshot, ancestryFiles, historyConfig])
         : null;
     return { ...data, snapshot };
   }
@@ -1386,14 +1388,29 @@ export class DataSource {
     );
   }
 
-  private async getShallowRoots(repo: string): Promise<string | null> {
-    const location = await this.runGitQuery(["rev-parse", "--git-path", "shallow"], repo);
-    if (location.kind !== "ok" || !location.stdout.trimEnd()) return null;
-    try {
-      return await readFile(path.resolve(repo, location.stdout.trimEnd()), "utf8");
-    } catch (error) {
-      return (error as NodeJS.ErrnoException).code === "ENOENT" ? "" : null;
+  private async getHistoryAncestryFiles(repo: string) {
+    const args = HISTORY_ANCESTRY_FILES.flatMap((file) => ["--git-path", file]);
+    const locations = await this.runGitQuery(["rev-parse", ...args], repo);
+    if (locations.kind !== "ok") return null;
+    // rev-parse emits one path per line. A newline in a path makes this result ambiguous.
+    const files = locations.stdout.split("\n");
+    if (
+      files.pop() !== "" ||
+      files.length !== HISTORY_ANCESTRY_FILES.length ||
+      files.includes("")
+    ) {
+      return null;
     }
+    const contents = await Promise.all(
+      files.map(async (file) => {
+        try {
+          return await readFile(path.resolve(repo, file), "utf8");
+        } catch (error) {
+          return (error as NodeJS.ErrnoException).code === "ENOENT" ? false : null;
+        }
+      })
+    );
+    return contents.includes(null) ? null : contents;
   }
 
   private readRefs(repo: string, showRemoteBranches: boolean) {
@@ -1550,6 +1567,7 @@ export class DataSource {
     const args = [
       "log",
       `--max-count=${num}`,
+      UTF8_OUTPUT_OPTION,
       `--format=${this.gitLogFormat}`,
       COMMIT_ORDER_FLAGS[commitOrdering],
       ...authorFilterArgs(authors)
@@ -1575,6 +1593,7 @@ export class DataSource {
     const args = [
       "log",
       NO_WALK_SORTED_OPTION,
+      UTF8_OUTPUT_OPTION,
       `--format=${this.gitLogFormat}`,
       ...authorFilterArgs(authors),
       ...heads
@@ -1599,7 +1618,7 @@ export class DataSource {
 
   private getAuthors(repo: string) {
     return this.spawnGit<string[]>(
-      ["shortlog", "-s", "HEAD"],
+      ["shortlog", UTF8_OUTPUT_OPTION, "-s", "HEAD"],
       repo,
       (stdout) => {
         const lines = stdout.split(eolRegex);
@@ -1620,7 +1639,7 @@ export class DataSource {
 
   private getStashes(repo: string) {
     return this.spawnGit<GitStash[]>(
-      ["reflog", `--format=${this.gitStashFormat}`, "refs/stash", "--"],
+      ["reflog", UTF8_OUTPUT_OPTION, `--format=${this.gitStashFormat}`, "refs/stash", "--"],
       repo,
       (stdout) => {
         const lines = stdout.split(eolRegex);

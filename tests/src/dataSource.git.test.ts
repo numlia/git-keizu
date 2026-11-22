@@ -104,6 +104,7 @@ describe("continuing ordinary Git history", () => {
   });
   afterEach(async () => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     await fs.rm(fixture.root, { recursive: true, force: true });
   });
 
@@ -134,6 +135,48 @@ describe("continuing ordinary Git history", () => {
     expect(
       (await full(4)).commits.flatMap((row) => [row.hash, row.parentHashes.join(" "), row.message])
     ).toEqual(expected.slice(0, -1));
+  });
+
+  // Case: TC-382
+  it.each(["EUC-JP", "UTF-8"])(
+    "keeps Japanese history readable when Git's output encoding changes from %s (TC-382)",
+    async (initialEncoding) => {
+      const { repo } = fixture;
+      const subjects = ["更新一", "更新二", "更新三", "更新四"];
+      for (const subject of subjects) {
+        git(repo, ["commit", "--allow-empty", "--author=作者 <author@example.com>", "-m", subject]);
+      }
+      git(repo, ["config", "i18n.logOutputEncoding", initialEncoding]);
+      const first = await full(2);
+      git(repo, [
+        "config",
+        "i18n.logOutputEncoding",
+        initialEncoding === "UTF-8" ? "EUC-JP" : "UTF-8"
+      ]);
+      const page = await ds.getNextHistoryPage(query(4, first.pageToken));
+      expect(page).toBeDefined();
+      const combined = first.commits.concat(page!.commits);
+      expect(combined.map((row) => row.message)).toEqual(subjects.toReversed());
+      expect(combined.map((row) => row.author)).toEqual(subjects.map(() => "作者"));
+      expect(first.authors).toContain("作者");
+      expect(combined).toEqual((await full(4)).commits);
+    }
+  );
+
+  // Case: TC-382
+  it("reads Japanese subjects from stashes and detached worktree heads in UTF-8 (TC-382)", async () => {
+    const { repo, root } = fixture;
+    const detached = path.join(root, "detached");
+    git(repo, ["worktree", "add", "--detach", detached, "HEAD"]);
+    git(detached, ["commit", "--allow-empty", "-m", "別の履歴"]);
+    const pinnedHash = git(detached, ["rev-parse", "HEAD"]);
+    await fs.writeFile(path.join(repo, "work.txt"), "work");
+    git(repo, ["stash", "push", "--include-untracked", "-m", "退避"]);
+    git(repo, ["config", "i18n.logOutputEncoding", "EUC-JP"]);
+
+    const { commits } = await full(2);
+    expect(commits.find((row) => row.hash === pinnedHash)?.message).toBe("別の履歴");
+    expect(commits.find((row) => row.stash !== null)?.message).toContain("退避");
   });
 
   // Case: TC-382
@@ -331,6 +374,46 @@ describe("continuing ordinary Git history", () => {
       expect(page?.moreCommitsAvailable).toBe(false);
       expect(page?.pageToken).toBeUndefined();
       expect(await ds.getNextHistoryPage(query(count + 4, first.pageToken))).toBeUndefined();
+    }
+  );
+
+  // Case: TC-385
+  it.each(["create", "edit", "remove"])(
+    "reloads history after a graft file %s with unchanged refs (TC-385)",
+    async (change) => {
+      const { repo, root } = fixture;
+      const [six, five, four, three, two] = git(repo, ["rev-list", "HEAD"]).split("\n");
+      git(repo, ["config", "advice.graftFileDeprecated", "false"]);
+      const grafts =
+        change === "edit"
+          ? path.join(root, "external grafts")
+          : path.join(repo, ".git", "info", "grafts");
+      vi.stubEnv("GIT_GRAFT_FILE", change === "edit" ? grafts : undefined);
+      if (change !== "create") await fs.writeFile(grafts, `${five} ${two}\n`);
+      const refs = listRefs(repo);
+      const first = await full(1);
+      const second = await ds.getNextHistoryPage(query(2, first.pageToken));
+      expect(second?.commits.map((row) => row.parentHashes)).toEqual([
+        [change === "create" ? four : two]
+      ]);
+      expect(second?.pageToken).toBeTypeOf("number");
+
+      if (change === "remove") await fs.unlink(grafts);
+      else await fs.writeFile(grafts, `${five}\n`);
+      expect(listRefs(repo)).toBe(refs);
+      expect(await ds.getNextHistoryPage(query(4, second!.pageToken))).toBeUndefined();
+      const refreshed = await full(4);
+      expect(refreshed.commits.map((row) => [row.hash, ...row.parentHashes])).toEqual(
+        change === "remove"
+          ? [
+              [six, five],
+              [five, four],
+              [four, three],
+              [three, two]
+            ]
+          : [[six, five], [five]]
+      );
+      expect(refreshed.moreCommitsAvailable).toBe(change === "remove");
     }
   );
 
