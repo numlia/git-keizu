@@ -49,3 +49,16 @@ Verifies the `normalizeCommitLoadCount` helper, which keeps the payload of `requ
 | TC-800  | With the selected row offscreen and focus on the list, press Shift+Enter or Alt+Down, then Down.       | Validation - unassigned keys                                               | The unassigned keys preserve the reading position and focus. Down mounts and focuses the next logical row.                                                                                                            | Keep the original selection outside the mounted rows.                 |
 
 TC-791 also has a desktop regression check. Build the extension, configure the [VS Code and Playwright capture environment](../../../../../scripts/readme-media/README.md), and open a workspace whose repository has at least 100,000 commits with `git-keizu.initialLoadCommits` set to 100,000. Run `node tests/browser/history-viewport.mjs /absolute/path/to/workspace.code-workspace` from the repository root. It compares the center of every fully visible commit row to its SVG node at two window heights around row 90,000. TC-795 checks that opening details uses native table row counts and closing them restores the partial table’s indices.
+
+## S89: Applying an author edit during pagination
+
+> Origin: Feature 061-02 (large history browsing)
+> Added: 2026-11-22
+> Status: active
+> Supersedes: -
+> Target Path: `web/main.ts` (updateAuthorMenu)
+> Test File: `tests/web/main.keyboard.test.ts`
+
+| Case ID | Input / Precondition                                                                                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                 | Notes                                           |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| TC-801  | While a page request is pending, open Authors and check a name. Deliver more rows with the same author choices and applied filters. | Boundary - editing during a page response                                  | The menu stays open with the name checked. Applying sends one history request with that author. | Exercise both an append and a full replacement. |

@@ -250,3 +250,17 @@ A fix that changes the 3rd argument of `cp.spawn` in both spawn helpers from `{ 
 | TC-384  | Request the last page with exactly one page remaining, then repeat with a shorter final page.                             | Boundary - end of history                                                  | Each result contains exactly the remaining commits and reports no more commits.                                                                                                                         | Assert both final-page lengths and availability.                        |
 | TC-385  | Reuse a token after changing the query, refs, shallow clone depth or working-tree state, or supply an unknown token.      | Validation - incompatible continuation                                     | Each request yields the complete replacement for the current conditions, including applicable stash and worktree rows, matching a fresh load at the same depth.                                         | Include a fetch that deepens the clone while every ref stays unchanged. |
 | TC-386  | Change a worktree, external or indexed mailmap between filtered pages. Also edit an external map with All Authors.        | Validation - author filters and menu choices                               | A stable mapping allows an append. A changed mapping requires a fresh query with the current matches and canonical author choices.                                                                      | Keep all refs fixed. The external file also leaves the worktree clean.  |
+
+## S55: Continuing history with Git mailmap settings
+
+> Origin: Feature 061-02 (large history browsing)
+> Added: 2026-11-22
+> Status: active
+> Supersedes: -
+> Target Path: `src/dataSource.ts` (getNextHistoryPage)
+> Test File: `tests/src/dataSource.git.test.ts`
+
+| Case ID | Input / Precondition                                                                               | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                     | Notes                                 |
+| ------- | -------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| TC-387  | Select All Authors with an external mailmap symlink, load another page, then edit the target file. | External - configured symlink                                              | A stable target allows an append. Editing it invalidates the token, and a full read returns the new canonical name. | The refs and worktree stay unchanged. |
+| TC-388  | Use a valueless log.mailmap key in an included Git config, then change it to false.                | Boundary - implicit boolean                                                | The bare key allows the next page to append. Changing its value invalidates the token.                              | Git reads the bare key as true.       |
