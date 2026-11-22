@@ -926,10 +926,13 @@ describe("row keys per state (S70)", () => {
     respondDetails(next);
     expect(detailsOwner()).toBe(next);
     expect(table().querySelectorAll("tr.commit")).toHaveLength(commits.length);
+    expect(table().querySelector("table")!.hasAttribute("aria-rowcount")).toBe(false);
+    expect(table().querySelector("[aria-rowindex]")).toBeNull();
     pressEscape();
     expect(details()).toBeNull();
     expect(rowsWithTabStop()).toEqual([next]);
     expect(table().querySelectorAll("tr.commit").length).toBeLessThan(commits.length);
+    expect(table().querySelector("#tableColHeaders")?.getAttribute("aria-rowindex")).toBe("1");
   });
 
   // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)

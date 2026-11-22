@@ -1321,11 +1321,13 @@ class GitKeizuView {
     const savedScrollTop = this.scrollContainerElem.scrollTop;
     this.mountedRows = rows;
     const { first, end } = this.mountedRows;
+    const partial = first > 0 || end < this.commits.length;
+    const headerIndex = partial ? ' aria-rowindex="1"' : "";
     const spacer = (start: number, end: number) =>
       end > start
         ? `<tr aria-hidden="true" data-skipped-start="${start}" data-skipped-end="${end}"><td colspan="${TABLE_COLUMN_COUNT}" style="height:${(end - start) * this.config.grid.y}px"></td></tr>`
         : "";
-    let html = `<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader">${t("table.graph")}</th><th class="tableColHeader">${t("table.description")}${this.buildCommitOrderingButtonHtml()}</th><th class="tableColHeader">${t("table.date")}</th><th class="tableColHeader">${t("table.author")}</th><th class="tableColHeader">${t("table.commit")}</th></tr>`,
+    let html = `<tr id="tableColHeaders"${headerIndex}><th id="tableHeaderGraphCol" class="tableColHeader">${t("table.graph")}</th><th class="tableColHeader">${t("table.description")}${this.buildCommitOrderingButtonHtml()}</th><th class="tableColHeader">${t("table.date")}</th><th class="tableColHeader">${t("table.author")}</th><th class="tableColHeader">${t("table.commit")}</th></tr>`,
       i,
       currentHash =
         this.commits.length > 0 && this.commits[0].hash === UNCOMMITTED_CHANGES_HASH
@@ -1393,7 +1395,8 @@ class GitKeizuView {
         this.commits[i].stash,
         muted[i]
       );
-      html += `<tr ${rowClass} aria-rowindex="${i + 2}" data-id="${i}" data-color="${this.graph.getVertexColour(i)}" ${ATTRIBUTE_ARIA_LABEL}="${escapeHtml(buildRowName(this.commits[i], date.value))}" ${ATTRIBUTE_ARIA_DESCRIBEDBY}="${ROW_STATE_ID_PREFIX}${i}"><td>${buildRowStateHtml(i)}</td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}<span class="commitMessage">${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</span></td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${
+      const rowIndex = partial ? ` aria-rowindex="${i + 2}"` : "";
+      html += `<tr ${rowClass}${rowIndex} data-id="${i}" data-color="${this.graph.getVertexColour(i)}" ${ATTRIBUTE_ARIA_LABEL}="${escapeHtml(buildRowName(this.commits[i], date.value))}" ${ATTRIBUTE_ARIA_DESCRIBEDBY}="${ROW_STATE_ID_PREFIX}${i}"><td>${buildRowStateHtml(i)}</td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}<span class="commitMessage">${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</span></td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${
         this.config.fetchAvatars
           ? `<span class="avatar" data-email="${escapeHtml(this.commits[i].email)}">${
               typeof this.avatars[this.commits[i].email] === "string"
@@ -1404,22 +1407,22 @@ class GitKeizuView {
       }${escapeHtml(this.commits[i].author)}</td><td title="${escapeHtml(this.commits[i].hash)}">${escapeHtml(abbrevCommit(this.commits[i].hash))}</td></tr>`;
     }
     html += spacer(end, this.commits.length);
-    this.tableElem.innerHTML = `<table aria-rowcount="${this.commits.length + 1}">${html}</table>`;
+    const rowCount = partial ? ` aria-rowcount="${this.commits.length + 1}"` : "";
+    this.tableElem.innerHTML = `<table${rowCount}>${html}</table>`;
     this.footerElem.innerHTML = this.moreCommitsAvailable
       ? `<button type="button" id="${LOAD_MORE_BUTTON_ID}" class="roundedBtn">${t("table.loadMoreCommits")}</button>`
       : "";
     const tableElem = this.tableElem.querySelector("table")!;
-    const refCounts =
-      first > 0 || end < this.commits.length
-        ? this.columnSizing.apply(
-            tableElem,
-            this.commits,
-            this.commitHead,
-            this.worktrees,
-            this.config.fetchAvatars,
-            this.gitRepos[this.currentRepo].columnWidths === null
-          )
-        : null;
+    const refCounts = partial
+      ? this.columnSizing.apply(
+          tableElem,
+          this.commits,
+          this.commitHead,
+          this.worktrees,
+          this.config.fetchAvatars,
+          this.gitRepos[this.currentRepo].columnWidths === null
+        )
+      : null;
     this.applyRowTargets();
     this.makeTableResizable();
     this.setupColumnHeaderContextMenu();

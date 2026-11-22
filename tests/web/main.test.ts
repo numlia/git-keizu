@@ -8351,6 +8351,11 @@ describe("installing an ordinary history page", () => {
       const table = scroller.querySelector("table")!;
       const rows = Array.from(table.querySelectorAll<HTMLElement>("tr.commit"));
       expect(table.getAttribute("aria-rowcount")).toBe(String(count + 1));
+      expect(table.querySelector("#tableColHeaders")?.getAttribute("aria-rowindex")).toBe("1");
+      expect(rows.length).toBeLessThanOrEqual(Math.ceil(scroller.clientHeight / pitch) + 24);
+      expect(rows.map((row) => Number(row.getAttribute("aria-rowindex")))).toEqual(
+        rows.map((row) => Number(row.dataset.id) + 2)
+      );
       expect(rows.some((r) => r.dataset.hash === String(depth))).toBe(true);
       expect(table.querySelector(`tr[data-id="${depth}"] .gitRef.tag`)?.textContent).toContain(
         longTag
