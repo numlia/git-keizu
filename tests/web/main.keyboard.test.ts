@@ -192,12 +192,12 @@ function loadCommits(
   });
 }
 
-function loadBranches(): void {
+function loadBranches(hard = true): void {
   dispatch({
     command: "loadBranches",
     branches: ["feature", "hotfix"],
     head: "feature",
-    hard: true,
+    hard,
     isRepo: true
   });
 }
@@ -836,6 +836,16 @@ describe("viewport coverage and offscreen keyboard targets (S88)", () => {
     scrollContainer().scrollTop = savedScrollTop;
   });
 
+  async function scrollAwayFrom(target: HTMLElement): Promise<void> {
+    target.focus();
+    const scroller = scrollContainer();
+    scroller.scrollTop = 100 * ROW_HEIGHT;
+    scroller.dispatchEvent(new Event("scroll"));
+    await new Promise(requestAnimationFrame);
+    expect(target.isConnected).toBe(false);
+    expect(document.activeElement).toBe(table());
+  }
+
   // Case: TC-799
   it("fills the larger viewport when Branch Cleanup closes without a window resize (TC-799)", () => {
     const panel = document.getElementById("branchCleanupPanel")!;
@@ -903,7 +913,6 @@ describe("viewport coverage and offscreen keyboard targets (S88)", () => {
     ["ContextMenu", UNCOMMITTED_CHANGES_HASH]
   ])("opens the offscreen row's menu with %s for %s (TC-802)", async (key, hash) => {
     vi.spyOn(document, "hasFocus").mockReturnValue(true);
-    const scroller = scrollContainer();
     const history = Array.from({ length: 300 }, (_, i) => node(String(i), []));
     loadCommits([...menuLaunchCommits(), ...history], { head: "N" });
     const selected = focusRow(hash);
@@ -911,11 +920,7 @@ describe("viewport coverage and offscreen keyboard targets (S88)", () => {
     const expectedTitles = menuTitles();
     fire(document, "click");
 
-    scroller.scrollTop = 100 * ROW_HEIGHT;
-    scroller.dispatchEvent(new Event("scroll"));
-    await new Promise(requestAnimationFrame);
-    expect(selected.isConnected).toBe(false);
-    expect(document.activeElement).toBe(table());
+    await scrollAwayFrom(selected);
 
     expect(press(table(), key, { shiftKey: key === "F10" }).defaultPrevented).toBe(true);
     expect(fire(table(), "contextmenu").defaultPrevented).toBe(true);
@@ -931,6 +936,88 @@ describe("viewport coverage and offscreen keyboard targets (S88)", () => {
       pressEscape(document.activeElement!);
     }
     expect(document.activeElement).toBe(row(hash));
+  });
+
+  // Case: TC-803
+  it.each([
+    { key: "F10", part: 0, name: "feature" },
+    { key: "ContextMenu", part: 1, name: "origin/feature" }
+  ])("opens the offscreen $name label's menu with $key (TC-803)", async ({ key, part, name }) => {
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    const history = Array.from({ length: 300 }, (_, i) => node(String(i), []));
+    loadCommits([...menuLaunchCommits(), ...history]);
+    const label = () => labelsOf("M")[part];
+    const launch = async () => {
+      await scrollAwayFrom(label());
+      expect(press(table(), key, { shiftKey: key === "F10" }).defaultPrevented).toBe(true);
+      expect(fire(table(), "contextmenu").defaultPrevented).toBe(true);
+      expect(menuTitles()).toContain("Copy Branch Name to Clipboard");
+    };
+    await launch();
+    pressEscape(document.activeElement!);
+    expect(document.activeElement).toBe(label());
+
+    await launch();
+    menuItem("Copy Branch Name to Clipboard").focus();
+    press(document.activeElement!, "Enter");
+    expect(posts("copyToClipboard")).toEqual([
+      { command: "copyToClipboard", type: "Branch Name", data: name }
+    ]);
+  });
+});
+
+// @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
+describe("dates in paged history (S88)", () => {
+  const authorDate = Date.UTC(2000, 0, 1) / 1000;
+  const commitDate = Date.UTC(2021, 0, 1) / 1000;
+  const displayedDate = (hash: string) => row(hash).querySelector("td:nth-child(3)")!.textContent;
+
+  // Case: TC-804
+  it("updates retained dates on a soft refresh before appending the next page (TC-804)", () => {
+    const first = node("M", ["R"], { date: authorDate });
+    const full = { command: "loadCommits", head: "M", moreCommitsAvailable: true };
+    dispatch({ ...full, commits: [first], hard: true, pageToken: 1 });
+    expect(displayedDate("M")).toBe(getCommitDate(authorDate).value);
+
+    dispatch({ command: "refresh" });
+    loadBranches(false);
+    const request = posts("loadCommits").at(-1)!;
+    expect(request.hard).toBe(false);
+    const refreshedToken = 2;
+    dispatch({
+      ...full,
+      commits: [{ ...first, date: commitDate }],
+      hard: false,
+      requestId: request.requestId,
+      pageToken: refreshedToken
+    });
+    expect(displayedDate("M")).toBe(getCommitDate(commitDate).value);
+
+    document.getElementById("loadMoreCommitsBtn")!.click();
+    expect(posts("loadCommits").at(-1)!.pageToken).toBe(refreshedToken);
+    dispatch({
+      command: "appendCommits",
+      repo: REPO,
+      from: refreshedToken,
+      baseCount: 1,
+      commits: [node("R", [], { date: commitDate })],
+      moreCommitsAvailable: false
+    });
+    expect([displayedDate("M"), displayedDate("R")]).toEqual([
+      getCommitDate(commitDate).value,
+      getCommitDate(commitDate).value
+    ]);
+  });
+
+  // Case: TC-804
+  it("updates only the working tree row when its timestamp changes (TC-804)", () => {
+    const first = node(UNCOMMITTED_CHANGES_HASH, ["M"], { date: authorDate });
+    const commit = node("M", []);
+    loadCommits([first, commit]);
+    const mountedCommit = row("M");
+    loadCommits([{ ...first, date: commitDate }, commit], { hard: false });
+    expect(displayedDate(UNCOMMITTED_CHANGES_HASH)).toBe(getCommitDate(commitDate).value);
+    expect(row("M")).toBe(mountedCommit);
   });
 });
 

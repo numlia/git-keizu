@@ -863,6 +863,7 @@ class GitKeizuView {
         commits,
         (a, b) =>
           a.hash === b.hash &&
+          (a.date === b.date || a.hash === UNCOMMITTED_CHANGES_HASH) &&
           arraysEqual(a.refs, b.refs, (a, b) => a.name === b.name && a.type === b.type) &&
           arraysEqual(a.parentHashes, b.parentHashes, (a, b) => a === b)
       )
@@ -1631,12 +1632,12 @@ class GitKeizuView {
   private showRefBadgeContextMenu(
     event: ContextMenuTrigger,
     badge: HTMLElement,
-    focusOptions?: ContextMenuFocusOptions
+    focusOptions?: ContextMenuFocusOptions,
+    source = resolveRefSource(event, badge)
   ): void {
     event.stopPropagation();
     // The builders keep the badge (its dataset and dialog / checkout marks); the menu itself is
     // anchored to and restores focus to the operable part that launched it.
-    const source = resolveRefSource(event, badge);
     if (badge.classList.contains(STASH_BADGE_CLASS)) {
       this.showStashBadgeContextMenu(event, badge, source, focusOptions);
       return;
@@ -2143,7 +2144,14 @@ class GitKeizuView {
     if (typeof index !== "number") return false;
     if (e.target === this.tableElem && consumeContextMenuLaunch(e)) {
       const row = this.mountRow(hash);
-      if (row !== null) this.showCommitRowContextMenu(e, row);
+      // Remounting restores focus to the original label, but the key event still targets the list.
+      const part = document.activeElement;
+      const badge = part?.closest<HTMLElement>(REF_BADGE_SELECTOR);
+      if (part instanceof HTMLElement && badge && row?.contains(badge)) {
+        this.showRefBadgeContextMenu(e, badge, undefined, part);
+      } else if (row !== null) {
+        this.showCommitRowContextMenu(e, row);
+      }
       return true;
     }
     if (e.altKey) return false;
