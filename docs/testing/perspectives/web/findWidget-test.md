@@ -311,3 +311,18 @@ The search side of finalized spec §4.7, "closing with the keyboard returns focu
 - Tests: describe `FindWidget focus origin per search session (S12)` in `tests/web/findWidget.test.ts`. TC-503 to TC-505 each have one `it` with the same number
 - RED → GREEN: with `show()` before the fix, TC-503 (`activeElement` is `#findClose`) and TC-504 (`activeElement` is the ref button from the first time) fail, and TC-505 passes. After the fix, all 3 pass
 - Execution result (2026-10-08): 66 pass in `tests/web/findWidget.test.ts`
+
+## S13: Finding and navigating matches outside the mounted window
+
+> Origin: Feature 061-02 (large history browsing)
+> Added: 2026-11-22
+> Status: active
+> Supersedes: -
+> Target Path: `web/findWidget.ts` (findMatches and updatePosition)
+> Test File: `tests/web/findWidget.test.ts`
+
+| Case ID | Input / Precondition                                                                                                       | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                        | Notes                                           |
+| ------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
+| TC-506  | Search the loaded model with matches above, inside and below the mounted window.                                           | Normal - logical match count                                               | The count includes all matching commits in history order. Only mounted matching rows receive highlight spans.                          | Retains S3 matching semantics.                  |
+| TC-507  | Navigate to an unmounted match with Next and Previous, including wraparound, with the details option enabled and disabled. | Boundary - offscreen navigation                                            | Navigation selects and scrolls to the expected hash and updates the current position. When enabled, details open for that same commit. | Retains S5 navigation and S9 details behavior.  |
+| TC-508  | Move the window after finding a match, then clear the search and remount its original row.                                 | Normal - mounted decorations                                               | Highlights follow matching rows into the new window. Clearing removes the current match and a remounted row has no stale highlight.    | Retains S11 ref button identity and attributes. |
