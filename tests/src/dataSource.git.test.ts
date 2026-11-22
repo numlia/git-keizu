@@ -175,6 +175,40 @@ describe("continuing ordinary Git history", () => {
     }
   });
 
+  // Case: TC-386
+  it.each(["worktree", "external", "index blob"])(
+    "invalidates the author-filtered page when the %s mailmap changes (TC-386)",
+    async (source) => {
+      const { repo, root } = fixture;
+      const map =
+        source === "external"
+          ? path.join(root, "author map")
+          : path.join(repo, source === "worktree" ? ".mailmap" : "authors.map");
+      if (source === "external") git(repo, ["config", "mailmap.file", map]);
+      if (source === "index blob") git(repo, ["config", "mailmap.blob", ":authors.map"]);
+      const writeMapping = async (name: string) => {
+        await fs.writeFile(map, `${name} <test@example.com>\n`);
+        if (source === "index blob") git(repo, ["add", "authors.map"]);
+      };
+      const authors = ["Mapped User"];
+      await writeMapping(authors[0]);
+      const first = await full(2, "date", authors);
+      expect(first.commits).toHaveLength(2);
+      const stable = await ds.getNextHistoryPage({ ...query(3, first.pageToken), authors });
+      expect(stable?.commits.map((c) => c.hash)).toEqual([git(repo, ["rev-parse", "HEAD~2"])]);
+      expect(stable?.pageToken).toBeTypeOf("number");
+
+      const refs = listRefs(repo);
+      await writeMapping("Former User");
+      expect(listRefs(repo)).toBe(refs);
+      if (source === "external") expect(git(repo, ["status", "--porcelain"])).toBe("");
+      expect(
+        await ds.getNextHistoryPage({ ...query(4, stable!.pageToken), authors })
+      ).toBeUndefined();
+      expect((await full(4, "date", authors)).commits).toEqual([]);
+    }
+  );
+
   // Case: TC-383
   it("resumes a linear walk from its saved parent and sends only the next 100 commits (TC-383)", async () => {
     const base = git(fixture.repo, ["rev-parse", "HEAD"]);

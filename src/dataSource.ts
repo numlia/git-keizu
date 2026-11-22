@@ -1,5 +1,5 @@
 import * as cp from "node:child_process";
-import { readFile } from "node:fs/promises";
+import { lstat, readFile } from "node:fs/promises";
 import * as path from "node:path";
 
 import {
@@ -79,6 +79,8 @@ const TAB_SEPARATOR = "\t";
 const VALID_FILE_CHANGE_TYPES: ReadonlySet<string> = new Set(["A", "M", "D", "R"]);
 const BRANCH_COMPARISON_MAX_PARALLEL = 3;
 const FILE_HISTORY_ANCESTRY_MIN_ENTRIES = 2;
+const MAILMAP_CONFIG_PATTERN = "^(mailmap\\.(file|blob)|log\\.mailmap)$";
+const GIT_CONFIG_NO_MATCH = 1;
 
 export const COMMIT_ORDER_FLAGS: Readonly<Record<CommitOrdering, string>> = {
   date: "--date-order",
@@ -326,7 +328,7 @@ export class DataSource {
     this.historyPage = undefined;
     const [worktrees, refData] = await Promise.all([
       this.getWorktrees(repo),
-      this.getRefs(repo, showRemoteBranches)
+      this.getRefs(repo, showRemoteBranches, authors)
     ]);
 
     const [commits, stashes, authorList, pinnedCommits] = await Promise.all([
@@ -437,7 +439,7 @@ export class DataSource {
         refData.refs.some((ref) => ref.name === branch || `remotes/${ref.name}` === branch)
       )
     ) {
-      const after = await this.getRefs(repo, showRemoteBranches);
+      const after = await this.getRefs(repo, showRemoteBranches, authors);
       if (token === this.historySequence && after.snapshot === refData.snapshot) {
         this.historyPage = {
           token,
@@ -1316,17 +1318,64 @@ export class DataSource {
     return comparisons;
   }
 
-  private async getRefs(repo: string, showRemoteBranches: boolean) {
-    const [data, shallowRoots] = await Promise.all([
+  private async getRefs(repo: string, showRemoteBranches: boolean, authors: readonly string[]) {
+    const [data, shallowRoots, mailmap] = await Promise.all([
       this.readRefs(repo, showRemoteBranches),
-      this.getShallowRoots(repo)
+      this.getShallowRoots(repo),
+      authors.length > 0 ? this.getMailmapSnapshot(repo) : ""
     ]);
-    // Deepening a clone can change the parents and traversal without moving a ref.
+    // Deepening a clone or editing an author mapping can change the walk without moving a ref.
     const snapshot =
-      data.snapshot !== null && shallowRoots !== null
-        ? JSON.stringify([data.snapshot, shallowRoots])
+      data.snapshot !== null && shallowRoots !== null && mailmap !== null
+        ? JSON.stringify([data.snapshot, shallowRoots, mailmap])
         : null;
     return { ...data, snapshot };
+  }
+
+  private async getMailmapSnapshot(repo: string): Promise<string | null> {
+    const config = await this.spawnGitProcess(
+      ["config", "--null", "--type=path", "--get-regexp", MAILMAP_CONFIG_PATTERN],
+      repo
+    );
+    if (config.kind !== "exit" || (config.code !== 0 && config.code !== GIT_CONFIG_NO_MATCH)) {
+      return null;
+    }
+    // With --null Git separates the key from its value with LF. Later config entries win.
+    const settings = new Map<string, string>();
+    for (const entry of splitNullSeparatedFields(config.stdout)) {
+      const separator = entry.indexOf("\n");
+      if (separator !== -1) settings.set(entry.slice(0, separator), entry.slice(separator + 1));
+    }
+    const file = settings.get("mailmap.file");
+    const blob = settings.get("mailmap.blob");
+    const sources = await Promise.all([
+      this.getMailmapFileHash(repo, ".mailmap"),
+      file ? this.getMailmapFileHash(repo, file) : "",
+      blob
+        ? this.spawnGit(
+            ["rev-parse", "--verify", "--end-of-options", blob],
+            repo,
+            (out) => out.trimEnd(),
+            null
+          )
+        : ""
+    ]);
+    return sources.includes(null) ? null : JSON.stringify([config.stdout, ...sources]);
+  }
+
+  private async getMailmapFileHash(repo: string, file: string): Promise<string | null> {
+    const location = path.resolve(repo, file);
+    try {
+      if (!(await lstat(location)).isFile()) return null;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "ENOENT" ? "" : null;
+    }
+    return this.spawnGit(
+      ["hash-object", "--no-filters", "--", location],
+      repo,
+      (out) => out.trimEnd(),
+      null
+    );
   }
 
   private async getShallowRoots(repo: string): Promise<string | null> {
@@ -1400,7 +1449,7 @@ export class DataSource {
       return undefined;
     }
 
-    const before = await this.getRefs(repo, showRemoteBranches);
+    const before = await this.getRefs(repo, showRemoteBranches, authors);
     if (before.snapshot !== page.refs) return undefined;
     const size = maxCommits - page.loaded;
     // A single remaining lineage can restart at its next parent. Multiple tips or an
@@ -1428,7 +1477,7 @@ export class DataSource {
           );
     if (fresh === null) return undefined;
     const [after, worktrees, dirty] = await Promise.all([
-      this.getRefs(repo, showRemoteBranches),
+      this.getRefs(repo, showRemoteBranches, authors),
       this.getWorktrees(repo),
       getConfig().showUncommittedChanges() ? this.getGitUnsavedChanges(repo) : null
     ]);
