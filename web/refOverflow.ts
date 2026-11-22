@@ -450,7 +450,11 @@ export class RefOverflowController {
     }
   }
 
-  public attachTable(table: HTMLTableElement, historyBadges: RefBadgeCounts | null = null): void {
+  public attachTable(
+    table: HTMLTableElement,
+    historyBadges: RefBadgeCounts | null = null,
+    restoreCounter = false
+  ): void {
     this.releaseTable();
     this.historyBadges = historyBadges;
     this.table = table;
@@ -459,7 +463,9 @@ export class RefOverflowController {
       this.headerObserver = new ResizeObserver(() => this.handleHeaderResize());
       this.headerObserver.observe(this.header);
     }
-    this.scheduleLayout();
+    // A remounted counter must exist before the table restores keyboard focus.
+    if (restoreCounter) this.layout();
+    else this.scheduleLayout();
   }
 
   public detachTable(): void {
@@ -725,6 +731,10 @@ export class RefOverflowController {
     const counter = event.currentTarget;
     if (!(counter instanceof HTMLButtonElement)) return;
     consumeKey(event);
+    this.openCounterFromKeyboard(counter);
+  }
+
+  public openCounterFromKeyboard(counter: HTMLButtonElement): void {
     if (counter !== this.popupCounter) {
       this.closePopup();
       this.openPopup(counter);

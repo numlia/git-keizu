@@ -973,6 +973,52 @@ describe("viewport coverage and offscreen keyboard targets (S88)", () => {
     ]);
   });
 
+  // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S90)
+  it.each(["Enter", " "])(
+    "opens an offscreen counter's hidden labels with %j (TC-805)",
+    async (key) => {
+      vi.spyOn(document, "hasFocus").mockReturnValue(true);
+      const style = document.createElement("style");
+      style.className = "keyboardTestExtra";
+      style.textContent = `td { padding: 0; border: 0px solid; }
+      .gitRef, .refOverflowCounter, .commitHeadDot { margin-right: 0; }`;
+      document.head.appendChild(style);
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+        this: HTMLElement
+      ) {
+        const width = this.matches("td") ? 80 : 30;
+        return new DOMRect(0, 0, width, ROW_HEIGHT);
+      });
+      const history = Array.from({ length: 300 }, (_, i) => node(String(i), []));
+      loadCommits([...standardCommits(), ...history], { head: "N" });
+      await new Promise(requestAnimationFrame);
+      const counter = () => row("M").querySelector<HTMLButtonElement>(".refOverflowCounter");
+      expect(counter()).not.toBeNull();
+      const firstHidden = row("M").querySelector<HTMLElement>(".refOverflowHidden")!.dataset.name;
+      await scrollAwayFrom(counter()!);
+
+      const event = press(table(), key);
+      // Browsers deliver the scroll event from remounting the row after the keydown.
+      scrollContainer().dispatchEvent(new Event("scroll"));
+      await new Promise(requestAnimationFrame);
+      const popup = document.querySelector("#refOverflowPopup");
+      expect(popup).not.toBeNull();
+      expect(event.defaultPrevented).toBe(true);
+      expect(popup!.querySelector<HTMLElement>(".gitRef")!.dataset.name).toBe(firstHidden);
+      expect(document.activeElement).toBe(popup!.querySelector("button"));
+      expect(posts("commitDetails")).toEqual([]);
+      expect(details()).toBeNull();
+      pressEscape(document.activeElement!);
+      expect(document.querySelector("#refOverflowPopup")).toBeNull();
+      expect(document.activeElement).toBe(counter());
+      press(counter()!, key);
+      expect(document.querySelector("#refOverflowPopup")).not.toBeNull();
+      scrollContainer().scrollTop += ROW_HEIGHT;
+      scrollContainer().dispatchEvent(new Event("scroll"));
+      expect(document.querySelector("#refOverflowPopup")).toBeNull();
+    }
+  );
+
   it("leaves Space unassigned and opens details on Enter for an offscreen row (TC-803)", async () => {
     const history = Array.from({ length: 300 }, (_, i) => node(String(i), []));
     loadCommits([...menuLaunchCommits(), ...history]);

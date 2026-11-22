@@ -14,6 +14,7 @@ export interface RowTarget {
 
 export type FocusKey =
   | { readonly kind: "row"; readonly repo: string; readonly hash: string }
+  | { readonly kind: "counter"; readonly repo: string; readonly hash: string }
   | {
       readonly kind: "ref";
       readonly repo: string;
@@ -373,6 +374,9 @@ export function captureFocusOrigin(element: HTMLElement | null): FocusOrigin | n
   let keys: readonly FocusKey[] = [];
   for (let node: HTMLElement | null = element; node !== null; node = node.parentElement) {
     const key = focusKeys.get(node);
+    if (key?.kind === "row" && element.matches(COUNTER_SELECTOR)) {
+      keys = addKey(keys, { ...key, kind: "counter" });
+    }
     if (key !== undefined) keys = addKey(keys, key);
   }
   const implied = keys.map(impliedRowKey).filter((key): key is FocusKey => key !== null);
@@ -457,6 +461,8 @@ function candidatesForKey(context: FocusContext, key: FocusKey): HTMLElement[] {
   switch (key.kind) {
     case "row":
       return rowElements(context, key.repo, key.hash);
+    case "counter":
+      return counterElements(context, key.repo, key.hash);
     case "ref":
       return [...elementsForKey(key), ...counterElements(context, key.repo, key.hash)];
     case "control":

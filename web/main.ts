@@ -388,6 +388,7 @@ class GitKeizuView {
 
   private graph: Graph;
   private refOverflow: RefOverflowController;
+  private remountedCounterScroll: { top: number; left: number } | null = null;
   private descriptionMinimumWidth: number | null = null;
   private displayFixedColumns: HTMLElement[] = [];
   private findWidget: FindWidget;
@@ -1558,7 +1559,10 @@ class GitKeizuView {
       this.handleRefDoubleClick(e, e.currentTarget);
     });
     // Attach after the listeners above so measurement clones never receive them.
-    this.refOverflow.attachTable(tableElem, refCounts);
+    const focusKey = focusUpdate?.origin.keys[0];
+    const restoreCounter =
+      focusKey?.kind === "counter" && this.findRowByHash(focusKey.hash) !== null;
+    this.refOverflow.attachTable(tableElem, refCounts, restoreCounter);
 
     this.finishListFocusUpdate(focusUpdate);
     this.scrollContainerElem.scrollTop = savedScrollTop;
@@ -2045,13 +2049,16 @@ class GitKeizuView {
           this.redrawViewport();
         });
       }
-      this.refOverflow.closePopup();
-      if (active !== this.scrollContainerElem.scrollTop > 0) {
-        active = this.scrollContainerElem.scrollTop > 0;
+      const { scrollTop, scrollLeft, clientHeight, scrollHeight } = this.scrollContainerElem;
+      // Remounting can queue a scroll event before the counter opens at this same position.
+      const remount = this.remountedCounterScroll;
+      this.remountedCounterScroll = null;
+      if (remount?.top !== scrollTop || remount.left !== scrollLeft) this.refOverflow.closePopup();
+      if (active !== scrollTop > 0) {
+        active = scrollTop > 0;
         this.scrollShadowElem.className = active ? "active" : "";
       }
 
-      const { scrollTop, clientHeight, scrollHeight } = this.scrollContainerElem;
       const movingDown = scrollTop > previousTop;
       previousTop = scrollTop;
       if (
@@ -2148,7 +2155,8 @@ class GitKeizuView {
     if (!menuKey) {
       if (e.key !== KEY_ENTER && e.key !== KEY_SPACE) return false;
       const [origin] = getParkedFocusKeys(this.tableElem, this.currentRepo);
-      if (origin?.kind !== "ref" || origin.hash !== hash) return false;
+      if ((origin?.kind !== "ref" && origin?.kind !== "counter") || origin.hash !== hash)
+        return false;
     }
 
     consumeKey(e);
@@ -2156,7 +2164,16 @@ class GitKeizuView {
     // Remounting restores focus to the original label, but the key event still targets the list.
     const part = document.activeElement;
     const badge = part?.closest<HTMLElement>(REF_BADGE_SELECTOR);
-    if (part instanceof HTMLElement && badge && row?.contains(badge)) {
+    if (
+      !menuKey &&
+      part instanceof HTMLButtonElement &&
+      part.matches(ROW_COUNTER_SELECTOR) &&
+      row?.contains(part)
+    ) {
+      const { scrollTop, scrollLeft } = this.scrollContainerElem;
+      this.remountedCounterScroll = { top: scrollTop, left: scrollLeft };
+      this.refOverflow.openCounterFromKeyboard(part);
+    } else if (part instanceof HTMLElement && badge && row?.contains(badge)) {
       this.showRefBadgeContextMenu(e, badge, undefined, part);
     } else if (menuKey && row !== null) {
       this.showCommitRowContextMenu(e, row);
