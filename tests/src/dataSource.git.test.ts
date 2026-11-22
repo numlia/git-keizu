@@ -209,6 +209,29 @@ describe("continuing ordinary Git history", () => {
     }
   );
 
+  // Case: TC-386
+  it("refreshes unfiltered author choices after an external mailmap edit (TC-386)", async () => {
+    const { repo, root } = fixture;
+    const map = path.join(root, "author map");
+    git(repo, ["config", "mailmap.file", map]);
+    await fs.writeFile(map, "");
+    const first = await full(2);
+    expect(first.authors).toEqual(["Test User"]);
+    const stable = await ds.getNextHistoryPage(query(3, first.pageToken));
+    expect(stable?.pageToken).toBeTypeOf("number");
+
+    const refs = listRefs(repo);
+    await fs.writeFile(map, "Canonical <test@example.com>\n");
+    expect(listRefs(repo)).toBe(refs);
+    expect(git(repo, ["status", "--porcelain"])).toBe("");
+    expect(await ds.getNextHistoryPage(query(4, stable!.pageToken))).toBeUndefined();
+    const refreshed = await full(4);
+    expect(refreshed.authors).toEqual(["Canonical"]);
+    expect(refreshed.commits.map((row) => row.hash)).toEqual(
+      git(repo, ["log", "-4", "--format=%H"]).split("\n")
+    );
+  });
+
   // Case: TC-383
   it("resumes a linear walk from its saved parent and sends only the next 100 commits (TC-383)", async () => {
     const base = git(fixture.repo, ["rev-parse", "HEAD"]);

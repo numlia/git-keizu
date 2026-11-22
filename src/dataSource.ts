@@ -328,7 +328,7 @@ export class DataSource {
     this.historyPage = undefined;
     const [worktrees, refData] = await Promise.all([
       this.getWorktrees(repo),
-      this.getRefs(repo, showRemoteBranches, authors)
+      this.getRefs(repo, showRemoteBranches)
     ]);
 
     const [commits, stashes, authorList, pinnedCommits] = await Promise.all([
@@ -439,7 +439,7 @@ export class DataSource {
         refData.refs.some((ref) => ref.name === branch || `remotes/${ref.name}` === branch)
       )
     ) {
-      const after = await this.getRefs(repo, showRemoteBranches, authors);
+      const after = await this.getRefs(repo, showRemoteBranches);
       if (token === this.historySequence && after.snapshot === refData.snapshot) {
         this.historyPage = {
           token,
@@ -1318,13 +1318,13 @@ export class DataSource {
     return comparisons;
   }
 
-  private async getRefs(repo: string, showRemoteBranches: boolean, authors: readonly string[]) {
+  private async getRefs(repo: string, showRemoteBranches: boolean) {
     const [data, shallowRoots, mailmap] = await Promise.all([
       this.readRefs(repo, showRemoteBranches),
       this.getShallowRoots(repo),
-      authors.length > 0 ? this.getMailmapSnapshot(repo) : ""
+      this.getMailmapSnapshot(repo)
     ]);
-    // Deepening a clone or editing an author mapping can change the walk without moving a ref.
+    // Shallow roots affect the walk. Mailmaps also affect the unfiltered author menu.
     const snapshot =
       data.snapshot !== null && shallowRoots !== null && mailmap !== null
         ? JSON.stringify([data.snapshot, shallowRoots, mailmap])
@@ -1449,7 +1449,7 @@ export class DataSource {
       return undefined;
     }
 
-    const before = await this.getRefs(repo, showRemoteBranches, authors);
+    const before = await this.getRefs(repo, showRemoteBranches);
     if (before.snapshot !== page.refs) return undefined;
     const size = maxCommits - page.loaded;
     // A single remaining lineage can restart at its next parent. Multiple tips or an
@@ -1477,7 +1477,7 @@ export class DataSource {
           );
     if (fresh === null) return undefined;
     const [after, worktrees, dirty] = await Promise.all([
-      this.getRefs(repo, showRemoteBranches, authors),
+      this.getRefs(repo, showRemoteBranches),
       this.getWorktrees(repo),
       getConfig().showUncommittedChanges() ? this.getGitUnsavedChanges(repo) : null
     ]);
