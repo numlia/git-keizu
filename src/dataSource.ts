@@ -1,5 +1,5 @@
 import * as cp from "node:child_process";
-import { lstat, readFile } from "node:fs/promises";
+import { lstat, readFile, stat } from "node:fs/promises";
 import * as path from "node:path";
 
 import {
@@ -1334,23 +1334,33 @@ export class DataSource {
 
   private async getMailmapSnapshot(repo: string): Promise<string | null> {
     const config = await this.spawnGitProcess(
-      ["config", "--null", "--type=path", "--get-regexp", MAILMAP_CONFIG_PATTERN],
+      ["config", "--null", "--get-regexp", MAILMAP_CONFIG_PATTERN],
       repo
     );
     if (config.kind !== "exit" || (config.code !== 0 && config.code !== GIT_CONFIG_NO_MATCH)) {
       return null;
     }
-    // With --null Git separates the key from its value with LF. Later config entries win.
+    // A bare log.mailmap has no LF or value. Its presence is part of the raw snapshot below.
     const settings = new Map<string, string>();
     for (const entry of splitNullSeparatedFields(config.stdout)) {
       const separator = entry.indexOf("\n");
       if (separator !== -1) settings.set(entry.slice(0, separator), entry.slice(separator + 1));
+      else if (entry === "mailmap.file" || entry === "mailmap.blob") return null;
     }
-    const file = settings.get("mailmap.file");
+    // Let Git expand configured paths, including ~/ and %(prefix)/, only for the file setting.
+    const file = settings.has("mailmap.file")
+      ? await this.spawnGit(
+          ["config", "--null", "--type=path", "--get", "mailmap.file"],
+          repo,
+          (out) => splitNullSeparatedFields(out)[0],
+          null
+        )
+      : "";
+    if (file === null) return null;
     const blob = settings.get("mailmap.blob");
     const sources = await Promise.all([
-      this.getMailmapFileHash(repo, ".mailmap"),
-      file ? this.getMailmapFileHash(repo, file) : "",
+      this.getMailmapFileHash(repo, ".mailmap", lstat),
+      file ? this.getMailmapFileHash(repo, file, stat) : "",
       blob
         ? this.spawnGit(
             ["rev-parse", "--verify", "--end-of-options", blob],
@@ -1363,10 +1373,14 @@ export class DataSource {
     return sources.includes(null) ? null : JSON.stringify([config.stdout, ...sources]);
   }
 
-  private async getMailmapFileHash(repo: string, file: string): Promise<string | null> {
+  private async getMailmapFileHash(
+    repo: string,
+    file: string,
+    readStat: typeof stat
+  ): Promise<string | null> {
     const location = path.resolve(repo, file);
     try {
-      if (!(await lstat(location)).isFile()) return null;
+      if (!(await readStat(location)).isFile()) return null;
     } catch (error) {
       return (error as NodeJS.ErrnoException).code === "ENOENT" ? "" : null;
     }

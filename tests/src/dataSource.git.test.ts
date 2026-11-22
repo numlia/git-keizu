@@ -209,27 +209,52 @@ describe("continuing ordinary Git history", () => {
     }
   );
 
-  // Case: TC-386
-  it("refreshes unfiltered author choices after an external mailmap edit (TC-386)", async () => {
-    const { repo, root } = fixture;
-    const map = path.join(root, "author map");
-    git(repo, ["config", "mailmap.file", map]);
-    await fs.writeFile(map, "");
-    const first = await full(2);
-    expect(first.authors).toEqual(["Test User"]);
-    const stable = await ds.getNextHistoryPage(query(3, first.pageToken));
-    expect(stable?.pageToken).toBeTypeOf("number");
+  // @see docs/testing/perspectives/src/dataSource-test/01-history-diff-01.md (S54, S55)
+  // Case: TC-386, TC-387
+  it.each([
+    { kind: "file", id: "TC-386" },
+    { kind: "symlink", id: "TC-387" }
+  ])(
+    "refreshes unfiltered author choices after editing an external $kind ($id)",
+    async ({ kind }) => {
+      const { repo, root } = fixture;
+      const map = path.join(root, "author map");
+      await fs.writeFile(map, "");
+      const configured = kind === "symlink" ? path.join(root, "linked map") : map;
+      if (kind === "symlink") await fs.symlink(path.basename(map), configured, "file");
+      git(repo, ["config", "mailmap.file", configured]);
+      const first = await full(2);
+      expect(first.authors).toEqual(["Test User"]);
+      const stable = await ds.getNextHistoryPage(query(3, first.pageToken));
+      expect(stable?.pageToken).toBeTypeOf("number");
 
-    const refs = listRefs(repo);
-    await fs.writeFile(map, "Canonical <test@example.com>\n");
-    expect(listRefs(repo)).toBe(refs);
-    expect(git(repo, ["status", "--porcelain"])).toBe("");
-    expect(await ds.getNextHistoryPage(query(4, stable!.pageToken))).toBeUndefined();
-    const refreshed = await full(4);
-    expect(refreshed.authors).toEqual(["Canonical"]);
-    expect(refreshed.commits.map((row) => row.hash)).toEqual(
-      git(repo, ["log", "-4", "--format=%H"]).split("\n")
-    );
+      const refs = listRefs(repo);
+      await fs.writeFile(map, "Canonical <test@example.com>\n");
+      expect(listRefs(repo)).toBe(refs);
+      expect(git(repo, ["status", "--porcelain"])).toBe("");
+      expect(await ds.getNextHistoryPage(query(4, stable!.pageToken))).toBeUndefined();
+      const refreshed = await full(4);
+      expect(refreshed.authors).toEqual(["Canonical"]);
+      expect(refreshed.commits.map((row) => row.hash)).toEqual(
+        git(repo, ["log", "-4", "--format=%H"]).split("\n")
+      );
+    }
+  );
+
+  // Case: TC-388
+  it("continues past a bare log.mailmap setting and detects a change to false (TC-388)", async () => {
+    const { repo, root } = fixture;
+    const config = path.join(root, "mailmap.config");
+    await fs.writeFile(config, "[log]\n\tmailmap\n");
+    git(repo, ["config", "include.path", config]);
+    expect(git(repo, ["config", "--bool", "--get", "log.mailmap"])).toBe("true");
+
+    const first = await full(2);
+    const page = await ds.getNextHistoryPage(query(3, first.pageToken));
+    expect(page?.commits.map((row) => row.hash)).toEqual([git(repo, ["rev-parse", "HEAD~2"])]);
+    expect(page?.pageToken).toBeTypeOf("number");
+    await fs.writeFile(config, "[log]\n\tmailmap = false\n");
+    expect(await ds.getNextHistoryPage(query(4, page!.pageToken))).toBeUndefined();
   });
 
   // Case: TC-383
