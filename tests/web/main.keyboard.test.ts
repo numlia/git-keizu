@@ -896,6 +896,65 @@ describe("viewport coverage and offscreen keyboard targets (S88)", () => {
   });
 });
 
+describe("editing the author filter while loading more history", () => {
+  // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S89)
+  // Case: TC-801
+  it.each(["append", "full"])(
+    "keeps a pending author edit when a history request completes (%s) (TC-801)",
+    (kind) => {
+      const menu = document.getElementById("authorSelect")!;
+      const ben = () => menu.querySelector<HTMLElement>('[role="option"][title="Ben"]')!;
+      const first = node("M", ["R"], { author: "Ada" });
+      const next = node("R", [], { author: "Ben" });
+      const full = {
+        command: "loadCommits",
+        commits: [first],
+        authors: ["Ada", "Ben"],
+        head: "M",
+        hard: true,
+        moreCommitsAvailable: true,
+        pageToken: 8
+      };
+      dispatch(full);
+      fire(document.getElementById("loadMoreCommitsBtn")!, "click");
+      const request = posts("loadCommits").at(-1)!;
+      expect(request.pageToken).toBe(8);
+      openDropdown("authorSelect");
+      fire(ben(), "click");
+      clearPosts();
+      if (kind === "append") {
+        dispatch({
+          command: "appendCommits",
+          repo: REPO,
+          from: 8,
+          baseCount: 1,
+          commits: [next],
+          moreCommitsAvailable: false
+        });
+      } else {
+        dispatch({
+          ...full,
+          requestId: request.requestId,
+          commits: [first, next],
+          moreCommitsAvailable: false
+        });
+      }
+      expect(table().querySelectorAll("tr.commit")).toHaveLength(2);
+      expect(dropdownIsOpen("authorSelect")).toBe(true);
+      expect(ben().getAttribute("aria-selected")).toBe("true");
+      expect(posts("loadCommits")).toHaveLength(0);
+      fire(menu.querySelector(".dropdownHint button")!, "click");
+      expect(posts("loadCommits")).toEqual([expect.objectContaining({ authors: ["Ben"] })]);
+
+      dispatch(full);
+      openDropdown("authorSelect");
+      fire(menu.querySelector('[role="option"]')!, "click");
+      fire(menu.querySelector(".dropdownHint button")!, "click");
+      loadCommits(standardCommits());
+    }
+  );
+});
+
 /* ------------------------------------------------------------------ */
 /* S70: row keys per state                                            */
 /* ------------------------------------------------------------------ */

@@ -643,7 +643,7 @@ class GitKeizuView {
         this.findWidget.restoreState(prevState.findWidgetState);
       }
       if (this.selectedAuthors.length > 0) {
-        this.updateAuthorMenu(this.selectedAuthors, false);
+        this.updateAuthorMenu(this.selectedAuthors);
       }
     }
     const refreshedDuringLoadRepos = this.loadRepos(this.gitRepos, lastActiveRepo);
@@ -933,20 +933,19 @@ class GitKeizuView {
 
     const authorList =
       authors !== undefined ? authors : [...new Set(this.commits.map((c) => c.author))].sort();
-    this.updateAuthorMenu(authorList, appending);
+    this.updateAuthorMenu(authorList);
 
     this.consumePendingBranchScroll();
     this.triggerLoadCommitsCallback(true);
     this.fetchAvatars(avatarsNeeded);
     this.updateCurrentBtnState();
   }
-  private updateAuthorMenu(authors: string[], appending: boolean) {
+  private updateAuthorMenu(authors: string[]) {
     const previous = this.displayedAuthors;
     const equal = (left: string, right: string) => left === right;
     if (
-      appending &&
+      this.isLoadingMoreCommits &&
       previous !== null &&
-      !this.authorDropdown.isOpen() &&
       arraysEqual(previous.authors, authors, equal) &&
       arraysEqual(previous.selected, this.selectedAuthors, equal)
     )
@@ -2269,6 +2268,7 @@ class GitKeizuView {
 
   /* Row Target and Tab Stops */
   private leaveRepository(): void {
+    this.displayedAuthors = null;
     this.leftBranchRequestRepo = this.loadBranchesCallback !== null;
     if (isContextMenuActive()) hideContextMenu("repository");
     this.rowTarget = null;
