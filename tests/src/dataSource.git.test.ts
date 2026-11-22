@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -176,7 +177,21 @@ describe("continuing ordinary Git history", () => {
 
   // Case: TC-383
   it("resumes a linear walk from its saved parent and sends only the next 100 commits (TC-383)", async () => {
-    for (let i = 0; i < 100; i++) git(fixture.repo, ["commit", "--allow-empty", "-m", `row ${i}`]);
+    const base = git(fixture.repo, ["rev-parse", "HEAD"]);
+    const commits = Array.from({ length: 100 }, (_, i) => {
+      const message = `row ${i}`;
+      return [
+        `commit refs/heads/${MAIN_BRANCH}`,
+        "committer Test User <test@example.com> now",
+        `data ${message.length}`,
+        message,
+        ...(i === 0 ? [`from ${base}`] : [])
+      ].join("\n");
+    });
+    cp.execFileSync("git", ["fast-import", "--quiet", "--date-format=now"], {
+      cwd: fixture.repo,
+      input: `${commits.join("\n")}\n`
+    });
     const refs = git(fixture.repo, ["log", "--date-order", "--format=%H"]).split("\n");
     const first = await full(3);
     vi.mocked(cp.spawn).mockClear();
@@ -205,6 +220,31 @@ describe("continuing ordinary Git history", () => {
       expect(await ds.getNextHistoryPage(query(count + 4, first.pageToken))).toBeUndefined();
     }
   );
+
+  // Case: TC-385
+  it("replaces history when deepening a shallow clone changes parents without moving refs (TC-385)", async () => {
+    const clone = path.join(fixture.root, "shallow");
+    git(fixture.root, ["clone", "--depth=3", pathToFileURL(fixture.repo).href, clone]);
+    const stable = await ds.getCommits(clone, [], 2, true, [], "date");
+    expect(stable.pageToken).toBeTypeOf("number");
+    const last = await ds.getNextHistoryPage({ ...query(3, stable.pageToken), repo: clone });
+    expect(last?.commits.map((row) => row.hash)).toEqual([git(clone, ["rev-parse", "HEAD~2"])]);
+    expect(last?.moreCommitsAvailable).toBe(false);
+    const first = await ds.getCommits(clone, [], 2, true, [], "date");
+    expect(first.pageToken).toBeTypeOf("number");
+    const oldRefs = listRefs(clone);
+    git(clone, ["fetch", "--deepen=2", "origin"]);
+    expect(listRefs(clone)).toBe(oldRefs);
+    expect(
+      await ds.getNextHistoryPage({ ...query(4, first.pageToken), repo: clone })
+    ).toBeUndefined();
+    const replacement = await ds.getCommits(clone, [], 4, true, [], "date");
+    expect(replacement.commits.map((row) => [row.hash, ...row.parentHashes])).toEqual(
+      git(clone, ["log", "-4", "--date-order", "--format=%H %P"])
+        .split("\n")
+        .map((line) => line.trim().split(" "))
+    );
+  });
 
   // Case: TC-385
   it.each(["query", "filter", "token", "refs", "worktree", "dirty", "stash"])(

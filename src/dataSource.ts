@@ -1,4 +1,5 @@
 import * as cp from "node:child_process";
+import { readFile } from "node:fs/promises";
 import * as path from "node:path";
 
 import {
@@ -1315,7 +1316,30 @@ export class DataSource {
     return comparisons;
   }
 
-  private getRefs(repo: string, showRemoteBranches: boolean) {
+  private async getRefs(repo: string, showRemoteBranches: boolean) {
+    const [data, shallowRoots] = await Promise.all([
+      this.readRefs(repo, showRemoteBranches),
+      this.getShallowRoots(repo)
+    ]);
+    // Deepening a clone can change the parents and traversal without moving a ref.
+    const snapshot =
+      data.snapshot !== null && shallowRoots !== null
+        ? JSON.stringify([data.snapshot, shallowRoots])
+        : null;
+    return { ...data, snapshot };
+  }
+
+  private async getShallowRoots(repo: string): Promise<string | null> {
+    const location = await this.runGitQuery(["rev-parse", "--git-path", "shallow"], repo);
+    if (location.kind !== "ok" || !location.stdout.trimEnd()) return null;
+    try {
+      return await readFile(path.resolve(repo, location.stdout.trimEnd()), "utf8");
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "ENOENT" ? "" : null;
+    }
+  }
+
+  private readRefs(repo: string, showRemoteBranches: boolean) {
     return this.spawnGit<GitRefData & { snapshot: string | null; singleTip?: string }>(
       ["show-ref", "-d", "--head"],
       repo,
