@@ -1,0 +1,1 @@
+../../../.agents/skills/update-release-docs/SKILL.md
