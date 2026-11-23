@@ -549,6 +549,7 @@ beforeAll(async () => {
     '<ul id="contextMenu"></ul><div id="dialogBacking"></div><div id="dialog"></div>'
   ].join("");
   (globalThis as Record<string, unknown>).viewState = {
+    viewId: "keyboard-test-view",
     repos: {
       [REPO]: { columnWidths: null, recentActions: [] },
       [OTHER_REPO]: { columnWidths: null, recentActions: [] }
@@ -624,6 +625,178 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+// @see docs/testing/perspectives/web/main-test/14-history-search-01.md (S91)
+describe("full history search on the displayed graph", () => {
+  const control = (id: string) => document.getElementById(id) as HTMLButtonElement;
+  const info = (hashes: string[], snapshot = "verified") => ({
+    kind: "verified",
+    hashes,
+    snapshot,
+    requestedCount: posts("loadCommits").at(-1)!.maxCommits
+  });
+  function request() {
+    dispatch({ command: "refresh" });
+    loadBranches(false);
+    return posts("loadCommits").at(-1)!;
+  }
+  function respond(commits: GitCommitNode[], history: unknown, more = false) {
+    dispatch({
+      command: "loadCommits",
+      requestId: posts("loadCommits").at(-1)!.requestId,
+      commits,
+      history,
+      head: commits[0]?.hash,
+      moreCommitsAvailable: more,
+      hard: false
+    });
+  }
+  function find(term: string) {
+    if (!findWidgetIsVisible()) control("searchBtn").click();
+    const input = document.getElementById("findInput") as HTMLInputElement;
+    input.value = term;
+    input.dispatchEvent(new Event("input"));
+    vi.runOnlyPendingTimers();
+  }
+  function hit(hasMore: boolean) {
+    const start = posts("startHistorySearch").at(-1)!;
+    dispatch({
+      ...start,
+      command: "historySearchBatch",
+      kind: "ok",
+      firstPosition: 301,
+      commits: [node("result", [], { message: "needle" })],
+      hasMore
+    });
+  }
+  beforeEach(() => {
+    loadCommits(standardCommits());
+    clearPosts();
+    vi.useFakeTimers();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("takes the verified ordinary depth while a larger unpaged request is in flight (TC-809, TC-810)", () => {
+    find("needle");
+    expect(control("findStart").disabled).toBe(true);
+    expect(control("findStatus").textContent).toBe(ENGLISH_MESSAGES["find.reloadFirst"]);
+    expect(posts("loadCommits")).toEqual([]);
+    const initial = request();
+    const ordinary = Array.from({ length: 300 }, (_, index) => node(String(index), []));
+    const inserted = [
+      node(UNCOMMITTED_CHANGES_HASH, ["0"]),
+      node("pinned", []),
+      ...["s0", "s1"].map((hash, index) =>
+        node(hash, [], {
+          stash: { selector: `stash@{${index}}`, baseHash: "0", untrackedFilesHash: null }
+        })
+      )
+    ];
+    respond([...inserted, ...ordinary], info(ordinary.map((commit) => commit.hash)), true);
+    expect(control("findScope").textContent).toBe("Searching loaded commits (303)");
+    control("loadMoreCommitsBtn").click();
+    expect(posts("loadCommits").at(-1)!.maxCommits).toBe(400);
+    control("findStart").click();
+    expect(posts("startHistorySearch")).toEqual([
+      {
+        command: "startHistorySearch",
+        repo: REPO,
+        viewId: "keyboard-test-view",
+        generation: expect.any(Number),
+        requestId: 1,
+        branches: initial.branches,
+        authors: initial.authors,
+        commitOrdering: "date",
+        showRemoteBranches: true,
+        skip: 300,
+        snapshot: "verified"
+      }
+    ]);
+    respond(ordinary, info(ordinary.map((commit) => commit.hash)));
+  });
+
+  it("searches a verified terminal graph with no page token (TC-811)", () => {
+    const commits = [node("loaded", [], { message: "needle" })];
+    request();
+    respond(commits, info(["loaded"]));
+    find("needle");
+    control("findStart").click();
+    const start = posts("startHistorySearch").at(-1)!;
+    dispatch({
+      ...start,
+      command: "historySearchBatch",
+      kind: "ok",
+      commits: [],
+      firstPosition: 301,
+      hasMore: false
+    });
+    expect(control("findPosition").textContent).toBe("1 of 1 (0 unloaded)");
+    expect(control("findStatus").textContent).toContain(ENGLISH_MESSAGES["find.complete"]);
+    expect(control("findNext").disabled).toBe(false);
+  });
+
+  it.each(["snapshot", "prefix", "reported", "unavailable", "legacy"])(
+    "ends the live search on %s with identical graph rows (TC-812, TC-813)",
+    (change) => {
+      const commits = [node("A", [], { message: "needle" }), node("B", [])];
+      request();
+      respond(commits, info(["A", "B"]));
+      find("needle");
+      control("findStart").click();
+      hit(false);
+      expect(control("findPosition").textContent).toBe("1 of 2 (1 unloaded)");
+      const previous = row("A");
+      request();
+      const changed = {
+        snapshot: info(["A", "B"], "changed"),
+        prefix: info(["B", "A"]),
+        reported: { kind: "historyChanged" },
+        unavailable: { kind: "unavailable" },
+        legacy: undefined
+      }[change];
+      respond(commits, changed);
+      expect(row("A")).toBe(previous);
+      expect(control("findPosition").textContent).toBe("1 of 1");
+      expect(control("findStatus").textContent).toBe(
+        ENGLISH_MESSAGES[
+          change === "unavailable" || change === "legacy"
+            ? "find.unavailable"
+            : "find.historyChanged"
+        ]
+      );
+      expect(control("findStart").disabled).toBe(
+        ["unavailable", "legacy", "reported"].includes(change)
+      );
+    }
+  );
+
+  it("recognizes a changed stash selector on a retained hash and merges matches loaded by hash (TC-814, TC-817)", () => {
+    const ordinary = node("ordinary", []);
+    const stash = node("stash", [], {
+      stash: { selector: "stash@{1}", baseHash: ordinary.hash, untrackedFilesHash: null }
+    });
+    request();
+    respond([stash, ordinary], info(["ordinary"]));
+    find("@{1}");
+    control("findStart").click();
+    hit(false);
+    request();
+    const moved = { ...stash, stash: { ...stash.stash!, selector: "stash@{0}" } };
+    respond([moved, ordinary], info(["ordinary"]));
+    expect(control("findPosition").textContent).toBe("No Results");
+    expect(row("stash").textContent).toContain("@{0}");
+    find("needle");
+    control("findStart").click();
+    hit(false);
+    expect(control("findPosition").textContent).toBe("0 of 1 (1 unloaded)");
+    request();
+    respond(
+      [moved, ordinary, node("result", [], { message: "needle" })],
+      info(["ordinary", "result"])
+    );
+    expect(control("findPosition").textContent).toBe("1 of 1 (0 unloaded)");
+  });
 });
 
 /* ------------------------------------------------------------------ */

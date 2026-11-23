@@ -586,6 +586,16 @@ class GitKeizuView {
       }
     });
     this.findWidget = new FindWidget({
+      getSearchStart: () => {
+        const applied = this.getAppliedSearchHistory();
+        if (applied?.info.kind !== "verified") return undefined;
+        return {
+          ...applied.query,
+          viewId: viewState.viewId,
+          snapshot: applied.info.snapshot,
+          skip: applied.requestedCount
+        };
+      },
       getCommits: () => this.commits,
       scrollToCommit: (hash, alwaysCenterCommit) => this.scrollToCommit(hash, alwaysCenterCommit),
       saveState: () => this.saveState(),
@@ -713,6 +723,7 @@ class GitKeizuView {
     }
     document.body.classList.toggle("singleRepo", repoPaths.length <= 1);
     this.repoDropdown.setOptions(options, this.currentRepo);
+    this.discardMismatchedSearchQuery();
 
     if (changedRepo) {
       this.refresh("hard");
@@ -805,6 +816,7 @@ class GitKeizuView {
     } else {
       this.selectedBranches = validBranches;
     }
+    this.discardMismatchedSearchQuery();
     this.saveState();
 
     this.syncBranchDropdownOptions();
@@ -858,6 +870,14 @@ class GitKeizuView {
       response.authors,
       response.worktrees
     );
+  }
+
+  public receiveHistorySearchBatch(response: GG.ResponseHistorySearchBatch) {
+    this.findWidget.receiveHistorySearch(response);
+  }
+
+  public receiveHistorySearchValidation(response: GG.ResponseHistorySearchValidation) {
+    this.findWidget.receiveHistorySearch(response);
   }
 
   public appendCommits(response: GG.ResponseAppendCommits) {
@@ -932,6 +952,10 @@ class GitKeizuView {
   ) {
     const authorList = authors ?? [...new Set(commits.map((commit) => commit.author))].sort();
     this.updateAuthorMenu(authorList, forceRender && !this.isLoadingMoreCommits);
+    if (this.findWidget.history.owner) {
+      const change = this.getAppliedSearchHistory()?.change ?? "unavailable";
+      if (change !== "compatible") this.findWidget.endHistorySearch(change);
+    }
 
     if (
       !forceRender &&
@@ -948,7 +972,8 @@ class GitKeizuView {
             (a.date === b.date &&
               a.message === b.message &&
               a.author === b.author &&
-              a.email === b.email)) &&
+              a.email === b.email &&
+              a.stash?.selector === b.stash?.selector)) &&
           arraysEqual(a.refs, b.refs, (a, b) => a.name === b.name && a.type === b.type) &&
           arraysEqual(a.parentHashes, b.parentHashes, (a, b) => a === b)
       )
@@ -958,6 +983,8 @@ class GitKeizuView {
         this.saveState();
         this.renderUncommitedChanges();
       }
+      this.findWidget.setInputEnabled(true);
+      this.findWidget.refresh();
       this.rememberMainWorktree();
       this.triggerLoadCommitsCallback(false);
       this.updateCurrentBtnState();
@@ -1137,7 +1164,14 @@ class GitKeizuView {
   private invalidateHistory() {
     this.historyGeneration++;
     this.pageToken = undefined;
-    this.appliedHistory = this.getAppliedSearchHistory();
+    this.discardMismatchedSearchQuery();
+  }
+
+  private discardMismatchedSearchQuery() {
+    if (this.appliedHistory && !this.getAppliedSearchHistory()) {
+      this.appliedHistory = undefined;
+      if (this.findWidget.history.owner) this.findWidget.endHistorySearch("idle");
+    }
   }
 
   private requestMoreCommits(manual: boolean) {

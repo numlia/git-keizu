@@ -5,8 +5,10 @@
   top: 0;
   right: 24px;
   display: flex;
-  align-items: center;
-  gap: 2px;
+  flex-direction: column;
+  align-items: stretch;
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
   padding: 4px;
   background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
   border: 1px solid var(--vscode-editorWidget-border, rgba(128, 128, 128, 0.5));
@@ -16,6 +18,25 @@
   z-index: var(--git-keizu-z-index-find-widget);
   transform: translateY(-100%);
 }
+.findRow {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.findScopeRow {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  font-size: 12px;
+}
+#findStatus {
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.findWidget .findAction {
+  border: 1px solid transparent;
+  cursor: pointer;
+  color: var(--vscode-textLink-foreground);
+}
 .findWidget.active {
   transform: translateY(0);
 }
@@ -24,6 +45,7 @@
 }
 #findInput {
   width: 200px;
+  min-width: 0;
   padding: 3px 6px;
   border: 1px solid rgba(128, 128, 128, 0.3);
   background-color: var(--vscode-input-background);

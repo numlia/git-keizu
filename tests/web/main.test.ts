@@ -82,6 +82,9 @@ const {
       return mockFileHistoryInstance;
     }),
     mockFindWidgetInstance: {
+      history: { owner: null },
+      endHistorySearch: vi.fn(),
+      receiveHistorySearch: vi.fn(),
       show: vi.fn(),
       close: vi.fn(),
       isVisible: vi.fn(() => false),

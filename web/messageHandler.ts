@@ -21,8 +21,8 @@ import { refreshGraphOrDisplayError } from "./utils";
 export type RefreshMode = "soft" | "forceRender" | "hard";
 
 export interface GitKeizuViewAPI {
-  receiveHistorySearchBatch?(response: ResponseHistorySearchBatch): void;
-  receiveHistorySearchValidation?(response: ResponseHistorySearchValidation): void;
+  receiveHistorySearchBatch(response: ResponseHistorySearchBatch): void;
+  receiveHistorySearchValidation(response: ResponseHistorySearchValidation): void;
   hideCommitDetails(): void;
   showCommitDetails(commitDetails: GitCommitDetails, fileTree: GitFolder): void;
   showCompareResult(fileChanges: GitFileChange[], fromHash: string, toHash: string): void;
@@ -42,10 +42,10 @@ export interface GitKeizuViewAPI {
 export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void {
   switch (msg.command) {
     case "historySearchBatch":
-      gitKeizu.receiveHistorySearchBatch?.(msg);
+      gitKeizu.receiveHistorySearchBatch(msg);
       break;
     case "historySearchValidation":
-      gitKeizu.receiveHistorySearchValidation?.(msg);
+      gitKeizu.receiveHistorySearchValidation(msg);
       break;
     case "addTag":
       refreshOrError(gitKeizu, msg.status, t("error.addTag"));
