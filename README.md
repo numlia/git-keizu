@@ -58,8 +58,9 @@ See branches, commits, tags, stash entries, and uncommitted changes together in 
 
 - Filter the graph by branch or author, and search commit messages with regex and case-sensitive modes.
 - Choose date, topological, or author-date ordering. Merge commits and non-ancestor commits can be visually muted.
-- Combined local and remote labels, automatic commit loading, and restored scroll position keep long histories manageable.
-- When a commit carries more branch, worktree, tag, or stash labels than fit in its row, the rest fold into a **+N** badge that opens them in a list with the same right-click and double-click actions, and Find highlights **+N** when a hidden label matches.
+- Scroll through long histories with commit rows and graph lines drawn together as they come into view. Find and keyboard navigation can take you to any loaded commit.
+- Scroll to the bottom with automatic loading enabled, or choose **Load More Commits**, to add the next page and keep your place. The graph also restores your scroll position when you reopen it.
+- Local and remote branches can share a label. When a commit carries more branch, worktree, tag, or stash labels than fit in its row, the rest fold into a **+N** badge that opens them in a list with the same right-click and double-click actions, and Find highlights **+N** when a hidden label matches.
 - **Highlight path**, from the context menu of a commit or a branch label, traces how it connects through the graph: direct parents and children, ancestors and descendants, or the first-parent line for a commit, and all ancestors or the first-parent line for a branch. Its lines are drawn thicker and its commits outlined while the other lines fade, until you clear it from the bar above the graph. Where the path reaches history that is not loaded yet, the loaded commit is marked with a square instead of guessing what lies beyond.
 
 ![Highlight path showing every ancestor of feature/offline-mode while the other branches fade](./resources/screenshots/path-highlight.png)
