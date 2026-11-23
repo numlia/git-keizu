@@ -229,10 +229,10 @@ describe("continuing ordinary Git history", () => {
       return { ...request, snapshot: history.snapshot };
     }
 
-    function controlledLog() {
+    function controlledLog(started = true) {
       const events = new EventEmitter();
       const child = Object.assign(events, {
-        pid: 123,
+        pid: started ? 123 : undefined,
         exitCode: null as number | null,
         signalCode: null as string | null,
         stdin: new PassThrough(),
@@ -486,6 +486,66 @@ describe("continuing ordinary Git history", () => {
           });
         }
         expect(log.child.stdout.destroyed).toBe(true);
+      }
+    );
+
+    // Case: TC-406, TC-408
+    it.each([
+      ["spawn", "spawn git ENOENT"],
+      ["stdout", "history stdout read failed"],
+      ["stderr", "history stderr read failed"],
+      ["early stdout close", "Git history output closed unexpectedly."]
+    ])(
+      "reports a %s failure and waits for child close before replacement",
+      async (source, message) => {
+        const request = await searchRequest();
+        const started = source !== "spawn";
+        const log = controlledLog(started);
+        const launches: string[][] = [];
+        interceptGit((args) => {
+          if (!args.includes(`--skip=${request.skip}`)) return;
+          launches.push(args);
+          if (launches.length === 1) return log.proc;
+        });
+        const report = vi.fn();
+        const read = async () => {
+          report(await ds.createHistorySearch(request).next());
+        };
+        const pending = read();
+        await vi.waitFor(() => expect(launches).toHaveLength(1));
+        if (started) {
+          const row = cp.execFileSync("git", [...launches[0], "--max-count=1"], {
+            cwd: fixture.repo
+          });
+          log.child.stdout.write(row);
+          await vi.waitFor(() => expect(log.child.stdout.readableLength).toBe(0));
+        }
+
+        if (source === "spawn") log.child.emit("error", new Error(message));
+        else if (source === "early stdout close") log.child.stdout.destroy();
+        else if (source === "stdout") log.child.stdout.destroy(new Error(message));
+        else log.child.stderr.destroy(new Error(message));
+
+        await vi.waitFor(() => expect(log.child.stdin.destroyed).toBe(true));
+        expect(log.child.stdout.destroyed).toBe(true);
+        expect(log.child.stderr.destroyed).toBe(true);
+        expect(log.child.kill).toHaveBeenCalledTimes(started ? 1 : 0);
+        const exitCode = started ? null : -2; // ENOENT when no child was spawned.
+        const signal = started ? "SIGTERM" : null;
+        if (started) log.child.emit("exit", exitCode, signal);
+        const replacement = ds.createHistorySearch(request);
+        const next = replacement.next();
+        // An independent ordinary read can finish while the replacement waits for close.
+        await full(request.skip);
+        expect(launches).toHaveLength(1);
+        expect(report).not.toHaveBeenCalled();
+
+        log.child.emit("close", exitCode, signal);
+        await pending;
+        expect(report.mock.calls).toEqual([[{ kind: "error", message }]]);
+        expect(await next).toMatchObject({ kind: "ok", firstPosition: request.skip + 1 });
+        expect(launches).toHaveLength(2);
+        await replacement.close();
       }
     );
 
