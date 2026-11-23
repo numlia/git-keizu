@@ -90,7 +90,8 @@ import { mainWorktreePath } from "./worktreeSuggestion";
 const FLASH_ANIMATION_DURATION_MS = 850;
 const VIEWPORT_BUFFER_ROWS = 8;
 export const MIN_COMMIT_LOAD_COUNT = 1;
-export const SEARCH_CONFIRMATION_DEPTH = 1000;
+// Full graph reload and repaint timings: docs/testing/history-search-calibration.md.
+export const SEARCH_CONFIRMATION_DEPTH = 20_000;
 
 export function normalizeCommitLoadCount(value: number, defaultValue: number): number {
   const count = Number.isFinite(value) ? value : defaultValue;

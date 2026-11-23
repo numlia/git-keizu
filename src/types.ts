@@ -538,7 +538,8 @@ export type ResponseHistorySearchBatch = SearchRequestKey & {
   command: "historySearchBatch";
 } & HistorySearchBatch;
 
-export const HISTORY_SEARCH_BATCH_SIZE = 1000;
+// Request-to-match timings across three starting offsets: docs/testing/history-search-calibration.md.
+export const HISTORY_SEARCH_BATCH_SIZE = 26_000;
 
 export interface ResponseLoadCommits {
   command: "loadCommits";
