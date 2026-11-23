@@ -677,12 +677,14 @@ export interface RequestSaveRepoState {
 
 export interface RequestCompareCommits {
   command: "compareCommits";
+  requestId: string;
   repo: string;
   fromHash: string;
   toHash: string;
 }
 export interface ResponseCompareCommits {
   command: "compareCommits";
+  requestId: string;
   fileChanges: GitFileChange[] | null;
   fromHash: string;
   toHash: string;

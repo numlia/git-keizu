@@ -433,6 +433,7 @@ class GitKeizuView {
   private restoredSearchScroll?: number;
   private restoredPendingDetails: ExpandedCommit | null = null;
   private searchDetails?: { hash: string; key: GG.SearchRequestKey };
+  private pendingComparisonId?: string;
   private detailRequestId = 0;
   private fileHistory: FileHistoryController;
   private pathHighlight: PathHighlightController;
@@ -2627,6 +2628,7 @@ class GitKeizuView {
 
   /* Row Target and Tab Stops */
   private leaveRepository(): void {
+    this.pendingComparisonId = undefined;
     if (this.findWidget.history.owner || this.searchDetails)
       this.findWidget.endHistorySearch("idle");
     this.clearSearchReturn();
@@ -2820,6 +2822,7 @@ class GitKeizuView {
   }
 
   public dispose(): void {
+    this.pendingComparisonId = undefined;
     if (this.findWidget.history.owner || this.searchDetails)
       this.findWidget.endHistorySearch("idle");
     this.viewportResizeObserver?.disconnect();
@@ -2987,8 +2990,11 @@ class GitKeizuView {
     const { hash, compareWithHash } = this.expandedCommit;
     if (compareWithHash !== null) {
       const order = this.getCommitOrder(hash, compareWithHash);
+      const requestId = crypto.randomUUID();
+      this.pendingComparisonId = requestId;
       sendMessage({
         command: "compareCommits",
+        requestId,
         repo: this.currentRepo,
         fromHash: order.from,
         toHash: order.to
@@ -3081,6 +3087,7 @@ class GitKeizuView {
   }
 
   private closeCommitDetails(restoreViewport: boolean) {
+    this.pendingComparisonId = undefined;
     this.restoredPendingDetails = null;
     this.searchDetails = undefined;
     if (this.expandedCommit !== null) {
@@ -3521,16 +3528,24 @@ class GitKeizuView {
     e.stopPropagation();
     this.showFileRowContextMenu(e);
   }
-  public showCompareResult(
-    fileChanges: GG.GitFileChange[] | null,
-    fromHash: string,
-    toHash: string
-  ) {
-    if (!this.expandedCommit?.loading || this.expandedCommit.compareWithHash === null) return;
+  public showCompareResult({
+    requestId,
+    fileChanges,
+    fromHash,
+    toHash
+  }: GG.ResponseCompareCommits) {
+    if (
+      !this.pendingComparisonId ||
+      requestId !== this.pendingComparisonId ||
+      !this.expandedCommit?.loading ||
+      this.expandedCommit.compareWithHash === null
+    )
+      return;
     // fromHash/toHash may be reordered by getCommitOrder, so validate as a set
     const hashes = new Set([fromHash, toHash]);
     if (!hashes.has(this.expandedCommit.hash) || !hashes.has(this.expandedCommit.compareWithHash))
       return;
+    this.pendingComparisonId = undefined;
     if (fileChanges === null) {
       this.hideCommitDetails();
       showErrorDialog(t("error.compareCommits"), null, null);

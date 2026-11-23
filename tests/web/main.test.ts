@@ -11440,7 +11440,7 @@ describe("path highlight selection across view changes (S68)", () => {
       target.dispatchEvent(new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true }));
     };
     interface InteractionRecord {
-      posts: unknown[];
+      posts: RequestMessage[];
       checkouts: unknown[];
       detailsAfterEscape: boolean;
     }
@@ -11468,7 +11468,7 @@ describe("path highlight selection across view changes (S68)", () => {
 
     // Given: the interactions recorded without a highlight
     const baseline = run();
-    expect(baseline.posts.map((post) => (post as { command: string }).command)).toEqual([
+    expect(baseline.posts.map((post) => post.command)).toEqual([
       "commitDetails",
       "compareCommits",
       "compareCommits",
@@ -11483,8 +11483,17 @@ describe("path highlight selection across view changes (S68)", () => {
     selectCommit("M");
     const highlighted = run();
 
-    // Then: identical requests and results, the highlight is untouched
-    expect(highlighted).toEqual(baseline);
+    // Both runs target the same commits, and each comparison has its own request ID.
+    expect(highlighted).toEqual({
+      ...baseline,
+      posts: baseline.posts.map((post) =>
+        post.command === "compareCommits" ? { ...post, requestId: expect.any(String) } : post
+      )
+    });
+    const comparisonIds = [...baseline.posts, ...highlighted.posts].flatMap((post) =>
+      post.command === "compareCommits" ? [post.requestId] : []
+    );
+    expect(new Set(comparisonIds).size).toBe(4);
     expect(barState()).toMatchObject({ active: true, hashTitle: "M" });
     expect(pathCalls().every((call) => call !== null)).toBe(true);
   });

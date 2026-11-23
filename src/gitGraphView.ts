@@ -409,6 +409,7 @@ export class GitKeizuView {
             case "compareCommits":
               this.sendMessage({
                 command: "compareCommits",
+                requestId: msg.requestId,
                 fileChanges: await this.dataSource.getCommitComparison(
                   msg.repo,
                   msg.fromHash,

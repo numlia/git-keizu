@@ -464,6 +464,7 @@ describe("GitKeizuView compareCommits message routing", () => {
     // When: RequestCompareCommits message is received
     await mocks.messageHandler.current!({
       command: "compareCommits",
+      requestId: "compare-args",
       repo: TEST_REPO,
       fromHash,
       toHash
@@ -492,6 +493,7 @@ describe("GitKeizuView compareCommits message routing", () => {
     // When: RequestCompareCommits message is received
     await mocks.messageHandler.current!({
       command: "compareCommits",
+      requestId: "compare-success",
       repo: TEST_REPO,
       fromHash,
       toHash
@@ -500,6 +502,7 @@ describe("GitKeizuView compareCommits message routing", () => {
     // Then: ResponseCompareCommits is sent with correct fileChanges, fromHash, toHash
     expect(mocks.postMessage).toHaveBeenCalledWith({
       command: "compareCommits",
+      requestId: "compare-success",
       fileChanges,
       fromHash,
       toHash
@@ -515,6 +518,7 @@ describe("GitKeizuView compareCommits message routing", () => {
     // When: RequestCompareCommits message is received
     await mocks.messageHandler.current!({
       command: "compareCommits",
+      requestId: "compare-error",
       repo: TEST_REPO,
       fromHash,
       toHash
@@ -523,6 +527,7 @@ describe("GitKeizuView compareCommits message routing", () => {
     // Then: ResponseCompareCommits is sent with null fileChanges
     expect(mocks.postMessage).toHaveBeenCalledWith({
       command: "compareCommits",
+      requestId: "compare-error",
       fileChanges: null,
       fromHash,
       toHash

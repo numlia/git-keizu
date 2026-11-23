@@ -1,9 +1,9 @@
 import type {
   CommitOrdering,
   GitCommitDetails,
-  GitFileChange,
   GitRepoSet,
   ResponseAppendCommits,
+  ResponseCompareCommits,
   ResponseFileHistory,
   ResponseHistorySearchBatch,
   ResponseHistorySearchValidation,
@@ -29,7 +29,7 @@ export interface GitKeizuViewAPI {
   receiveHistorySearchValidation(response: ResponseHistorySearchValidation): void;
   hideCommitDetails(): void;
   showCommitDetails(commitDetails: GitCommitDetails, fileTree: GitFolder): void;
-  showCompareResult(fileChanges: GitFileChange[] | null, fromHash: string, toHash: string): void;
+  showCompareResult(response: ResponseCompareCommits): void;
   loadAvatar(email: string, image: string): void;
   loadBranchCleanup(response: ResponseLoadBranchCleanup): void;
   receiveBranches(response: ResponseLoadBranches): void;
@@ -117,7 +117,7 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       }
       break;
     case "compareCommits":
-      gitKeizu.showCompareResult(msg.fileChanges, msg.fromHash, msg.toHash);
+      gitKeizu.showCompareResult(msg);
       break;
     case "copyToClipboard":
       if (msg.success === false) showErrorDialog(t("error.copyToClipboard", msg.type), null, null);

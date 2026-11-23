@@ -1806,7 +1806,8 @@ describe("row keys per state (S70)", () => {
     openDetails("N");
     clearPosts();
     fire(row("M"), "click", { ctrlKey: true });
-    expect(posts()).toEqual(keyboardPosts);
+    expect(posts()).toEqual([{ ...keyboardPosts[0], requestId: expect.any(String) }]);
+    expect(posts()[0].requestId).not.toBe(keyboardPosts[0].requestId);
   });
 
   it("cancels the comparison on a modified Enter at the compare target (TC-668)", () => {
@@ -4725,7 +4726,13 @@ describe("full history navigation and return on the displayed graph", () => {
         expect(posts("compareCommits")).toEqual([]);
       } else {
         expect(posts("compareCommits")).toEqual([
-          { command: "compareCommits", repo: REPO, fromHash: b.hash, toHash: a.hash }
+          {
+            command: "compareCommits",
+            requestId: expect.any(String),
+            repo: REPO,
+            fromHash: b.hash,
+            toHash: a.hash
+          }
         ]);
         respondDetails(a.hash);
         compare(c.hash, file("a-c.txt"));
@@ -4742,6 +4749,69 @@ describe("full history navigation and return on the displayed graph", () => {
       compare(b.hash, file("replayed.txt"));
       expect(details()?.textContent).not.toContain("replayed.txt");
       expect(scrollContainer().scrollTop).toBe(137);
+    }
+  );
+
+  // Case: TC-830
+  it.each(["return", "redraw", "recreate"])(
+    "ignores both obsolete outcomes of the same working-tree comparison after %s (TC-830)",
+    async (change) => {
+      const working = node(UNCOMMITTED_CHANGES_HASH, [origin.hash]);
+      const commits = [working, origin];
+      reply(commits, [origin.hash]);
+      search("needle");
+      button("findStart").click();
+      openDetails(origin.hash);
+      fire(row(working.hash), "click", { ctrlKey: true });
+      const before = posts("compareCommits").at(-1)!;
+      scrollContainer().scrollTop = 137;
+      if (change === "return") {
+        batch([target], 400);
+        next();
+        reply([...commits, target], [origin.hash, target.hash]);
+        clearPosts();
+        button("findReturn").click();
+        expect(posts("loadCommits")).toEqual([]);
+      } else if (change === "redraw") {
+        refresh();
+        reply(commits, [origin.hash]);
+      } else {
+        await recreate({ viewId: "replacement-comparison-view" }, saved());
+        reply(commits, [origin.hash]);
+      }
+      const current = posts("compareCommits").at(-1)!;
+      const top = scrollContainer().scrollTop;
+      const respond = (request: Record<string, unknown>, path: string | null) =>
+        dispatch({
+          command: "compareCommits",
+          fromHash: request.fromHash,
+          toHash: request.toHash,
+          requestId: request.requestId,
+          fileChanges:
+            path === null ? null : [{ ...FILE_CHANGE, oldFilePath: path, newFilePath: path }]
+        });
+      expect(current).toMatchObject({ fromHash: working.hash, toHash: origin.hash });
+      respond({ ...current, requestId: undefined }, null);
+      expect(button("dialog").classList.contains("active")).toBe(false);
+      const previousFile = "obsolete-worktree.txt";
+      const outcomes = change === "redraw" ? [previousFile, null] : [null, previousFile];
+      for (const outcome of outcomes) {
+        respond(before, outcome);
+        expect(button("dialog").classList.contains("active")).toBe(false);
+        expect(document.getElementById("cdvLoading")).not.toBeNull();
+        expect(details()?.textContent).not.toContain(previousFile);
+        expect(scrollContainer().scrollTop).toBe(top);
+      }
+      expect(before.requestId).toEqual(expect.any(String));
+      expect(current.requestId).toEqual(expect.any(String));
+      expect(before.requestId).not.toBe(current.requestId);
+      respond(current, "current-worktree.txt");
+      expect(details()?.textContent).toContain("current-worktree.txt");
+      if (change === "return") expect(scrollContainer().scrollTop).toBe(137);
+      respond(before, null);
+      respond(before, "replayed-worktree.txt");
+      expect(button("dialog").classList.contains("active")).toBe(false);
+      expect(details()?.textContent).toContain("current-worktree.txt");
     }
   );
 

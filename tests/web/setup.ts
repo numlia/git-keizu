@@ -2,10 +2,11 @@ import { vi } from "vitest";
 
 import type { RequestMessage } from "../../src/types";
 
-let branchRequestId: string | undefined;
+const requestIds = new Map<string, string>();
 
 export function dispatchHostMessage(data: Record<string, unknown>): void {
-  const response = data.command === "loadBranches" ? { requestId: branchRequestId, ...data } : data;
+  const requestId = typeof data.command === "string" ? requestIds.get(data.command) : undefined;
+  const response = requestId !== undefined ? { requestId, ...data } : data;
   window.dispatchEvent(new MessageEvent("message", { data: response }));
 }
 
@@ -14,7 +15,8 @@ vi.stubGlobal(
   vi.fn(() => ({
     getState: vi.fn(() => null),
     postMessage: vi.fn((message: RequestMessage) => {
-      if (message.command === "loadBranches") branchRequestId = message.requestId;
+      if (message.command === "loadBranches" || message.command === "compareCommits")
+        requestIds.set(message.command, message.requestId);
     }),
     setState: vi.fn()
   }))
