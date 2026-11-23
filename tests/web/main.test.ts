@@ -8339,7 +8339,16 @@ describe("installing an ordinary history page", () => {
       );
       const skippedHeight = Array.from(
         table.querySelectorAll<HTMLElement>("tr[data-skipped-start] td")
-      ).reduce((sum, td) => sum + parseFloat(td.style.height), 0);
+      ).reduce((sum, td) => {
+        const { skippedStart, skippedEnd } = td.closest("tr")!.dataset;
+        // jsdom rounds large pixel values when serializing the CSSOM height.
+        const style = td.getAttribute("style") ?? "";
+        const height = Number(
+          /(?:^|;)\s*height\s*:\s*(\d+(?:\.\d+)?)px\s*(?:;|$)/i.exec(style)?.[1]
+        );
+        expect(height).toBe((Number(skippedEnd) - Number(skippedStart)) * pitch);
+        return sum + height;
+      }, 0);
       expect(skippedHeight + pitch * rows.length).toBe(count * pitch);
       const first = Number(rows[0].dataset.id);
       expect(rows.map((r) => r.dataset.id)).toEqual(rows.map((_, i) => String(first + i)));
