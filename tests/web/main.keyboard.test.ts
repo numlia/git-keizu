@@ -4644,6 +4644,107 @@ describe("full history navigation and return on the displayed graph", () => {
     }
   );
 
+  // Case: TC-829
+  it("isolates loaded-only details across redraw, full search, cancellation and same-hash reuse (TC-829)", () => {
+    const a = { ...origin, message: "needle" };
+    reply([a]);
+    search("needle");
+    button("findOpenCdv").click();
+    const loaded = posts("commitDetails").at(-1)!.searchKey;
+    expect(loaded).toMatchObject({
+      viewId: viewState.viewId,
+      repo: REPO,
+      requestId: expect.any(Number)
+    });
+    refresh();
+    reply([a]);
+    const redrawn = posts("commitDetails").at(-1)!.searchKey;
+    expect(redrawn).not.toEqual(loaded);
+    button("findStart").click();
+    batch([target], 400);
+    next();
+    reply([a, target]);
+    const b = posts("commitDetails").at(-1)!.searchKey;
+    expect(detailsOwner()).toBe(target.hash);
+    for (const stale of [loaded, redrawn, undefined]) detailReply(stale, null);
+    expect(button("dialog").classList.contains("active")).toBe(false);
+    expect(document.getElementById("cdvLoading")).not.toBeNull();
+    detailReply(b, target.hash, "B details");
+    next();
+    const aAgain = posts("commitDetails").at(-1)!.searchKey;
+    expect(detailsOwner()).toBe(a.hash);
+    for (const stale of [loaded, redrawn, undefined]) detailReply(stale, a.hash, "old A details");
+    expect(document.getElementById("cdvLoading")).not.toBeNull();
+    detailReply(aAgain, a.hash, "current A details");
+    button("findCancel").click();
+    button("findStart").click();
+    detailReply(loaded, null);
+    detailReply(aAgain, a.hash, "old A details");
+    expect(details()?.textContent).toContain("current A details");
+    expect(button("dialog").classList.contains("active")).toBe(false);
+  });
+
+  // Case: TC-830
+  it.each(["base", "previous comparison", "completed comparison"])(
+    "returns to the selected comparison when the cached files belong to %s (TC-830)",
+    (cache) => {
+      const a = node("A", ["B"]);
+      const b = node("B", ["C"]);
+      const c = node("C", []);
+      const file = (path: string) => [{ ...FILE_CHANGE, oldFilePath: path, newFilePath: path }];
+      const compare = (other: string, changes: GitFileChange[] | null) =>
+        dispatch({
+          command: "compareCommits",
+          fromHash: other,
+          toHash: a.hash,
+          fileChanges: changes
+        });
+      start([a, b, c]);
+      openDetails(a.hash);
+      if (cache === "previous comparison") {
+        fire(row(c.hash), "click", { ctrlKey: true });
+        compare(c.hash, file("a-c.txt"));
+        expect(details()?.textContent).toContain("a-c.txt");
+      }
+      fire(row(b.hash), "click", { ctrlKey: true });
+      if (cache === "completed comparison") compare(b.hash, file("a-b.txt"));
+      scrollContainer().scrollTop = 137;
+      batch([target], 400);
+      next();
+      reply([a, b, c, target]);
+      // The original comparison may finish while the search destination is displayed.
+      compare(b.hash, file("a-b.txt"));
+      clearPosts();
+      button("findReturn").click();
+      expect(detailsOwner()).toBe(a.hash);
+      expect(compareTargetRows()).toEqual([b.hash]);
+      expect(posts("loadCommits")).toEqual([]);
+      expect(posts("loadBranches")).toEqual([]);
+      expect(posts("commitDetails")).toEqual([]);
+      if (cache === "completed comparison") {
+        expect(posts("compareCommits")).toEqual([]);
+      } else {
+        expect(posts("compareCommits")).toEqual([
+          { command: "compareCommits", repo: REPO, fromHash: b.hash, toHash: a.hash }
+        ]);
+        respondDetails(a.hash);
+        compare(c.hash, file("a-c.txt"));
+        compare(c.hash, null);
+        expect(button("dialog").classList.contains("active")).toBe(false);
+        expect(document.getElementById("cdvLoading")).not.toBeNull();
+        expect(details()?.textContent).not.toContain(FILE_PATH);
+        expect(details()?.textContent).not.toContain("a-c.txt");
+        expect(scrollContainer().scrollTop).toBe(137);
+        compare(b.hash, file("a-b.txt"));
+      }
+      expect(details()?.textContent).toContain("a-b.txt");
+      expect(scrollContainer().scrollTop).toBe(137);
+      compare(b.hash, file("replayed.txt"));
+      expect(details()?.textContent).not.toContain("replayed.txt");
+      expect(scrollContainer().scrollTop).toBe(137);
+    }
+  );
+
   // Case: TC-830
   it("keeps the saved scroll when the prior details were still loading (TC-830)", () => {
     start();

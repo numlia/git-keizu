@@ -24,12 +24,12 @@ export type RefreshMode = "soft" | "forceRender" | "hard";
 
 export interface GitKeizuViewAPI {
   setCommitOrdering(ordering: CommitOrdering): void;
-  acceptSearchDetails(key: SearchRequestKey, hash?: string): boolean;
+  acceptCommitDetails(key: SearchRequestKey | undefined, hash?: string): boolean;
   receiveHistorySearchBatch(response: ResponseHistorySearchBatch): void;
   receiveHistorySearchValidation(response: ResponseHistorySearchValidation): void;
   hideCommitDetails(): void;
   showCommitDetails(commitDetails: GitCommitDetails, fileTree: GitFolder): void;
-  showCompareResult(fileChanges: GitFileChange[], fromHash: string, toHash: string): void;
+  showCompareResult(fileChanges: GitFileChange[] | null, fromHash: string, toHash: string): void;
   loadAvatar(email: string, image: string): void;
   loadBranchCleanup(response: ResponseLoadBranchCleanup): void;
   receiveBranches(response: ResponseLoadBranches): void;
@@ -98,8 +98,7 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       refreshOrError(gitKeizu, msg.status, t("error.cleanUntrackedFiles"));
       break;
     case "commitDetails":
-      if (msg.searchKey && !gitKeizu.acceptSearchDetails(msg.searchKey, msg.commitDetails?.hash))
-        break;
+      if (!gitKeizu.acceptCommitDetails(msg.searchKey, msg.commitDetails?.hash)) break;
       if (msg.commitDetails === null) {
         gitKeizu.hideCommitDetails();
         showErrorDialog(t("error.commitDetails"), null, null);
@@ -118,11 +117,7 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       }
       break;
     case "compareCommits":
-      if (msg.fileChanges === null) {
-        showErrorDialog(t("error.compareCommits"), null, null);
-      } else {
-        gitKeizu.showCompareResult(msg.fileChanges, msg.fromHash, msg.toHash);
-      }
+      gitKeizu.showCompareResult(msg.fileChanges, msg.fromHash, msg.toHash);
       break;
     case "copyToClipboard":
       if (msg.success === false) showErrorDialog(t("error.copyToClipboard", msg.type), null, null);

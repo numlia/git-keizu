@@ -22,7 +22,7 @@ import { showPushRemoteDialog } from "../../web/refMenu";
 function createMockGitKeizuView(): GitKeizuViewAPI {
   return {
     setCommitOrdering: vi.fn(),
-    acceptSearchDetails: vi.fn(),
+    acceptCommitDetails: vi.fn(() => true),
     hideCommitDetails: vi.fn(),
     showCommitDetails: vi.fn(),
     showCompareResult: vi.fn(),
@@ -60,12 +60,12 @@ describe("dispatching full history search responses", () => {
     "checks keyed detail success and failure before touching the graph (TC-097, accepted %s)",
     (accepted) => {
       const view = createMockGitKeizuView();
-      vi.mocked(view.acceptSearchDetails).mockReturnValue(accepted);
+      vi.mocked(view.acceptCommitDetails).mockReturnValue(accepted);
       const details = makeCommitDetails();
       for (const commitDetails of [details, null])
         handleMessage({ command: "commitDetails", searchKey: key, commitDetails }, view);
-      expect(view.acceptSearchDetails).toHaveBeenNthCalledWith(1, key, details.hash);
-      expect(view.acceptSearchDetails).toHaveBeenNthCalledWith(2, key, undefined);
+      expect(view.acceptCommitDetails).toHaveBeenNthCalledWith(1, key, details.hash);
+      expect(view.acceptCommitDetails).toHaveBeenNthCalledWith(2, key, undefined);
       expect(view.showCommitDetails).toHaveBeenCalledTimes(Number(accepted));
       expect(view.hideCommitDetails).toHaveBeenCalledTimes(Number(accepted));
     }

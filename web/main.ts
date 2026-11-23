@@ -90,6 +90,7 @@ import { mainWorktreePath } from "./worktreeSuggestion";
 const FLASH_ANIMATION_DURATION_MS = 850;
 const VIEWPORT_BUFFER_ROWS = 8;
 export const MIN_COMMIT_LOAD_COUNT = 1;
+const LOADED_FIND_GENERATION = 0;
 // Full graph reload and repaint timings: docs/testing/history-search-calibration.md.
 export const SEARCH_CONFIRMATION_DEPTH = 20_000;
 
@@ -635,7 +636,15 @@ class GitKeizuView {
       onSearchEnd: (reason) => this.onSearchEnd(reason),
       scrollToCommit: (hash, alwaysCenterCommit) => this.scrollToCommit(hash, alwaysCenterCommit),
       saveState: () => this.saveState(),
-      loadCommitDetails: (elem) => this.loadCommitDetails(elem, this.findWidget.history.owner),
+      loadCommitDetails: (elem) =>
+        this.loadCommitDetails(
+          elem,
+          this.findWidget.history.owner ?? {
+            viewId: viewState.viewId,
+            repo: this.currentRepo,
+            generation: LOADED_FIND_GENERATION
+          }
+        ),
       getCommitId: (hash) =>
         typeof this.commitLookup[hash] === "number" ? this.commitLookup[hash] : null,
       isCdvOpen: (hash) =>
@@ -699,7 +708,11 @@ class GitKeizuView {
           prevState.maxCommits,
           this.config.initialLoadCommits
         );
-        this.expandedCommit = prevState.expandedCommit;
+        const expanded = prevState.expandedCommit;
+        // A saved comparison from an older webview can still contain the base commit's files.
+        this.expandedCommit = expanded?.compareWithHash
+          ? { ...expanded, commitDetails: null, fileTree: null, loading: true }
+          : expanded;
         this.avatars = prevState.avatars;
         this.updateBranches(prevState.gitBranches, prevState.gitBranchHead, true);
         this.loadCommits(
@@ -823,7 +836,7 @@ class GitKeizuView {
     this.dismissSearchConfirmation = undefined;
     if (this.searchMove) this.finishSearchMove();
     this.approvedSearch = undefined;
-    if (this.searchDetails) this.hideCommitDetails();
+    if (this.searchDetails && this.expandedCommit?.loading) this.hideCommitDetails();
     if (reason === "historyChanged" || reason === "unavailable") this.clearSearchReturn();
   }
 
@@ -925,10 +938,7 @@ class GitKeizuView {
         });
       else {
         const row = this.mountRow(details.hash);
-        if (row) this.loadCommitDetails(row);
-        const compareRow = details.compareWithHash && this.findRowByHash(details.compareWithHash);
-        if (compareRow && details.compareWithHash)
-          this.handleCommitRowActivation(details.compareWithHash, compareRow, true);
+        if (row) this.loadCommitDetails(row, undefined, details.compareWithHash);
         this.restoredPendingDetails = this.expandedCommit;
       }
     }
@@ -1524,7 +1534,8 @@ class GitKeizuView {
       moreCommitsAvailable: this.moreCommitsAvailable,
       maxCommits: this.maxCommits,
       showRemoteBranches: this.showRemoteBranches,
-      expandedCommit: this.searchDetails ? null : this.expandedCommit,
+      expandedCommit:
+        this.searchDetails && this.expandedCommit?.loading ? null : this.expandedCommit,
       findWidgetState: this.findWidget.getState(),
       selectedAuthors: this.selectedAuthors,
       scrollTop: this.scrollContainerElem.scrollTop,
@@ -1783,7 +1794,7 @@ class GitKeizuView {
         } else if (this.expandedCommit.loading) {
           elem.classList.add("commitDetailsOpen");
           this.renderCommitDetailsView();
-          this.requestCommitDetails(this.expandedCommit.hash, this.searchDetails?.key);
+          this.requestExpandedDetails(this.searchDetails?.key);
         } else {
           this.loadCommitDetails(elem);
         }
@@ -2616,7 +2627,8 @@ class GitKeizuView {
 
   /* Row Target and Tab Stops */
   private leaveRepository(): void {
-    if (this.findWidget.history.owner) this.findWidget.endHistorySearch("idle");
+    if (this.findWidget.history.owner || this.searchDetails)
+      this.findWidget.endHistorySearch("idle");
     this.clearSearchReturn();
     this.appliedHistory = undefined;
     this.displayedAuthors = null;
@@ -2808,7 +2820,8 @@ class GitKeizuView {
   }
 
   public dispose(): void {
-    if (this.findWidget.history.owner) this.findWidget.endHistorySearch("idle");
+    if (this.findWidget.history.owner || this.searchDetails)
+      this.findWidget.endHistorySearch("idle");
     this.viewportResizeObserver?.disconnect();
     document.removeEventListener("keydown", this.keydownListener);
     this.disposeFocusContext();
@@ -2908,21 +2921,23 @@ class GitKeizuView {
           this.loadCommitDetails(originElem);
         }
       } else if (clickedHash !== this.expandedCommit.hash) {
-        // Different commit → enter/change compare target
+        // Keep the current panel visible until the comparison arrives. Its files belong
+        // to the previous selection and cannot be cached or restored for this pair.
         this.clearCompareTarget();
         this.searchDetails = undefined;
-        this.expandedCommit.compareWithHash = clickedHash;
-        this.expandedCommit.compareWithSrcElem = sourceElem;
+        this.restoredPendingDetails = null;
+        this.expandedCommit = {
+          ...this.expandedCommit,
+          compareWithHash: clickedHash,
+          compareWithSrcElem: sourceElem,
+          commitDetails: null,
+          fileTree: null,
+          loading: true
+        };
         sourceElem.classList.add("compareTarget");
         this.saveState();
         this.refreshRowStates();
-        const order = this.getCommitOrder(this.expandedCommit.hash, clickedHash);
-        sendMessage({
-          command: "compareCommits",
-          repo: this.currentRepo,
-          fromHash: order.from,
-          toHash: order.to
-        });
+        this.requestExpandedDetails();
       }
     } else if (this.expandedCommit !== null && this.expandedCommit.hash === clickedHash) {
       this.hideCommitDetails();
@@ -2931,7 +2946,11 @@ class GitKeizuView {
     }
   }
 
-  private loadCommitDetails(sourceElem: HTMLElement, owner?: GG.SearchOwner | null) {
+  private loadCommitDetails(
+    sourceElem: HTMLElement,
+    owner?: GG.SearchOwner,
+    compareWithHash: string | null = null
+  ) {
     const previousDetails = document.getElementById(COMMIT_DETAILS_ID);
     const focusWasInDetails =
       previousDetails !== null && previousDetails.contains(document.activeElement);
@@ -2941,18 +2960,21 @@ class GitKeizuView {
     const mounted = this.findRowByHash(hash);
     if (mounted === null) return;
     sourceElem = mounted;
+    const compareWithSrcElem =
+      compareWithHash === null ? null : this.findRowByHash(compareWithHash);
     this.expandedCommit = {
       id: parseInt(sourceElem.dataset.id!, 10),
       hash: hash,
       srcElem: sourceElem,
-      compareWithHash: null,
-      compareWithSrcElem: null,
+      compareWithHash,
+      compareWithSrcElem,
       commitDetails: null,
       fileTree: null,
       loading: true
     };
     sourceElem.classList.add("commitDetailsOpen");
-    this.requestCommitDetails(hash, owner);
+    compareWithSrcElem?.classList.add("compareTarget");
+    this.requestExpandedDetails(owner);
     this.saveState();
     this.refreshRowStates();
     this.renderCommitDetailsView();
@@ -2960,7 +2982,19 @@ class GitKeizuView {
     if (focusWasInDetails) sourceElem.focus({ preventScroll: true });
   }
 
-  private requestCommitDetails(hash: string, owner?: GG.SearchOwner | null) {
+  private requestExpandedDetails(owner?: GG.SearchOwner) {
+    if (!this.expandedCommit) return;
+    const { hash, compareWithHash } = this.expandedCommit;
+    if (compareWithHash !== null) {
+      const order = this.getCommitOrder(hash, compareWithHash);
+      sendMessage({
+        command: "compareCommits",
+        repo: this.currentRepo,
+        fromHash: order.from,
+        toHash: order.to
+      });
+      return;
+    }
     const commit = this.commits[this.commitLookup[hash]];
     const searchKey = owner && { ...owner, requestId: ++this.detailRequestId };
     this.searchDetails = searchKey ? { hash, key: searchKey } : undefined;
@@ -2974,24 +3008,21 @@ class GitKeizuView {
     });
   }
 
-  public acceptSearchDetails(key: GG.SearchRequestKey, hash?: string): boolean {
+  public acceptCommitDetails(key: GG.SearchRequestKey | undefined, hash?: string): boolean {
     const request = this.searchDetails;
-    const owner = this.findWidget.history.owner;
-    if (
-      !request ||
-      !owner ||
-      !this.expandedCommit?.loading ||
-      this.expandedCommit.compareWithHash !== null ||
-      request.hash !== this.expandedCommit.hash ||
-      (hash !== undefined && request.hash !== hash) ||
-      key.viewId !== owner.viewId ||
-      key.repo !== owner.repo ||
-      key.generation !== owner.generation ||
-      key.requestId !== request.key.requestId
-    )
-      return false;
-    this.searchDetails = undefined;
-    return true;
+    if (this.isComparing()) return false;
+    if (!key) return !request;
+    return (
+      !!request &&
+      this.expandedCommit?.loading === true &&
+      request.hash === this.expandedCommit.hash &&
+      (hash === undefined || request.hash === hash) &&
+      key.viewId === viewState.viewId &&
+      key.repo === this.currentRepo &&
+      key.generation === (this.findWidget.history.owner?.generation ?? LOADED_FIND_GENERATION) &&
+      key.generation === request.key.generation &&
+      key.requestId === request.key.requestId
+    );
   }
   private renderCommitDetailsView() {
     if (this.expandedCommit === null || this.expandedCommit.srcElem === null) return;
@@ -3490,12 +3521,21 @@ class GitKeizuView {
     e.stopPropagation();
     this.showFileRowContextMenu(e);
   }
-  public showCompareResult(fileChanges: GG.GitFileChange[], fromHash: string, toHash: string) {
-    if (this.expandedCommit === null || this.expandedCommit.compareWithHash === null) return;
+  public showCompareResult(
+    fileChanges: GG.GitFileChange[] | null,
+    fromHash: string,
+    toHash: string
+  ) {
+    if (!this.expandedCommit?.loading || this.expandedCommit.compareWithHash === null) return;
     // fromHash/toHash may be reordered by getCommitOrder, so validate as a set
     const hashes = new Set([fromHash, toHash]);
     if (!hashes.has(this.expandedCommit.hash) || !hashes.has(this.expandedCommit.compareWithHash))
       return;
+    if (fileChanges === null) {
+      this.hideCommitDetails();
+      showErrorDialog(t("error.compareCommits"), null, null);
+      return;
+    }
     const syntheticDetails: GG.GitCommitDetails = {
       hash: this.expandedCommit.hash,
       parents: [],
