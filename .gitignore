@@ -19,3 +19,11 @@ notes/*
 .mcp.json
 .tmp/
 .agents/
+
+# Share project skills and the Claude Code symlink.
+!/.agents/
+/.agents/*
+!/.agents/skills/
+!/.claude/
+/.claude/*
+!/.claude/skills
