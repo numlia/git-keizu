@@ -19,3 +19,14 @@ notes/*
 .mcp.json
 .tmp/
 .agents/
+
+# Share project skills and their Claude Code entry points.
+!/.agents/
+/.agents/*
+!/.agents/skills/
+!/.claude/
+/.claude/**
+!/.claude/skills/
+!/.claude/skills/release/
+!/.claude/skills/update-release-docs/
+!/.claude/skills/*/SKILL.md
