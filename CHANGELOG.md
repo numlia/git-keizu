@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-11-23
+
+### Changed
+
+- **Browsing long histories**: As you scroll, the graph draws the visible commit rows and their connecting lines together, including lines whose endpoints are both offscreen. Find, keyboard navigation, and path highlighting still work across all loaded commits.
+- **Loading older commits**: Scrolling to the bottom with automatic loading enabled or choosing **Load More Commits** appends the next page in Git order and keeps your reading position. When the history and filters still match, Git Keizu fetches just the additional commits. If a branch moves or a shallow clone gains more history, the graph reloads the requested range. The button disappears when you reach the end, even if the last page is full.
+
+### Fixed
+
+- **Missing commits after an unusual subject**: A carriage return inside a commit subject could cut off the rest of the history. The graph now shows the complete subject and the commits that follow it.
+- **Garbled history text**: Commit subjects and author names, including Japanese text, stay readable when Git uses a different log output encoding such as EUC-JP. This also covers stash messages and commit subjects from detached worktrees.
+- **Author filters**: Names such as `dependabot[bot]` now match literally regardless of Git's pattern settings. When a Git mailmap changes, the author list and filtered history pick up the corrected names. A background refresh also preserves the boxes you have checked or unchecked in the open Authors menu.
+- **Refresh and reopen**: If an automatic refresh overtakes a manual one, the commit table reappears even when the history is unchanged. Reopening the graph keeps the current branch filter and history if a reply from the previous view arrives late. Changes to a commit's displayed date, subject, or author also survive loading the next page.
+- **Scroll position and keyboard focus**: Closing Branch Cleanup fills the newly visible rows without moving the graph. When the focused row has scrolled out of view, an unassigned key leaves your place alone. Menu shortcuts still reach the focused commit, branch label, or **+N** list.
+
 ## [1.8.0] - 2026-10-28
 
 This release lets you choose where new worktrees go with `git-keizu.worktreePathTemplate` and adds Create Worktree to Branch Cleanup. It also fixes Highlight File History on Git 2.56, where a file's commits from before a rename could be missing.
@@ -720,7 +735,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/numlia/git-keizu/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/numlia/git-keizu/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/numlia/git-keizu/compare/v1.7.0...v1.7.1
 [1.7.0]: https://github.com/numlia/git-keizu/compare/v1.6.0...v1.7.0
