@@ -13,7 +13,7 @@ vi.mock("../../web/refMenu", () => ({
   showPushRemoteDialog: vi.fn()
 }));
 
-import type { GitCommitDetails, ResponseMessage } from "../../src/types";
+import type { GitCommitDetails, ResponseLoadCommits, ResponseMessage } from "../../src/types";
 import { showErrorDialog } from "../../web/dialogs";
 import { generateGitFileTree } from "../../web/fileTree";
 import { type GitKeizuViewAPI, handleMessage } from "../../web/messageHandler";
@@ -74,6 +74,30 @@ describe("dispatching history pages", () => {
     expect(vi.mocked(view.appendCommits).mock.calls).toEqual([[response]]);
     expect(view.receiveCommits).not.toHaveBeenCalled();
   });
+
+  // @see docs/testing/perspectives/web/messageHandler-test/01-basic-responses-01.md (TC-093)
+  it.each([
+    {},
+    { history: { kind: "verified", hashes: ["a"], requestedCount: 300, snapshot: "snapshot" } },
+    { history: { kind: "unavailable" } },
+    { history: { kind: "historyChanged" } }
+  ] satisfies Pick<ResponseLoadCommits, "history">[])(
+    "delivers the full history verification metadata (TC-093)",
+    (fields) => {
+      const view = createMockGitKeizuView();
+      const response = {
+        command: "loadCommits" as const,
+        requestId: "normal",
+        head: null,
+        commits: [],
+        moreCommitsAvailable: false,
+        hard: false,
+        ...fields
+      };
+      handleMessage(response, view);
+      expect(view.receiveCommits).toHaveBeenCalledWith(response);
+    }
+  );
 });
 
 // S13: pull レスポンス処理の維持

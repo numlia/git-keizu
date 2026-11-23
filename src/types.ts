@@ -478,10 +478,17 @@ export interface RequestLoadCommits {
   authors: string[];
   commitOrdering: CommitOrdering;
 }
+
+export type SearchHistoryInfo =
+  | { kind: "verified"; snapshot: string; hashes: string[]; requestedCount: number }
+  | { kind: "historyChanged" }
+  | { kind: "unavailable" };
+
 export interface ResponseLoadCommits {
   command: "loadCommits";
   requestId?: string;
   pageToken?: number;
+  history?: SearchHistoryInfo;
   commits: GitCommitNode[];
   head: string | null;
   moreCommitsAvailable: boolean;
@@ -492,6 +499,7 @@ export interface ResponseLoadCommits {
 
 export interface ResponseAppendCommits {
   command: "appendCommits";
+  requestId?: string;
   repo: string;
   from: number;
   baseCount: number;

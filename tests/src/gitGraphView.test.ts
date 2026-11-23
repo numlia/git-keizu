@@ -2467,6 +2467,23 @@ describe("GitKeizuView loadCommits authorFilter (S10)", () => {
       expect(mocks.getCommits).not.toHaveBeenCalled();
       expect(mocks.postMessage.mock.calls.map(([response]) => response)).toEqual([page]);
     });
+
+    // @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md (TC-426)
+    it.each([
+      { kind: "verified", hashes: [row.hash], requestedCount: 400, snapshot: "snapshot" },
+      { kind: "historyChanged" },
+      { kind: "unavailable" }
+    ])("relays the $kind ordinary history to the issuing request (TC-426)", async (history) => {
+      const result = { commits: [row], head: row.hash, moreCommitsAvailable: false, history };
+      mocks.getCommits.mockResolvedValue(result);
+      await mocks.messageHandler.current!(request);
+      expect(mocks.postMessage).toHaveBeenCalledWith({
+        command: "loadCommits",
+        requestId: request.requestId,
+        hard: true,
+        ...result
+      });
+    });
   });
 
   it("passes authors array to dataSource.getCommits when specified (TC-029)", async () => {

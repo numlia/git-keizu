@@ -19,9 +19,11 @@ import type {
   GitFileChangeType,
   GitRef,
   RequestCommitDetails,
-  RequestMessage
+  RequestMessage,
+  SearchHistoryInfo
 } from "../../src/types";
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
+import type { GitKeizuViewAPI } from "../../web/messageHandler";
 import { dispatchHostMessage as dispatchMessage } from "./setup";
 
 /* ------------------------------------------------------------------ */
@@ -8243,6 +8245,9 @@ describe("highlightFileHistory icon wiring and click handler (S54)", () => {
 
 // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
 describe("installing an ordinary history page", () => {
+  type SearchableGraph = GitKeizuViewAPI & {
+    getAppliedSearchHistory(): { info: SearchHistoryInfo; change: string; requestedCount: number };
+  };
   const initialToken = 41;
   const otherRepo = "/other";
   const page = {
@@ -8371,6 +8376,121 @@ describe("installing an ordinary history page", () => {
       expect(tall).toBeGreaterThan(short);
       expect(requests()).toEqual([]);
     });
+  });
+
+  // @see docs/testing/perspectives/web/main-test/14-history-search-01.md (TC-812–816)
+  it("updates verified positions only for the accepted request, including unchanged rows (TC-812, TC-813, TC-815, TC-816)", async () => {
+    const messages = vi.spyOn(await import("../../web/messageHandler"), "handleMessage");
+    const reload = (fields: Record<string, unknown>) => {
+      dispatchMessage({ command: "refresh" });
+      dispatchMessage({ ...branches, hard: false });
+      const request = requests().at(-1)!;
+      dispatchMessage({ ...fullResponse, hard: false, requestId: request.requestId, ...fields });
+    };
+    const hashes = MOCK_COMMITS.map((row) => row.hash);
+    const history = { kind: "verified", snapshot: "first", hashes, requestedCount: hashes.length };
+    reload({ history });
+    const graph = messages.mock.lastCall![1] as SearchableGraph;
+    try {
+      expect(graph.getAppliedSearchHistory()).toMatchObject({
+        info: history,
+        change: "compatible"
+      });
+      for (const fields of [
+        { history: { ...history, snapshot: "second" } },
+        { history: { ...history, snapshot: "second", hashes: [...hashes].reverse() } },
+        { history: { kind: "historyChanged" } }
+      ]) {
+        reload(fields);
+        expect(graph.getAppliedSearchHistory()).toMatchObject({
+          info: fields.history,
+          change: "historyChanged"
+        });
+      }
+      for (const fields of [{ history: { kind: "unavailable" } }, {}]) {
+        reload(fields);
+        expect(graph.getAppliedSearchHistory()).toMatchObject({
+          info: { kind: "unavailable" },
+          change: "unavailable"
+        });
+      }
+      reload({ history });
+      document.getElementById("loadMoreCommitsBtn")!.click();
+      const issued = requests().at(-1)!;
+      expect(issued.maxCommits).toBeGreaterThan(hashes.length);
+      for (const stale of [
+        { ...page, requestId: firstId },
+        { ...page, from: -1 },
+        { ...page, repo: otherRepo },
+        { ...page, baseCount: 0 },
+        { ...fullResponse, requestId: firstId, history: { kind: "unavailable" } }
+      ]) {
+        dispatchMessage(stale);
+        expect(graph.getAppliedSearchHistory()).toMatchObject({
+          requestedCount: hashes.length,
+          info: history
+        });
+      }
+      dispatchMessage({ ...page, requestId: issued.requestId });
+      const accepted = graph.getAppliedSearchHistory();
+      expect(accepted.info).toEqual({
+        ...history,
+        hashes: [...hashes, ...page.commits.map((row) => row.hash)],
+        requestedCount: issued.maxCommits
+      });
+      expect(accepted.requestedCount).toBe(issued.maxCommits);
+      dispatchMessage({ ...page, requestId: issued.requestId });
+      expect(graph.getAppliedSearchHistory()).toEqual(accepted);
+    } finally {
+      messages.mockRestore();
+    }
+  });
+
+  it("continues through a pinned row moving behind new ordinary positions (TC-814)", async () => {
+    const messages = vi.spyOn(await import("../../web/messageHandler"), "handleMessage");
+    const [a, b] = MOCK_COMMITS;
+    const pin = { ...a, hash: "pin" };
+    const c = { ...a, hash: "c" };
+    try {
+      dispatchMessage({ command: "refresh" });
+      dispatchMessage({ ...branches, hard: false });
+      const request = requests().at(-1)!;
+      const history = {
+        kind: "verified",
+        snapshot: "fixed",
+        hashes: [a.hash, b.hash],
+        requestedCount: request.maxCommits
+      };
+      dispatchMessage({
+        ...fullResponse,
+        requestId: request.requestId,
+        commits: [a, b, pin],
+        pageToken: undefined,
+        history
+      });
+      document.getElementById("loadMoreCommitsBtn")!.click();
+      const extension = requests().at(-1)!;
+      const extended = {
+        ...history,
+        requestedCount: extension.maxCommits,
+        hashes: [a.hash, b.hash, c.hash]
+      };
+      dispatchMessage({
+        ...fullResponse,
+        requestId: extension.requestId,
+        commits: [a, b, c, pin],
+        pageToken: undefined,
+        history: extended
+      });
+      const graph = messages.mock.lastCall![1] as SearchableGraph;
+      expect(graph.getAppliedSearchHistory()).toMatchObject({
+        change: "compatible",
+        info: extended
+      });
+      expect(savedCommits().map((row) => row.hash)).toEqual([a.hash, b.hash, c.hash, pin.hash]);
+    } finally {
+      messages.mockRestore();
+    }
   });
 
   // Case: TC-792

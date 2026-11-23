@@ -190,6 +190,21 @@ type PendingCommitLoad = {
   callbacks: ((changes: boolean) => void)[];
 };
 
+type HistoryQuery = Pick<
+  GG.RequestLoadCommits,
+  "repo" | "branches" | "authors" | "showRemoteBranches" | "commitOrdering"
+>;
+
+function sameHistoryQuery(a: HistoryQuery, b: HistoryQuery): boolean {
+  return (
+    a.repo === b.repo &&
+    a.showRemoteBranches === b.showRemoteBranches &&
+    a.commitOrdering === b.commitOrdering &&
+    arraysEqual(a.branches, b.branches, (left, right) => left === right) &&
+    arraysEqual(a.authors, b.authors, (left, right) => left === right)
+  );
+}
+
 const EDITABLE_TAG_NAMES = ["INPUT", "TEXTAREA", "SELECT"];
 
 const CONTENT_EDITABLE_ATTRIBUTE = "contenteditable";
@@ -422,8 +437,15 @@ class GitKeizuView {
   private activeHistoryRequest?: {
     id: string;
     generation: number;
-    repo: string;
+    query: HistoryQuery;
+    requestedCount: number;
     pageToken?: number;
+  };
+  private appliedHistory?: {
+    query: HistoryQuery;
+    requestedCount: number;
+    info: GG.SearchHistoryInfo;
+    change: "compatible" | "historyChanged" | "unavailable";
   };
   private pageToken?: number;
   private historyAuthors?: string[];
@@ -804,12 +826,27 @@ class GitKeizuView {
 
   public receiveCommits(response: GG.ResponseLoadCommits) {
     const active = this.activeHistoryRequest;
-    if (response.requestId !== undefined) {
-      if (!active || response.requestId !== active.id) return;
-      if (active.generation !== this.historyGeneration || active.repo !== this.currentRepo) {
-        this.triggerLoadCommitsCallback(false);
-        return;
-      }
+    if (response.requestId !== undefined && response.requestId !== active?.id) return;
+    if (
+      active &&
+      response.requestId !== undefined &&
+      (active.generation !== this.historyGeneration ||
+        !sameHistoryQuery(active.query, this.getHistoryQuery()))
+    ) {
+      this.triggerLoadCommitsCallback(false);
+      return;
+    }
+    if (active && response.requestId === active.id) {
+      const info = response.history;
+      this.applyHistory(
+        active.query,
+        active.requestedCount,
+        info && (info.kind !== "verified" || info.requestedCount === active.requestedCount)
+          ? info
+          : { kind: "unavailable" }
+      );
+    } else {
+      this.appliedHistory = undefined;
     }
     this.pageToken = response.pageToken;
     this.historyAuthors = response.authors;
@@ -825,12 +862,34 @@ class GitKeizuView {
 
   public appendCommits(response: GG.ResponseAppendCommits) {
     const active = this.activeHistoryRequest;
-    if (!active || response.repo !== active.repo || response.from !== active.pageToken) return;
-    if (active.generation !== this.historyGeneration || response.repo !== this.currentRepo) {
+    if (!active || response.repo !== active.query.repo || response.from !== active.pageToken)
+      return;
+    if (response.requestId !== undefined && response.requestId !== active.id) return;
+    if (
+      active.generation !== this.historyGeneration ||
+      !sameHistoryQuery(active.query, this.getHistoryQuery())
+    ) {
       this.triggerLoadCommitsCallback(false);
       return;
     }
     if (response.baseCount !== this.commits.length || response.from !== this.pageToken) return;
+    const previous = this.appliedHistory;
+    if (previous && !sameHistoryQuery(active.query, previous.query)) return;
+    if (previous?.info.kind === "verified") {
+      if (response.baseCount !== previous.info.hashes.length) return;
+      this.appliedHistory = {
+        query: active.query,
+        requestedCount: active.requestedCount,
+        change: "compatible",
+        info: {
+          ...previous.info,
+          requestedCount: active.requestedCount,
+          hashes: previous.info.hashes.concat(response.commits.map((row) => row.hash))
+        }
+      };
+    } else {
+      this.applyHistory(active.query, active.requestedCount, { kind: "unavailable" });
+    }
     this.pageToken = response.pageToken;
     this.loadCommits(
       this.commits.concat(response.commits),
@@ -841,6 +900,25 @@ class GitKeizuView {
       this.worktrees,
       true
     );
+  }
+
+  public getAppliedSearchHistory() {
+    const applied = this.appliedHistory;
+    return applied && sameHistoryQuery(applied.query, this.getHistoryQuery()) ? applied : undefined;
+  }
+
+  private applyHistory(query: HistoryQuery, requestedCount: number, info: GG.SearchHistoryInfo) {
+    const previous = this.getAppliedSearchHistory();
+    let change: NonNullable<typeof previous>["change"] = "compatible";
+    if (info.kind !== "verified") change = info.kind;
+    else if (
+      previous?.info.kind === "verified" &&
+      (previous.info.snapshot !== info.snapshot ||
+        !previous.info.hashes.every((hash, index) => info.hashes[index] === hash))
+    ) {
+      change = "historyChanged";
+    }
+    this.appliedHistory = { query, requestedCount, info, change };
   }
 
   private loadCommits(
@@ -1059,6 +1137,7 @@ class GitKeizuView {
   private invalidateHistory() {
     this.historyGeneration++;
     this.pageToken = undefined;
+    this.appliedHistory = this.getAppliedSearchHistory();
   }
 
   private requestMoreCommits(manual: boolean) {
@@ -1092,24 +1171,36 @@ class GitKeizuView {
     this.loadCommitsCallback = loadedCallback;
     const requestId = crypto.randomUUID();
     const pageToken = append ? this.pageToken : undefined;
+    const query = this.getHistoryQuery();
+    const requestedCount = normalizeCommitLoadCount(
+      this.maxCommits,
+      this.config.initialLoadCommits
+    );
     this.activeHistoryRequest = {
       id: requestId,
       generation: this.historyGeneration,
-      repo: this.currentRepo,
+      query,
+      requestedCount,
       pageToken
     };
     sendMessage({
       command: "loadCommits",
       requestId,
       ...(pageToken === undefined ? {} : { pageToken }),
-      repo: this.currentRepo!,
-      branches: this.selectedBranches,
-      maxCommits: normalizeCommitLoadCount(this.maxCommits, this.config.initialLoadCommits),
-      showRemoteBranches: this.showRemoteBranches,
-      hard: forceRender,
-      authors: this.selectedAuthors,
-      commitOrdering: this.getEffectiveCommitOrdering()
+      ...query,
+      maxCommits: requestedCount,
+      hard: forceRender
     });
+  }
+
+  private getHistoryQuery(): HistoryQuery {
+    return {
+      repo: this.currentRepo,
+      branches: this.selectedBranches,
+      authors: this.selectedAuthors,
+      showRemoteBranches: this.showRemoteBranches,
+      commitOrdering: this.getEffectiveCommitOrdering()
+    };
   }
   private getEffectiveCommitOrdering(): GG.CommitOrdering {
     const repoOrdering = this.gitRepos[this.currentRepo]?.commitOrdering;
@@ -2312,6 +2403,7 @@ class GitKeizuView {
 
   /* Row Target and Tab Stops */
   private leaveRepository(): void {
+    this.appliedHistory = undefined;
     this.displayedAuthors = null;
     if (this.activeBranchRequest !== null) {
       this.activeBranchRequest = { ...this.activeBranchRequest, onLoaded: null };

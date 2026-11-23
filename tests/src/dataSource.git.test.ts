@@ -125,6 +125,153 @@ describe("continuing ordinary Git history", () => {
     return ds.getCommits(fixture.repo, [], count, true, authors, order);
   }
 
+  function addLinearCommits(count: number) {
+    const base = git(fixture.repo, ["rev-parse", "HEAD"]);
+    const commits = Array.from({ length: count }, (_, i) => {
+      const message = `row ${i}`;
+      return [
+        `commit refs/heads/${MAIN_BRANCH}`,
+        "committer Test User <test@example.com> now",
+        `data ${message.length}`,
+        message,
+        ...(i === 0 ? [`from ${base}`] : [])
+      ].join("\n");
+    });
+    cp.execFileSync("git", ["fast-import", "--quiet", "--date-format=now"], {
+      cwd: fixture.repo,
+      input: `${commits.join("\n")}\n`
+    });
+  }
+
+  // @see docs/testing/perspectives/src/dataSource-test/01-history-diff-02.md (S56)
+  it("keeps the ordinary 300 positions while displaying pins, stashes and the working tree (TC-390, TC-391)", async () => {
+    const { repo, root } = fixture;
+    addLinearCommits(300);
+    const pinned = path.join(root, "pinned");
+    git(repo, ["worktree", "add", "--detach", pinned, "HEAD"]);
+    git(pinned, ["commit", "--allow-empty", "-m", "pin"]);
+    for (const message of ["one", "two"]) {
+      await fs.writeFile(path.join(repo, "work"), message);
+      git(repo, ["stash", "push", "--include-untracked", "-m", message]);
+    }
+    await fs.writeFile(path.join(repo, "work"), "uncommitted");
+    const config = getConfig();
+    vi.mocked(getConfig).mockReturnValue({ ...config, showUncommittedChanges: () => true });
+    try {
+      const hashes = git(repo, ["log", "--date-order", "--branches", "--format=%H"]).split("\n");
+      for (const count of [300, 400]) {
+        const result = await full(count);
+        expect(result.history).toEqual({
+          kind: "verified",
+          snapshot: expect.any(String),
+          hashes: hashes.slice(0, count),
+          requestedCount: count
+        });
+        expect(result.commits.map((row) => row.hash)).toContain(git(pinned, ["rev-parse", "HEAD"]));
+        expect(result.commits.filter((row) => row.stash !== null)).toHaveLength(2);
+        expect(result.commits).toHaveLength(Math.min(hashes.length, count) + 4);
+        expect(result.moreCommitsAvailable).toBe(count < hashes.length);
+        expect(result.pageToken).toBeUndefined();
+      }
+    } finally {
+      vi.mocked(getConfig).mockReturnValue(config);
+    }
+  });
+
+  function interceptGit(intercept: (args: string[]) => cp.ChildProcess | void) {
+    const spawn = actualSpawnRef.current as typeof cp.spawn;
+    vi.mocked(cp.spawn).mockImplementation(
+      ((command: string, args: string[], options: cp.SpawnOptions) =>
+        intercept(args) ?? spawn(command, args, options)) as typeof cp.spawn
+    );
+  }
+
+  it("distinguishes a visible ref change around a tokenless load from an unreadable input (TC-392, TC-393)", async () => {
+    const { repo } = fixture;
+    const original = await full(100);
+    let reads = 0;
+    interceptGit((args) => {
+      if (args[0] === "show-ref" && ++reads === 2) git(repo, ["tag", "appeared"]);
+    });
+    try {
+      const changed = await full(100);
+      expect(changed.commits).toEqual(original.commits);
+      expect(changed.history).toEqual({ kind: "historyChanged" });
+      expect(reads).toBe(2);
+      for (const phase of ["before", "after", "log"]) {
+        reads = 0;
+        interceptGit((args) => {
+          if (
+            (args[0] === "show-ref" &&
+              ++reads === (phase === "before" ? 1 : 2) &&
+              phase !== "log") ||
+            (phase === "log" && args[0] === "log")
+          ) {
+            return createGitProcess({ stderr: "unreadable", exitCode: 128 });
+          }
+        });
+        const failure = await full(100);
+        expect(failure.history).toEqual({ kind: "unavailable" });
+        expect(failure.commits.map((row) => row.hash)).toEqual(
+          phase === "log" ? [] : original.commits.map((row) => row.hash)
+        );
+      }
+    } finally {
+      vi.mocked(cp.spawn).mockImplementation(actualSpawnRef.current as typeof cp.spawn);
+    }
+  });
+
+  it("normalizes ref order and observes independently changed HEADs, names, kinds and targets (TC-394)", async () => {
+    const { repo } = fixture;
+    git(repo, ["tag", "named"]);
+    git(repo, ["update-ref", "refs/remotes/origin/topic", "HEAD~2"]);
+    const initial = await full(2);
+    const listed = git(repo, ["show-ref", "-d", "--head"]).split("\n");
+    const fullRead = async (lines: string[]) => {
+      interceptGit((args) => {
+        if (args[0] === "show-ref") return createGitProcess({ stdout: `${lines.join("\n")}\n` });
+      });
+      return (await full(2)).history;
+    };
+    try {
+      expect(initial.history.kind).toBe("verified");
+      expect(await fullRead([...listed].reverse())).toEqual(initial.history);
+      const target = git(repo, ["rev-parse", "HEAD~3"]);
+      for (const modified of [
+        listed.map((line) => (line.endsWith(" HEAD") ? `${target} HEAD` : line)),
+        listed.map((line) => line.replace("refs/tags/named", "refs/tags/renamed")),
+        listed.map((line) => line.replace("refs/tags/named", "refs/heads/named")),
+        listed.map((line) =>
+          line.endsWith(" refs/tags/named") ? `${target} refs/tags/named` : line
+        )
+      ]) {
+        const info = await fullRead(modified);
+        expect(info.kind).toBe("verified");
+        expect(info).not.toEqual(initial.history);
+      }
+    } finally {
+      vi.mocked(cp.spawn).mockImplementation(actualSpawnRef.current as typeof cp.spawn);
+    }
+  });
+
+  it("ignores only a successfully enumerated hidden remote for search (TC-393, TC-394)", async () => {
+    const { repo } = fixture;
+    const hidden = () => ds.getCommits(repo, [], 2, false, [], "date");
+    const remote = "refs/remotes/origin/topic";
+    git(repo, ["update-ref", remote, "HEAD~2"]);
+    const first = await hidden();
+    expect(first.history.kind).toBe("verified");
+    git(repo, ["update-ref", remote, "HEAD~3"]);
+    expect(
+      await ds.getNextHistoryPage({ ...query(3, first.pageToken), showRemoteBranches: false })
+    ).toBeUndefined();
+    expect((await hidden()).history).toEqual(first.history);
+    await fs.writeFile(path.join(repo, ".git", remote), `${"f".repeat(40)}\n`);
+    const broken = await hidden();
+    expect(broken.history).toEqual({ kind: "unavailable" });
+    expect(broken.commits.map((row) => row.hash)).toEqual(first.commits.map((row) => row.hash));
+  });
+
   // Case: TC-381
   it("preserves single and consecutive carriage returns and reads the following records (TC-381)", async () => {
     for (const subject of ["one\rreturn", "two\r\rreturns", "newest"]) {
@@ -333,21 +480,7 @@ describe("continuing ordinary Git history", () => {
 
   // Case: TC-383
   it("resumes a linear walk from its saved parent and sends only the next 100 commits (TC-383)", async () => {
-    const base = git(fixture.repo, ["rev-parse", "HEAD"]);
-    const commits = Array.from({ length: 100 }, (_, i) => {
-      const message = `row ${i}`;
-      return [
-        `commit refs/heads/${MAIN_BRANCH}`,
-        "committer Test User <test@example.com> now",
-        `data ${message.length}`,
-        message,
-        ...(i === 0 ? [`from ${base}`] : [])
-      ].join("\n");
-    });
-    cp.execFileSync("git", ["fast-import", "--quiet", "--date-format=now"], {
-      cwd: fixture.repo,
-      input: `${commits.join("\n")}\n`
-    });
+    addLinearCommits(100);
     const refs = git(fixture.repo, ["log", "--date-order", "--format=%H"]).split("\n");
     const first = await full(3);
     vi.mocked(cp.spawn).mockClear();
