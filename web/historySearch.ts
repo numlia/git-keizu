@@ -45,7 +45,8 @@ export class HistorySearch {
   constructor(
     private readonly send: (message: Request) => void,
     private readonly match: (row: GG.GitCommitNode) => CommitMatch,
-    private readonly isLoaded: (hash: string) => boolean
+    private readonly isLoaded: (hash: string) => boolean,
+    private readonly onEnd?: (reason: SearchEnd) => void
   ) {}
 
   public get unreadCount() {
@@ -109,6 +110,7 @@ export class HistorySearch {
     this.added = 0;
     this.errorMessage = "";
     this.status = status;
+    this.onEnd?.(status);
   }
 
   public receive(

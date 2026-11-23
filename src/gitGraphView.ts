@@ -266,8 +266,25 @@ export class GitKeizuView {
 
     vscode.workspace.onDidChangeConfiguration(
       (event) => {
+        if (
+          this.panel.visible &&
+          (event.affectsConfiguration("git-keizu.dateType") ||
+            event.affectsConfiguration("git-keizu.dateFormat"))
+        ) {
+          void this.update();
+          return;
+        }
         if (event.affectsConfiguration(CONFIG_SECTION)) {
           this.configChangedSinceRender = true;
+        }
+        if (
+          this.panel.visible &&
+          event.affectsConfiguration("git-keizu.repository.commits.order")
+        ) {
+          this.sendMessage({
+            command: "setCommitOrdering",
+            ordering: getConfig().commitOrdering()
+          });
         }
       },
       null,
@@ -377,6 +394,7 @@ export class GitKeizuView {
             case "commitDetails":
               this.sendMessage({
                 command: "commitDetails",
+                ...(msg.searchKey ? { searchKey: msg.searchKey } : {}),
                 commitDetails:
                   msg.commitHash === UNCOMMITTED_CHANGES_HASH
                     ? await this.dataSource.getUncommittedDetails(msg.repo)

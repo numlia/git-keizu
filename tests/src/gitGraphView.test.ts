@@ -5411,6 +5411,41 @@ describe("GitKeizuView retainContextWhenHidden (S35)", () => {
       return { finish, promise };
     }
 
+    it.each(["dateType", "dateFormat"])(
+      "rebuilds the visible graph when %s changes (TC-819)",
+      async (setting) => {
+        const panel = await createPanel();
+        const previous = docId(panel);
+        changeConfiguration(`git-keizu.${setting}`);
+        await vi.waitFor(() => expect(docId(panel)).not.toBe(previous));
+      }
+    );
+
+    it("echoes the search key for both detail outcomes and preserves ordinary responses (TC-430)", async () => {
+      const details = { hash: "target", fileChanges: [] };
+      const source = {
+        commitDetails: vi.fn().mockResolvedValueOnce(details).mockResolvedValue(null)
+      };
+      const panel = await createPanel(source as unknown as DataSource);
+      const searchKey = { viewId: docId(panel), repo: TEST_REPO, generation: 2, requestId: 8 };
+      const request = {
+        command: "commitDetails",
+        commitHash: "target",
+        repo: TEST_REPO,
+        hasParents: true,
+        isStash: false
+      };
+      const send = mocks.messageHandler.current!;
+      await send({ ...request, searchKey });
+      await send({ ...request, searchKey });
+      await send(request);
+      expect(sentMessages("commitDetails")).toEqual([
+        { command: "commitDetails", searchKey, commitDetails: details },
+        { command: "commitDetails", searchKey, commitDetails: null },
+        { command: "commitDetails", commitDetails: null }
+      ]);
+    });
+
     // Case: TC-423, TC-427, TC-428, TC-429
     it("keeps retained identity and rejects old reads, starts and cancels after HTML replacement and disposal", async () => {
       const oldRead = deferredBatch();

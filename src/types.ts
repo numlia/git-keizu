@@ -322,6 +322,7 @@ export interface ResponseCherrypickCommit {
 
 export interface RequestCommitDetails {
   command: "commitDetails";
+  searchKey?: SearchRequestKey;
   repo: string;
   commitHash: string;
   hasParents: boolean;
@@ -329,6 +330,7 @@ export interface RequestCommitDetails {
 }
 export interface ResponseCommitDetails {
   command: "commitDetails";
+  searchKey?: SearchRequestKey;
   commitDetails: GitCommitDetails | null;
 }
 
@@ -620,6 +622,11 @@ export interface ResponseSelectRepo {
 export interface ResponseSetShowRecentActions {
   command: "setShowRecentActions";
   showRecentActions: boolean;
+}
+
+export interface ResponseSetCommitOrdering {
+  command: "setCommitOrdering";
+  ordering: CommitOrdering;
 }
 
 export interface ResponseSetWorktreePath {
@@ -974,6 +981,7 @@ export type ResponseMessage =
   | ResponseRefresh
   | ResponseRemoveWorktree
   | ResponseSelectRepo
+  | ResponseSetCommitOrdering
   | ResponseSetShowRecentActions
   | ResponseSetWorktreePath
   | ResponseRenameBranch

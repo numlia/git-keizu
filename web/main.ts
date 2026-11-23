@@ -8,7 +8,13 @@ import {
   showContextMenu
 } from "./contextMenu";
 import { getCommitDate } from "./dates";
-import { hideDialog, isDialogActive, isErrorDialogActive, showErrorDialog } from "./dialogs";
+import {
+  hideDialog,
+  isDialogActive,
+  isErrorDialogActive,
+  showConfirmationDialog,
+  showErrorDialog
+} from "./dialogs";
 import { Dropdown } from "./dropdown";
 import {
   CLASS_FILE_HISTORY_CURRENT,
@@ -34,6 +40,7 @@ import {
 import { FindWidget } from "./findWidget";
 import { Graph } from "./graph";
 import { HistoryColumnSizing } from "./historyColumnSizing";
+import type { SearchEnd, UnreadMatch } from "./historySearch";
 import { t } from "./i18n";
 import {
   beginFocusUpdate,
@@ -83,6 +90,7 @@ import { mainWorktreePath } from "./worktreeSuggestion";
 const FLASH_ANIMATION_DURATION_MS = 850;
 const VIEWPORT_BUFFER_ROWS = 8;
 export const MIN_COMMIT_LOAD_COUNT = 1;
+export const SEARCH_CONFIRMATION_DEPTH = 1000;
 
 export function normalizeCommitLoadCount(value: number, defaultValue: number): number {
   const count = Number.isFinite(value) ? value : defaultValue;
@@ -188,6 +196,12 @@ type PendingCommitLoad = {
   forceRender: boolean;
   append: boolean;
   callbacks: ((changes: boolean) => void)[];
+};
+
+type SearchMove = {
+  match: UnreadMatch;
+  owner: GG.SearchOwner;
+  phase: "ready" | "confirming" | "loading";
 };
 
 type HistoryQuery = Pick<
@@ -407,6 +421,17 @@ class GitKeizuView {
   private descriptionMinimumWidth: number | null = null;
   private displayFixedColumns: HTMLElement[] = [];
   private findWidget: FindWidget;
+  private searchMove?: SearchMove;
+  private dismissSearchConfirmation?: () => void;
+  private approvedSearch?: GG.SearchOwner;
+  private searchReturn?: {
+    scrollTop: number;
+    details: Pick<ExpandedCommit, "hash" | "compareWithHash" | "commitDetails" | "fileTree"> | null;
+  };
+  private restoredSearchScroll?: number;
+  private restoredPendingDetails: ExpandedCommit | null = null;
+  private searchDetails?: { hash: string; key: GG.SearchRequestKey };
+  private detailRequestId = 0;
   private fileHistory: FileHistoryController;
   private pathHighlight: PathHighlightController;
   private config: Config;
@@ -440,6 +465,7 @@ class GitKeizuView {
     query: HistoryQuery;
     requestedCount: number;
     pageToken?: number;
+    searchMove?: SearchMove;
   };
   private appliedHistory?: {
     query: HistoryQuery;
@@ -597,9 +623,18 @@ class GitKeizuView {
         };
       },
       getCommits: () => this.commits,
+      navigateToUnread: (match, owner) => {
+        if (this.searchMove || owner !== this.findWidget.history.owner) return;
+        this.searchMove = { match, owner, phase: "ready" };
+        this.findWidget.setNavigationPending(true);
+        this.trySearchMove();
+      },
+      returnFromSearch: () => this.returnFromSearch(),
+      onClose: () => this.clearSearchReturn(),
+      onSearchEnd: (reason) => this.onSearchEnd(reason),
       scrollToCommit: (hash, alwaysCenterCommit) => this.scrollToCommit(hash, alwaysCenterCommit),
       saveState: () => this.saveState(),
-      loadCommitDetails: (elem) => this.loadCommitDetails(elem),
+      loadCommitDetails: (elem) => this.loadCommitDetails(elem, this.findWidget.history.owner),
       getCommitId: (hash) =>
         typeof this.commitLookup[hash] === "number" ? this.commitLookup[hash] : null,
       isCdvOpen: (hash) =>
@@ -777,6 +812,131 @@ class GitKeizuView {
     this.findWidget.show(true);
   }
 
+  private finishSearchMove() {
+    this.searchMove = undefined;
+    this.findWidget.setNavigationPending(false);
+  }
+
+  private onSearchEnd(reason: SearchEnd) {
+    this.dismissSearchConfirmation?.();
+    this.dismissSearchConfirmation = undefined;
+    if (this.searchMove) this.finishSearchMove();
+    this.approvedSearch = undefined;
+    if (this.searchDetails) this.hideCommitDetails();
+    if (reason === "historyChanged" || reason === "unavailable") this.clearSearchReturn();
+  }
+
+  private trySearchMove() {
+    const move = this.searchMove;
+    if (!move || move.phase !== "ready" || move.owner !== this.findWidget.history.owner) return;
+    const { hash, position } = move.match;
+    if (typeof this.commitLookup[hash] === "number") {
+      this.selectSearchDestination(hash);
+      return;
+    }
+    const depth = Math.max(this.maxCommits, position + this.config.loadMoreCommits);
+    if (depth > SEARCH_CONFIRMATION_DEPTH && this.approvedSearch !== move.owner) {
+      this.confirmSearchMove(move, depth);
+      return;
+    }
+    // A normal request already in flight may load the target or supersede the planned depth.
+    if (this.loadCommitsCallback !== null) return;
+    this.rememberSearchReturn();
+    if (this.expandedCommit) this.hideCommitDetails();
+    this.maxCommits = depth;
+    move.phase = "loading";
+    this.requestLoadCommits(
+      true,
+      () => {
+        if (this.searchMove === move && this.findWidget.history.owner === move.owner)
+          this.selectSearchDestination(hash);
+      },
+      false,
+      move
+    );
+  }
+
+  private confirmSearchMove(move: SearchMove, depth: number) {
+    move.phase = "confirming";
+    this.dismissSearchConfirmation = showConfirmationDialog(
+      t("find.confirmLoad", move.match.position.toLocaleString(), depth.toLocaleString()),
+      () => {
+        if (this.searchMove !== move || move.owner !== this.findWidget.history.owner) return;
+        this.dismissSearchConfirmation = undefined;
+        this.approvedSearch = move.owner;
+        move.phase = "ready";
+        this.trySearchMove();
+      },
+      document.getElementById("findInput"),
+      () => {
+        if (this.searchMove === move) this.finishSearchMove();
+        this.dismissSearchConfirmation = undefined;
+      }
+    );
+  }
+
+  private rememberSearchReturn() {
+    if (this.searchReturn) return;
+    const details = this.expandedCommit;
+    this.searchReturn = {
+      scrollTop: this.scrollContainerElem.scrollTop,
+      details: details && {
+        hash: details.hash,
+        compareWithHash: details.compareWithHash,
+        commitDetails: details.commitDetails,
+        fileTree: details.fileTree
+      }
+    };
+    this.findWidget.showReturn(true);
+  }
+
+  private selectSearchDestination(hash: string) {
+    this.finishSearchMove();
+    if (typeof this.commitLookup[hash] !== "number")
+      this.findWidget.endHistorySearch("targetMissing");
+    else if (!this.findWidget.selectLoadedMatch(hash))
+      this.findWidget.endHistorySearch("targetChanged");
+  }
+
+  private clearSearchReturn() {
+    if (!this.searchReturn) return;
+    this.searchReturn = undefined;
+    this.findWidget.showReturn(false);
+  }
+
+  private returnFromSearch() {
+    const point = this.searchReturn;
+    if (!point || this.searchMove) return;
+    this.clearSearchReturn();
+    this.hideCommitDetails();
+    const details = point.details;
+    if (
+      details &&
+      typeof this.commitLookup[details.hash] === "number" &&
+      (details.compareWithHash === null ||
+        typeof this.commitLookup[details.compareWithHash] === "number")
+    ) {
+      if (details.commitDetails && details.fileTree)
+        this.restoreExpandedCommit({
+          ...details,
+          commitDetails: details.commitDetails,
+          fileTree: details.fileTree
+        });
+      else {
+        const row = this.mountRow(details.hash);
+        if (row) this.loadCommitDetails(row);
+        const compareRow = details.compareWithHash && this.findRowByHash(details.compareWithHash);
+        if (compareRow && details.compareWithHash)
+          this.handleCommitRowActivation(details.compareWithHash, compareRow, true);
+        this.restoredPendingDetails = this.expandedCommit;
+      }
+    }
+    this.scrollContainerElem.scrollTop = point.scrollTop;
+    this.restoredSearchScroll = this.scrollContainerElem.scrollTop;
+    this.redrawViewport();
+    this.saveState();
+  }
+
   public receiveBranches(response: GG.ResponseLoadBranches) {
     const active = this.activeBranchRequest;
     if (active === null || response.requestId !== active.id) return;
@@ -839,12 +999,20 @@ class GitKeizuView {
   public receiveCommits(response: GG.ResponseLoadCommits) {
     const active = this.activeHistoryRequest;
     if (response.requestId !== undefined && response.requestId !== active?.id) return;
+    if (active?.searchMove && active.searchMove !== this.searchMove) {
+      this.triggerLoadCommitsCallback(false);
+      return;
+    }
     if (
       active &&
       response.requestId !== undefined &&
       (active.generation !== this.historyGeneration ||
         !sameHistoryQuery(active.query, this.getHistoryQuery()))
     ) {
+      if (active.searchMove && this.searchMove === active.searchMove) {
+        this.searchMove.phase = "ready";
+        this.loadCommitsCallback = null;
+      }
       this.triggerLoadCommitsCallback(false);
       return;
     }
@@ -952,7 +1120,7 @@ class GitKeizuView {
   ) {
     const authorList = authors ?? [...new Set(commits.map((commit) => commit.author))].sort();
     this.updateAuthorMenu(authorList, forceRender && !this.isLoadingMoreCommits);
-    if (this.findWidget.history.owner) {
+    if (this.findWidget.history.owner || this.searchReturn) {
       const change = this.getAppliedSearchHistory()?.change ?? "unavailable";
       if (change !== "compatible") this.findWidget.endHistorySearch(change);
     }
@@ -960,6 +1128,7 @@ class GitKeizuView {
     if (
       !forceRender &&
       this.tableElem.querySelector("table") !== null &&
+      !(viewState.dateFormat === "Relative" && this.findWidget.isVisible()) &&
       this.moreCommitsAvailable === moreAvailable &&
       this.commitHead === commitHead &&
       worktreeCollectionsEqual(this.worktrees, worktrees ?? EMPTY_WORKTREE_COLLECTION) &&
@@ -1072,6 +1241,7 @@ class GitKeizuView {
       callback(changes);
     }
     this.flushPendingLoadCommits();
+    this.trySearchMove();
   }
 
   public loadAvatar(email: string, image: string) {
@@ -1170,6 +1340,7 @@ class GitKeizuView {
   private discardMismatchedSearchQuery() {
     if (this.appliedHistory && !this.getAppliedSearchHistory()) {
       this.appliedHistory = undefined;
+      this.clearSearchReturn();
       if (this.findWidget.history.owner) this.findWidget.endHistorySearch("idle");
     }
   }
@@ -1196,7 +1367,8 @@ class GitKeizuView {
   private requestLoadCommits(
     forceRender: boolean,
     loadedCallback: (changes: boolean) => void,
-    append = false
+    append = false,
+    searchMove?: SearchMove
   ) {
     if (this.loadCommitsCallback !== null) {
       this.queueLoadCommits(forceRender, loadedCallback, append);
@@ -1215,6 +1387,7 @@ class GitKeizuView {
       generation: this.historyGeneration,
       query,
       requestedCount,
+      searchMove,
       pageToken
     };
     sendMessage({
@@ -1243,6 +1416,14 @@ class GitKeizuView {
     }
     return this.commitOrdering;
   }
+
+  public setCommitOrdering(ordering: GG.CommitOrdering) {
+    const previous = this.getEffectiveCommitOrdering();
+    this.commitOrdering = ordering;
+    if (previous === this.getEffectiveCommitOrdering()) return;
+    this.invalidateHistory();
+    this.requestLoadCommits(true, () => {});
+  }
   private requestLoadBranchesAndCommits(forceRender: boolean) {
     if (this.activeBranchRequest !== null) {
       this.queueLoadBranchesAndCommits(forceRender);
@@ -1252,7 +1433,8 @@ class GitKeizuView {
       if (isRepo) {
         this.requestLoadCommits(forceRender || branchChanges, (commitChanges: boolean) => {
           if (branchChanges || commitChanges) {
-            if (isDialogActive() && !isErrorDialogActive()) hideDialog();
+            if (isDialogActive() && !isErrorDialogActive() && !this.dismissSearchConfirmation)
+              hideDialog();
             if (isContextMenuActive()) hideContextMenu();
           }
         });
@@ -1341,7 +1523,7 @@ class GitKeizuView {
       moreCommitsAvailable: this.moreCommitsAvailable,
       maxCommits: this.maxCommits,
       showRemoteBranches: this.showRemoteBranches,
-      expandedCommit: this.expandedCommit,
+      expandedCommit: this.searchDetails ? null : this.expandedCommit,
       findWidgetState: this.findWidget.getState(),
       selectedAuthors: this.selectedAuthors,
       scrollTop: this.scrollContainerElem.scrollTop,
@@ -1600,14 +1782,7 @@ class GitKeizuView {
         } else if (this.expandedCommit.loading) {
           elem.classList.add("commitDetailsOpen");
           this.renderCommitDetailsView();
-          const commit = this.commits[this.commitLookup[this.expandedCommit.hash]];
-          sendMessage({
-            command: "commitDetails",
-            repo: this.currentRepo!,
-            commitHash: this.expandedCommit.hash,
-            hasParents: commit !== undefined && commit.parentHashes.length > 0,
-            isStash: commit !== undefined && commit.stash !== null
-          });
+          this.requestCommitDetails(this.expandedCommit.hash, this.searchDetails?.key);
         } else {
           this.loadCommitDetails(elem);
         }
@@ -2184,7 +2359,10 @@ class GitKeizuView {
 
       const movingDown = scrollTop > previousTop;
       previousTop = scrollTop;
+      const restored = this.restoredSearchScroll === scrollTop;
+      this.restoredSearchScroll = undefined;
       if (
+        !restored &&
         movingDown &&
         this.config.loadMoreCommitsAutomatically &&
         this.moreCommitsAvailable &&
@@ -2437,6 +2615,8 @@ class GitKeizuView {
 
   /* Row Target and Tab Stops */
   private leaveRepository(): void {
+    if (this.findWidget.history.owner) this.findWidget.endHistorySearch("idle");
+    this.clearSearchReturn();
     this.appliedHistory = undefined;
     this.displayedAuthors = null;
     if (this.activeBranchRequest !== null) {
@@ -2627,6 +2807,7 @@ class GitKeizuView {
   }
 
   public dispose(): void {
+    if (this.findWidget.history.owner) this.findWidget.endHistorySearch("idle");
     this.viewportResizeObserver?.disconnect();
     document.removeEventListener("keydown", this.keydownListener);
     this.disposeFocusContext();
@@ -2728,6 +2909,7 @@ class GitKeizuView {
       } else if (clickedHash !== this.expandedCommit.hash) {
         // Different commit → enter/change compare target
         this.clearCompareTarget();
+        this.searchDetails = undefined;
         this.expandedCommit.compareWithHash = clickedHash;
         this.expandedCommit.compareWithSrcElem = sourceElem;
         sourceElem.classList.add("compareTarget");
@@ -2748,7 +2930,7 @@ class GitKeizuView {
     }
   }
 
-  private loadCommitDetails(sourceElem: HTMLElement) {
+  private loadCommitDetails(sourceElem: HTMLElement, owner?: GG.SearchOwner | null) {
     const previousDetails = document.getElementById(COMMIT_DETAILS_ID);
     const focusWasInDetails =
       previousDetails !== null && previousDetails.contains(document.activeElement);
@@ -2758,7 +2940,6 @@ class GitKeizuView {
     const mounted = this.findRowByHash(hash);
     if (mounted === null) return;
     sourceElem = mounted;
-    const commit = this.commits[this.commitLookup[hash]];
     this.expandedCommit = {
       id: parseInt(sourceElem.dataset.id!, 10),
       hash: hash,
@@ -2770,18 +2951,46 @@ class GitKeizuView {
       loading: true
     };
     sourceElem.classList.add("commitDetailsOpen");
+    this.requestCommitDetails(hash, owner);
     this.saveState();
     this.refreshRowStates();
     this.renderCommitDetailsView();
     // A switch started from inside the old details (parent link) lands on the new origin row.
     if (focusWasInDetails) sourceElem.focus({ preventScroll: true });
+  }
+
+  private requestCommitDetails(hash: string, owner?: GG.SearchOwner | null) {
+    const commit = this.commits[this.commitLookup[hash]];
+    const searchKey = owner && { ...owner, requestId: ++this.detailRequestId };
+    this.searchDetails = searchKey ? { hash, key: searchKey } : undefined;
     sendMessage({
       command: "commitDetails",
+      ...(searchKey ? { searchKey } : {}),
       repo: this.currentRepo!,
       commitHash: hash,
       hasParents: commit !== undefined && commit.parentHashes.length > 0,
       isStash: commit !== undefined && commit.stash !== null
     });
+  }
+
+  public acceptSearchDetails(key: GG.SearchRequestKey, hash?: string): boolean {
+    const request = this.searchDetails;
+    const owner = this.findWidget.history.owner;
+    if (
+      !request ||
+      !owner ||
+      !this.expandedCommit?.loading ||
+      this.expandedCommit.compareWithHash !== null ||
+      request.hash !== this.expandedCommit.hash ||
+      (hash !== undefined && request.hash !== hash) ||
+      key.viewId !== owner.viewId ||
+      key.repo !== owner.repo ||
+      key.generation !== owner.generation ||
+      key.requestId !== request.key.requestId
+    )
+      return false;
+    this.searchDetails = undefined;
+    return true;
   }
   private renderCommitDetailsView() {
     if (this.expandedCommit === null || this.expandedCommit.srcElem === null) return;
@@ -2840,6 +3049,8 @@ class GitKeizuView {
   }
 
   private closeCommitDetails(restoreViewport: boolean) {
+    this.restoredPendingDetails = null;
+    this.searchDetails = undefined;
     if (this.expandedCommit !== null) {
       this.clearCompareTarget();
       let elem = document.getElementById(COMMIT_DETAILS_ID);
@@ -2909,7 +3120,8 @@ class GitKeizuView {
     elem.style.height = `${cdvHeight}px`;
 
     this.renderGraph();
-    this.scrollToExpandedCommit(elem);
+    if (this.restoredPendingDetails === this.expandedCommit) this.restoredPendingDetails = null;
+    else this.scrollToExpandedCommit(elem);
 
     this.bindDetailsClose();
     const toggleElem = document.getElementById(FILE_VIEW_TOGGLE_ID);
@@ -2928,16 +3140,13 @@ class GitKeizuView {
     markFocusTarget(closeElem, { kind: "control", id: COMMIT_DETAILS_CLOSE_ID });
     closeElem.addEventListener("click", () => this.hideCommitDetails());
   }
-  private findCommitRowByHash(hash: string): HTMLElement | null {
-    return document.querySelector<HTMLElement>(`.commit[data-hash="${hash}"]`);
-  }
   private restoreExpandedCommit(snapshot: FileHistoryExpandedSnapshot): boolean {
     if (typeof this.commitLookup[snapshot.hash] !== "number") return false;
     this.replaceMountedRows({ first: 0, end: this.commits.length });
-    const srcElem = this.findCommitRowByHash(snapshot.hash);
+    const srcElem = this.findRowByHash(snapshot.hash);
     if (srcElem === null) return false;
     const compareWithSrcElem =
-      snapshot.compareWithHash !== null ? this.findCommitRowByHash(snapshot.compareWithHash) : null;
+      snapshot.compareWithHash !== null ? this.findRowByHash(snapshot.compareWithHash) : null;
     this.expandedCommit = {
       id: parseInt(srcElem.dataset.id!, 10),
       hash: snapshot.hash,
@@ -3312,6 +3521,10 @@ class GitKeizuView {
 }
 
 /* Initialization */
+const LISTENER_CLEANUP_KEY = "__gitKeizuMessageCleanup";
+const _win = window as unknown as Record<string, unknown>;
+const prevCleanup = _win[LISTENER_CLEANUP_KEY];
+if (typeof prevCleanup === "function") (prevCleanup as () => void)();
 // Guards are installed before any other listener so composition and repeat state is tracked first.
 const disposeKeyboardGuards = installKeyboardGuards(document);
 let gitKeizu = new GitKeizuView(
@@ -3333,10 +3546,6 @@ let gitKeizu = new GitKeizuView(
 );
 
 /* Command Processing */
-const LISTENER_CLEANUP_KEY = "__gitKeizuMessageCleanup";
-const _win = window as unknown as Record<string, unknown>;
-const prevCleanup = _win[LISTENER_CLEANUP_KEY];
-if (typeof prevCleanup === "function") (prevCleanup as () => void)();
 const messageHandler = (event: MessageEvent) => handleMessage(event.data, gitKeizu);
 window.addEventListener("message", messageHandler);
 // Escape closes one layer per keydown in the bubble phase; a key a local UI already consumed, a

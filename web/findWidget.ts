@@ -140,6 +140,9 @@ export function matchesCommit(
 export interface FindWidgetCallbacks {
   getSearchStart(): SearchStart | undefined;
   navigateToUnread?(match: UnreadMatch, owner: GG.SearchOwner): void;
+  onSearchEnd?(reason: SearchEnd): void;
+  onClose?(): void;
+  returnFromSearch?(): void;
   getCommits(): GG.GitCommitNode[];
   scrollToCommit(hash: string, alwaysCenterCommit: boolean): void;
   saveState(): void;
@@ -181,6 +184,8 @@ export class FindWidget {
   private readonly startElem: HTMLButtonElement;
   private readonly continueElem: HTMLButtonElement;
   private readonly cancelElem: HTMLButtonElement;
+  private readonly returnElem: HTMLButtonElement;
+  private navigating = false;
 
   constructor(callbacks: FindWidgetCallbacks) {
     this.callbacks = callbacks;
@@ -195,7 +200,8 @@ export class FindWidget {
               false
             )
           : "miss",
-      (hash) => this.callbacks.getCommitId(hash) !== null
+      (hash) => this.callbacks.getCommitId(hash) !== null,
+      (reason) => this.callbacks.onSearchEnd?.(reason)
     );
 
     this.widgetElem = document.createElement("div");
@@ -214,6 +220,7 @@ export class FindWidget {
       FindWidget.buttonHtml("findStart", t("find.start"), "findAction", t("find.start")),
       FindWidget.buttonHtml("findContinue", t("find.continue"), "findAction", t("find.continue")),
       FindWidget.buttonHtml("findCancel", t("find.cancel"), "findAction", t("find.cancel")),
+      FindWidget.buttonHtml("findReturn", t("find.return"), "findAction", t("find.return")),
       '</div><div id="findStatus" role="status"></div>'
     ].join("");
     document.body.appendChild(this.widgetElem);
@@ -224,6 +231,12 @@ export class FindWidget {
     this.startElem = document.getElementById("findStart") as HTMLButtonElement;
     this.continueElem = document.getElementById("findContinue") as HTMLButtonElement;
     this.cancelElem = document.getElementById("findCancel") as HTMLButtonElement;
+    this.returnElem = document.getElementById("findReturn") as HTMLButtonElement;
+    this.returnElem.hidden = true;
+    this.returnElem.addEventListener("click", () => {
+      this.callbacks.returnFromSearch?.();
+      this.inputElem.focus({ preventScroll: true });
+    });
     this.startElem.addEventListener("click", () => {
       const query = this.callbacks.getSearchStart();
       if (
@@ -334,6 +347,7 @@ export class FindWidget {
     if (!this.visible) return;
     this.visible = false;
     this.history.end("idle");
+    this.callbacks.onClose?.();
     this.widgetElem.classList.add(CLASS_TRANSITION);
     this.widgetElem.classList.remove(CLASS_ACTIVE);
     this.clearMatches();
@@ -377,6 +391,19 @@ export class FindWidget {
   public endHistorySearch(reason: SearchEnd) {
     this.history.end(reason);
     this.renderStatus();
+  }
+
+  public setNavigationPending(pending: boolean) {
+    const focus = document.activeElement;
+    if (pending && (focus === this.prevElem || focus === this.nextElem))
+      this.inputElem.focus({ preventScroll: true });
+    this.navigating = pending;
+    this.returnElem.disabled = pending;
+    this.syncNavigationState();
+  }
+
+  public showReturn(available: boolean) {
+    this.returnElem.hidden = !available;
   }
 
   public selectLoadedMatch(hash: string): boolean {
@@ -637,7 +664,7 @@ export class FindWidget {
   }
 
   private navigate(index: number) {
-    if (this.inputElem.disabled || index < 0) return;
+    if (this.navigating || this.inputElem.disabled || index < 0) return;
     if (index < this.matches.length) {
       this.selectLoadedMatch(this.matches[index]);
       return;
@@ -724,7 +751,9 @@ export class FindWidget {
   // Previous / next need results and an enabled input (results are stale while the list reloads).
   private syncNavigationState() {
     const disabled =
-      this.inputElem.disabled || (this.matches.length === 0 && this.history.unreadCount === 0);
+      this.navigating ||
+      this.inputElem.disabled ||
+      (this.matches.length === 0 && this.history.unreadCount === 0);
     for (const elem of [this.prevElem, this.nextElem]) {
       this.toggleClass(elem, CLASS_DISABLED, disabled);
       elem.disabled = disabled;

@@ -146,6 +146,8 @@
   "find.reloadFirst": "履歴を再読み込みしてから検索してください。",
   "find.targetMissing": "対象のコミットが見つかりませんでした。検索し直してください。",
   "find.targetChanged": "検索対象が変化しました。検索し直してください。",
+  "find.return": "移動前に戻る",
+  "find.confirmLoad": "先頭から約{0}件目のコミットへ移動するため、{1}件まで読み込みますか？",
   "find.matchCase": "大文字と小文字を区別",
   "find.useRegex": "正規表現を使用",
   "find.previous": "前の一致 (Shift+Enter)",

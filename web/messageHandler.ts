@@ -1,4 +1,5 @@
 import type {
+  CommitOrdering,
   GitCommitDetails,
   GitFileChange,
   GitRepoSet,
@@ -10,6 +11,7 @@ import type {
   ResponseLoadBranches,
   ResponseLoadCommits,
   ResponseMessage,
+  SearchRequestKey,
   WorktreePathViewState
 } from "../src/types";
 import { hideDialog, showErrorDialog } from "./dialogs";
@@ -21,6 +23,8 @@ import { refreshGraphOrDisplayError } from "./utils";
 export type RefreshMode = "soft" | "forceRender" | "hard";
 
 export interface GitKeizuViewAPI {
+  setCommitOrdering(ordering: CommitOrdering): void;
+  acceptSearchDetails(key: SearchRequestKey, hash?: string): boolean;
   receiveHistorySearchBatch(response: ResponseHistorySearchBatch): void;
   receiveHistorySearchValidation(response: ResponseHistorySearchValidation): void;
   hideCommitDetails(): void;
@@ -41,6 +45,9 @@ export interface GitKeizuViewAPI {
 
 export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void {
   switch (msg.command) {
+    case "setCommitOrdering":
+      gitKeizu.setCommitOrdering(msg.ordering);
+      break;
     case "historySearchBatch":
       gitKeizu.receiveHistorySearchBatch(msg);
       break;
@@ -91,6 +98,8 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       refreshOrError(gitKeizu, msg.status, t("error.cleanUntrackedFiles"));
       break;
     case "commitDetails":
+      if (msg.searchKey && !gitKeizu.acceptSearchDetails(msg.searchKey, msg.commitDetails?.hash))
+        break;
       if (msg.commitDetails === null) {
         gitKeizu.hideCommitDetails();
         showErrorDialog(t("error.commitDetails"), null, null);
