@@ -8382,6 +8382,7 @@ describe("installing an ordinary history page", () => {
   });
 
   // @see docs/testing/perspectives/web/main-test/14-history-search-01.md (TC-812–816)
+  // Case: TC-812, TC-813, TC-815, TC-816
   it("updates verified positions only for the accepted request, including unchanged rows (TC-812, TC-813, TC-815, TC-816)", async () => {
     const messages = vi.spyOn(await import("../../web/messageHandler"), "handleMessage");
     const reload = (fields: Record<string, unknown>) => {
@@ -8449,6 +8450,7 @@ describe("installing an ordinary history page", () => {
     }
   });
 
+  // Case: TC-814
   it("continues through a pinned row moving behind new ordinary positions (TC-814)", async () => {
     const messages = vi.spyOn(await import("../../web/messageHandler"), "handleMessage");
     const [a, b] = MOCK_COMMITS;

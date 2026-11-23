@@ -3,10 +3,92 @@ import { resolve } from "node:path";
 
 import { afterEach, describe, expect, it } from "vitest";
 
+import english from "../../l10n/web/web.l10n.en.json";
+import japanese from "../../l10n/web/web.l10n.ja.json";
 import { getWebviewLocale, t } from "../../web/i18n";
 
 const originalMessages = globalThis.webviewMessages;
 const originalLocale = globalThis.webviewLocale;
+
+// @see docs/testing/perspectives/l10n/web/web.l10n.en.json-test.md
+// @see docs/testing/perspectives/l10n/web/web.l10n.ja.json-test.md
+describe.each([
+  { locale: "en", bundle: english },
+  { locale: "ja", bundle: japanese }
+] as const)("full-history search translations in $locale", ({ locale, bundle }) => {
+  // Case: TC-106, TC-108
+  it("renders distinct localized find controls, progress and failure reasons", () => {
+    globalThis.webviewMessages = bundle;
+    const keys = [
+      "find.fullScope",
+      "find.start",
+      "find.continue",
+      "find.cancel",
+      "find.return",
+      "find.running",
+      "find.paused",
+      "find.complete",
+      "find.noResults",
+      "find.cancelled",
+      "find.excludeStashes",
+      "find.readError",
+      "find.zeroLengthRegex",
+      "find.historyChanged",
+      "find.unavailable",
+      "find.reloadFirst",
+      "find.targetMissing",
+      "find.targetChanged"
+    ] as const;
+    const translated = keys.map((key) => {
+      const result = t(key, 42);
+      expect(result).toMatch(locale === "ja" ? /[ぁ-んァ-ン一-龯]/ : /[A-Za-z]/);
+      expect(result).not.toBe(key);
+      expect(result).not.toMatch(/\{\d+\}/);
+      return result;
+    });
+    expect(new Set(translated).size).toBe(keys.length);
+    const detail = "git exited with code 128";
+    expect(t("find.readError", detail)).toBe(
+      locale === "en" ? `History search failed. ${detail}` : `履歴の検索に失敗しました。${detail}`
+    );
+    expect(t("find.historyChanged")).toBe(
+      locale === "en"
+        ? "Full history search ended because history changed."
+        : "履歴が更新されたため全履歴検索を終了しました。"
+    );
+    expect(t("find.unavailable")).toBe(
+      locale === "en"
+        ? "Could not verify history. Reload and search again."
+        : "履歴を確認できませんでした。再読み込みして検索し直してください。"
+    );
+  });
+
+  // Case: TC-107
+  it("places counts, paused suffixes and confirmation depths in their localized roles", () => {
+    globalThis.webviewMessages = bundle;
+    const isEnglish = locale === "en";
+    expect(t("find.loadedScope", 303)).toBe(
+      isEnglish ? "Searching loaded commits (303)" : "読み込み済みのコミット（303件）を検索"
+    );
+    expect(t("find.fullPosition", 0, 1, 1)).toBe(
+      isEnglish ? "0 of 1 (1 unloaded)" : "0 / 1（未読込 1）"
+    );
+    expect(t("find.fullPosition", 3, "12+", "9+")).toBe(
+      isEnglish ? "3 of 12+ (9+ unloaded)" : "3 / 12+（未読込 9+）"
+    );
+    expect(t("find.confirmLoad", "12,345", "12,445")).toBe(
+      isEnglish
+        ? "Load up to 12,445 commits to go to the match at position 12,345?"
+        : "先頭から約12,345件目のコミットへ移動するため、12,445件まで読み込みますか？"
+    );
+    for (const key of Object.keys(english).filter((key) => key.startsWith("find."))) {
+      const other: Record<string, string> = japanese;
+      expect(Object.hasOwn(other, key)).toBe(true);
+      const slots = (text: string) => text.match(/\{\d+\}/g)?.sort() ?? [];
+      expect(slots(other[key])).toEqual(slots((english as Record<string, string>)[key]));
+    }
+  });
+});
 
 afterEach(() => {
   globalThis.webviewMessages = originalMessages;

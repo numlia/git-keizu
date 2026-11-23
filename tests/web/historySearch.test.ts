@@ -54,6 +54,7 @@ function start() {
 
 // @see docs/testing/perspectives/web/historySearch-test.md
 describe("full history search", () => {
+  // Case: TC-001, TC-002
   it("retains only hit positions, accepts each awaited batch once and ignores competing requests (TC-001, TC-002)", () => {
     const { search, send, batch } = start();
     expect(send).toHaveBeenCalledWith({
@@ -81,6 +82,7 @@ describe("full history search", () => {
     expect(search.status).toBe("complete");
   });
 
+  // Case: TC-003
   it.each([true, false])(
     "resumes from the third of four buffered records with host lookahead %s (TC-003)",
     (hasMore) => {
@@ -120,6 +122,7 @@ describe("full history search", () => {
     }
   );
 
+  // Case: TC-004, TC-005
   it.each([
     [{ kind: "historyChanged" }, "historyChanged", 0],
     [{ kind: "error", message: "graft unreadable" }, "readError", 1000]
@@ -137,6 +140,7 @@ describe("full history search", () => {
     }
   );
 
+  // Case: TC-006
   it("completes at an exact limit and accepts an empty terminal batch (TC-006)", () => {
     for (const count of [0, 1000]) {
       const { search, send, batch } = start();
@@ -148,6 +152,7 @@ describe("full history search", () => {
     }
   });
 
+  // Case: TC-007
   it("resumes host-only tails and collects 2001 matches over three operations (TC-007)", () => {
     const { search, send, batch } = start();
     for (const first of [1, 1001]) {
@@ -163,6 +168,7 @@ describe("full history search", () => {
     expect(search.examined).toBe(2001);
   });
 
+  // Case: TC-008, TC-009
   it("merges by actual hash and preserves additions already spent in the operation (TC-008, TC-009)", () => {
     const { search, loaded, batch } = start();
     loaded.add("pinned");
@@ -180,6 +186,7 @@ describe("full history search", () => {
     ]);
   });
 
+  // Case: TC-010
   it("retains verified hits on read failure and restarts with a fresh generation (TC-010)", () => {
     const { search, send, batch } = start();
     search.receive(batch([row("first")], 301, true));
@@ -201,6 +208,7 @@ describe("full history search", () => {
     expect(search.receive(failed)).toBe(false);
   });
 
+  // Case: TC-011, TC-012
   it("clears earlier hits on a later regex error or changed snapshot (TC-011, TC-012)", () => {
     for (const reason of ["regexError", "historyChanged"]) {
       const { search, send, batch } = start();
@@ -216,6 +224,7 @@ describe("full history search", () => {
     }
   });
 
+  // Case: TC-013, TC-014
   it("rejects obsolete views, repositories, generations and request IDs even after cancellation (TC-013, TC-014)", () => {
     const { search, batch, validate } = start();
     const old = batch([row("old")], 301, true);

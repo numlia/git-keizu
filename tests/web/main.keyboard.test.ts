@@ -12,7 +12,7 @@ import type {
   GitRef,
   WorktreeCollection
 } from "../../src/types";
-import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
+import { HISTORY_SEARCH_BATCH_SIZE, UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 import { getCommitDate } from "../../web/dates";
 import { captureFocusOrigin, moveFocusPast } from "../../web/keyboardNavigation";
 import { vscode } from "../../web/utils";
@@ -636,6 +636,77 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+// @see docs/testing/perspectives/web/main-test/14-history-search-01.md (TC-835)
+// @see docs/testing/perspectives/web/historySearch-test.md (TC-015)
+describe("full-history calibration", () => {
+  const paint = { metric: "paint", sizes: [1000, 5000, 10000, 20000], budgetMs: 2000, fallback: 0 };
+  const batch = {
+    metric: "batch",
+    sizes: Array.from({ length: 100 }, (_, i) => (i + 1) * 1000),
+    budgetMs: 500,
+    fallback: 1
+  };
+
+  function selectLimit(maxima: Map<number, number>, budgetMs: number, fallback: number) {
+    const eligible = [...maxima].filter(([, worst]) => worst <= budgetMs);
+    return Math.max(fallback, ...eligible.map(([size]) => size));
+  }
+
+  // Case: TC-015, TC-835
+  it.each([paint, batch])(
+    "selects the largest passing $metric size at the inclusive time boundary",
+    ({ sizes, budgetMs, fallback }) => {
+      const maxima = new Map(sizes.map((size) => [size, budgetMs]));
+      expect(selectLimit(maxima, budgetMs, fallback)).toBe(sizes.at(-1));
+      for (const size of sizes.slice(2)) maxima.set(size, budgetMs + 0.1);
+      expect(selectLimit(maxima, budgetMs, fallback)).toBe(sizes[1]);
+      for (const size of sizes.slice(0, 2)) maxima.set(size, budgetMs + 0.1);
+      expect(selectLimit(maxima, budgetMs, fallback)).toBe(fallback);
+    }
+  );
+
+  // Case: TC-015, TC-835
+  it.each([paint, batch])(
+    "reproduces the product $metric limit from every full-size measured condition",
+    ({ metric, sizes, budgetMs, fallback }) => {
+      const raw = readFileSync(
+        resolve(process.cwd(), "docs/testing/history-search-calibration.csv"),
+        "utf8"
+      );
+      const maxima = new Map<number, number>();
+      const expected = new Set(
+        sizes.flatMap((size) =>
+          (metric === "paint" ? [0] : [0, 50000, 90000]).flatMap((skip) =>
+            ["history-search-benchmark", "not-present-in-history"].map((query) =>
+              [size, skip, query].join(",")
+            )
+          )
+        )
+      );
+      for (const record of raw.trim().split(/\r?\n/).slice(1)) {
+        const [kind, size, skip, query, count, warmup, ...trials] = record.split(",");
+        if (kind !== metric) continue;
+        expect(expected.delete([size, skip, query].join(","))).toBe(true);
+        expect(Number(warmup)).toBeGreaterThan(0);
+        const received = Math.min(Number(size), 100000 - Number(skip));
+        expect(Number(count)).toBe(received);
+        expect(trials).toHaveLength(5);
+        if (received < Number(size)) {
+          expect(trials).toEqual(["", "", "", "", ""]);
+          continue;
+        }
+        const scored = trials.map(Number);
+        expect(scored.every((time) => Number.isFinite(time) && time > 0)).toBe(true);
+        maxima.set(Number(size), Math.max(maxima.get(Number(size)) ?? 0, ...scored));
+      }
+      expect(expected.size).toBe(0);
+      expect(selectLimit(maxima, budgetMs, fallback)).toBe(
+        metric === "paint" ? confirmationDepth : HISTORY_SEARCH_BATCH_SIZE
+      );
+    }
+  );
+});
+
 // @see docs/testing/perspectives/web/main-test/14-history-search-01.md (S91)
 describe("full history search on the displayed graph", () => {
   const control = (id: string) => document.getElementById(id) as HTMLButtonElement;
@@ -686,6 +757,7 @@ describe("full history search on the displayed graph", () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  // Case: TC-809, TC-810
   it("takes the verified ordinary depth while a larger unpaged request is in flight (TC-809, TC-810)", () => {
     find("needle");
     expect(control("findStart").disabled).toBe(true);
@@ -725,6 +797,7 @@ describe("full history search on the displayed graph", () => {
     respond(ordinary, info(ordinary.map((commit) => commit.hash)));
   });
 
+  // Case: TC-811
   it("searches a verified terminal graph with no page token (TC-811)", () => {
     const commits = [node("loaded", [], { message: "needle" })];
     request();
@@ -745,6 +818,7 @@ describe("full history search on the displayed graph", () => {
     expect(control("findNext").disabled).toBe(false);
   });
 
+  // Case: TC-812, TC-813
   it.each(["snapshot", "prefix", "reported", "unavailable", "legacy"])(
     "ends the live search on %s with identical graph rows (TC-812, TC-813)",
     (change) => {
@@ -780,6 +854,7 @@ describe("full history search on the displayed graph", () => {
     }
   );
 
+  // Case: TC-814, TC-817
   it("recognizes a changed stash selector on a retained hash and merges matches loaded by hash (TC-814, TC-817)", () => {
     const ordinary = node("ordinary", []);
     const stash = node("stash", [], {
@@ -4242,6 +4317,7 @@ describe("full history navigation and return on the displayed graph", () => {
   });
   afterEach(() => vi.useRealTimers());
 
+  // Case: TC-815
   it("merges a scroll-triggered page exactly once before any manual load (TC-815)", async () => {
     await recreate({ loadMoreCommitsAutomatically: true });
     reply([origin], [origin.hash], { pageToken: 71 });
@@ -4276,6 +4352,7 @@ describe("full history navigation and return on the displayed graph", () => {
     expect(posts("cancelHistorySearch")).toEqual([]);
   });
 
+  // Case: TC-817
   it.each(["message", "author", "date", "refs"] as const)(
     "rechecks a retained row when its %s changes (TC-817)",
     (field) => {
@@ -4307,6 +4384,7 @@ describe("full history navigation and return on the displayed graph", () => {
     }
   );
 
+  // Case: TC-818
   it.each(["author", "branch", "remote", "ordering"])(
     "keeps an unapplied author edit and expires the applied %s change (TC-818)",
     (scope) => {
@@ -4340,6 +4418,7 @@ describe("full history navigation and return on the displayed graph", () => {
     }
   );
 
+  // Case: TC-819, TC-832
   it.each(["running", "paused", "complete", "readError"])(
     "drops the %s search and its return point on repo change (TC-819, TC-832)",
     (status) => {
@@ -4366,6 +4445,7 @@ describe("full history navigation and return on the displayed graph", () => {
     }
   );
 
+  // Case: TC-825
   it.each(["cancel", "close", "repo", "webview"])(
     "ignores late approval and extension after %s (TC-825)",
     async (action) => {
@@ -4412,6 +4492,7 @@ describe("full history navigation and return on the displayed graph", () => {
     }
   );
 
+  // Case: TC-829
   it("rejects old details on both outcomes after redraw, switching matches, and recreating the graph (TC-829)", async () => {
     function navigateWithDetails() {
       start();
@@ -4451,6 +4532,7 @@ describe("full history navigation and return on the displayed graph", () => {
     expect(button("dialog").textContent).toContain(ENGLISH_MESSAGES["error.commitDetails"]);
   });
 
+  // Case: TC-833
   it.each([false, true])(
     "opening search exits file history (displayed %s) and ignores expired search replies (TC-833)",
     (displayed) => {
@@ -4473,10 +4555,16 @@ describe("full history navigation and return on the displayed graph", () => {
       const response = { ...request, entries: [{ hash: "M", historicalPath: FILE_PATH }] };
       expect(findWidgetIsVisible()).toBe(false);
       if (displayed) dispatch(response);
+      expect(historyIsActive()).toBe(true);
+      expect(row("M").classList.contains("fileHistoryCurrent")).toBe(displayed);
       const before = detailsOwner();
+      const scrollBefore = scrollContainer().scrollTop;
       detailReply(oldKey, null);
       detailReply(oldKey, target.hash);
       batch([target], 400);
+      expect(scrollContainer().scrollTop).toBe(scrollBefore);
+      expect(findWidgetIsVisible()).toBe(false);
+      expect(row("M").classList.contains("fileHistoryCurrent")).toBe(displayed);
       expect(detailsOwner()).toBe(before);
       expect(button("dialog").classList.contains("active")).toBe(false);
       button("searchBtn").click();
@@ -4488,6 +4576,7 @@ describe("full history navigation and return on the displayed graph", () => {
     }
   );
 
+  // Case: TC-819, TC-834
   it("restores only the saved find preferences after a paused graph is recreated in another language (TC-819, TC-834)", async () => {
     start();
     button("findCaseSensitive").click();
@@ -4514,6 +4603,7 @@ describe("full history navigation and return on the displayed graph", () => {
     expect(posts("startHistorySearch")).toEqual([]);
   });
 
+  // Case: TC-820
   it.each([false, true])(
     "mounts the only hit at position 400, with details %s, and accepts the next key (TC-820)",
     (showDetails) => {
@@ -4554,6 +4644,7 @@ describe("full history navigation and return on the displayed graph", () => {
     }
   );
 
+  // Case: TC-830
   it("keeps the saved scroll when the prior details were still loading (TC-830)", () => {
     start();
     fire(row(origin.hash), "click");
@@ -4570,6 +4661,7 @@ describe("full history navigation and return on the displayed graph", () => {
     expect(posts("loadCommits")).toEqual([]);
   });
 
+  // Case: TC-821
   it("selects a now-loaded pinned match without growing the graph (TC-821)", () => {
     start();
     batch([target], Math.max(confirmationDepth, 500) + 1);
@@ -4585,6 +4677,7 @@ describe("full history navigation and return on the displayed graph", () => {
     expect(button("findReturn").hidden).toBe(true);
   });
 
+  // Case: TC-822, TC-823
   it("confirms only above the boundary and preserves the current selection on dismissal (TC-822, TC-823)", () => {
     const loaded = { ...origin, message: "needle" };
     start([loaded]);
@@ -4610,6 +4703,7 @@ describe("full history navigation and return on the displayed graph", () => {
     reply([loaded, target, { ...target, hash: "second" }]);
   });
 
+  // Case: TC-822
   it("accepts a depth equal to the calibrated boundary without confirmation (TC-822)", () => {
     if (!confirmationDepth) {
       start();
@@ -4626,6 +4720,7 @@ describe("full history navigation and return on the displayed graph", () => {
     reply([origin, target]);
   });
 
+  // Case: TC-824
   it("uses the latest ordinary depth and accepts only one move during confirmation and load (TC-824)", async () => {
     const increment = Math.max(confirmationDepth, 1000);
     await recreate({ loadMoreCommits: increment });
@@ -4652,6 +4747,7 @@ describe("full history navigation and return on the displayed graph", () => {
     expect(row(target.hash).classList.contains("findCurrentCommit")).toBe(true);
   });
 
+  // Case: TC-826
   it.each(["historyChanged", "unavailable", "targetMissing"] as const)(
     "reports %s before trying to select a missing target (TC-826)",
     (reason) => {
@@ -4668,6 +4764,7 @@ describe("full history navigation and return on the displayed graph", () => {
     }
   );
 
+  // Case: TC-827
   it.each([true, false])(
     "rechecks displayed fields after extension, with a regex error %s (TC-827)",
     async (regexError) => {
@@ -4691,6 +4788,7 @@ describe("full history navigation and return on the displayed graph", () => {
     }
   );
 
+  // Case: TC-828
   it("resumes path highlighting when the search loads its target at EOF (TC-828)", () => {
     reply([origin, target]);
     highlightThroughMenu(target.hash);
@@ -4709,6 +4807,7 @@ describe("full history navigation and return on the displayed graph", () => {
     expect(row(target.hash).classList.contains("findCurrentCommit")).toBe(true);
   });
 
+  // Case: TC-830, TC-831, TC-832
   it.each([true, false])(
     "restores the scroll after two moves, with the saved details still present %s (TC-830, TC-831, TC-832)",
     (present) => {

@@ -152,6 +152,7 @@ describe("continuing ordinary Git history", () => {
   }
 
   // @see docs/testing/perspectives/src/dataSource-test/01-history-diff-02.md (S56)
+  // Case: TC-390, TC-391
   it("keeps the ordinary 300 positions while displaying pins, stashes and the working tree (TC-390, TC-391)", async () => {
     const { repo, root } = fixture;
     addLinearCommits(300);
@@ -259,6 +260,8 @@ describe("continuing ordinary Git history", () => {
       git(repo, ["tag", "v1", "main~2"]);
       git(repo, ["branch", "sibling", "main~2"]);
       git(repo, ["update-ref", "refs/remotes/origin/sibling", "main~2"]);
+      const sharedRefHash = git(repo, ["rev-parse", "main~2"]);
+      const topicOnly = git(repo, ["rev-parse", "topic"]);
       git(repo, ["switch", MAIN_BRANCH]);
       addLinearCommits(300);
       for (const order of ["date", "topo", "author-date"] as const) {
@@ -284,15 +287,30 @@ describe("continuing ordinary Git history", () => {
           vi.mocked(cp.spawn).mockClear();
           const scan = ds.createHistorySearch(request);
           let pos = request.skip;
+          const suffix: string[] = [];
           for (;;) {
             const batch = await scan.next();
             if (batch.kind !== "ok") throw new Error(JSON.stringify(batch));
             expect(batch.firstPosition).toBe(pos + 1);
             expect(batch.commits).toEqual(ordinary.commits.slice(pos, pos + 3));
+            for (const commit of batch.commits) {
+              suffix.push(commit.hash);
+              if (commit.hash === sharedRefHash) {
+                expect(commit.refs.map((ref) => [ref.type, ref.name])).toEqual([
+                  ["head", "sibling"],
+                  ...(remotes ? [["remote", "origin/sibling"]] : []),
+                  ["tag", "v1"]
+                ]);
+              }
+            }
             pos += batch.commits.length;
             if (!batch.hasMore) break;
           }
           expect(pos).toBe(ordinary.commits.length);
+          expect(suffix).toContain(sharedRefHash);
+          expect(ordinary.commits.some((commit) => commit.hash === topicOnly)).toBe(
+            branches.length === 0
+          );
           const logs = vi.mocked(cp.spawn).mock.calls.filter(([, args]) => args?.[0] === "log");
           expect(logs).toHaveLength(1);
           expect(logs[0][1]).toContain("--skip=300");
@@ -497,6 +515,8 @@ describe("continuing ordinary Git history", () => {
     // Case: TC-402, TC-404, TC-405, TC-407
     it("verifies before and after every batch and after EOF without starting another walk", async () => {
       const { repo } = fixture;
+      const graft = path.join(fixture.root, "search-grafts");
+      vi.stubEnv("GIT_GRAFT_FILE", graft);
       const request = await searchRequest({ skip: 5, showRemoteBranches: false });
       const verify = () => ds.verifyHistorySearch(repo, false, request.snapshot);
       git(repo, ["update-ref", "refs/remotes/origin/topic", "HEAD~2"]);
@@ -506,6 +526,13 @@ describe("continuing ordinary Git history", () => {
       });
       vi.mocked(cp.spawn).mockClear();
       expect(await verify()).toEqual({ kind: "ok" });
+      await fs.writeFile(graft, `${git(repo, ["rev-parse", "HEAD~2"])}\n`);
+      expect(await verify()).toEqual({ kind: "historyChanged" });
+      await fs.unlink(graft);
+      expect(await verify()).toEqual({ kind: "ok" });
+      expect(vi.mocked(cp.spawn).mock.calls.filter(([, args]) => args?.[0] === "log")).toHaveLength(
+        0
+      );
       git(repo, ["tag", "incoming"]);
       expect(await verify()).toEqual({ kind: "historyChanged" });
       for (const phase of ["before", "after", "change"]) {
@@ -598,6 +625,7 @@ describe("continuing ordinary Git history", () => {
     });
   });
 
+  // Case: TC-392, TC-393
   it("distinguishes a visible ref change around a tokenless load from an unreadable input (TC-392, TC-393)", async () => {
     const { repo } = fixture;
     const original = await full(100);
@@ -633,6 +661,7 @@ describe("continuing ordinary Git history", () => {
     }
   });
 
+  // Case: TC-394
   it("normalizes ref order and observes independently changed HEADs, names, kinds and targets (TC-394)", async () => {
     const { repo } = fixture;
     git(repo, ["tag", "named"]);
@@ -666,6 +695,7 @@ describe("continuing ordinary Git history", () => {
     }
   });
 
+  // Case: TC-393, TC-394
   it("ignores only a successfully enumerated hidden remote for search (TC-393, TC-394)", async () => {
     const { repo } = fixture;
     const hidden = () => ds.getCommits(repo, [], 2, false, [], "date");

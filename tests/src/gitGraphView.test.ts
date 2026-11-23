@@ -2470,6 +2470,7 @@ describe("GitKeizuView loadCommits authorFilter (S10)", () => {
     });
 
     // @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md (TC-426)
+    // Case: TC-426
     it.each([
       { kind: "verified", hashes: [row.hash], requestedCount: 400, snapshot: "snapshot" },
       { kind: "historyChanged" },
@@ -5411,6 +5412,7 @@ describe("GitKeizuView retainContextWhenHidden (S35)", () => {
       return { finish, promise };
     }
 
+    // Case: TC-819 (docs/testing/perspectives/web/main-test/14-history-search-01.md)
     it.each(["dateType", "dateFormat"])(
       "rebuilds the visible graph when %s changes (TC-819)",
       async (setting) => {
@@ -5421,6 +5423,7 @@ describe("GitKeizuView retainContextWhenHidden (S35)", () => {
       }
     );
 
+    // Case: TC-430
     it("echoes the search key for both detail outcomes and preserves ordinary responses (TC-430)", async () => {
       const details = { hash: "target", fileChanges: [] };
       const source = {

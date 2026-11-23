@@ -55,6 +55,7 @@ describe("dispatching full history search responses", () => {
     message: "subject",
     date: 0
   };
+  // Case: TC-097
   it.each([true, false])(
     "checks keyed detail success and failure before touching the graph (TC-097, accepted %s)",
     (accepted) => {
@@ -138,6 +139,7 @@ describe("dispatching history pages", () => {
   });
 
   // @see docs/testing/perspectives/web/messageHandler-test/01-basic-responses-01.md (TC-093)
+  // Case: TC-093
   it.each([
     {},
     { history: { kind: "verified", hashes: ["a"], requestedCount: 300, snapshot: "snapshot" } },

@@ -193,6 +193,7 @@ describe("full history find controls", () => {
     vi.useRealTimers();
   });
 
+  // Case: TC-509, TC-510, TC-512, TC-513
   it.each([
     ["fix issue", false, false, 1, 1],
     ["fix issue", true, false, 0, 0],
@@ -228,6 +229,7 @@ describe("full history find controls", () => {
     }
   );
 
+  // Case: TC-511, TC-513
   it.each([
     ["^$", ""],
     ["Ada|(?=Fix)", "Fix Issue"],
@@ -253,6 +255,7 @@ describe("full history find controls", () => {
     }
   );
 
+  // Case: TC-514, TC-516
   it("clears every match on late regex failure until the text or options change (TC-514, TC-516)", () => {
     setup([{ ...source, message: "ok" }]);
     createCommitRow(0, ["ok", source.author, hash.slice(0, 8)]);
@@ -281,6 +284,7 @@ describe("full history find controls", () => {
     expect(widget.getState().text).toBe("");
   });
 
+  // Case: TC-515
   it("starts only on request and reports the filtered hit at position 400 (TC-515)", () => {
     setup(Array.from({ length: 300 }, (_, index) => makeCommit({ hash: String(index) })));
     widget.show(false);
@@ -305,6 +309,7 @@ describe("full history find controls", () => {
     );
   });
 
+  // Case: TC-519
   it("navigates loaded hits in row order and hands off unread hits by position, including wraparound (TC-519)", () => {
     const makeHit = (index: number) => makeCommit({ hash: String(index), message: "needle" });
     setup([makeHit(1), makeHit(2), makeHit(3)]);
@@ -345,6 +350,7 @@ describe("full history find controls", () => {
     expect(getPositionText()).toBe("1 of 12 (0 unloaded)");
   });
 
+  // Case: TC-517, TC-518
   it.each([
     [english, "en"],
     [japanese, "ja"]
