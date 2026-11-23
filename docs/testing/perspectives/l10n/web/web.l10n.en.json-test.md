@@ -416,3 +416,18 @@ The English values of the table in implementation plan Task 11, implementation i
 - Tests: the end of the describe in `tests/web/i18n.test.ts` (`// @see` this file). TC-101 `English bundle holds the twelve keys with non-empty values (en l10n TC-101)` / TC-102 `English bundle holds exactly the fixed values of the Task 11 table (en l10n TC-102)` / TC-103 `English placeholders exist only on actionFor and commitsLoaded (en l10n TC-103)` / TC-104 `keeps the a11y key sets of both locales in parity (en l10n TC-104 / ja l10n TC-104)` / TC-105 `references every a11y key from web/ and defines every referenced one (en l10n TC-105)`
 - Task 11 added `a11y.closeDetails` in addition to the 12 keys of the table. "12 keys" in TC-101 / TC-102 means the set in the Task 11 table, while the parity and reference checks of TC-104 / TC-105 cover every `a11y.` key including `a11y.closeDetails` (the added key is also present in both en / ja and referenced from `web/main.ts`)
 - Execution result (2026-10-07): 5 passed
+
+## S12: English full history search controls and messages
+
+> Origin: Feature 061-02 (full history search)
+> Added: 2026-11-23
+> Status: active
+> Supersedes: -
+> Target Path: `l10n/web/web.l10n.en.json` (full history search entries)
+> Test File: `tests/web/i18n.test.ts`
+
+| Case ID | Input / Precondition                                                                                                                                           | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                 | Notes |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----- |
+| TC-106  | Render the English find controls for loaded scope, full scope, unread stash exclusion, Start, Continue, Cancel and Return, and all six search states.          | Normal - localized controls                                                | Every action and state resolves to nonempty English text. The two scope descriptions differentiate loaded commits from history under the current filters.                       | -     |
+| TC-107  | Render a loaded count of 303, a position of 0 with one unread result, a paused 3 of 12 with 9 unread, and confirmation for position 12,345 and depth 12,445.   | Boundary - formatted counts                                                | All numbers and paused plus signs appear in the correct roles in English. Both target position and requested depth appear in the confirmation, with no unresolved placeholders. | -     |
+| TC-108  | Render cancellation, acquisition failure, invalid regex, history changed, unverifiable history, reload required, missing target and target no longer matching. | Exception - reason-specific text                                           | Each reason resolves to the corresponding English message, distinguishing history updates from verification failures. Error interpolation preserves the supplied details.       | -     |

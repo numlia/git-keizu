@@ -2,18 +2,19 @@
 
 > Source: `src/dataSource.ts`
 > Storage Mode: sharded
-> Generated: 2026-11-22T00:00:00Z
+> Generated: 2026-11-23T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
-> Total Shards: 9
-> Total Sections: 48
-> Total Cases: 334
+> Total Shards: 10
+> Total Sections: 50
+> Total Cases: 353
 
 ## Shards
 
 | Shard File                  | Responsibility     | Sections | Cases | Last Updated |
 | --------------------------- | ------------------ | -------- | ----- | ------------ |
 | 01-history-diff-01.md       | history-diff       | 11       | 70    | 2026-11-22   |
+| 01-history-diff-02.md       | history-diff       | 2        | 19    | 2026-11-23   |
 | 02-branch-worktree-01.md    | branch-worktree    | 9        | 47    | 2026-09-13   |
 | 02-branch-worktree-02.md    | branch-worktree    | 5        | 49    | 2026-08-06   |
 | 02-branch-worktree-03.md    | branch-worktree    | 1        | 26    | 2026-11-22   |
@@ -46,6 +47,7 @@
 | Feature 053 (detached-worktree-menu) (light-spec-plan)                 | 02-branch-worktree-01.md                              |
 | Feature 055-03 (light-spec-plan)                                       | 06-branch-cleanup-01.md                               |
 | Feature 055-07 (light-spec-plan)                                       | 07-file-history-01.md                                 |
+| Feature 061-02 (full history search)                                   | 01-history-diff-02.md                                 |
 | Feature 061-02 (large history browsing)                                | 01-history-diff-01.md                                 |
 | test-plan (既存テスト)                                                 | 01-history-diff-01.md                                 |
 | フェーズ1 修正 H2 (rename-tracking-repair)                             | 02-branch-worktree-01.md                              |
