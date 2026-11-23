@@ -125,22 +125,23 @@
 | TC-154  | `git-dir` gets an error event, `git-common-dir="/main/.git"`                 | External - git-dir failure                                                 | Returns only `["/main/.git"]`, the result of the successful `git-common-dir`                                                                  | error event fallback                                  |
 | TC-155  | Both `git-dir` and `git-common-dir` fail                                     | External - all rev-parse failed                                            | Returns an empty array `[]`                                                                                                                   | Final fallback when the watch root cannot be resolved |
 
-## S29: getGitLog() escaping regex metacharacters in `--author`
+## S29: Literal author filters
 
 > Origin: フェーズ2 修正 M1 (author-filter-regex-escape)
 > Added: 2026-07-04T02:44:58Z
+> Updated: 2026-11-22
 > Status: active
 > Supersedes: -
-> Signature: `function escapeRegExp(str: string): string` / `private getGitLog(repo, branches, num, showRemoteBranches, authors: string[])`
-> Target Path: `src/dataSource.ts:64-66, 979-981`
+> Target Path: `src/dataSource.ts` (authorFilterArgs)
+> Test File: `tests/src/dataSource.test.ts`
 
-`git log --author=<pattern>` interprets the value as a regular expression, so this fix escapes regex metacharacters in author names (`. * + ? ^ $ { } ( ) | [ ] \`) with `\` using `escapeRegExp` before concatenating them to `--author=`. This lets authors containing brackets, such as `dependabot[bot]`, be filtered by the intended exact match. Author names without metacharacters are unchanged after escaping.
+Selecting an author passes the name unchanged to `git log --fixed-strings`. Git matches the literal text within the author header, including punctuation and backslashes.
 
-| Case ID | Input / Precondition                                      | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                 | Notes                                                                 |
-| ------- | --------------------------------------------------------- | -------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| TC-173  | authors=["dependabot[bot]"]                               | Normal - bracket escape                                                    | The git log arguments include `--author=dependabot\[bot\]` (`[` and `]` are escaped with `\`)                                   | Exact match for bot authors with brackets                             |
-| TC-174  | authors=["Jane O'Brien"] (no metacharacters)              | Normal - passthrough unchanged                                             | The git log arguments include `--author=Jane O'Brien` as is (`'` and the space are outside the metacharacter set and unchanged) | Backward compatibility of existing behavior (consistent with S13/S18) |
-| TC-175  | authors=["a.b*c"]                                         | Normal - dot and star escape                                               | The git log arguments include `--author=a\.b\*c` (`.` and `*` are escaped with `\`)                                             | Neutralizes any-character and quantifier metacharacters               |
-| TC-176  | authors=["a\\b"] (backslash)                              | Boundary - backslash escape                                                | The git log arguments include `--author=a\\b` (`\` is doubled to `\\`)                                                          | Escaping the backslash itself                                         |
-| TC-177  | authors=[""] (empty-string author)                        | Boundary - empty author                                                    | The git log arguments include `--author=` (`escapeRegExp("")==="" `). spawn does not throw                                      | The empty string has nothing to replace                               |
-| TC-178  | authors=["(a\|b)"] (group and alternation metacharacters) | Boundary - group and alternation escape                                    | The git log arguments include `--author=\(a\|b\)` (`(`, `)`, `\|` are escaped with `\`)                                         | Neutralizes alternation and group metacharacters                      |
+| Case ID | Selected author   | Perspective                      | Expected argument          |
+| ------- | ----------------- | -------------------------------- | -------------------------- |
+| TC-173  | `dependabot[bot]` | Normal - brackets                | `--author=dependabot[bot]` |
+| TC-174  | `Jane O'Brien`    | Normal - space and apostrophe    | `--author=Jane O'Brien`    |
+| TC-175  | `a.b*c`           | Normal - dot and asterisk        | `--author=a.b*c`           |
+| TC-176  | `a\b`             | Boundary - single backslash      | `--author=a\b`             |
+| TC-177  | Empty string      | Boundary - empty selection value | `--author=`                |
+| TC-178  | `(a\|b)`          | Boundary - parentheses and pipe  | `--author=(a\|b)`          |

@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-10-28T01:57:59+09:00
+> Auto-generated: 2026-11-23T08:53:15+09:00
 > Total sources: 59
 > Total physical files: 105
-> Total sections: 629
-> Total cases: 3774
+> Total sections: 638
+> Total cases: 3813
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -25,14 +25,14 @@
 | `src/config.ts` | single-file | `archive/src/config-test/2026-05-17-pre-sharding-config-test.md` | 1 | 14 | 79 | 2026-05-02 |
 | `src/config.ts` | sharded | `src/config-test/INDEX.md` | 5 | 20 | 101 | 2026-10-27 |
 | `src/dataSource.ts` | single-file | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md` | 1 | 25 | 149 | 2026-04-04 |
-| `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 9 | 46 | 325 | 2026-10-28 |
+| `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 9 | 48 | 334 | 2026-11-22 |
 | `src/diffDocProvider.ts` | single-file | `src/diffDocProvider-test.md` | 1 | 7 | 33 | 2026-07-04 |
 | `src/extension.ts` | single-file | `src/extension-test.md` | 1 | 10 | 33 | 2026-10-27 |
 | `src/extensionState.ts` | single-file | `src/extensionState-test.md` | 1 | 14 | 42 | 2026-07-04 |
 | `src/fileHistory.ts` | single-file | `src/fileHistory-test.md` | 1 | 9 | 87 | 2026-10-28 |
 | `src/gitExecutable.ts` | single-file | `src/gitExecutable-test.md` | 1 | 1 | 6 | 2026-07-19 |
 | `src/gitGraphView.ts` | single-file | `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md` | 1 | 17 | 60 | 2026-03-20 |
-| `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 11 | 38 | 183 | 2026-10-27 |
+| `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 11 | 39 | 185 | 2026-11-22 |
 | `src/i18n.ts` | single-file | `src/i18n-test.md` | 1 | 2 | 11 | 2026-08-25 |
 | `src/refValidation.ts` | single-file | `src/refValidation-test.md` | 1 | 1 | 19 | 2026-08-03 |
 | `src/repoFileWatcher.ts` | single-file | `src/repoFileWatcher-test.md` | 1 | 10 | 74 | 2026-08-08 |
@@ -44,7 +44,7 @@
 | `src/worktreePath.ts` | single-file | `src/worktreePath-test.md` | 1 | 3 | 34 | 2026-10-27 |
 | `web/branchCleanupPanel.ts` | single-file | `web/branchCleanupPanel-test.md` | 1 | 7 | 53 | 2026-10-27 |
 | `web/branchLabels.ts` | single-file | `web/branchLabels-test.md` | 1 | 1 | 17 | 2026-03-21 |
-| `web/commitMenu.ts` | single-file | `web/commitMenu-test.md` | 1 | 12 | 53 | 2026-10-03 |
+| `web/commitMenu.ts` | single-file | `web/commitMenu-test.md` | 1 | 12 | 53 | 2026-11-23 |
 | `web/contextMenu.ts` | single-file | `web/contextMenu-test.md` | 1 | 10 | 77 | 2026-10-07 |
 | `web/dates.ts` | single-file | `web/dates-test.md` | 1 | 8 | 31 | 2026-07-04 |
 | `web/dialogs.ts` | single-file | `web/dialogs-test.md` | 1 | 9 | 56 | 2026-10-07 |
@@ -52,14 +52,14 @@
 | `web/fileHistory.ts` | single-file | `web/fileHistory-test.md` | 1 | 11 | 100 | 2026-10-07 |
 | `web/fileMenu.ts` | single-file | `web/fileMenu-test.md` | 1 | 4 | 39 | 2026-09-13 |
 | `web/fileTree.ts` | single-file | `web/fileTree-test.md` | 1 | 5 | 44 | 2026-10-07 |
-| `web/findWidget.ts` | single-file | `web/findWidget-test.md` | 1 | 12 | 62 | 2026-10-08 |
-| `web/graph.ts` | single-file | `web/graph-test.md` | 1 | 21 | 89 | 2026-10-03 |
+| `web/findWidget.ts` | single-file | `web/findWidget-test.md` | 1 | 13 | 65 | 2026-11-22 |
+| `web/graph.ts` | single-file | `web/graph-test.md` | 1 | 22 | 94 | 2026-11-22 |
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 3 | 11 | 2026-10-03 |
 | `web/keyboardNavigation.ts` | single-file | `web/keyboardNavigation-test.md` | 1 | 4 | 54 | 2026-10-07 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 19 | 63 | 457 | 2026-10-27 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 19 | 66 | 475 | 2026-11-23 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
-| `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 18 | 68 | 2026-10-27 |
+| `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 19 | 70 | 2026-11-22 |
 | `web/pathHighlight.ts` | single-file | `web/pathHighlight-test.md` | 1 | 3 | 21 | 2026-10-03 |
 | `web/pathHighlightController.ts` | single-file | `web/pathHighlightController-test.md` | 1 | 2 | 17 | 2026-10-07 |
 | `web/refMenu.ts` | single-file | `archive/web/refMenu-test/2026-08-03-pre-sharding-refMenu-test.md` | 1 | 14 | 74 | 2026-07-19 |
@@ -149,6 +149,7 @@
 | Feature 060-03 (light-spec-plan) | `web/contextMenu-test.md`, `web/refMenu-test/INDEX.md`, `web/worktreeMenu-test.md` |
 | Feature 060-03 addendum (light-spec-plan) | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
 | Feature 061-01 (light-spec-plan) | `media/main-test.md`, `web/commitMenu-test.md`, `web/fileHistory-test.md`, `web/graph-test.md`, `web/i18n-test.md`, `web/main-test/INDEX.md`, `web/pathHighlight-test.md`, `web/pathHighlightController-test.md`, `web/refMenu-test/INDEX.md` |
+| Feature 061-02 (large history browsing) | `src/dataSource-test/INDEX.md`, `src/gitGraphView-test/INDEX.md`, `web/findWidget-test.md`, `web/graph-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md` |
 | Feature 061-05 (PR #105 review) | `web/findWidget-test.md` |
 | Feature 061-05 (light-spec-plan) | `l10n/bundle.l10n-test.md`, `l10n/bundle.l10n.ja-test.md`, `l10n/web/web.l10n.en.json-test.md`, `l10n/web/web.l10n.ja.json-test.md`, `media/dropdown-test.md`, `media/findwidget-test.md`, `media/main-test.md`, `src/gitGraphView-test/INDEX.md`, `web/branchCleanupPanel-test.md`, `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/dropdown-test.md`, `web/fileHistory-test.md`, `web/fileTree-test.md`, `web/findWidget-test.md`, `web/keyboardNavigation-test.md`, `web/main-test/INDEX.md`, `web/pathHighlightController-test.md`, `web/refOverflow-test.md` |
 | Feature 061-05 (light-spec-plan) review fix | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md` |

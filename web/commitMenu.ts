@@ -28,13 +28,14 @@ function buildMergeParentOptions(
   commits: GitCommitNode[],
   commitLookup: { [hash: string]: number }
 ): { name: string; value: string }[] {
-  return parentHashes.map((parentHash, index) => ({
-    name:
-      typeof commitLookup[parentHash] === "number"
-        ? `${abbrevCommit(parentHash)}: ${commits[commitLookup[parentHash]].message}`
-        : abbrevCommit(parentHash),
-    value: (index + 1).toString()
-  }));
+  return parentHashes.map((parentHash, index) => {
+    const parent = commits[commitLookup[parentHash]];
+    const shortHash = abbrevCommit(parentHash);
+    return {
+      name: parent ? `${shortHash}: ${parent.message}` : shortHash,
+      value: (index + 1).toString()
+    };
+  });
 }
 
 export function buildCommitContextMenuItems(
@@ -46,6 +47,9 @@ export function buildCommitContextMenuItems(
   sourceElem: HTMLElement,
   onHighlight?: (mode: CommitPathMode) => void
 ): ContextMenuElement[] {
+  // An open menu can outlive the page that supplied its rows and parent indices.
+  const parentOptions =
+    parentHashes.length > 1 ? buildMergeParentOptions(parentHashes, commits, commitLookup) : null;
   const addTagItem: ContextMenuItem = {
     title: `${t("Add Tag")}${ELLIPSIS}`,
     recentActionId: "commit.addTag",
@@ -198,7 +202,7 @@ export function buildCommitContextMenuItems(
           )
         }
       ];
-      if (parentHashes.length <= 1) {
+      if (parentOptions === null) {
         showFormDialog(
           t(
             "Are you sure you want to cherry pick commit {0}?",
@@ -220,7 +224,6 @@ export function buildCommitContextMenuItems(
           sourceElem
         );
       } else {
-        const options = buildMergeParentOptions(parentHashes, commits, commitLookup);
         showFormDialog(
           t(
             "Are you sure you want to cherry pick merge commit {0}? Choose the parent hash on the main branch, to cherry pick the commit relative to:",
@@ -230,7 +233,7 @@ export function buildCommitContextMenuItems(
             {
               type: "select" as const,
               name: t("Parent: "),
-              options: options,
+              options: parentOptions,
               default: "1"
             },
             ...cherryPickCheckboxes
@@ -255,7 +258,7 @@ export function buildCommitContextMenuItems(
   const revertItem: ContextMenuItem = {
     title: `${t("Revert")}${ELLIPSIS}`,
     onClick: () => {
-      if (parentHashes.length <= 1) {
+      if (parentOptions === null) {
         showConfirmationDialog(
           t("Are you sure you want to revert commit {0}?", `<b><i>${abbrevCommit(hash)}</i></b>`),
           () => {
@@ -269,14 +272,13 @@ export function buildCommitContextMenuItems(
           sourceElem
         );
       } else {
-        const options = buildMergeParentOptions(parentHashes, commits, commitLookup);
         showSelectDialog(
           t(
             "Are you sure you want to revert merge commit {0}? Choose the parent hash on the main branch, to revert the commit relative to:",
             `<b><i>${abbrevCommit(hash)}</i></b>`
           ),
           "1",
-          options,
+          parentOptions,
           t("Yes, revert commit"),
           (parentIndex) => {
             sendMessage({

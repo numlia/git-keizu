@@ -273,10 +273,25 @@ export class FileHistoryController {
     if (originHash === null) return null;
     const hash = findAdjacentMatch(loadedHashes, state.visibleHashes, originHash, delta);
     // The row is confirmed before the state changes so a missing row leaves nothing half-updated.
-    if (hash === null || !getCommitRows().some((row) => row.dataset.hash === hash)) return null;
+    if (hash === null) return null;
+    const mounted = getCommitRows().some((row) => row.dataset.hash === hash);
+    if (!mounted) {
+      const index = this.callbacks.getCommitId(hash);
+      const skipped = document.querySelectorAll<HTMLElement>("#commitTable tr[data-skipped-start]");
+      if (
+        index === null ||
+        !Array.from(skipped).some(
+          (row) =>
+            Number(row.dataset.skippedStart) <= index && index < Number(row.dataset.skippedEnd)
+        )
+      )
+        return null;
+      this.callbacks.scrollToCommit(hash, true);
+      if (!getCommitRows().some((row) => row.dataset.hash === hash)) return null;
+    }
     this.state = { ...state, currentHash: hash };
     this.applyClasses();
-    this.callbacks.scrollToCommit(hash, true);
+    if (mounted) this.callbacks.scrollToCommit(hash, true);
     return hash;
   }
 
@@ -417,18 +432,24 @@ export class FileHistoryController {
     if (this.state === null) return;
     const { visibleHashes, currentHash } = this.state;
     const matchHashes: ReadonlySet<string> = new Set(visibleHashes);
+    this.paintMountedRows();
+    this.callbacks.setGraphHighlight({ matchHashes, currentHash });
+    this.renderBar();
+  }
+
+  public paintMountedRows(): void {
+    if (this.state === null) return;
+    const { entryByHash, currentHash } = this.state;
     for (const row of getCommitRows()) {
       row.classList.remove(...HIGHLIGHT_CLASSES);
       const hash = row.dataset.hash;
-      if (hash !== undefined && matchHashes.has(hash)) {
+      if (hash !== undefined && entryByHash.has(hash)) {
         row.classList.add(CLASS_FILE_HISTORY_MATCH);
         if (hash === currentHash) row.classList.add(CLASS_FILE_HISTORY_CURRENT);
       } else {
         row.classList.add(CLASS_FILE_HISTORY_DIM);
       }
     }
-    this.callbacks.setGraphHighlight({ matchHashes, currentHash });
-    this.renderBar();
   }
 
   private renderBar(): void {

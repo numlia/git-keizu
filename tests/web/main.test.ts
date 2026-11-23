@@ -22,6 +22,7 @@ import type {
   RequestMessage
 } from "../../src/types";
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
+import { dispatchHostMessage as dispatchMessage } from "./setup";
 
 /* ------------------------------------------------------------------ */
 /* Hoisted mocks (shared references for mock factories + assertions)  */
@@ -44,6 +45,7 @@ const {
     request: vi.fn(),
     handleResponse: vi.fn(),
     onCommitsRendered: vi.fn(),
+    paintMountedRows: vi.fn(),
     onRepositoryChanged: vi.fn(),
     handleCommitRowClick: vi.fn(),
     navigate: vi.fn<(delta: -1 | 1, useExpandedCommit?: boolean) => string | null>(() => null),
@@ -82,6 +84,7 @@ const {
       close: vi.fn(),
       isVisible: vi.fn(() => false),
       refresh: vi.fn(),
+      repaintMountedMatches: vi.fn(),
       setInputEnabled: vi.fn(),
       getState: vi.fn(() => ({
         text: "",
@@ -1077,10 +1080,6 @@ function setupViewState(): void {
       removeWorktree: { deleteBranch: true }
     }
   };
-}
-
-function dispatchMessage(data: Record<string, unknown>): void {
-  window.dispatchEvent(new MessageEvent("message", { data }));
 }
 
 function loadTestCommits(): void {
@@ -4531,6 +4530,8 @@ describe("GitKeizuView frontend integration", () => {
       vi.clearAllMocks();
       // Ensure moreCommitsAvailable=true and config.loadMoreCommitsAutomatically=true
       loadCommitsWithMore(true);
+      setScrollMetrics(0, 500, 1000);
+      fireScroll();
       vi.clearAllMocks();
     });
 
@@ -4645,7 +4646,7 @@ describe("GitKeizuView frontend integration", () => {
       vi.clearAllMocks();
 
       // Then: next scroll can trigger auto-load again (isLoadingMoreCommits reset)
-      setScrollMetrics(475, 500, 1000);
+      setScrollMetrics(476, 500, 1000);
       fireScroll();
       expect(vscode.postMessage).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -5950,17 +5951,23 @@ describe("Multi-select filter state management", () => {
   /* S25: Branch dropdown constants                                    */
   /* ---------------------------------------------------------------- */
 
+  function refreshBranchOptions(branches: string[], head: string | null): void {
+    document.getElementById("refreshBtn")!.click();
+    dispatchMessage({ command: "loadBranches", branches, head, hard: true, isRepo: true });
+    dispatchMessage({
+      command: "loadCommits",
+      commits: MOCK_COMMITS,
+      head: COMMIT_HASH_1,
+      moreCommitsAvailable: false,
+      hard: true
+    });
+  }
+
   describe("Branch dropdown constants (S25)", () => {
     it("ALL_BRANCHES_LABEL is 'Show All' (TC-151)", () => {
       // Given/When: loadBranches response is dispatched
       vi.clearAllMocks();
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["main"],
-        head: "main",
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["main"], "main");
 
       // Then: first option name is "Show All"
       const call = mockBranchDropdownInstance.setOptions.mock.calls[0];
@@ -5972,13 +5979,7 @@ describe("Multi-select filter state management", () => {
     it("ALL_BRANCHES_VALUE is empty string (TC-152)", () => {
       // Given/When: loadBranches response is dispatched
       vi.clearAllMocks();
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["main"],
-        head: "main",
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["main"], "main");
 
       // Then: first option value is ""
       const call = mockBranchDropdownInstance.setOptions.mock.calls[0];
@@ -5990,13 +5991,7 @@ describe("Multi-select filter state management", () => {
     it("REMOTE_BRANCH_PREFIX strips 'remotes/' from display name (TC-153)", () => {
       // Given: branch list includes a remote branch
       vi.clearAllMocks();
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["main", "remotes/origin/feature"],
-        head: "main",
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["main", "remotes/origin/feature"], "main");
 
       // Then: remote branch display name strips "remotes/" prefix
       const call = mockBranchDropdownInstance.setOptions.mock.calls[0];
@@ -6009,13 +6004,7 @@ describe("Multi-select filter state management", () => {
     it("uses REMOTE_BRANCH_PREFIX.length instead of magic number 8 (TC-154)", () => {
       // Given: branch list includes a remote branch with long prefix
       vi.clearAllMocks();
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["remotes/upstream/main"],
-        head: null,
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["remotes/upstream/main"], null);
 
       // Then: display name correctly strips "remotes/" (8 chars) via constant
       const call = mockBranchDropdownInstance.setOptions.mock.calls[0];
@@ -6045,13 +6034,7 @@ describe("Multi-select filter state management", () => {
       vi.clearAllMocks();
 
       // When: loadBranches response includes both branches
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["main", "dev", "feature"],
-        head: "main",
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["main", "dev", "feature"], "main");
 
       // Then: branchDropdown.setOptions is called with selectedBranches=["main","dev"]
       expect(mockBranchDropdownInstance.setOptions).toHaveBeenCalledWith(expect.any(Array), [
@@ -6073,13 +6056,7 @@ describe("Multi-select filter state management", () => {
       vi.clearAllMocks();
 
       // When: loadBranches response excludes "deleted-branch"
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["main", "dev"],
-        head: "main",
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["main", "dev"], "main");
 
       // Then: branchDropdown.setOptions is called with only ["main"]
       expect(mockBranchDropdownInstance.setOptions).toHaveBeenCalledWith(expect.any(Array), [
@@ -6101,13 +6078,7 @@ describe("Multi-select filter state management", () => {
 
       // When: loadBranches response has none of the selected branches
       // (showCurrentBranchByDefault=false in setupViewState)
-      dispatchMessage({
-        command: "loadBranches",
-        branches: ["main", "dev"],
-        head: "main",
-        hard: true,
-        isRepo: true
-      });
+      refreshBranchOptions(["main", "dev"], "main");
 
       // Then: branchDropdown.setOptions is called with [] (empty = Show All fallback)
       expect(mockBranchDropdownInstance.setOptions).toHaveBeenCalledWith(expect.any(Array), []);
@@ -8270,6 +8241,296 @@ describe("highlightFileHistory icon wiring and click handler (S54)", () => {
 /* S40: ロード要求の保留と再送 (Feature 041)                          */
 /* ------------------------------------------------------------------ */
 
+// @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
+describe("installing an ordinary history page", () => {
+  const initialToken = 41;
+  const otherRepo = "/other";
+  const page = {
+    command: "appendCommits",
+    repo: TEST_REPO,
+    from: initialToken,
+    baseCount: MOCK_COMMITS.length,
+    commits: Array.from({ length: 100 }, (_, i) => ({ ...MOCK_COMMITS[0], hash: `page-${i}` })),
+    moreCommitsAvailable: false
+  };
+  const fullResponse = {
+    command: "loadCommits",
+    head: COMMIT_HASH_1,
+    commits: MOCK_COMMITS,
+    moreCommitsAvailable: true,
+    hard: true,
+    pageToken: initialToken
+  };
+  const branches = {
+    command: "loadBranches",
+    branches: ["main"],
+    head: "main",
+    hard: true,
+    isRepo: true
+  };
+  let api: typeof vscode;
+  let firstId: string | undefined;
+  function requests() {
+    return vi
+      .mocked(api.postMessage)
+      .mock.calls.map(([msg]) => msg as RequestMessage)
+      .filter((msg) => msg.command === "loadCommits");
+  }
+  function savedCommits() {
+    return (vi.mocked(api.setState).mock.lastCall![0] as WebViewState).commits;
+  }
+  async function startWebview(savedState: WebViewState | null = null) {
+    vi.resetModules();
+    dropdownCallCount = 0;
+    setupTestDOM();
+    setupViewState();
+    viewState.repos[otherRepo] = { columnWidths: null };
+    viewState.initialLoadCommits = MOCK_COMMITS.length;
+    api = (await import("../../web/utils")).vscode;
+    vi.mocked(api.getState).mockReturnValueOnce(savedState);
+    await import("../../web/main");
+    return vi
+      .mocked(api.postMessage)
+      .mock.calls.map(([msg]) => msg as RequestMessage)
+      .find((msg) => msg.command === "loadBranches")!.requestId;
+  }
+  async function openWebview() {
+    const requestId = await startWebview();
+    dispatchMessage({ ...branches, requestId });
+    return requests().at(-1)!.requestId;
+  }
+  beforeEach(async () => {
+    firstId = await openWebview();
+    dispatchMessage({ ...fullResponse, requestId: firstId });
+    vi.mocked(api.postMessage).mockClear();
+  });
+
+  // Case: TC-791
+  it("keeps the full history height and resizes the deep row window (TC-791)", async () => {
+    const count = 100_000;
+    const pitch = 24;
+    const depth = 90_000;
+    const scroller = document.getElementById("scrollContainer")!;
+    const commits = Array.from({ length: count }, (_, i) => ({
+      ...MOCK_COMMITS[0],
+      hash: String(i)
+    }));
+    const longTag = `release/${"subproject-".repeat(12)}candidate`;
+    commits[depth] = {
+      ...commits[depth],
+      refs: [{ hash: String(depth), type: "tag", name: longTag }]
+    };
+    const resize = (height: number) => {
+      Object.defineProperty(scroller, "clientHeight", { value: height, configurable: true });
+      window.dispatchEvent(new Event("resize"));
+    };
+    const verifyWindow = () => {
+      const table = scroller.querySelector("table")!;
+      const rows = Array.from(table.querySelectorAll<HTMLElement>("tr.commit"));
+      expect(table.getAttribute("aria-rowcount")).toBe(String(count + 1));
+      expect(table.querySelector("#tableColHeaders")?.getAttribute("aria-rowindex")).toBe("1");
+      expect(rows.length).toBeLessThanOrEqual(Math.ceil(scroller.clientHeight / pitch) + 24);
+      expect(rows.map((row) => Number(row.getAttribute("aria-rowindex")))).toEqual(
+        rows.map((row) => Number(row.dataset.id) + 2)
+      );
+      expect(rows.some((r) => r.dataset.hash === String(depth))).toBe(true);
+      expect(table.querySelector(`tr[data-id="${depth}"] .gitRef.tag`)?.textContent).toContain(
+        longTag
+      );
+      const skippedHeight = Array.from(
+        table.querySelectorAll<HTMLElement>("tr[data-skipped-start] td")
+      ).reduce((sum, td) => sum + parseFloat(td.style.height), 0);
+      expect(skippedHeight + pitch * rows.length).toBe(count * pitch);
+      const first = Number(rows[0].dataset.id);
+      expect(rows.map((r) => r.dataset.id)).toEqual(rows.map((_, i) => String(first + i)));
+      expect(mockGraphHighlight.render).toHaveBeenLastCalledWith(null, first, first + rows.length);
+      return rows.length;
+    };
+    const labels =
+      await vi.importActual<typeof import("../../web/branchLabels")>("../../web/branchLabels");
+    await vi.mocked(getBranchLabels).withImplementation(labels.getBranchLabels, () => {
+      resize(pitch * 10);
+      scroller.scrollTop = 1000 * pitch;
+      dispatchMessage({ ...fullResponse, head: "0", commits: commits.slice(0, 2000) });
+      const smallHistoryRows = scroller.querySelectorAll("tr.commit").length;
+      scroller.scrollTop = depth * pitch;
+      dispatchMessage({ ...fullResponse, head: "0", commits });
+      const short = verifyWindow();
+      expect(short).toBe(smallHistoryRows);
+      resize(pitch * 30);
+      const tall = verifyWindow();
+      expect(tall).toBeGreaterThan(short);
+      expect(requests()).toEqual([]);
+    });
+  });
+
+  // Case: TC-792
+  it("moves 100 rows up and down inside loaded history without a request (TC-792)", async () => {
+    const commits = Array.from({ length: 800 }, (_, i) => ({
+      ...MOCK_COMMITS[0],
+      hash: String(i)
+    }));
+    const scroller = document.getElementById("scrollContainer")!;
+    Object.defineProperties(scroller, {
+      clientHeight: { value: 240, configurable: true },
+      scrollHeight: { value: 24 * commits.length, configurable: true }
+    });
+    dispatchMessage({ ...fullResponse, commits, head: "0" });
+    for (const firstVisible of [400, 300, 400]) {
+      scroller.scrollTop = firstVisible * 24;
+      scroller.dispatchEvent(new Event("scroll"));
+      await new Promise(requestAnimationFrame);
+      const rows = Array.from(scroller.querySelectorAll<HTMLElement>("tr.commit"));
+      expect(rows.map((r) => r.dataset.hash)).toContain(String(firstVisible));
+      const first = Number(rows[0].dataset.id);
+      expect(mockGraphHighlight.render).toHaveBeenLastCalledWith(null, first, first + rows.length);
+      expect(requests()).toEqual([]);
+    }
+  });
+
+  // Case: TC-793
+  it.each(["button", "scroll"])(
+    "appends 100 rows once and preserves the reading offset on %s (TC-793)",
+    (trigger) => {
+      const scroller = document.getElementById("scrollContainer")!;
+      scroller.scrollTop = 72;
+      if (trigger === "button") document.getElementById("loadMoreCommitsBtn")!.click();
+      else {
+        Object.defineProperty(scroller, "clientHeight", { value: 240, configurable: true });
+        Object.defineProperty(scroller, "scrollHeight", { value: 320, configurable: true });
+        scroller.dispatchEvent(new Event("scroll"));
+        document.getElementById("loadMoreCommitsBtn")!.click();
+      }
+      expect(requests()).toHaveLength(1);
+      expect(requests()[0]).toMatchObject({ pageToken: initialToken, maxCommits: 103 });
+      dispatchMessage(page);
+      dispatchMessage(page);
+      expect(savedCommits()).toEqual([...MOCK_COMMITS, ...page.commits]);
+      expect(scroller.scrollTop).toBe(72);
+      expect(document.getElementById("loadMoreCommitsBtn")).toBeNull();
+    }
+  );
+
+  // Case: TC-794
+  it("keeps the current history when a previous webview replies after reopening (TC-794)", async () => {
+    const previousId = await openWebview();
+    const currentId = await openWebview();
+    const staleResponse = {
+      ...fullResponse,
+      requestId: previousId,
+      commits: MOCK_COMMITS.slice(1)
+    };
+    dispatchMessage(staleResponse);
+    expect(document.querySelectorAll("#commitTable tr.commit")).toHaveLength(0);
+    dispatchMessage({ ...fullResponse, requestId: currentId });
+    dispatchMessage(staleResponse);
+    expect(savedCommits()).toEqual(MOCK_COMMITS);
+  });
+
+  // Case: TC-808
+  it.each(["before", "after"])(
+    "keeps the restored branch when an old reply arrives %s the current one (TC-808)",
+    async (order) => {
+      const saved = {
+        ...MOCK_PREV_STATE,
+        gitBranches: ["main", "topic"],
+        selectedBranches: ["topic"]
+      };
+      const previousId = await startWebview(saved);
+      const currentId = await startWebview(saved);
+      const stale = { ...branches, requestId: previousId };
+      const current = {
+        ...branches,
+        branches: [...saved.gitBranches, "release"],
+        requestId: currentId
+      };
+      const expectRestored = (expectedBranches: string[]) => {
+        expect(vi.mocked(api.setState).mock.lastCall![0]).toMatchObject({
+          gitBranches: expectedBranches,
+          selectedBranches: ["topic"]
+        });
+        expect(mockBranchDropdownInstance.setOptions).toHaveBeenLastCalledWith(expect.any(Array), [
+          "topic"
+        ]);
+      };
+      if (order === "before") {
+        dispatchMessage(stale);
+        dispatchMessage({ ...branches, requestId: undefined });
+        expect(requests()).toEqual([]);
+        expectRestored(saved.gitBranches);
+      }
+      dispatchMessage(current);
+      if (order === "after") dispatchMessage(stale);
+      expectRestored(current.branches);
+      expect(requests()).toEqual([
+        expect.objectContaining({ branches: ["topic"], requestId: expect.any(String) })
+      ]);
+      expect(currentId).toEqual(expect.any(String));
+      expect(currentId).not.toBe(previousId);
+    }
+  );
+
+  // Case: TC-794
+  it("keeps the outstanding page through wrong repo, token, count and old replacement responses (TC-794)", () => {
+    document.getElementById("loadMoreCommitsBtn")!.click();
+    for (const stale of [
+      { ...page, repo: otherRepo },
+      { ...page, from: -1 },
+      { ...page, baseCount: 0 },
+      { ...fullResponse, requestId: firstId, commits: [] }
+    ]) {
+      dispatchMessage(stale);
+      expect(savedCommits()).toEqual(MOCK_COMMITS);
+    }
+    dispatchMessage(page);
+    expect(savedCommits()).toEqual([...MOCK_COMMITS, ...page.commits]);
+    expect(requests()).toHaveLength(1);
+  });
+  // Case: TC-794
+  it.each(["refresh", "switch away and back"])(
+    "drops a late page after %s and installs the current replacement (TC-794)",
+    (action) => {
+      document.getElementById("loadMoreCommitsBtn")!.click();
+      if (action === "refresh") document.getElementById("refreshBtn")!.click();
+      else {
+        dispatchMessage({ command: "selectRepo", repo: otherRepo });
+        dispatchMessage({ command: "selectRepo", repo: TEST_REPO });
+        dispatchMessage(branches);
+      }
+      dispatchMessage(branches);
+      dispatchMessage(page);
+      expect(savedCommits()).toEqual(MOCK_COMMITS);
+      const current = requests().at(-1)!;
+      expect(current.pageToken).toBeUndefined();
+      const commits = MOCK_COMMITS.slice(1);
+      dispatchMessage({ ...fullResponse, requestId: current.requestId, commits });
+      dispatchMessage(page);
+      expect(savedCommits()).toEqual(commits);
+    }
+  );
+
+  // Case: TC-798
+  it("restores unchanged rows when a soft refresh supersedes a hard refresh (TC-798)", () => {
+    document.getElementById("refreshBtn")!.click();
+    dispatchMessage(branches);
+    const hardRequest = requests().at(-1)!;
+    expect(hardRequest.hard).toBe(true);
+
+    dispatchMessage({ command: "refresh" });
+    dispatchMessage({ ...branches, hard: false });
+    dispatchMessage({ ...fullResponse, requestId: hardRequest.requestId });
+    expect(document.querySelector("#commitTable #loadingHeader")).not.toBeNull();
+
+    const softRequest = requests().at(-1)!;
+    expect(softRequest.requestId).not.toBe(hardRequest.requestId);
+    expect(softRequest.hard).toBe(false);
+    dispatchMessage({ ...fullResponse, hard: false, requestId: softRequest.requestId });
+    const rows = document.querySelectorAll<HTMLElement>("#commitTable .commit");
+    expect(Array.from(rows, (row) => row.dataset.hash)).toEqual(MOCK_COMMITS.map((c) => c.hash));
+    expect(document.querySelector("#commitTable #loadingHeader")).toBeNull();
+  });
+});
+
 describe("request queue / refresh contention (S40)", () => {
   let liveVscode: typeof vscode;
 
@@ -8440,6 +8701,7 @@ describe("request queue / refresh contention (S40)", () => {
     vi.clearAllMocks();
 
     // Then: isLoadingMoreCommits has been reset; another scroll re-fires auto Load More
+    container.scrollTop++;
     container.dispatchEvent(new Event("scroll", { bubbles: true }));
     expect(postedCommands("loadCommits")).toHaveLength(1);
 
@@ -9303,6 +9565,7 @@ describe("Branch cleanup panel wiring (S49)", () => {
     expect(branchRequests).toHaveLength(1);
     expect(branchRequests[0]).toEqual({
       command: "loadBranches",
+      requestId: expect.any(String),
       repo: TEST_REPO,
       showRemoteBranches: true,
       hard: false

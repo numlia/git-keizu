@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { pathToFileURL } from "node:url";
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -38,8 +39,14 @@ vi.mock("../../src/worktree", async (importOriginal) => {
   return { ...actual, parseWorktreeList: vi.fn(actual.parseWorktreeList) };
 });
 
+import { getConfig } from "../../src/config";
 import { DataSource } from "../../src/dataSource";
-import type { BranchCleanupResult, FileHistoryEntry } from "../../src/types";
+import type {
+  BranchCleanupResult,
+  CommitOrdering,
+  FileHistoryEntry,
+  RequestLoadCommits
+} from "../../src/types";
 import { parseWorktreeList } from "../../src/worktree";
 
 const MAIN_BRANCH = "main";
@@ -83,6 +90,434 @@ async function createFixture(): Promise<GitFixture> {
 
   return { root, repo, originBare, upstreamBare };
 }
+
+// @see docs/testing/perspectives/src/dataSource-test/01-history-diff-01.md (S54)
+describe("continuing ordinary Git history", () => {
+  let fixture: GitFixture;
+  let ds: DataSource;
+  beforeEach(async () => {
+    fixture = await createFixture();
+    ds = new DataSource();
+    for (const message of ["two", "three", "four", "five", "six"]) {
+      git(fixture.repo, ["commit", "--allow-empty", "-m", message]);
+    }
+  });
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    await fs.rm(fixture.root, { recursive: true, force: true });
+  });
+
+  function query(maxCommits: number, pageToken?: number): RequestLoadCommits {
+    return {
+      command: "loadCommits",
+      repo: fixture.repo,
+      branches: [],
+      maxCommits,
+      showRemoteBranches: true,
+      authors: [],
+      commitOrdering: "date",
+      hard: true,
+      pageToken
+    };
+  }
+  function full(count: number, order: CommitOrdering = "date", authors: string[] = []) {
+    return ds.getCommits(fixture.repo, [], count, true, authors, order);
+  }
+
+  // Case: TC-381
+  it("preserves single and consecutive carriage returns and reads the following records (TC-381)", async () => {
+    for (const subject of ["one\rreturn", "two\r\rreturns", "newest"]) {
+      git(fixture.repo, ["commit", "--allow-empty", "--cleanup=verbatim", "-m", subject]);
+    }
+    const expected = git(fixture.repo, ["log", "-z", "--format=%H%x00%P%x00%s", "-4"]).split("\0");
+    // The helper trims whitespace, but preserves Git's final NUL.
+    expect(
+      (await full(4)).commits.flatMap((row) => [row.hash, row.parentHashes.join(" "), row.message])
+    ).toEqual(expected.slice(0, -1));
+  });
+
+  // Case: TC-382
+  it.each(["EUC-JP", "UTF-8"])(
+    "keeps Japanese history readable when Git's output encoding changes from %s (TC-382)",
+    async (initialEncoding) => {
+      const { repo } = fixture;
+      const subjects = ["更新一", "更新二", "更新三", "更新四"];
+      for (const subject of subjects) {
+        git(repo, ["commit", "--allow-empty", "--author=作者 <author@example.com>", "-m", subject]);
+      }
+      git(repo, ["config", "i18n.logOutputEncoding", initialEncoding]);
+      const first = await full(2);
+      git(repo, [
+        "config",
+        "i18n.logOutputEncoding",
+        initialEncoding === "UTF-8" ? "EUC-JP" : "UTF-8"
+      ]);
+      const page = await ds.getNextHistoryPage(query(4, first.pageToken));
+      expect(page).toBeDefined();
+      const combined = first.commits.concat(page!.commits);
+      expect(combined.map((row) => row.message)).toEqual(subjects.toReversed());
+      expect(combined.map((row) => row.author)).toEqual(subjects.map(() => "作者"));
+      expect(first.authors).toContain("作者");
+      expect(combined).toEqual((await full(4)).commits);
+    }
+  );
+
+  // Case: TC-382
+  it("reads Japanese subjects from stashes and detached worktree heads in UTF-8 (TC-382)", async () => {
+    const { repo, root } = fixture;
+    const detached = path.join(root, "detached");
+    git(repo, ["worktree", "add", "--detach", detached, "HEAD"]);
+    git(detached, ["commit", "--allow-empty", "-m", "別の履歴"]);
+    const pinnedHash = git(detached, ["rev-parse", "HEAD"]);
+    await fs.writeFile(path.join(repo, "work.txt"), "work");
+    git(repo, ["stash", "push", "--include-untracked", "-m", "退避"]);
+    git(repo, ["config", "i18n.logOutputEncoding", "EUC-JP"]);
+
+    const { commits } = await full(2);
+    expect(commits.find((row) => row.hash === pinnedHash)?.message).toBe("別の履歴");
+    expect(commits.find((row) => row.stash !== null)?.message).toContain("退避");
+  });
+
+  // Case: TC-382
+  it("preserves Git order, both merge parents and refs across multi-tip and author-filtered walks (TC-382)", async () => {
+    const { repo } = fixture;
+    git(repo, ["switch", "-c", "topic", "HEAD~3"]);
+    git(repo, ["commit", "--allow-empty", "--author=Second <second@example.com>", "-m", "side"]);
+    git(repo, ["switch", MAIN_BRANCH]);
+    git(repo, ["merge", "--no-ff", "topic", "-m", "joined"]);
+    git(repo, ["switch", "topic"]);
+    git(repo, ["commit", "--allow-empty", "-m", "another tip"]);
+    git(repo, ["tag", "older", "main~2"]);
+    for (const order of ["date", "topo", "author-date"] as const) {
+      for (const authors of [[], ["Test User"]]) {
+        const expected = await full(100, order, authors);
+        const first = await full(2, order, authors);
+        const page = await ds.getNextHistoryPage({
+          ...query(100, first.pageToken),
+          authors,
+          commitOrdering: order
+        });
+        expect(page?.baseCount).toBe(2);
+        const rows = first.commits.concat(page!.commits);
+        expect(rows).toEqual(expected.commits);
+        expect(rows.map((row) => [row.hash, ...row.parentHashes].join(" "))).toEqual(
+          git(repo, [
+            "log",
+            `--${order}-order`,
+            ...authors.map((a) => `--author=${a}`),
+            "--format=%H %P",
+            "--branches",
+            "--tags",
+            "--remotes"
+          ])
+            .split("\n")
+            .map((line) => line.trimEnd())
+        );
+      }
+    }
+  });
+
+  // Case: TC-389
+  it("keeps a literal author filter across a Git pattern mode change (TC-389)", async () => {
+    const { repo, root } = fixture;
+    const authors = ["Build[bot]"];
+    const config = path.join(root, "author-filter.config");
+    await fs.writeFile(config, "[grep]\n\tpatternType = basic\n");
+    git(repo, ["config", "include.path", config]);
+    for (const subject of ["bot 1", "bot 2", "bot 3", "bot 4", "bot 5"]) {
+      git(repo, [
+        "commit",
+        "--allow-empty",
+        "--author=Build[bot] <bot@example.com>",
+        "-m",
+        subject
+      ]);
+    }
+    git(repo, ["commit", "--allow-empty", "--author=Buildb <other@example.com>", "-m", "other"]);
+
+    const first = await full(2, "date", authors);
+    expect(first.commits.map((row) => row.message)).toEqual(["bot 5", "bot 4"]);
+    await fs.writeFile(config, "[grep]\n\tpatternType = fixed\n");
+    expect(git(repo, ["config", "--get", "grep.patternType"])).toBe("fixed");
+    const page = await ds.getNextHistoryPage({ ...query(4, first.pageToken), authors });
+    const fresh = await full(4, "date", authors);
+
+    expect(page?.commits.map((row) => row.message)).toEqual(["bot 3", "bot 2"]);
+    expect(first.commits.concat(page!.commits)).toEqual(fresh.commits);
+    expect(page!.moreCommitsAvailable).toBe(true);
+    expect(fresh.moreCommitsAvailable).toBe(true);
+  });
+
+  // Case: TC-386
+  it.each(["worktree", "external", "index blob"])(
+    "invalidates the author-filtered page when the %s mailmap changes (TC-386)",
+    async (source) => {
+      const { repo, root } = fixture;
+      const map =
+        source === "external"
+          ? path.join(root, "author map")
+          : path.join(repo, source === "worktree" ? ".mailmap" : "authors.map");
+      if (source === "external") git(repo, ["config", "mailmap.file", map]);
+      if (source === "index blob") git(repo, ["config", "mailmap.blob", ":authors.map"]);
+      const writeMapping = async (name: string) => {
+        await fs.writeFile(map, `${name} <test@example.com>\n`);
+        if (source === "index blob") git(repo, ["add", "authors.map"]);
+      };
+      const authors = ["Mapped User"];
+      await writeMapping(authors[0]);
+      const first = await full(2, "date", authors);
+      expect(first.commits).toHaveLength(2);
+      const stable = await ds.getNextHistoryPage({ ...query(3, first.pageToken), authors });
+      expect(stable?.commits.map((c) => c.hash)).toEqual([git(repo, ["rev-parse", "HEAD~2"])]);
+      expect(stable?.pageToken).toBeTypeOf("number");
+
+      const refs = listRefs(repo);
+      await writeMapping("Former User");
+      expect(listRefs(repo)).toBe(refs);
+      if (source === "external") expect(git(repo, ["status", "--porcelain"])).toBe("");
+      expect(
+        await ds.getNextHistoryPage({ ...query(4, stable!.pageToken), authors })
+      ).toBeUndefined();
+      expect((await full(4, "date", authors)).commits).toEqual([]);
+    }
+  );
+
+  // @see docs/testing/perspectives/src/dataSource-test/01-history-diff-01.md (S54, S55)
+  // Case: TC-386, TC-387
+  it.each([
+    { kind: "file", id: "TC-386" },
+    { kind: "symlink", id: "TC-387" }
+  ])(
+    "refreshes unfiltered author choices after editing an external $kind ($id)",
+    async ({ kind }) => {
+      const { repo, root } = fixture;
+      const map = path.join(root, "author map");
+      await fs.writeFile(map, "");
+      const configured = kind === "symlink" ? path.join(root, "linked map") : map;
+      if (kind === "symlink") await fs.symlink(path.basename(map), configured, "file");
+      git(repo, ["config", "mailmap.file", configured]);
+      const first = await full(2);
+      expect(first.authors).toEqual(["Test User"]);
+      const stable = await ds.getNextHistoryPage(query(3, first.pageToken));
+      expect(stable?.pageToken).toBeTypeOf("number");
+
+      const refs = listRefs(repo);
+      await fs.writeFile(map, "Canonical <test@example.com>\n");
+      expect(listRefs(repo)).toBe(refs);
+      expect(git(repo, ["status", "--porcelain"])).toBe("");
+      expect(await ds.getNextHistoryPage(query(4, stable!.pageToken))).toBeUndefined();
+      const refreshed = await full(4);
+      expect(refreshed.authors).toEqual(["Canonical"]);
+      expect(refreshed.commits.map((row) => row.hash)).toEqual(
+        git(repo, ["log", "-4", "--format=%H"]).split("\n")
+      );
+    }
+  );
+
+  // Case: TC-388
+  it("continues past a bare log.mailmap setting and detects a change to false (TC-388)", async () => {
+    const { repo, root } = fixture;
+    const config = path.join(root, "mailmap.config");
+    await fs.writeFile(config, "[log]\n\tmailmap\n");
+    git(repo, ["config", "include.path", config]);
+    expect(git(repo, ["config", "--bool", "--get", "log.mailmap"])).toBe("true");
+
+    const first = await full(2);
+    const page = await ds.getNextHistoryPage(query(3, first.pageToken));
+    expect(page?.commits.map((row) => row.hash)).toEqual([git(repo, ["rev-parse", "HEAD~2"])]);
+    expect(page?.pageToken).toBeTypeOf("number");
+    await fs.writeFile(config, "[log]\n\tmailmap = false\n");
+    expect(await ds.getNextHistoryPage(query(4, page!.pageToken))).toBeUndefined();
+  });
+
+  // Case: TC-383
+  it("resumes a linear walk from its saved parent and sends only the next 100 commits (TC-383)", async () => {
+    const base = git(fixture.repo, ["rev-parse", "HEAD"]);
+    const commits = Array.from({ length: 100 }, (_, i) => {
+      const message = `row ${i}`;
+      return [
+        `commit refs/heads/${MAIN_BRANCH}`,
+        "committer Test User <test@example.com> now",
+        `data ${message.length}`,
+        message,
+        ...(i === 0 ? [`from ${base}`] : [])
+      ].join("\n");
+    });
+    cp.execFileSync("git", ["fast-import", "--quiet", "--date-format=now"], {
+      cwd: fixture.repo,
+      input: `${commits.join("\n")}\n`
+    });
+    const refs = git(fixture.repo, ["log", "--date-order", "--format=%H"]).split("\n");
+    const first = await full(3);
+    vi.mocked(cp.spawn).mockClear();
+    const result = await ds.getNextHistoryPage(query(103, first.pageToken));
+    const logs = vi
+      .mocked(cp.spawn)
+      .mock.calls.filter(([, args]) => Array.isArray(args) && args[0] === "log");
+    expect(logs).toHaveLength(1);
+    expect(logs[0][1]).toEqual(expect.arrayContaining(["--max-count=100", refs[4]]));
+    expect(result?.commits.map((row) => row.hash)).toEqual(refs.slice(3, 103));
+    expect(result?.moreCommitsAvailable).toBe(true);
+    expect(result?.pageToken).toBeTypeOf("number");
+  });
+
+  // Case: TC-384
+  it.each([4, 5])(
+    "ends an exact or short final page after %i loaded commits (TC-384)",
+    async (count) => {
+      const first = await full(count);
+      const page = await ds.getNextHistoryPage(query(count + 2, first.pageToken));
+      expect(page?.commits.map((row) => row.hash)).toEqual(
+        git(fixture.repo, ["log", `--skip=${count}`, "--format=%H"]).split("\n")
+      );
+      expect(page?.moreCommitsAvailable).toBe(false);
+      expect(page?.pageToken).toBeUndefined();
+      expect(await ds.getNextHistoryPage(query(count + 4, first.pageToken))).toBeUndefined();
+    }
+  );
+
+  // Case: TC-385
+  it.each(["create", "edit", "remove"])(
+    "reloads history after a graft file %s with unchanged refs (TC-385)",
+    async (change) => {
+      const { repo, root } = fixture;
+      const [six, five, four, three, two] = git(repo, ["rev-list", "HEAD"]).split("\n");
+      git(repo, ["config", "advice.graftFileDeprecated", "false"]);
+      const grafts =
+        change === "edit"
+          ? path.join(root, "external grafts")
+          : path.join(repo, ".git", "info", "grafts");
+      vi.stubEnv("GIT_GRAFT_FILE", change === "edit" ? grafts : undefined);
+      if (change !== "create") await fs.writeFile(grafts, `${five} ${two}\n`);
+      const refs = listRefs(repo);
+      const first = await full(1);
+      const second = await ds.getNextHistoryPage(query(2, first.pageToken));
+      expect(second?.commits.map((row) => row.parentHashes)).toEqual([
+        [change === "create" ? four : two]
+      ]);
+      expect(second?.pageToken).toBeTypeOf("number");
+
+      if (change === "remove") await fs.unlink(grafts);
+      else await fs.writeFile(grafts, `${five}\n`);
+      expect(listRefs(repo)).toBe(refs);
+      expect(await ds.getNextHistoryPage(query(4, second!.pageToken))).toBeUndefined();
+      const refreshed = await full(4);
+      expect(refreshed.commits.map((row) => [row.hash, ...row.parentHashes])).toEqual(
+        change === "remove"
+          ? [
+              [six, five],
+              [five, four],
+              [four, three],
+              [three, two]
+            ]
+          : [[six, five], [five]]
+      );
+      expect(refreshed.moreCommitsAvailable).toBe(change === "remove");
+    }
+  );
+
+  // Case: TC-385
+  it.each([true, false])(
+    "reloads the full range when core.useReplaceRefs changes from %s (TC-385)",
+    async (initialMode) => {
+      const { repo, root } = fixture;
+      const [five, four, , two] = git(repo, ["rev-list", "HEAD^"]).split("\n");
+      git(repo, ["replace", "--graft", five, two]);
+      const config = path.join(root, "replacement.config");
+      git(repo, ["config", "--file", config, "core.useReplaceRefs", String(initialMode)]);
+      git(repo, ["config", "include.path", config]);
+      const refs = listRefs(repo);
+
+      const first = await full(1);
+      const second = await ds.getNextHistoryPage(query(2, first.pageToken));
+      expect(second?.commits.map((row) => [row.hash, ...row.parentHashes])).toEqual([
+        [five, initialMode ? two : four]
+      ]);
+      expect(second?.pageToken).toBeTypeOf("number");
+
+      git(repo, ["config", "--file", config, "core.useReplaceRefs", String(!initialMode)]);
+      expect(listRefs(repo)).toBe(refs);
+      const requestedCount = 4;
+      expect(await ds.getNextHistoryPage(query(requestedCount, second!.pageToken))).toBeUndefined();
+      const refreshed = await full(requestedCount);
+      const expected = git(repo, ["log", "--date-order", "--format=%H %P"]).split("\n");
+      expect(refreshed.commits.map((row) => [row.hash, ...row.parentHashes])).toEqual(
+        expected.slice(0, requestedCount).map((line) => line.trimEnd().split(" "))
+      );
+      expect(refreshed.moreCommitsAvailable).toBe(expected.length > requestedCount);
+    }
+  );
+
+  // Case: TC-385
+  it("replaces history when deepening a shallow clone changes parents without moving refs (TC-385)", async () => {
+    const clone = path.join(fixture.root, "shallow");
+    git(fixture.root, ["clone", "--depth=3", pathToFileURL(fixture.repo).href, clone]);
+    const stable = await ds.getCommits(clone, [], 2, true, [], "date");
+    expect(stable.pageToken).toBeTypeOf("number");
+    const last = await ds.getNextHistoryPage({ ...query(3, stable.pageToken), repo: clone });
+    expect(last?.commits.map((row) => row.hash)).toEqual([git(clone, ["rev-parse", "HEAD~2"])]);
+    expect(last?.moreCommitsAvailable).toBe(false);
+    const first = await ds.getCommits(clone, [], 2, true, [], "date");
+    expect(first.pageToken).toBeTypeOf("number");
+    const oldRefs = listRefs(clone);
+    git(clone, ["fetch", "--deepen=2", "origin"]);
+    expect(listRefs(clone)).toBe(oldRefs);
+    expect(
+      await ds.getNextHistoryPage({ ...query(4, first.pageToken), repo: clone })
+    ).toBeUndefined();
+    const replacement = await ds.getCommits(clone, [], 4, true, [], "date");
+    expect(replacement.commits.map((row) => [row.hash, ...row.parentHashes])).toEqual(
+      git(clone, ["log", "-4", "--date-order", "--format=%H %P"])
+        .split("\n")
+        .map((line) => line.trim().split(" "))
+    );
+  });
+
+  // Case: TC-385
+  it.each(["query", "filter", "token", "refs", "worktree", "dirty", "stash"])(
+    "falls back to a fresh history after a %s change (TC-385)",
+    async (change) => {
+      const { repo, root } = fixture;
+      const config = getConfig();
+      vi.mocked(getConfig).mockReturnValue({
+        ...config,
+        showUncommittedChanges: () => true
+      } as typeof config);
+      try {
+        const first = await full(2);
+        expect(first.pageToken).toBeTypeOf("number");
+        const request = query(4, first.pageToken);
+        if (change === "query") request.commitOrdering = "topo";
+        if (change === "filter") request.authors = ["missing author"];
+        if (change === "token") request.pageToken = -1;
+        if (change === "refs") git(repo, ["tag", "new-ref"]);
+        if (change === "worktree")
+          git(repo, ["worktree", "add", "--detach", path.join(root, "second"), "HEAD~4"]);
+        if (change === "dirty" || change === "stash")
+          await fs.writeFile(path.join(repo, "change"), "local");
+        if (change === "stash") git(repo, ["stash", "push", "--include-untracked"]);
+        expect(await ds.getNextHistoryPage(request)).toBeUndefined();
+        if (change === "dirty") vi.spyOn(Date.prototype, "getTime").mockReturnValue(1700000000000);
+        const fresh = await full(4, request.commitOrdering, request.authors);
+        expect(fresh.commits).toEqual(
+          (
+            await new DataSource().getCommits(
+              repo,
+              [],
+              4,
+              true,
+              request.authors,
+              request.commitOrdering
+            )
+          ).commits
+        );
+      } finally {
+        vi.mocked(getConfig).mockReturnValue(config);
+      }
+    }
+  );
+});
 
 // S46 repository state cases (real Git integration)
 // @see docs/testing/perspectives/src/dataSource-test/02-branch-worktree-02.md

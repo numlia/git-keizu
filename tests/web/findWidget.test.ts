@@ -115,6 +115,73 @@ describe("FindWidget", () => {
 
   /* --- DOM generation and visibility --- */
 
+  // @see docs/testing/perspectives/web/findWidget-test.md (S13)
+  describe("matching across mounted windows", () => {
+    const commits = ["one", "two", "three"].map((hash) => makeCommit({ hash, message: "needle" }));
+    function mount(index: number) {
+      document.querySelectorAll("tr.commit").forEach((row) => row.remove());
+      return createCommitRow(index, [commits[index].message, commits[index].hash]);
+    }
+    beforeEach(() => {
+      vi.mocked(callbacks.getCommits).mockReturnValue(commits);
+      vi.mocked(callbacks.getCommitId).mockImplementation((hash) =>
+        commits.findIndex((c) => c.hash === hash)
+      );
+      mount(1);
+      triggerSearch(widget, "needle");
+    });
+
+    // Case: TC-506
+    it("counts matches on both sides of the mounted row (TC-506)", () => {
+      expect(getPositionText()).toBe("1 of 3");
+      expect(widget.getCurrentHash()).toBe("one");
+      expect(getMatchSpans().map((s) => s.closest("tr")?.dataset.id)).toEqual(["1"]);
+      expect(getHighlightedRows()).toEqual([]);
+    });
+
+    // Case: TC-507
+    it.each([false, true])(
+      "navigates and wraps outside the window with details set to %s (TC-507)",
+      (openDetails) => {
+        vi.mocked(callbacks.scrollToCommit).mockImplementation((hash) => {
+          mount(commits.findIndex((c) => c.hash === hash));
+          widget.repaintMountedMatches();
+        });
+        if (openDetails) document.getElementById("findOpenCdv")!.click();
+        vi.mocked(callbacks.scrollToCommit).mockClear();
+        vi.mocked(callbacks.loadCommitDetails).mockClear();
+        for (const [control, index] of [
+          ["findPrev", 2],
+          ["findNext", 0]
+        ] as const) {
+          document.getElementById(control)!.click();
+          expect(callbacks.scrollToCommit).toHaveBeenLastCalledWith(commits[index].hash, false);
+          expect(widget.getCurrentHash()).toBe(commits[index].hash);
+          expect(getPositionText()).toBe(`${index + 1} of 3`);
+          const selected = document.querySelector(`tr[data-id="${index}"]`)!;
+          expect(getHighlightedRows()).toEqual([selected]);
+          if (openDetails) expect(callbacks.loadCommitDetails).toHaveBeenLastCalledWith(selected);
+          else expect(callbacks.loadCommitDetails).not.toHaveBeenCalled();
+        }
+      }
+    );
+
+    // Case: TC-508
+    it("restores current marks on remount and clears them for later windows (TC-508)", () => {
+      const first = mount(0);
+      widget.repaintMountedMatches();
+      expect(getHighlightedRows()).toEqual([first]);
+      expect(getMatchSpans()).toHaveLength(1);
+      widget.close();
+      expect(getMatchSpans()).toHaveLength(0);
+      mount(0);
+      widget.repaintMountedMatches();
+      expect(getHighlightedRows()).toEqual([]);
+      expect(getMatchSpans()).toEqual([]);
+      expect(widget.getCurrentHash()).toBeNull();
+    });
+  });
+
   describe("DOM generation and visibility", () => {
     it("generates correct DOM structure on construction (TC-001)", () => {
       // Given: FindWidget is constructed

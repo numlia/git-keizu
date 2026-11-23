@@ -89,6 +89,37 @@ function abbrevCommit(commitHash: string): string {
 
 /* === Interfaces === */
 
+function matchesCommit(
+  commit: GG.GitCommitNode,
+  pattern: RegExp,
+  globalRegex: RegExp | null
+): boolean | null {
+  const labels = getBranchLabels(commit.refs);
+  const fields = [
+    commit.message,
+    commit.author,
+    abbrevCommit(commit.hash),
+    getCommitDate(commit.date).value,
+    ...labels.heads.flatMap((head) => [head.name, ...head.remotes]),
+    ...labels.remotes.map((remote) => remote.name),
+    ...labels.tags.map((tag) => tag.name)
+  ];
+  if (commit.stash !== null) fields.push(buildStashSelectorDisplay(commit.stash.selector));
+  const hashMatch = pattern.exec(commit.hash);
+  let matched = hashMatch?.index === 0;
+  if (globalRegex === null) return matched || fields.some((field) => pattern.test(field));
+  // A zero-width match in an unmounted row must give the same error as one on screen.
+  if (matched && hashMatch?.[0] === "") return null;
+  for (const field of fields) {
+    if (!field) continue;
+    for (const match of field.matchAll(globalRegex)) {
+      if (!match[0].length) return null;
+      matched = true;
+    }
+  }
+  return matched;
+}
+
 export interface FindWidgetCallbacks {
   getCommits(): GG.GitCommitNode[];
   scrollToCommit(hash: string, alwaysCenterCommit: boolean): void;
@@ -104,7 +135,10 @@ export interface FindWidgetCallbacks {
 export class FindWidget {
   private readonly callbacks: FindWidgetCallbacks;
   private text: string = "";
-  private matches: { hash: string; elem: HTMLElement }[] = [];
+  private matches: string[] = [];
+  private readonly matchHashes = new Set<string>();
+  private readonly mounted = new Map<string, HTMLElement>();
+  private patterns: { single: RegExp; global: RegExp } | null = null;
   private position: number = -1;
   private visible: boolean = false;
   private caseSensitive: boolean = false;
@@ -233,6 +267,9 @@ export class FindWidget {
     this.clearMatches();
     this.callbacks.onHighlightsChanged?.();
     this.text = "";
+    this.matchHashes.clear();
+    this.mounted.clear();
+    this.patterns = null;
     this.matches = [];
     this.position = -1;
     this.inputElem.value = this.text;
@@ -274,7 +311,7 @@ export class FindWidget {
   }
 
   public getCurrentHash(): string | null {
-    return this.position > -1 ? this.matches[this.position].hash : null;
+    return this.position > -1 ? this.matches[this.position] : null;
   }
 
   public restoreState(state: FindWidgetState) {
@@ -294,6 +331,9 @@ export class FindWidget {
 
   private findMatches(goToCommitHash: string | null, scrollToCommit: boolean) {
     this.matches = [];
+    this.matchHashes.clear();
+    this.mounted.clear();
+    this.patterns = null;
     this.position = -1;
 
     if (this.text !== "") {
@@ -313,103 +353,25 @@ export class FindWidget {
       }
 
       if (findPattern !== null && findGlobalPattern !== null) {
-        const commitElems = getCommitElems();
-        let j = 0;
-        let zeroLengthMatch = false;
+        this.patterns = { single: findPattern, global: findGlobalPattern };
 
         const commits = this.callbacks.getCommits();
         for (let i = 0; i < commits.length; i++) {
           const commit = commits[i];
-          const branchLabels = getBranchLabels(commit.refs);
-
-          if (
-            commit.hash !== UNCOMMITTED_CHANGES_HASH &&
-            (findPattern.test(commit.message) ||
-              findPattern.test(commit.author) ||
-              commit.hash.search(findPattern) === 0 ||
-              findPattern.test(abbrevCommit(commit.hash)) ||
-              branchLabels.heads.some(
-                (head) =>
-                  findPattern!.test(head.name) ||
-                  head.remotes.some((remote) => findPattern!.test(remote))
-              ) ||
-              branchLabels.remotes.some((remote) => findPattern!.test(remote.name)) ||
-              branchLabels.tags.some((tag) => findPattern!.test(tag.name)) ||
-              findPattern.test(getCommitDate(commit.date).value) ||
-              (commit.stash !== null &&
-                findPattern.test(buildStashSelectorDisplay(commit.stash.selector))))
-          ) {
-            const idStr = i.toString();
-            while (j < commitElems.length && commitElems[j].dataset.id !== idStr) j++;
-            if (j === commitElems.length) continue;
-
-            this.matches.push({ hash: commit.hash, elem: commitElems[j] });
-
-            const textElems = getChildNodesWithTextContent(commitElems[j]);
-            for (let k = 0; k < textElems.length; k++) {
-              const textElem = textElems[k];
-              let matchStart = 0;
-              let matchEnd = 0;
-              const text = textElem.textContent!;
-              findGlobalPattern.lastIndex = 0;
-              let match: RegExpExecArray | null;
-              while ((match = findGlobalPattern.exec(text)) !== null) {
-                if (match[0].length === 0) {
-                  zeroLengthMatch = true;
-                  break;
-                }
-                if (matchEnd !== match.index) {
-                  if (matchStart !== matchEnd) {
-                    textElem.parentNode!.insertBefore(
-                      FindWidget.createMatchElem(text.substring(matchStart, matchEnd)),
-                      textElem
-                    );
-                  }
-                  textElem.parentNode!.insertBefore(
-                    document.createTextNode(text.substring(matchEnd, match.index)),
-                    textElem
-                  );
-                  matchStart = match.index;
-                }
-                matchEnd = findGlobalPattern.lastIndex;
-              }
-              if (matchEnd > 0) {
-                if (matchStart !== matchEnd) {
-                  textElem.parentNode!.insertBefore(
-                    FindWidget.createMatchElem(text.substring(matchStart, matchEnd)),
-                    textElem
-                  );
-                }
-                if (matchEnd !== text.length) {
-                  textElem.textContent = text.substring(matchEnd);
-                } else {
-                  textElem.parentNode!.removeChild(textElem);
-                }
-              }
-              if (zeroLengthMatch) break;
-            }
-
-            if (
-              commit.hash.search(findPattern) === 0 &&
-              !findPattern.test(abbrevCommit(commit.hash)) &&
-              textElems.length > 0
-            ) {
-              const commitNode = textElems[textElems.length - 1];
-              commitNode.parentNode!.replaceChild(
-                FindWidget.createMatchElem(commitNode.textContent!),
-                commitNode
-              );
-            }
-
-            if (zeroLengthMatch) break;
+          if (commit.hash === UNCOMMITTED_CHANGES_HASH) continue;
+          const matched = matchesCommit(commit, findPattern, this.regex ? findGlobalPattern : null);
+          if (matched === null) {
+            this.widgetElem.setAttribute(ATTR_ERROR, t(ZERO_LENGTH_MATCH_ERROR));
+            this.matches = [];
+            this.matchHashes.clear();
+            break;
+          }
+          if (matched) {
+            this.matches.push(commit.hash);
+            this.matchHashes.add(commit.hash);
           }
         }
-
-        if (zeroLengthMatch) {
-          this.widgetElem.setAttribute(ATTR_ERROR, t(ZERO_LENGTH_MATCH_ERROR));
-          this.clearMatches();
-          this.matches = [];
-        }
+        this.repaintMountedMatches(commits);
       }
     } else {
       this.widgetElem.removeAttribute(ATTR_ERROR);
@@ -421,7 +383,7 @@ export class FindWidget {
     if (this.matches.length > 0) {
       newPos = 0;
       if (goToCommitHash !== null) {
-        const pos = this.matches.findIndex((m) => m.hash === goToCommitHash);
+        const pos = this.matches.indexOf(goToCommitHash);
         if (pos > -1) newPos = pos;
       }
     }
@@ -431,12 +393,92 @@ export class FindWidget {
     this.callbacks.onHighlightsChanged?.();
   }
 
-  private clearMatches() {
-    for (let i = 0; i < this.matches.length; i++) {
-      if (i === this.position) {
-        this.matches[i].elem.classList.remove(CLASS_FIND_CURRENT_COMMIT);
+  public repaintMountedMatches(commits = this.callbacks.getCommits()) {
+    this.mounted.clear();
+    if (!this.visible || !this.patterns || !this.matchHashes.size) return;
+    for (const row of Array.from(getCommitElems())) {
+      const hash = commits[Number(row.dataset.id)]?.hash;
+      if (!hash || !this.matchHashes.has(hash)) continue;
+      this.mounted.set(hash, row);
+      if (this.markRow(row, hash, this.patterns.single, this.patterns.global)) {
+        this.widgetElem.setAttribute(ATTR_ERROR, t(ZERO_LENGTH_MATCH_ERROR));
+        this.clearMatches();
+        this.matches = [];
+        this.matchHashes.clear();
+        this.position = -1;
+        this.syncNavigationState();
+        this.updatePosition(-1, false);
+        return;
       }
-      const matchElems = getChildrenWithClassName(this.matches[i].elem, CLASS_FIND_MATCH);
+      row.classList.toggle(CLASS_FIND_CURRENT_COMMIT, hash === this.getCurrentHash());
+    }
+  }
+
+  private markRow(row: HTMLElement, hash: string, findPattern: RegExp, findGlobalPattern: RegExp) {
+    let zeroLengthMatch = false;
+    const textElems = getChildNodesWithTextContent(row);
+    for (let k = 0; k < textElems.length; k++) {
+      const textElem = textElems[k];
+      let matchStart = 0;
+      let matchEnd = 0;
+      const text = textElem.textContent!;
+      findGlobalPattern.lastIndex = 0;
+      let match: RegExpExecArray | null;
+      while ((match = findGlobalPattern.exec(text)) !== null) {
+        if (match[0].length === 0) {
+          zeroLengthMatch = true;
+          break;
+        }
+        if (matchEnd !== match.index) {
+          if (matchStart !== matchEnd) {
+            textElem.parentNode!.insertBefore(
+              FindWidget.createMatchElem(text.substring(matchStart, matchEnd)),
+              textElem
+            );
+          }
+          textElem.parentNode!.insertBefore(
+            document.createTextNode(text.substring(matchEnd, match.index)),
+            textElem
+          );
+          matchStart = match.index;
+        }
+        matchEnd = findGlobalPattern.lastIndex;
+      }
+      if (matchEnd > 0) {
+        if (matchStart !== matchEnd) {
+          textElem.parentNode!.insertBefore(
+            FindWidget.createMatchElem(text.substring(matchStart, matchEnd)),
+            textElem
+          );
+        }
+        if (matchEnd !== text.length) {
+          textElem.textContent = text.substring(matchEnd);
+        } else {
+          textElem.parentNode!.removeChild(textElem);
+        }
+      }
+      if (zeroLengthMatch) break;
+    }
+
+    if (
+      hash.search(findPattern) === 0 &&
+      !findPattern.test(abbrevCommit(hash)) &&
+      textElems.length > 0
+    ) {
+      const commitNode = textElems[textElems.length - 1];
+      commitNode.parentNode!.replaceChild(
+        FindWidget.createMatchElem(commitNode.textContent!),
+        commitNode
+      );
+    }
+
+    return zeroLengthMatch;
+  }
+
+  private clearMatches() {
+    for (const row of this.mounted.values()) {
+      row.classList.remove(CLASS_FIND_CURRENT_COMMIT);
+      const matchElems = getChildrenWithClassName(row, CLASS_FIND_MATCH);
       for (let j = 0; j < matchElems.length; j++) {
         const matchElem = matchElems[j];
         let text = matchElem.childNodes[0].textContent!;
@@ -464,13 +506,13 @@ export class FindWidget {
 
   private updatePosition(position: number, scrollToCommit: boolean) {
     if (this.position > -1) {
-      this.matches[this.position].elem.classList.remove(CLASS_FIND_CURRENT_COMMIT);
+      this.mounted.get(this.matches[this.position])?.classList.remove(CLASS_FIND_CURRENT_COMMIT);
     }
     this.position = position;
     if (this.position > -1) {
-      this.matches[this.position].elem.classList.add(CLASS_FIND_CURRENT_COMMIT);
+      this.mounted.get(this.matches[this.position])?.classList.add(CLASS_FIND_CURRENT_COMMIT);
       if (scrollToCommit) {
-        this.callbacks.scrollToCommit(this.matches[position].hash, false);
+        this.callbacks.scrollToCommit(this.matches[position], false);
       }
     }
     this.positionElem.textContent =
@@ -496,6 +538,7 @@ export class FindWidget {
     if (!this.openCdvEnabled) return;
     const commitHash = this.getCurrentHash();
     if (commitHash === null || this.callbacks.isCdvOpen(commitHash)) return;
+    if (!this.mounted.has(commitHash)) this.callbacks.scrollToCommit(commitHash, false);
     const commitElem = findCommitElemWithId(
       getCommitElems(),
       this.callbacks.getCommitId(commitHash)
