@@ -1,7 +1,7 @@
 ---
 name: release
 description: "リリース実行: リリース準備 PR マージ後の main を検証し、タグを作成してタグ push で GitHub Actions の公開を起動する"
-allowed-tools: Read, Bash(cd:*), Bash(git status:*), Bash(git log:*), Bash(git fetch:*), Bash(git switch:*), Bash(git pull:*), Bash(git tag:*), Bash(git ls-remote:*), Bash(npx:*)
+allowed-tools: Read, Bash(cd:*), Bash(git rev-parse --show-toplevel), Bash(git status:*), Bash(git log:*), Bash(git fetch:*), Bash(git switch:*), Bash(git pull:*), Bash(git tag:*), Bash(git ls-remote:*), Bash(npx:*)
 argument-hint: <version> # 例: v0.9.0 または 0.9.0
 ---
 
@@ -31,8 +31,7 @@ VS Code 拡張機能 git-keizu を VS Marketplace と OpenVSX に公開します
 
 ## 前提条件
 
-- リポジトリルート: `~/work/ai/git-keizu`
-- 最初の Bash tool call で必ず `cd ~/work/ai/git-keizu` を実行すること
+- Run `git rev-parse --show-toplevel` in the checkout where the skill was invoked. Use the returned directory as the working directory for all following steps. Stop if Git cannot locate the worktree.
 - `/update-release-docs` のリリース準備 PR（CHANGELOG / README / package.json バンプ）がマージ済みであること
 - GitHub Secrets に `VS_MARKETPLACE_TOKEN` と `OPEN_VSX_TOKEN` が設定済みであること
 

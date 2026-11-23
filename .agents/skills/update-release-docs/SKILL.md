@@ -1,7 +1,7 @@
 ---
 name: update-release-docs
 description: "リリース準備: 前回リリースタグとの差分と要件ドキュメントから CHANGELOG / README を更新し、バージョンバンプとあわせてリリース準備 PR を作成する"
-allowed-tools: Read, Edit, Bash(cd:*), Bash(git log:*), Bash(git diff:*), Bash(git status:*), Bash(git tag:*), Bash(git switch:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(gh pr:*)
+allowed-tools: Read, Edit, Bash(cd:*), Bash(git rev-parse --show-toplevel), Bash(git log:*), Bash(git diff:*), Bash(git status:*), Bash(git tag:*), Bash(git switch:*), Bash(git add:*), Bash(git commit:*), Bash(git push:*), Bash(gh pr:*)
 argument-hint: <要件ドキュメントのパス> [バージョン] # 例: notes/features/052/memo.md 0.9.0
 ---
 
@@ -25,8 +25,7 @@ argument-hint: <要件ドキュメントのパス> [バージョン] # 例: note
 
 ## 前提条件
 
-- リポジトリルート: `~/work/ai/git-keizu`
-- 最初の Bash tool call で必ず `cd ~/work/ai/git-keizu` を実行すること
+- Run `git rev-parse --show-toplevel` in the checkout where the skill was invoked. Use the returned directory as the working directory for all following steps. Stop if Git cannot locate the worktree.
 - リリース対象の機能 PR がすべて main へマージ済みであること
 - ローカル main が `origin/main` と一致していること（`git status` で確認。乖離している場合は中断してユーザーに報告する）
 
@@ -58,10 +57,9 @@ argument-hint: <要件ドキュメントのパス> [バージョン] # 例: note
 
 ## 実行手順
 
-### Step 1: リポジトリルートへ移動と前提確認
+### Step 1: Check the working tree at the repository root
 
 ```bash
-cd ~/work/ai/git-keizu
 git status
 ```
 
