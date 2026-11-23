@@ -2,12 +2,12 @@
 
 > Source: `src/gitGraphView.ts`
 > Storage Mode: sharded
-> Generated: 2026-10-27T00:00:00Z
+> Generated: 2026-11-22T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 11
-> Total Sections: 38
-> Total Cases: 183
+> Total Sections: 39
+> Total Cases: 185
 
 ## Shards
 
@@ -15,7 +15,7 @@
 | ------------------------------------ | --------------------------- | -------- | ----- | ------------ |
 | 01-message-routing-01.md             | message-routing             | 9        | 27    | 2026-05-17   |
 | 01-message-routing-02.md             | message-routing             | 1        | 7     | 2026-07-04   |
-| 01-message-routing-03.md             | message-routing             | 3        | 26    | 2026-08-06   |
+| 01-message-routing-03.md             | message-routing             | 4        | 28    | 2026-11-22   |
 | 02-state-lifecycle-01.md             | state-lifecycle             | 12       | 47    | 2026-09-12   |
 | 02-state-lifecycle-02.md             | state-lifecycle             | 1        | 1     | 2026-09-12   |
 | 03-worktree-actions-01.md            | worktree-actions            | 6        | 36    | 2026-10-27   |
@@ -53,6 +53,7 @@
 | Feature 056 (retain-context-when-hidden) issue #48                             | 07-retain-context-01.md                             |
 | Feature 057 (multi-repo-single-folder-workspace) issue #49                     | 02-state-lifecycle-01.md                            |
 | Feature 057 (multi-repo-single-folder-workspace) issue #49 PR #60 レビュー指摘 | 02-state-lifecycle-01.md, 02-state-lifecycle-02.md  |
+| Feature 061-02 (large history browsing)                                        | 01-message-routing-03.md                            |
 | Feature 061-05 (light-spec-plan)                                               | 08-keyboard-accessibility-01.md                     |
 | Feature 062-01 (PR #114 follow-up)                                             | 03-worktree-actions-01.md                           |
 | test-plan (既存コード網羅)                                                     | 01-message-routing-01.md                            |

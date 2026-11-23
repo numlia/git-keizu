@@ -452,12 +452,14 @@ export interface ResponseLoadBranchCleanup {
 
 export interface RequestLoadBranches {
   command: "loadBranches";
+  requestId: string;
   repo: string;
   showRemoteBranches: boolean;
   hard: boolean;
 }
 export interface ResponseLoadBranches {
   command: "loadBranches";
+  requestId: string;
   branches: string[];
   head: string | null;
   hard: boolean;
@@ -466,6 +468,8 @@ export interface ResponseLoadBranches {
 
 export interface RequestLoadCommits {
   command: "loadCommits";
+  requestId?: string;
+  pageToken?: number;
   repo: string;
   branches: string[];
   maxCommits: number;
@@ -476,12 +480,24 @@ export interface RequestLoadCommits {
 }
 export interface ResponseLoadCommits {
   command: "loadCommits";
+  requestId?: string;
+  pageToken?: number;
   commits: GitCommitNode[];
   head: string | null;
   moreCommitsAvailable: boolean;
   hard: boolean;
   authors?: string[];
   worktrees?: WorktreeCollection;
+}
+
+export interface ResponseAppendCommits {
+  command: "appendCommits";
+  repo: string;
+  from: number;
+  baseCount: number;
+  commits: GitCommitNode[];
+  moreCommitsAvailable: boolean;
+  pageToken?: number;
 }
 
 export interface RequestLoadRepos {
@@ -853,6 +869,7 @@ export type RequestMessage =
 
 export type ResponseMessage =
   | ResponseAddTag
+  | ResponseAppendCommits
   | ResponseApplyStash
   | ResponseBranchFromStash
   | ResponseCheckoutBranch

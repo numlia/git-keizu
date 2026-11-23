@@ -33,6 +33,7 @@ import {
 } from "./fileTree";
 import { FindWidget } from "./findWidget";
 import { Graph } from "./graph";
+import { HistoryColumnSizing } from "./historyColumnSizing";
 import { t } from "./i18n";
 import {
   beginFocusUpdate,
@@ -41,6 +42,7 @@ import {
   finishFocusUpdate,
   type FocusKey,
   type FocusUpdate,
+  getParkedFocusKeys,
   installKeyboardGuards,
   isKeyboardActionBlocked,
   markFocusTarget,
@@ -79,6 +81,7 @@ import { buildDetachedWorktreeContextMenuItems, getWorktreeLabelName } from "./w
 import { mainWorktreePath } from "./worktreeSuggestion";
 
 const FLASH_ANIMATION_DURATION_MS = 850;
+const VIEWPORT_BUFFER_ROWS = 8;
 export const MIN_COMMIT_LOAD_COUNT = 1;
 
 export function normalizeCommitLoadCount(value: number, defaultValue: number): number {
@@ -183,6 +186,7 @@ const COMMIT_ROW_SELECTOR = ".commit";
 
 type PendingCommitLoad = {
   forceRender: boolean;
+  append: boolean;
   callbacks: ((changes: boolean) => void)[];
 };
 
@@ -324,11 +328,15 @@ function activeContainer(element: Element | null): Element | null {
   return element !== null && element.classList.contains(CLASS_ACTIVE) ? element : null;
 }
 
+function isContextMenuKey(e: KeyboardEvent): boolean {
+  return e.key === KEY_CONTEXT_MENU || (e.key === KEY_F10 && e.shiftKey);
+}
+
 // ContextMenu / Shift+F10 open the target's own menu; inputs keep the browser's edit menu and
 // repeat / keyup / IME presses never launch. A consumed launch stops at the innermost target.
 function consumeContextMenuLaunch(e: Event): e is KeyboardEvent {
   if (!(e instanceof KeyboardEvent) || e.defaultPrevented) return false;
-  if (e.key !== KEY_CONTEXT_MENU && !(e.key === KEY_F10 && e.shiftKey)) return false;
+  if (!isContextMenuKey(e)) return false;
   if (isEditableEventTarget(e.target) || isKeyboardActionBlocked(e)) return false;
   e.preventDefault();
   e.stopPropagation();
@@ -369,6 +377,9 @@ class GitKeizuView {
   private gitBranches: string[] = [];
   private gitBranchHead: string | null = null;
   private commits: GG.GitCommitNode[] = [];
+  private mountedRows = { first: 0, end: 0 };
+  private mutedRows: boolean[] = [];
+  private readonly columnSizing = new HistoryColumnSizing();
   private commitHead: string | null = null;
   private commitLookup: { [hash: string]: number } = {};
   private avatars: AvatarImageCollection = {};
@@ -377,6 +388,7 @@ class GitKeizuView {
 
   private graph: Graph;
   private refOverflow: RefOverflowController;
+  private remountedCounterScroll: { top: number; left: number } | null = null;
   private descriptionMinimumWidth: number | null = null;
   private displayFixedColumns: HTMLElement[] = [];
   private findWidget: FindWidget;
@@ -399,14 +411,27 @@ class GitKeizuView {
   private branchCleanupPanel: BranchCleanupPanel;
   private pendingBranchScroll: string | null = null;
 
-  private loadBranchesCallback: ((changes: boolean, isRepo: boolean) => void) | null = null;
+  private activeBranchRequest: {
+    id: string;
+    onLoaded: ((changes: boolean, isRepo: boolean) => void) | null;
+  } | null = null;
   private loadCommitsCallback: ((changes: boolean) => void) | null = null;
   private pendingLoadBranchesAndCommitsForceRender: boolean | null = null;
   private pendingLoadCommits: PendingCommitLoad | null = null;
+  private historyGeneration = 0;
+  private activeHistoryRequest?: {
+    id: string;
+    generation: number;
+    repo: string;
+    pageToken?: number;
+  };
+  private pageToken?: number;
+  private historyAuthors?: string[];
   private worktrees: GG.WorktreeCollection = EMPTY_WORKTREE_COLLECTION;
 
   private commitOrdering: GG.CommitOrdering;
   private selectedAuthors: string[] = [];
+  private displayedAuthors: { authors: string[]; selected: string[] } | null = null;
 
   private stashNavigationIndex: number = -1;
   private stashNavigationTimer: ReturnType<typeof setTimeout> | null = null;
@@ -415,6 +440,7 @@ class GitKeizuView {
   private rowTarget: RowTarget | null = null;
   private readonly keydownListener = (e: KeyboardEvent) => this.handleKeyboardShortcut(e);
   private readonly disposeFocusContext: () => void;
+  private viewportResizeObserver?: ResizeObserver;
 
   constructor(
     repos: GG.GitRepoSet,
@@ -559,6 +585,7 @@ class GitKeizuView {
       getScrollTop: () => this.scrollContainerElem.scrollTop,
       setScrollTop: (scrollTop) => {
         this.scrollContainerElem.scrollTop = scrollTop;
+        this.redrawViewport();
       },
       hideCommitDetails: () => this.hideCommitDetails(),
       restoreExpandedCommit: (snapshot) => this.restoreExpandedCommit(snapshot),
@@ -606,7 +633,7 @@ class GitKeizuView {
         );
         this.expandedCommit = prevState.expandedCommit;
         this.avatars = prevState.avatars;
-        this.loadBranches(prevState.gitBranches, prevState.gitBranchHead, true, true);
+        this.updateBranches(prevState.gitBranches, prevState.gitBranchHead, true);
         this.loadCommits(
           prevState.commits,
           prevState.commitHead,
@@ -617,17 +644,14 @@ class GitKeizuView {
         );
         if (typeof prevState.scrollTop === "number") {
           this.scrollContainerElem.scrollTop = prevState.scrollTop;
+          this.redrawViewport();
         }
       }
       if (prevState.findWidgetState !== null && prevState.findWidgetState !== undefined) {
         this.findWidget.restoreState(prevState.findWidgetState);
       }
       if (this.selectedAuthors.length > 0) {
-        const { options, selected } = buildAuthorOptions(
-          this.selectedAuthors,
-          this.selectedAuthors
-        );
-        this.authorDropdown.setOptions(options, selected);
+        this.updateAuthorMenu(this.selectedAuthors, true);
       }
     }
     const refreshedDuringLoadRepos = this.loadRepos(this.gitRepos, lastActiveRepo);
@@ -720,23 +744,29 @@ class GitKeizuView {
     this.findWidget.show(true);
   }
 
-  public loadBranches(
+  public receiveBranches(response: GG.ResponseLoadBranches) {
+    const active = this.activeBranchRequest;
+    if (active === null || response.requestId !== active.id) return;
+    this.activeBranchRequest = null;
+    if (active.onLoaded !== null) {
+      const changed =
+        response.isRepo && this.updateBranches(response.branches, response.head, response.hard);
+      active.onLoaded(changed, response.isRepo);
+    }
+    this.flushPendingLoadBranchesAndCommits();
+  }
+
+  private updateBranches(
     branchOptions: string[],
     branchHead: string | null,
-    forceRender: boolean,
-    isRepo: boolean
-  ) {
-    if (!isRepo) {
-      this.triggerLoadBranchesCallback(false, isRepo);
-      return;
-    }
+    forceRender: boolean
+  ): boolean {
     if (
       !forceRender &&
       arraysEqual(this.gitBranches, branchOptions, (a, b) => a === b) &&
       this.gitBranchHead === branchHead
     ) {
-      this.triggerLoadBranchesCallback(false, isRepo);
-      return;
+      return false;
     }
 
     this.gitBranches = branchOptions;
@@ -757,7 +787,7 @@ class GitKeizuView {
 
     this.syncBranchDropdownOptions();
 
-    this.triggerLoadBranchesCallback(true, isRepo);
+    return true;
   }
   private syncBranchDropdownOptions() {
     const options = [{ name: ALL_BRANCHES_LABEL, value: ALL_BRANCHES_VALUE }];
@@ -771,25 +801,63 @@ class GitKeizuView {
     }
     this.branchDropdown.setOptions(options, this.selectedBranches);
   }
-  private triggerLoadBranchesCallback(changes: boolean, isRepo: boolean) {
-    const callback = this.loadBranchesCallback;
-    this.loadBranchesCallback = null;
-    if (callback !== null) {
-      callback(changes, isRepo);
+
+  public receiveCommits(response: GG.ResponseLoadCommits) {
+    const active = this.activeHistoryRequest;
+    if (response.requestId !== undefined) {
+      if (!active || response.requestId !== active.id) return;
+      if (active.generation !== this.historyGeneration || active.repo !== this.currentRepo) {
+        this.triggerLoadCommitsCallback(false);
+        return;
+      }
     }
-    this.flushPendingLoadBranchesAndCommits();
+    this.pageToken = response.pageToken;
+    this.historyAuthors = response.authors;
+    this.loadCommits(
+      response.commits,
+      response.head,
+      response.moreCommitsAvailable,
+      response.hard,
+      response.authors,
+      response.worktrees
+    );
   }
 
-  public loadCommits(
+  public appendCommits(response: GG.ResponseAppendCommits) {
+    const active = this.activeHistoryRequest;
+    if (!active || response.repo !== active.repo || response.from !== active.pageToken) return;
+    if (active.generation !== this.historyGeneration || response.repo !== this.currentRepo) {
+      this.triggerLoadCommitsCallback(false);
+      return;
+    }
+    if (response.baseCount !== this.commits.length || response.from !== this.pageToken) return;
+    this.pageToken = response.pageToken;
+    this.loadCommits(
+      this.commits.concat(response.commits),
+      this.commitHead,
+      response.moreCommitsAvailable,
+      true,
+      this.historyAuthors,
+      this.worktrees,
+      true
+    );
+  }
+
+  private loadCommits(
     commits: GG.GitCommitNode[],
     commitHead: string | null,
     moreAvailable: boolean,
     forceRender: boolean,
     authors?: string[],
-    worktrees?: GG.WorktreeCollection
+    worktrees?: GG.WorktreeCollection,
+    appending = false
   ) {
+    const authorList = authors ?? [...new Set(commits.map((commit) => commit.author))].sort();
+    this.updateAuthorMenu(authorList, forceRender && !this.isLoadingMoreCommits);
+
     if (
       !forceRender &&
+      this.tableElem.querySelector("table") !== null &&
       this.moreCommitsAvailable === moreAvailable &&
       this.commitHead === commitHead &&
       worktreeCollectionsEqual(this.worktrees, worktrees ?? EMPTY_WORKTREE_COLLECTION) &&
@@ -798,6 +866,11 @@ class GitKeizuView {
         commits,
         (a, b) =>
           a.hash === b.hash &&
+          (a.hash === UNCOMMITTED_CHANGES_HASH ||
+            (a.date === b.date &&
+              a.message === b.message &&
+              a.author === b.author &&
+              a.email === b.email)) &&
           arraysEqual(a.refs, b.refs, (a, b) => a.name === b.name && a.type === b.type) &&
           arraysEqual(a.parentHashes, b.parentHashes, (a, b) => a === b)
       )
@@ -813,17 +886,18 @@ class GitKeizuView {
       return;
     }
 
+    const firstChangedRow = appending ? this.commits.length : 0;
     this.moreCommitsAvailable = moreAvailable;
     this.commits = commits;
     this.commitHead = commitHead;
     this.worktrees = worktrees ?? EMPTY_WORKTREE_COLLECTION;
     this.rememberMainWorktree();
-    this.commitLookup = {};
+    if (!appending) this.commitLookup = {};
     this.saveState();
 
     let i: number,
       avatarsNeeded: { [email: string]: string[] } = {};
-    for (i = 0; i < this.commits.length; i++) {
+    for (i = firstChangedRow; i < this.commits.length; i++) {
       this.commitLookup[this.commits[i].hash] = i;
       if (
         this.config.fetchAvatars &&
@@ -844,7 +918,9 @@ class GitKeizuView {
       this.commits.map((commit) => commit.hash),
       this.commitHead
     );
-    this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup);
+    if (appending) this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup, true);
+    else this.graph.loadCommits(this.commits, this.commitHead, this.commitLookup);
+    this.mutedRows = this.graph.getMutedCommits(this.commitHead);
 
     const expandedCommitVisible =
       this.expandedCommit !== null &&
@@ -863,17 +939,28 @@ class GitKeizuView {
         : t(STATUS_KEY_COMMITS_LOADED, this.commits.length)
     );
 
-    const authorList =
-      authors !== undefined ? authors : [...new Set(this.commits.map((c) => c.author))].sort();
-    const { options, selected } = buildAuthorOptions(authorList, this.selectedAuthors);
-    this.authorDropdown.setOptions(options, selected);
-
     this.consumePendingBranchScroll();
     this.triggerLoadCommitsCallback(true);
     this.fetchAvatars(avatarsNeeded);
     this.updateCurrentBtnState();
   }
+  private updateAuthorMenu(authors: string[], forceRender: boolean) {
+    const previous = this.displayedAuthors;
+    const equal = (left: string, right: string) => left === right;
+    const sameFilter =
+      previous !== null && arraysEqual(previous.selected, this.selectedAuthors, equal);
+    const editing = sameFilter && this.authorDropdown.isOpen();
+    if (sameFilter && (!forceRender || editing) && arraysEqual(previous.authors, authors, equal))
+      return;
+
+    const { options, selected } = buildAuthorOptions(authors, this.selectedAuthors);
+    if (editing) this.authorDropdown.setOptions(options, selected, true);
+    else this.authorDropdown.setOptions(options, selected);
+    this.displayedAuthors = { authors, selected };
+  }
+
   private triggerLoadCommitsCallback(changes: boolean) {
+    this.activeHistoryRequest = undefined;
     const callback = this.loadCommitsCallback;
     this.loadCommitsCallback = null;
     if (callback !== null) {
@@ -923,20 +1010,15 @@ class GitKeizuView {
     if (this.pendingBranchScroll === null) return;
     const branchName = this.pendingBranchScroll;
     this.pendingBranchScroll = null;
-    const labels = document.querySelectorAll<HTMLElement>(".gitRef.head");
-    for (let i = 0; i < labels.length; i++) {
-      if (labels[i].dataset.name !== branchName) continue;
-      const commitElem = labels[i].closest<HTMLElement>(".commit");
-      const hash = commitElem?.dataset.hash;
-      if (hash !== undefined) {
-        this.scrollToCommit(hash, true, true);
-      }
-      return;
-    }
+    const commit = this.commits.find((commit) =>
+      commit.refs.some((ref) => ref.type === "head" && ref.name === branchName)
+    );
+    if (commit !== undefined) this.scrollToCommit(commit.hash, true, true);
   }
 
   /* Refresh */
   public refresh(mode: RefreshMode) {
+    this.invalidateHistory();
     if (mode === "hard") {
       if (this.expandedCommit !== null) {
         this.expandedCommit = null;
@@ -955,15 +1037,18 @@ class GitKeizuView {
     forceRender: boolean,
     loadedCallback: (changes: boolean, isRepo: boolean) => void
   ) {
-    this.loadBranchesCallback = loadedCallback;
+    const requestId = crypto.randomUUID();
+    this.activeBranchRequest = { id: requestId, onLoaded: loadedCallback };
     sendMessage({
       command: "loadBranches",
+      requestId,
       repo: this.currentRepo!,
       showRemoteBranches: this.showRemoteBranches,
       hard: forceRender
     });
   }
   private resetFilterAndReload() {
+    this.invalidateHistory();
     this.maxCommits = this.config.initialLoadCommits;
     this.expandedCommit = null;
     this.saveState();
@@ -971,14 +1056,52 @@ class GitKeizuView {
     this.requestLoadCommits(true, () => {});
   }
 
-  private requestLoadCommits(forceRender: boolean, loadedCallback: (changes: boolean) => void) {
+  private invalidateHistory() {
+    this.historyGeneration++;
+    this.pageToken = undefined;
+  }
+
+  private requestMoreCommits(manual: boolean) {
+    this.isLoadingMoreCommits = true;
+    this.maxCommits = normalizeCommitLoadCount(
+      this.maxCommits + this.config.loadMoreCommits,
+      this.config.initialLoadCommits
+    );
+    if (manual) {
+      this.hideCommitDetails();
+      this.saveState();
+    }
+    this.requestLoadCommits(
+      true,
+      () => {
+        this.isLoadingMoreCommits = false;
+      },
+      true
+    );
+  }
+
+  private requestLoadCommits(
+    forceRender: boolean,
+    loadedCallback: (changes: boolean) => void,
+    append = false
+  ) {
     if (this.loadCommitsCallback !== null) {
-      this.queueLoadCommits(forceRender, loadedCallback);
+      this.queueLoadCommits(forceRender, loadedCallback, append);
       return;
     }
     this.loadCommitsCallback = loadedCallback;
+    const requestId = crypto.randomUUID();
+    const pageToken = append ? this.pageToken : undefined;
+    this.activeHistoryRequest = {
+      id: requestId,
+      generation: this.historyGeneration,
+      repo: this.currentRepo,
+      pageToken
+    };
     sendMessage({
       command: "loadCommits",
+      requestId,
+      ...(pageToken === undefined ? {} : { pageToken }),
       repo: this.currentRepo!,
       branches: this.selectedBranches,
       maxCommits: normalizeCommitLoadCount(this.maxCommits, this.config.initialLoadCommits),
@@ -996,7 +1119,7 @@ class GitKeizuView {
     return this.commitOrdering;
   }
   private requestLoadBranchesAndCommits(forceRender: boolean) {
-    if (this.loadBranchesCallback !== null) {
+    if (this.activeBranchRequest !== null) {
       this.queueLoadBranchesAndCommits(forceRender);
       return;
     }
@@ -1027,23 +1150,32 @@ class GitKeizuView {
     this.pendingLoadBranchesAndCommitsForceRender = null;
     this.requestLoadBranchesAndCommits(forceRender);
   }
-  private queueLoadCommits(forceRender: boolean, loadedCallback: (changes: boolean) => void) {
+  private queueLoadCommits(
+    forceRender: boolean,
+    loadedCallback: (changes: boolean) => void,
+    append: boolean
+  ) {
     if (this.pendingLoadCommits === null) {
-      this.pendingLoadCommits = { forceRender, callbacks: [loadedCallback] };
+      this.pendingLoadCommits = { forceRender, append, callbacks: [loadedCallback] };
       return;
     }
     this.pendingLoadCommits.forceRender = this.pendingLoadCommits.forceRender || forceRender;
+    this.pendingLoadCommits.append = this.pendingLoadCommits.append && append;
     this.pendingLoadCommits.callbacks.push(loadedCallback);
   }
   private flushPendingLoadCommits() {
     if (this.pendingLoadCommits === null) return;
     const pending = this.pendingLoadCommits;
     this.pendingLoadCommits = null;
-    this.requestLoadCommits(pending.forceRender, (changes: boolean) => {
-      for (const cb of pending.callbacks) {
-        cb(changes);
-      }
-    });
+    this.requestLoadCommits(
+      pending.forceRender,
+      (changes: boolean) => {
+        for (const cb of pending.callbacks) {
+          cb(changes);
+        }
+      },
+      pending.append
+    );
   }
   private fetchAvatars(avatars: { [email: string]: string[] }) {
     let emails = Object.keys(avatars);
@@ -1112,6 +1244,52 @@ class GitKeizuView {
   }
 
   /* Renderers */
+  private viewportRows() {
+    if (this.expandedCommit) return { first: 0, end: this.commits.length };
+    const { clientHeight, scrollTop } = this.scrollContainerElem;
+    const rowHeight = this.config.grid.y;
+    const visible = Math.ceil(clientHeight / rowHeight);
+    const top = Math.min(
+      Math.floor(scrollTop / rowHeight),
+      Math.max(0, this.commits.length - visible)
+    );
+    const block = Math.floor(top / VIEWPORT_BUFFER_ROWS);
+    const first = Math.max(0, (block - 1) * VIEWPORT_BUFFER_ROWS);
+    const end = Math.min(this.commits.length, (block + 2) * VIEWPORT_BUFFER_ROWS + visible);
+    return { first, end };
+  }
+  private redrawViewport() {
+    if (this.replaceMountedRows(this.viewportRows())) this.renderGraph();
+  }
+
+  private replaceMountedRows(rows: { first: number; end: number }): boolean {
+    if (
+      !this.tableElem.querySelector("table") ||
+      (rows.first === this.mountedRows.first && rows.end === this.mountedRows.end)
+    )
+      return false;
+    this.renderTable(rows);
+    if (this.findWidget.isVisible()) {
+      this.findWidget.repaintMountedMatches();
+      this.refOverflow.syncSearchHighlights();
+    }
+    if (this.fileHistory.isActive()) this.fileHistory.paintMountedRows();
+    return true;
+  }
+
+  private mountRow(hash: string): HTMLElement | null {
+    const index = this.commitLookup[hash];
+    if (typeof index !== "number") return null;
+    if (index < this.mountedRows.first || index >= this.mountedRows.end) {
+      this.scrollContainerElem.scrollTop = Math.max(
+        0,
+        index * this.config.grid.y - this.scrollContainerElem.clientHeight / 2
+      );
+      this.redrawViewport();
+    }
+    return this.findRowByHash(hash);
+  }
+
   private render() {
     this.renderTable();
     this.renderGraph();
@@ -1129,30 +1307,38 @@ class GitKeizuView {
       expandedCommitElem !== null
         ? expandedCommitElem.getBoundingClientRect().height
         : this.config.grid.expandY;
-    this.config.grid.y =
-      this.commits.length > 0
-        ? (this.tableElem.children[0].clientHeight -
-            headerHeight -
-            (this.expandedCommit !== null ? this.config.grid.expandY : 0)) /
-          this.commits.length
-        : this.config.grid.y;
+    const cell = this.tableElem.querySelector<HTMLElement>("tr[data-id] td");
+    if (cell) {
+      // A row touching the collapsed header border has a different offsetHeight.
+      const pitch = parseFloat(getComputedStyle(cell).lineHeight);
+      if (pitch > 0) this.config.grid.y = pitch;
+    }
     this.config.grid.offsetY = headerHeight + this.config.grid.y / 2;
-    this.graph.render(this.expandedCommit);
+    this.graph.render(this.expandedCommit, this.mountedRows.first, this.mountedRows.end);
   }
-  private renderTable() {
+  private renderTable(rows = this.viewportRows()) {
     const focusUpdate = this.beginListFocusUpdate();
     // Close first: the ref listeners below are bound by class name across the whole document.
     // The ticket above already captured focus inside the list, so the list restores nothing.
     this.refOverflow.closePopup("replace");
     const savedScrollTop = this.scrollContainerElem.scrollTop;
-    let html = `<tr id="tableColHeaders"><th id="tableHeaderGraphCol" class="tableColHeader">${t("table.graph")}</th><th class="tableColHeader">${t("table.description")}${this.buildCommitOrderingButtonHtml()}</th><th class="tableColHeader">${t("table.date")}</th><th class="tableColHeader">${t("table.author")}</th><th class="tableColHeader">${t("table.commit")}</th></tr>`,
+    this.mountedRows = rows;
+    const { first, end } = this.mountedRows;
+    const partial = first > 0 || end < this.commits.length;
+    const headerIndex = partial ? ' aria-rowindex="1"' : "";
+    const spacer = (start: number, end: number) =>
+      end > start
+        ? `<tr aria-hidden="true" data-skipped-start="${start}" data-skipped-end="${end}"><td colspan="${TABLE_COLUMN_COUNT}" style="height:${(end - start) * this.config.grid.y}px"></td></tr>`
+        : "";
+    let html = `<tr id="tableColHeaders"${headerIndex}><th id="tableHeaderGraphCol" class="tableColHeader">${t("table.graph")}</th><th class="tableColHeader">${t("table.description")}${this.buildCommitOrderingButtonHtml()}</th><th class="tableColHeader">${t("table.date")}</th><th class="tableColHeader">${t("table.author")}</th><th class="tableColHeader">${t("table.commit")}</th></tr>`,
       i,
       currentHash =
         this.commits.length > 0 && this.commits[0].hash === UNCOMMITTED_CHANGES_HASH
           ? UNCOMMITTED_CHANGES_HASH
           : this.commitHead;
-    const muted = this.graph.getMutedCommits(this.commitHead);
-    for (i = 0; i < this.commits.length; i++) {
+    html += spacer(0, first);
+    const muted = this.mutedRows;
+    for (i = first; i < end; i++) {
       let refs = "",
         message = escapeHtml(this.commits[i].message),
         date = getCommitDate(this.commits[i].date),
@@ -1212,7 +1398,8 @@ class GitKeizuView {
         this.commits[i].stash,
         muted[i]
       );
-      html += `<tr ${rowClass} data-id="${i}" data-color="${this.graph.getVertexColour(i)}" ${ATTRIBUTE_ARIA_LABEL}="${escapeHtml(buildRowName(this.commits[i], date.value))}" ${ATTRIBUTE_ARIA_DESCRIBEDBY}="${ROW_STATE_ID_PREFIX}${i}"><td>${buildRowStateHtml(i)}</td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}<span class="commitMessage">${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</span></td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${
+      const rowIndex = partial ? ` aria-rowindex="${i + 2}"` : "";
+      html += `<tr ${rowClass}${rowIndex} data-id="${i}" data-color="${this.graph.getVertexColour(i)}" ${ATTRIBUTE_ARIA_LABEL}="${escapeHtml(buildRowName(this.commits[i], date.value))}" ${ATTRIBUTE_ARIA_DESCRIBEDBY}="${ROW_STATE_ID_PREFIX}${i}"><td>${buildRowStateHtml(i)}</td><td>${this.commits[i].hash === this.commitHead ? '<span class="commitHeadDot"></span>' : ""}${refs}<span class="commitMessage">${this.commits[i].hash === currentHash ? `<b>${message}</b>` : message}</span></td><td title="${date.title}">${date.value}</td><td title="${escapeHtml(`${this.commits[i].author} <${this.commits[i].email}>`)}">${
         this.config.fetchAvatars
           ? `<span class="avatar" data-email="${escapeHtml(this.commits[i].email)}">${
               typeof this.avatars[this.commits[i].email] === "string"
@@ -1222,10 +1409,23 @@ class GitKeizuView {
           : ""
       }${escapeHtml(this.commits[i].author)}</td><td title="${escapeHtml(this.commits[i].hash)}">${escapeHtml(abbrevCommit(this.commits[i].hash))}</td></tr>`;
     }
-    this.tableElem.innerHTML = `<table>${html}</table>`;
+    html += spacer(end, this.commits.length);
+    const rowCount = partial ? ` aria-rowcount="${this.commits.length + 1}"` : "";
+    this.tableElem.innerHTML = `<table${rowCount}>${html}</table>`;
     this.footerElem.innerHTML = this.moreCommitsAvailable
       ? `<button type="button" id="${LOAD_MORE_BUTTON_ID}" class="roundedBtn">${t("table.loadMoreCommits")}</button>`
       : "";
+    const tableElem = this.tableElem.querySelector("table")!;
+    const refCounts = partial
+      ? this.columnSizing.apply(
+          tableElem,
+          this.commits,
+          this.commitHead,
+          this.worktrees,
+          this.config.fetchAvatars,
+          this.gitRepos[this.currentRepo].columnWidths === null
+        )
+      : null;
     this.applyRowTargets();
     this.makeTableResizable();
     this.setupColumnHeaderContextMenu();
@@ -1234,17 +1434,12 @@ class GitKeizuView {
       const loadMoreElem = document.getElementById(LOAD_MORE_BUTTON_ID)!;
       markFocusTarget(loadMoreElem, { kind: "control", id: LOAD_MORE_BUTTON_ID });
       loadMoreElem.addEventListener("click", () => {
+        if (this.isLoadingMoreCommits) return;
         const loadMoreFocusUpdate = beginFocusUpdate(this.footerElem);
         (<HTMLElement>(
           document.getElementById(LOAD_MORE_BUTTON_ID)!.parentNode!
         )).innerHTML = `<h2 id="loadingHeader">${svgIcons.loading}${t("loading.label")}</h2>`;
-        this.maxCommits = normalizeCommitLoadCount(
-          this.maxCommits + this.config.loadMoreCommits,
-          this.config.initialLoadCommits
-        );
-        this.hideCommitDetails();
-        this.saveState();
-        this.requestLoadCommits(true, () => {});
+        this.requestMoreCommits(true);
         this.finishListFocusUpdate(loadMoreFocusUpdate);
       });
     }
@@ -1330,14 +1525,14 @@ class GitKeizuView {
     });
     addListenerToClass("unsavedChanges", "contextmenu", (e: Event) => {
       e.stopPropagation();
-      this.showUncommittedContextMenu(
+      this.showCommitRowContextMenu(
         <MouseEvent>e,
         <HTMLElement>(<Element>e.target).closest(".unsavedChanges")!
       );
     });
     addListenerToClass("unsavedChanges", "keydown", (e: Event) => {
       if (!consumeContextMenuLaunch(e)) return;
-      this.showUncommittedContextMenu(e, <HTMLElement>e.currentTarget);
+      this.showCommitRowContextMenu(e, <HTMLElement>e.currentTarget);
     });
     addListenerToClass("gitRef", "contextmenu", (e: Event) => {
       this.showRefBadgeContextMenu(<MouseEvent>e, <HTMLElement>e.currentTarget);
@@ -1362,15 +1557,26 @@ class GitKeizuView {
       this.handleRefDoubleClick(e, e.currentTarget);
     });
     // Attach after the listeners above so measurement clones never receive them.
-    const tableElem = this.tableElem.querySelector("table");
-    if (tableElem !== null) this.refOverflow.attachTable(tableElem);
+    const focusKey = focusUpdate?.origin.keys[0];
+    const restoreCounter =
+      focusKey?.kind === "counter" && this.findRowByHash(focusKey.hash) !== null;
+    this.refOverflow.attachTable(tableElem, refCounts, restoreCounter);
 
     this.finishListFocusUpdate(focusUpdate);
     this.scrollContainerElem.scrollTop = savedScrollTop;
   }
   // Pointer and keyboard launches share these builders, so a row's menu is the same either way.
   private showCommitRowContextMenu(event: ContextMenuTrigger, sourceElem: HTMLElement): void {
-    let hash = sourceElem.dataset.hash!;
+    const hash = sourceElem.dataset.hash!;
+    if (hash === UNCOMMITTED_CHANGES_HASH) {
+      showContextMenu(
+        event,
+        buildUncommittedContextMenuItems(this.currentRepo, sourceElem),
+        sourceElem,
+        this.getCurrentRepoRecentActions()
+      );
+      return;
+    }
     let commit = this.commits[this.commitLookup[hash]];
     if (commit.stash !== null) {
       let selector = commit.stash.selector;
@@ -1395,14 +1601,6 @@ class GitKeizuView {
         sourceElem,
         (mode) => this.pathHighlight.select({ kind: "commit", repo, hash, name: subject, mode })
       ),
-      sourceElem,
-      this.getCurrentRepoRecentActions()
-    );
-  }
-  private showUncommittedContextMenu(event: ContextMenuTrigger, sourceElem: HTMLElement): void {
-    showContextMenu(
-      event,
-      buildUncommittedContextMenuItems(this.currentRepo, sourceElem),
       sourceElem,
       this.getCurrentRepoRecentActions()
     );
@@ -1441,12 +1639,12 @@ class GitKeizuView {
   private showRefBadgeContextMenu(
     event: ContextMenuTrigger,
     badge: HTMLElement,
-    focusOptions?: ContextMenuFocusOptions
+    focusOptions?: ContextMenuFocusOptions,
+    source = resolveRefSource(event, badge)
   ): void {
     event.stopPropagation();
     // The builders keep the badge (its dataset and dialog / checkout marks); the menu itself is
     // anchored to and restores focus to the operable part that launched it.
-    const source = resolveRefSource(event, badge);
     if (badge.classList.contains(STASH_BADGE_CLASS)) {
       this.showStashBadgeContextMenu(event, badge, source, focusOptions);
       return;
@@ -1544,7 +1742,8 @@ class GitKeizuView {
   }
   private renderUncommitedChanges() {
     let date = getCommitDate(this.commits[0].date);
-    const rowElem = <HTMLElement>document.getElementsByClassName("unsavedChanges")[0];
+    const rowElem = this.findRowByHash(UNCOMMITTED_CHANGES_HASH);
+    if (rowElem === null) return;
     const focusUpdate = beginFocusUpdate(rowElem);
     const index = parseInt(rowElem.dataset.id ?? "0", 10);
     rowElem.setAttribute(ATTRIBUTE_ARIA_LABEL, buildRowName(this.commits[0], date.value));
@@ -1721,6 +1920,7 @@ class GitKeizuView {
           commitOrdering: value
         };
         this.gitRepos[this.currentRepo] = updatedRepo;
+        this.invalidateHistory();
         sendMessage({
           command: "saveRepoState",
           repo: this.currentRepo,
@@ -1795,9 +1995,15 @@ class GitKeizuView {
 
   /* Observers */
   private observeWindowSizeChanges() {
+    if (typeof ResizeObserver === "function") {
+      // Opening or closing a panel changes the history height within the same window.
+      this.viewportResizeObserver = new ResizeObserver(() => this.redrawViewport());
+      this.viewportResizeObserver.observe(this.scrollContainerElem);
+    }
     let windowWidth = window.outerWidth,
       windowHeight = window.outerHeight;
     window.addEventListener("resize", () => {
+      this.redrawViewport();
       this.releaseDisplayColumnWidths();
       this.refOverflow.scheduleLayout();
       if (windowWidth === window.outerWidth && windowHeight === window.outerHeight) {
@@ -1828,37 +2034,46 @@ class GitKeizuView {
     }).observe(document.documentElement, { attributes: true, attributeFilter: ["style"] });
   }
   private observeWebviewScroll() {
+    let previousTop = this.scrollContainerElem.scrollTop;
+    this.scrollContainerElem.style.overflowAnchor = "none";
+    let scheduled = false;
     let active = this.scrollContainerElem.scrollTop > 0;
     this.scrollShadowElem.className = active ? "active" : "";
     this.scrollContainerElem.addEventListener("scroll", () => {
-      this.refOverflow.closePopup();
-      if (active !== this.scrollContainerElem.scrollTop > 0) {
-        active = this.scrollContainerElem.scrollTop > 0;
+      if (!scheduled) {
+        scheduled = true;
+        requestAnimationFrame(() => {
+          scheduled = false;
+          this.redrawViewport();
+        });
+      }
+      const { scrollTop, scrollLeft, clientHeight, scrollHeight } = this.scrollContainerElem;
+      // Remounting can queue a scroll event before the counter opens at this same position.
+      const remount = this.remountedCounterScroll;
+      this.remountedCounterScroll = null;
+      if (remount?.top !== scrollTop || remount.left !== scrollLeft) this.refOverflow.closePopup();
+      if (active !== scrollTop > 0) {
+        active = scrollTop > 0;
         this.scrollShadowElem.className = active ? "active" : "";
       }
 
-      const { scrollTop, clientHeight, scrollHeight } = this.scrollContainerElem;
+      const movingDown = scrollTop > previousTop;
+      previousTop = scrollTop;
       if (
+        movingDown &&
         this.config.loadMoreCommitsAutomatically &&
         this.moreCommitsAvailable &&
         !this.isLoadingMoreCommits &&
         scrollTop + clientHeight >= scrollHeight - SCROLL_AUTO_LOAD_THRESHOLD
       ) {
-        this.isLoadingMoreCommits = true;
-        this.maxCommits = normalizeCommitLoadCount(
-          this.maxCommits + this.config.loadMoreCommits,
-          this.config.initialLoadCommits
-        );
-        this.requestLoadCommits(true, () => {
-          this.isLoadingMoreCommits = false;
-        });
+        this.requestMoreCommits(false);
       }
     });
   }
 
   /* Scroll to Commit */
   private scrollToCommit(hash: string, alwaysCenterCommit: boolean, flash: boolean = false) {
-    const elem = document.querySelector<HTMLElement>(`.commit[data-hash="${hash}"]`);
+    const elem = this.mountRow(hash);
     if (elem === null) return;
 
     const elemTop = elem.offsetTop;
@@ -1909,7 +2124,9 @@ class GitKeizuView {
       return;
     }
     const focused = this.resolveFocusedRow(e.target);
-    if (focused !== null && this.handleRowKey(e, focused.row, focused.onRow)) return;
+    // A wheel can park focus on the list while its logical target is offscreen.
+    const hash = e.target === this.tableElem ? this.rowTarget?.hash : focused?.row.dataset.hash;
+    if (hash !== undefined && this.handleRowKey(e, hash, focused?.onRow ?? true)) return;
     this.handleConfiguredShortcut(e, focused !== null || this.isListScopeTarget(e.target));
   }
 
@@ -1931,16 +2148,49 @@ class GitKeizuView {
     return target === document.body || target === document || target === this.tableElem;
   }
 
+  private handleParkedMenuKey(e: KeyboardEvent, hash: string): boolean {
+    const menuKey = isContextMenuKey(e);
+    if (!menuKey) {
+      if (e.key !== KEY_ENTER && e.key !== KEY_SPACE) return false;
+      const [origin] = getParkedFocusKeys(this.tableElem, this.currentRepo);
+      if ((origin?.kind !== "ref" && origin?.kind !== "counter") || origin.hash !== hash)
+        return false;
+    }
+
+    consumeKey(e);
+    const row = this.mountRow(hash);
+    // Remounting restores focus to the original label, but the key event still targets the list.
+    const part = document.activeElement;
+    const badge = part?.closest<HTMLElement>(REF_BADGE_SELECTOR);
+    if (
+      !menuKey &&
+      part instanceof HTMLButtonElement &&
+      part.matches(ROW_COUNTER_SELECTOR) &&
+      row?.contains(part)
+    ) {
+      const { scrollTop, scrollLeft } = this.scrollContainerElem;
+      this.remountedCounterScroll = { top: scrollTop, left: scrollLeft };
+      this.refOverflow.openCounterFromKeyboard(part);
+    } else if (part instanceof HTMLElement && badge && row?.contains(badge)) {
+      this.showRefBadgeContextMenu(e, badge, undefined, part);
+    } else if (menuKey && row !== null) {
+      this.showCommitRowContextMenu(e, row);
+    }
+    return true;
+  }
+
   // Returns true when the key belonged to the list, whether or not it moved anything.
-  private handleRowKey(e: KeyboardEvent, row: HTMLElement, onRow: boolean): boolean {
+  private handleRowKey(e: KeyboardEvent, hash: string, onRow: boolean): boolean {
+    const index = this.commitLookup[hash];
+    if (typeof index !== "number") return false;
+    if (e.target === this.tableElem && this.handleParkedMenuKey(e, hash)) return true;
     if (e.altKey) return false;
-    const hash = row.dataset.hash;
-    const index = hash === undefined ? undefined : this.commitLookup[hash];
-    if (hash === undefined || typeof index !== "number") return false;
     const ctrlOrCmd = e.ctrlKey || e.metaKey;
     if (e.key === KEY_ENTER) {
       // Ref labels and the overflow counter own their Enter; Shift / Alt + Enter are unassigned.
       if (!onRow || e.shiftKey) return false;
+      const row = this.mountRow(hash);
+      if (row === null) return false;
       consumeKey(e);
       if (ctrlOrCmd) {
         this.handleCommitRowActivation(hash, row, true);
@@ -1993,7 +2243,7 @@ class GitKeizuView {
   // list never wraps and never fetches unloaded commits.
   private moveRowTarget(index: number, e: KeyboardEvent, followDetails: boolean): boolean {
     const commit = this.commits[index];
-    const row = commit === undefined ? null : this.findRowByHash(commit.hash);
+    const row = commit === undefined ? null : this.mountRow(commit.hash);
     if (commit === undefined || row === null) return false;
     consumeKey(e);
     this.setRowTarget(commit.hash);
@@ -2062,6 +2312,10 @@ class GitKeizuView {
 
   /* Row Target and Tab Stops */
   private leaveRepository(): void {
+    this.displayedAuthors = null;
+    if (this.activeBranchRequest !== null) {
+      this.activeBranchRequest = { ...this.activeBranchRequest, onLoaded: null };
+    }
     if (isContextMenuActive()) hideContextMenu("repository");
     this.rowTarget = null;
   }
@@ -2096,7 +2350,8 @@ class GitKeizuView {
       });
       this.setRowTabIndex(row, hash === targetHash ? TAB_INDEX_STOP : TAB_INDEX_PROGRAMMATIC);
     });
-    this.tableElem.tabIndex = rows.length === 0 ? TAB_INDEX_STOP : TAB_INDEX_PROGRAMMATIC;
+    this.tableElem.tabIndex =
+      this.getRowTargetElem() === null ? TAB_INDEX_STOP : TAB_INDEX_PROGRAMMATIC;
   }
 
   private rowKey(hash: string): FocusKey {
@@ -2246,6 +2501,7 @@ class GitKeizuView {
   }
 
   public dispose(): void {
+    this.viewportResizeObserver?.disconnect();
     document.removeEventListener("keydown", this.keydownListener);
     this.disposeFocusContext();
   }
@@ -2370,8 +2626,12 @@ class GitKeizuView {
     const previousDetails = document.getElementById(COMMIT_DETAILS_ID);
     const focusWasInDetails =
       previousDetails !== null && previousDetails.contains(document.activeElement);
-    this.hideCommitDetails();
+    this.closeCommitDetails(false);
     const hash = sourceElem.dataset.hash!;
+    this.replaceMountedRows({ first: 0, end: this.commits.length });
+    const mounted = this.findRowByHash(hash);
+    if (mounted === null) return;
+    sourceElem = mounted;
     const commit = this.commits[this.commitLookup[hash]];
     this.expandedCommit = {
       id: parseInt(sourceElem.dataset.id!, 10),
@@ -2450,6 +2710,10 @@ class GitKeizuView {
     }
   }
   public hideCommitDetails() {
+    this.closeCommitDetails(true);
+  }
+
+  private closeCommitDetails(restoreViewport: boolean) {
     if (this.expandedCommit !== null) {
       this.clearCompareTarget();
       let elem = document.getElementById(COMMIT_DETAILS_ID);
@@ -2460,8 +2724,11 @@ class GitKeizuView {
       this.expandedCommit = null;
       this.saveState();
       this.refreshRowStates();
-      this.renderGraph();
       finishFocusUpdate(focusUpdate);
+      if (restoreViewport) {
+        this.replaceMountedRows(this.viewportRows());
+        this.renderGraph();
+      }
     }
   }
   public showCommitDetails(commitDetails: GG.GitCommitDetails, fileTree: GitFolder) {
@@ -2539,6 +2806,8 @@ class GitKeizuView {
     return document.querySelector<HTMLElement>(`.commit[data-hash="${hash}"]`);
   }
   private restoreExpandedCommit(snapshot: FileHistoryExpandedSnapshot): boolean {
+    if (typeof this.commitLookup[snapshot.hash] !== "number") return false;
+    this.replaceMountedRows({ first: 0, end: this.commits.length });
     const srcElem = this.findCommitRowByHash(snapshot.hash);
     if (srcElem === null) return false;
     const compareWithSrcElem =

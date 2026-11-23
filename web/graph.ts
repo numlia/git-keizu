@@ -5,6 +5,11 @@ import {
   CLASS_FILE_HISTORY_MATCH,
   CLASS_FILE_HISTORY_MODE
 } from "./fileHistoryClasses";
+import {
+  CHECKPOINT_TAIL_ROWS,
+  GraphLayoutCheckpoint,
+  MAX_CHECKPOINT_TAIL_ROWS
+} from "./graphLayoutCheckpoint";
 import type { PathHighlightResult } from "./pathHighlight";
 import { pathEdgeKey } from "./pathHighlight";
 
@@ -54,8 +59,17 @@ interface UnavailablePoint {
 }
 type VertexOrNull = Vertex | null;
 
+interface Continuation {
+  vertex: Vertex;
+  parent: VertexOrNull;
+  point: Point;
+  edgeKeys: ReadonlySet<string>;
+  branch: Branch;
+  merge: boolean;
+}
+
 class Branch {
-  private lines: Line[] = [];
+  public readonly lines: Line[] = [];
   private colour: number;
   private numUncommitted: number = 0;
 
@@ -98,7 +112,10 @@ class Branch {
     svg: SVGElement,
     config: Config,
     expandAt: number,
-    highlightedEdgeKeys: ReadonlySet<string> | null
+    highlightedEdgeKeys: ReadonlySet<string> | null,
+    first: number,
+    end: number,
+    fullRange: boolean
   ) {
     let colour = config.graphColours[this.colour % config.graphColours.length],
       i,
@@ -115,6 +132,7 @@ class Branch {
 
     // Convert branch lines into pixel coordinates, respecting expanded commit extensions
     for (i = 0; i < this.lines.length; i++) {
+      if (this.lines[i].p2.y < first || this.lines[i].p1.y >= end) continue;
       x1 = this.lines[i].p1.x * config.grid.x + config.grid.offsetX;
       y1 = this.lines[i].p1.y * config.grid.y + config.grid.offsetY;
       x2 = this.lines[i].p2.x * config.grid.x + config.grid.offsetX;
@@ -232,7 +250,9 @@ class Branch {
       }
     }
 
-    this.drawPath(svg, curPath, curColour, curSelected); // Draw the remaining path
+    if (curPath !== "" || (fullRange && this.lines.length === 0)) {
+      this.drawPath(svg, curPath, curColour, curSelected);
+    }
   }
   private drawPath(svg: SVGElement, path: string, colour: string, selected: boolean) {
     const highlightClass = selected ? CLASS_PATH_HIGHLIGHT_SELECTED : null;
@@ -354,6 +374,21 @@ export class Vertex {
     return point !== undefined && point.onBranch === onBranch ? point.nextLineIndex : null;
   }
 
+  public resetPlacement() {
+    this.x = 0;
+    this.nextX = 0;
+    this.nextParent = 0;
+    this.onBranch = null;
+    this.connections = [];
+  }
+  public resolveParent(index: number, parent: Vertex) {
+    this.parents[index] = parent;
+    parent.addChild(this);
+  }
+  public releaseLayoutConnections() {
+    this.connections.length = 0;
+  }
+
   public getColour() {
     return this.onBranch !== null ? this.onBranch.getColour() : 0;
   }
@@ -466,12 +501,17 @@ export class Graph {
   private svgGradientStop1: SVGStopElement;
   private svgGradientStop2: SVGStopElement;
   private maxWidth: number = -1;
+  private layoutColumns = 0;
 
   private vertices: Vertex[] = [];
   private branches: Branch[] = [];
   private availableColours: number[] = [];
   private commits: GG.GitCommitNode[] = [];
   private commitLookup: { [hash: string]: number } = {};
+  private checkpoint: GraphLayoutCheckpoint | null = null;
+  private readonly unloaded = new Vertex(NULL_VERTEX_ID);
+  private commitHead: string | null = null;
+
   private fileHistoryHighlight: GraphFileHistoryHighlight | null = null;
   private pathHighlight: PathHighlightResult | null = null;
 
@@ -505,47 +545,135 @@ export class Graph {
   public loadCommits(
     commits: GG.GitCommitNode[],
     commitHead: string | null,
-    commitLookup: { [hash: string]: number }
+    commitLookup: { [hash: string]: number },
+    append = false
   ) {
+    const firstNew = this.vertices.length;
+    const checkpoint = this.checkpoint;
+    const eligible =
+      append &&
+      checkpoint !== null &&
+      this.commitHead === commitHead &&
+      commits.length > firstNew &&
+      commits.length - checkpoint.first <= MAX_CHECKPOINT_TAIL_ROWS &&
+      this.canPlaceFrom(commits, commitLookup, firstNew, checkpoint);
+    this.commits = commits;
+    this.commitHead = commitHead;
+    this.commitLookup = commitLookup;
+    if (eligible && this.extendPlacement(firstNew, commitHead, checkpoint)) return;
+
     this.vertices = [];
     this.branches = [];
     this.availableColours = [];
-    this.commits = commits;
-    this.commitLookup = commitLookup;
+    this.checkpoint =
+      commits.length > CHECKPOINT_TAIL_ROWS && this.canPlaceFrom(commits, commitLookup, 0, null)
+        ? new GraphLayoutCheckpoint(commits.length - CHECKPOINT_TAIL_ROWS)
+        : null;
+    this.addVertices(0);
+    this.linkParents(0);
+    if (commits[0]?.hash === UNCOMMITTED_CHANGES_HASH) {
+      this.vertices[0].setNotCommited();
+      this.vertices[0].setCurrent();
+    } else if (commitHead !== null && typeof commitLookup[commitHead] === "number") {
+      this.vertices[commitLookup[commitHead]].setCurrent();
+    }
+    this.placeFrom(0);
+  }
 
-    const nullVertex = new Vertex(NULL_VERTEX_ID);
-    let i: number, j: number;
-    for (i = 0; i < commits.length; i++) {
-      let vertex = new Vertex(i);
-      if (commits[i].stash !== null) {
-        vertex.setStash();
+  private canPlaceFrom(
+    commits: GG.GitCommitNode[],
+    lookup: { [hash: string]: number },
+    first: number,
+    checkpoint: GraphLayoutCheckpoint | null
+  ) {
+    for (let i = first; i < commits.length; i++) {
+      const row = commits[i];
+      if (
+        !isNormalCommit(row) ||
+        lookup[row.hash] !== i ||
+        row.parentHashes.some((hash) => lookup[hash] <= i)
+      )
+        return false;
+      if (checkpoint !== null) {
+        const oldIndex = this.commitLookup[row.hash];
+        if (oldIndex !== undefined && oldIndex < first) return false;
+        const children = checkpoint.missing.get(row.hash);
+        if (children?.some(({ child }) => child.getId() < checkpoint.first)) return false;
       }
+    }
+    return true;
+  }
+
+  private extendPlacement(
+    firstNew: number,
+    head: string | null,
+    checkpoint: GraphLayoutCheckpoint
+  ) {
+    this.addVertices(firstNew);
+    if (head !== null && this.commitLookup[head] >= firstNew) {
+      this.vertices[this.commitLookup[head]].setCurrent();
+    }
+    // Old children must precede the new children in the parent's ordered list.
+    for (let i = firstNew; i < this.commits.length; i++) {
+      const hash = this.commits[i].hash;
+      const pending = checkpoint.missing.get(hash);
+      if (pending === undefined) continue;
+      for (const { child, slot } of pending) child.resolveParent(slot, this.vertices[i]);
+      checkpoint.missing.delete(hash);
+    }
+    this.linkParents(firstNew);
+    for (let i = checkpoint.first; i < this.vertices.length; i++) this.vertices[i].resetPlacement();
+    this.branches.length = checkpoint.branchCount;
+    this.availableColours = checkpoint.colours.slice();
+    if (!checkpoint.replay()) return false;
+    this.placeFrom(checkpoint.first);
+    return true;
+  }
+
+  private addVertices(first: number) {
+    for (let i = first; i < this.commits.length; i++) {
+      const vertex = new Vertex(i);
+      if (this.commits[i].stash !== null) vertex.setStash();
       this.vertices.push(vertex);
     }
-    for (i = 0; i < commits.length; i++) {
-      for (j = 0; j < commits[i].parentHashes.length; j++) {
-        if (typeof commitLookup[commits[i].parentHashes[j]] === "number") {
-          const parentVertex = this.vertices[commitLookup[commits[i].parentHashes[j]]];
-          this.vertices[i].addParent(parentVertex);
-          parentVertex.addChild(this.vertices[i]);
+  }
+
+  private linkParents(first: number) {
+    for (let i = first; i < this.commits.length; i++) {
+      const child = this.vertices[i];
+      const hashes = this.commits[i].parentHashes;
+      for (let slot = 0; slot < hashes.length; slot++) {
+        const hash = hashes[slot],
+          id = this.commitLookup[hash];
+        if (typeof id === "number") {
+          child.addParent(this.vertices[id]);
+          this.vertices[id].addChild(child);
         } else {
-          this.vertices[i].addParent(nullVertex);
+          child.addParent(this.unloaded);
+          if (this.checkpoint !== null) {
+            const pending = this.checkpoint.missing.get(hash);
+            if (pending === undefined) this.checkpoint.missing.set(hash, [{ child, slot }]);
+            else pending.push({ child, slot });
+          }
         }
       }
     }
+  }
 
-    if (commits.length > 0) {
-      if (commits[0].hash === "*") {
-        this.vertices[0].setCurrent();
-        this.vertices[0].setNotCommited();
-      } else if (commitHead !== null && typeof commitLookup[commitHead] === "number") {
-        this.vertices[commitLookup[commitHead]].setCurrent();
+  private placeFrom(first: number) {
+    const checkpoint = this.checkpoint;
+    let width = first > 0 && checkpoint !== null ? checkpoint.width : 0;
+    // Placing one path can finish later vertices; only visit each starting row once.
+    for (let i = first; i < this.vertices.length; i++) {
+      if (checkpoint?.recording && i === checkpoint.first) {
+        checkpoint.seal(this.branches.length, this.availableColours, width);
       }
+      const vertex = this.vertices[i];
+      while (vertex.getNextParent() !== null || vertex.isNotOnBranch()) this.determinePath(i);
+      width = Math.max(width, vertex.getNextPoint().x);
+      vertex.releaseLayoutConnections();
     }
-
-    while ((i = this.findStart()) !== -1) {
-      this.determinePath(i);
-    }
+    this.layoutColumns = width;
   }
 
   public setFileHistoryHighlight(highlight: GraphFileHistoryHighlight | null): void {
@@ -567,18 +695,21 @@ export class Graph {
   private drawPathHighlightMarks(
     group: SVGGElement,
     highlight: PathHighlightResult,
-    expandedCommit: ExpandedCommit | null
+    expandedCommit: ExpandedCommit | null,
+    config: Config,
+    first: number,
+    end: number
   ) {
     // One square per child, however many unloaded parents it has.
     const boundaryChildren = new Set(highlight.boundaries.map((boundary) => boundary.childHash));
-    for (let i = 0; i < this.vertices.length; i++) {
+    for (let i = first; i < end; i++) {
       const hash = this.commits[i].hash;
       const ring = highlight.hashes.has(hash);
       const boundary = boundaryChildren.has(hash);
       if (!ring && !boundary) continue;
       this.vertices[i].drawPathHighlightMarks(
         group,
-        this.config,
+        config,
         expandedCommit !== null && i > expandedCommit.id,
         ring,
         boundary
@@ -593,7 +724,15 @@ export class Graph {
     return highlight.matchHashes.has(hash) ? CLASS_FILE_HISTORY_MATCH : CLASS_FILE_HISTORY_DIM;
   }
 
-  public render(expandedCommit: ExpandedCommit | null) {
+  public render(expandedCommit: ExpandedCommit | null, first = 0, end = this.vertices.length) {
+    end = Math.min(end, this.vertices.length);
+    first = Math.min(first, end);
+    const offset = first * this.config.grid.y;
+    const config = {
+      ...this.config,
+      grid: { ...this.config.grid, offsetY: this.config.grid.offsetY - offset }
+    };
+    this.svg.setAttribute("style", `position:relative;top:${offset}px`);
     let group = <SVGGElement>document.createElementNS("http://www.w3.org/2000/svg", "g"),
       i,
       width = this.getWidth();
@@ -604,29 +743,35 @@ export class Graph {
     for (i = 0; i < this.branches.length; i++) {
       this.branches[i].draw(
         group,
-        this.config,
+        config,
         expandedCommit !== null ? expandedCommit.id : -1,
-        highlightedEdgeKeys
+        highlightedEdgeKeys,
+        first,
+        end,
+        first === 0 && end === this.vertices.length
       );
     }
-    for (i = 0; i < this.vertices.length; i++) {
+    for (i = first; i < end; i++) {
       const hash = this.commits[i].hash;
       this.vertices[i].draw(
         group,
-        this.config,
+        config,
         expandedCommit !== null && i > expandedCommit.id,
         hash,
         this.getFileHistoryHighlightClass(hash)
       );
     }
     if (this.pathHighlight !== null) {
-      this.drawPathHighlightMarks(group, this.pathHighlight, expandedCommit);
+      this.drawPathHighlightMarks(group, this.pathHighlight, expandedCommit, config, first, end);
     }
 
     if (this.svgGroup !== null) this.svg.removeChild(this.svgGroup);
     this.svg.appendChild(group);
     this.svgGroup = group;
-    this.setDimensions(width, this.getHeight(expandedCommit));
+    this.setDimensions(
+      width,
+      this.getHeight(expandedCommit) - (this.vertices.length - end + first) * this.config.grid.y
+    );
     this.applyMaxWidth(width);
   }
 
@@ -634,19 +779,13 @@ export class Graph {
     if (this.svgGroup !== null) {
       this.svg.removeChild(this.svgGroup);
       this.svgGroup = null;
+      this.svg.setAttribute("style", "");
       this.setDimensions(0, 0);
     }
   }
 
   public getWidth() {
-    let x = 0,
-      i,
-      p;
-    for (i = 0; i < this.vertices.length; i++) {
-      p = this.vertices[i].getNextPoint();
-      if (p.x > x) x = p.x;
-    }
-    return x * this.config.grid.x;
+    return this.layoutColumns * this.config.grid.x;
   }
 
   public getHeight(expandedCommit: ExpandedCommit | null) {
@@ -809,31 +948,59 @@ export class Graph {
     while (point.y < end.y) {
       const row = this.vertices[point.y];
       const index = row !== undefined ? row.getLineIndexAfter(point.x, branch) : null;
+      const checkpoint = this.checkpoint;
+      if (checkpoint?.recording && point.y === checkpoint.first - 1 && index !== null) {
+        const entry = point;
+        checkpoint.recordSharedPath(branch.lines, index, (line) => {
+          const next = branch.shareEdgeKeys(line, entry, edgeKeys);
+          if (next === null || next.y !== checkpoint.first) return false;
+          this.shareEdgeKeysToParent(branch, next, parentVertex, edgeKeys);
+          return true;
+        });
+      }
       const next = index !== null ? branch.shareEdgeKeys(index, point, edgeKeys) : null;
       if (next === null || next.y !== point.y + 1) return;
       point = next;
     }
   }
 
-  private determinePath(startAt: number) {
+  private determinePath(startAt: number, resume?: Continuation) {
     let i = startAt;
-    let vertex = this.vertices[i],
-      parentVertex = this.vertices[i].getNextParent();
-    let lastPoint = vertex.isNotOnBranch() ? vertex.getNextPoint() : vertex.getPoint(),
-      curPoint;
-    let edgeKeys = this.getEdgeKeysToParent(vertex, parentVertex);
-
-    if (
-      parentVertex !== null &&
-      parentVertex.getId() !== NULL_VERTEX_ID &&
-      vertex.isMerge() &&
-      !vertex.isNotOnBranch() &&
-      !parentVertex.isNotOnBranch()
-    ) {
-      // Branch is a merge between two vertices already on branches
-      let foundPointToParent = false,
-        parentBranch = parentVertex.getBranch()!;
+    let vertex = resume?.vertex ?? this.vertices[i];
+    let parentVertex = resume ? resume.parent : vertex.getNextParent();
+    let lastPoint =
+      resume?.point ?? (vertex.isNotOnBranch() ? vertex.getNextPoint() : vertex.getPoint());
+    let curPoint;
+    let edgeKeys = resume ? resume.edgeKeys : this.getEdgeKeysToParent(vertex, parentVertex);
+    const checkpoint = this.checkpoint;
+    const boundary = checkpoint?.recording ? checkpoint.first : -1;
+    const mergeParent =
+      vertex.isMerge() && !vertex.isNotOnBranch() && parentVertex?.getId() !== NULL_VERTEX_ID
+        ? parentVertex
+        : null;
+    // A merge above the boundary may choose its lane by inspecting a parent below it.
+    if (checkpoint?.recording && mergeParent !== null && mergeParent.getId() >= boundary) {
+      checkpoint.recordMergeLane(mergeParent);
+    }
+    const parentBranch = resume
+      ? resume.merge
+        ? resume.branch
+        : null
+      : (mergeParent?.getBranch() ?? null);
+    if (parentVertex !== null && parentBranch !== null) {
+      let foundPointToParent = false;
       for (i = startAt + 1; i < this.vertices.length; i++) {
+        if (i === boundary && checkpoint !== null) {
+          const state = {
+            vertex,
+            parent: parentVertex,
+            point: lastPoint,
+            edgeKeys,
+            branch: parentBranch,
+            merge: true
+          };
+          checkpoint.recordPath(parentBranch.lines, () => this.determinePath(boundary - 1, state));
+        }
         curPoint = this.vertices[i].getPointConnectingTo(parentVertex, parentBranch); // Check if there is already a point connecting the ith vertex to the required parent
         if (curPoint !== null) {
           foundPointToParent = true; // Parent was found
@@ -854,16 +1021,29 @@ export class Graph {
 
         if (foundPointToParent) {
           this.shareEdgeKeysToParent(parentBranch, curPoint, parentVertex, edgeKeys);
-          vertex.registerParentProcessed();
+          if (resume === undefined || vertex.getId() > startAt) vertex.registerParentProcessed();
           break;
         }
       }
     } else {
       // Branch is normal
-      let branch = new Branch(this.getAvailableColour(startAt));
-      vertex.addToBranch(branch, lastPoint.x);
-      vertex.registerUnavailablePoint(lastPoint.x, vertex, branch);
+      const branch = resume?.branch ?? new Branch(this.getAvailableColour(startAt));
+      if (!resume) {
+        vertex.addToBranch(branch, lastPoint.x);
+        vertex.registerUnavailablePoint(lastPoint.x, vertex, branch);
+      }
       for (i = startAt + 1; i < this.vertices.length; i++) {
+        if (i === boundary && checkpoint !== null) {
+          const state = {
+            vertex,
+            parent: parentVertex,
+            point: lastPoint,
+            edgeKeys,
+            branch,
+            merge: false
+          };
+          checkpoint.recordPath(branch.lines, () => this.determinePath(boundary - 1, state));
+        }
         curPoint =
           parentVertex === this.vertices[i] && !parentVertex.isNotOnBranch()
             ? this.vertices[i].getPoint()
@@ -879,7 +1059,7 @@ export class Graph {
         lastPoint = curPoint;
 
         if (parentVertex === this.vertices[i]) {
-          vertex.registerParentProcessed();
+          if (resume === undefined || vertex.getId() > startAt) vertex.registerParentProcessed();
           let parentVertexOnBranch = !parentVertex.isNotOnBranch();
           parentVertex.addToBranch(branch, curPoint.x);
           vertex = parentVertex;
@@ -893,7 +1073,7 @@ export class Graph {
       // remaining children of the current vertex and must not be marked processed.
       // A parent listed before its child (id below the vertex) is equally
       // unreachable by walking down, so it is consumed here as well.
-      if (i === this.vertices.length) {
+      if (i === this.vertices.length && (resume === undefined || vertex.getId() > startAt)) {
         while (vertex.getNextParent() !== null) {
           const nextParentId = vertex.getNextParent()!.getId();
           if (nextParentId === NULL_VERTEX_ID || nextParentId < vertex.getId()) {
@@ -903,16 +1083,9 @@ export class Graph {
           }
         }
       }
-      this.branches.push(branch);
+      if (!resume) this.branches.push(branch);
       this.availableColours[branch.getColour()] = i;
     }
-  }
-
-  private findStart() {
-    for (let i = 0; i < this.vertices.length; i++) {
-      if (this.vertices[i].getNextParent() !== null || this.vertices[i].isNotOnBranch()) return i;
-    }
-    return -1;
   }
 
   private getAvailableColour(startAt: number) {

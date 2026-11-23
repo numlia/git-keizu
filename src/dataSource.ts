@@ -1,4 +1,5 @@
 import * as cp from "node:child_process";
+import { lstat, readFile, stat } from "node:fs/promises";
 import * as path from "node:path";
 
 import {
@@ -49,6 +50,8 @@ import {
   PushPreparation,
   PushTarget,
   RemoteBranchTarget,
+  RequestLoadCommits,
+  ResponseAppendCommits,
   UNCOMMITTED_CHANGES_HASH,
   VALID_UNCOMMITTED_RESET_MODES,
   WorktreeCollection
@@ -58,7 +61,6 @@ import { parseWorktreeList } from "./worktree";
 
 const eolRegex = /\r\n|\r|\n/g;
 const headRegex = /^\(HEAD detached (at|from) .+\)$/;
-const REGEX_META_CHARS = /[.*+?^${}()|[\]\\]/g;
 const gitLogSeparator = "XX7Nal-YARtTpjCikii9nJxER19D6diSyk-AWkPb";
 const NO_QUOTE_PATH_CONFIG = ["-c", "core.quotePath=false"];
 const LOG_FORMAT_FIELD_COUNT = 6;
@@ -72,10 +74,14 @@ const NULL_BYTE_SEPARATOR = "\0";
 const NAME_STATUS_OPTION = "--name-status";
 const NUMSTAT_OPTION = "--numstat";
 const NO_WALK_SORTED_OPTION = "--no-walk=sorted";
+const UTF8_OUTPUT_OPTION = "--encoding=UTF-8";
 const TAB_SEPARATOR = "\t";
 const VALID_FILE_CHANGE_TYPES: ReadonlySet<string> = new Set(["A", "M", "D", "R"]);
 const BRANCH_COMPARISON_MAX_PARALLEL = 3;
 const FILE_HISTORY_ANCESTRY_MIN_ENTRIES = 2;
+const HISTORY_ANCESTRY_FILES = ["shallow", "info/grafts"];
+const HISTORY_CONFIG_PATTERN = "^(core\\.usereplacerefs|mailmap\\.(file|blob)|log\\.mailmap)$";
+const GIT_CONFIG_NO_MATCH = 1;
 
 export const COMMIT_ORDER_FLAGS: Readonly<Record<CommitOrdering, string>> = {
   date: "--date-order",
@@ -97,18 +103,13 @@ const COMMIT_DETAILS_FIELD = {
   COMMITTER_EMAIL: 6
 } as const;
 
-function escapeRegExp(str: string): string {
-  return str.replace(REGEX_META_CHARS, "\\$&");
-}
-
 function splitNullSeparatedFields(stdout: string): string[] {
   return stdout.split(NULL_BYTE_SEPARATOR);
 }
 
-function appendAuthorArgs(args: string[], authors: string[]) {
-  for (const author of authors) {
-    args.push(`--author=${escapeRegExp(author)}`);
-  }
+function authorFilterArgs(authors: string[]): string[] {
+  if (authors.length === 0) return [];
+  return ["--fixed-strings", ...authors.map((author) => `--author=${author}`)];
 }
 
 function buildMergeArgs(
@@ -158,6 +159,33 @@ type GitQueryResult = { kind: "ok"; stdout: string } | { kind: "error"; status: 
 
 type RemoteNamesResult = { kind: "ok"; remotes: string[] } | { kind: "error"; status: string };
 
+interface HistoryPage {
+  token: number;
+  query: string;
+  refs: string;
+  worktrees: string;
+  loaded: number;
+  next: GitCommit;
+  linear: boolean;
+}
+
+function historyQuery(
+  repo: string,
+  branches: string[],
+  remotes: boolean,
+  authors: string[],
+  order: CommitOrdering
+) {
+  return JSON.stringify([
+    repo,
+    branches,
+    remotes,
+    authors,
+    order,
+    getConfig().showUncommittedChanges()
+  ]);
+}
+
 function isRefNameSafe(refName: string): boolean {
   return !refName.startsWith(OPTION_ARG_PREFIX);
 }
@@ -165,7 +193,8 @@ function isRefNameSafe(refName: string): boolean {
 const VALID_RESET_MODES = new Set(["soft", "mixed", "hard"]);
 
 function parseGitLogCommits(stdout: string): GitCommit[] {
-  const lines = stdout.split(eolRegex);
+  // Git subjects can contain literal carriage returns, including consecutive ones.
+  const lines = stdout.split(/\r?\n/);
   const gitCommits: GitCommit[] = [];
   for (let i = 0; i < lines.length - 1; i++) {
     const line = lines[i].split(gitLogSeparator);
@@ -229,6 +258,8 @@ function orderPinnedParentsFirst(pinnedCommits: GitCommit[]): GitCommit[] {
 }
 
 export class DataSource {
+  private historyPage?: HistoryPage;
+  private historySequence = 0;
   private gitPath: string = DEFAULT_GIT_PATH;
   private gitLogFormat!: string;
   private gitStashFormat!: string;
@@ -243,6 +274,8 @@ export class DataSource {
   }
 
   public generateGitCommandFormats() {
+    this.historySequence++;
+    this.historyPage = undefined;
     let dateType = getConfig().dateType() === "Author Date" ? "%at" : "%ct";
     this.gitLogFormat = ["%H", "%P", "%an", "%ae", dateType, "%s"].join(gitLogSeparator);
     this.gitStashFormat = ["%H", "%P", "%gD", "%an", "%ae", dateType, "%s"].join(gitLogSeparator);
@@ -287,18 +320,22 @@ export class DataSource {
     authors: string[],
     commitOrdering: CommitOrdering
   ) {
-    const worktrees = await this.getWorktrees(repo);
+    const token = ++this.historySequence;
+    this.historyPage = undefined;
+    const [worktrees, refData] = await Promise.all([
+      this.getWorktrees(repo),
+      this.getRefs(repo, showRemoteBranches)
+    ]);
 
-    const [commits, refData, stashes, authorList, pinnedCommits] = await Promise.all([
+    const [commits, stashes, authorList, pinnedCommits] = await Promise.all([
       this.getGitLog(repo, branches, maxCommits + 1, showRemoteBranches, authors, commitOrdering),
-      this.getRefs(repo, showRemoteBranches),
       this.getStashes(repo),
       this.getAuthors(repo),
       this.getPinnedDetachedCommits(repo, collectDetachedHeads(worktrees), authors)
     ]);
 
     const moreCommitsAvailable = commits.length === maxCommits + 1;
-    if (moreCommitsAvailable) commits.pop();
+    const next = moreCommitsAvailable ? commits.pop() : undefined;
 
     const knownHashes = new Set(commits.map((commit) => commit.hash));
     const pendingPinnedCommits = pinnedCommits.filter((pinnedCommit) => {
@@ -316,7 +353,7 @@ export class DataSource {
           const unsavedChanges = getConfig().showUncommittedChanges()
             ? await this.getGitUnsavedChanges(repo)
             : null;
-          if (unsavedChanges !== null) {
+          if (unsavedChanges) {
             commits.unshift({
               hash: UNCOMMITTED_CHANGES_HASH,
               parentHashes: [refData.head],
@@ -387,8 +424,40 @@ export class DataSource {
       }
     }
 
+    if (
+      next &&
+      refData.snapshot !== null &&
+      stashes.length === 0 &&
+      worktrees.detached.length === 0 &&
+      Object.keys(worktrees.branches).length > 0 &&
+      commitNodes.length === maxCommits &&
+      branches.every((branch) =>
+        refData.refs.some((ref) => ref.name === branch || `remotes/${ref.name}` === branch)
+      )
+    ) {
+      const after = await this.getRefs(repo, showRemoteBranches);
+      if (token === this.historySequence && after.snapshot === refData.snapshot) {
+        this.historyPage = {
+          token,
+          query: historyQuery(repo, branches, showRemoteBranches, authors, commitOrdering),
+          refs: after.snapshot,
+          worktrees: JSON.stringify(worktrees),
+          loaded: maxCommits,
+          next,
+          linear:
+            authors.length === 0 &&
+            refData.singleTip === commits[0]?.hash &&
+            commits.every(
+              (row, index) =>
+                row.parentHashes.length === 1 &&
+                row.parentHashes[0] === (commits[index + 1] ?? next).hash
+            )
+        };
+      }
+    }
     return {
       commits: commitNodes,
+      pageToken: this.historyPage?.token === token ? token : undefined,
       head: refData.head,
       moreCommitsAvailable: moreCommitsAvailable,
       authors: authorList,
@@ -1245,18 +1314,113 @@ export class DataSource {
     return comparisons;
   }
 
-  private getRefs(repo: string, showRemoteBranches: boolean) {
-    let args = ["show-ref"];
-    if (!showRemoteBranches) {
-      args.push("--heads", "--tags");
-    }
-    args.push("-d", "--head");
+  private async getRefs(repo: string, showRemoteBranches: boolean) {
+    const [data, ancestryFiles, historyConfig] = await Promise.all([
+      this.readRefs(repo, showRemoteBranches),
+      this.getHistoryAncestryFiles(repo),
+      this.getHistoryConfigSnapshot(repo)
+    ]);
+    // Git can change parents and canonical author names without moving any ref.
+    const snapshot =
+      data.snapshot !== null && ancestryFiles !== null && historyConfig !== null
+        ? JSON.stringify([data.snapshot, ancestryFiles, historyConfig])
+        : null;
+    return { ...data, snapshot };
+  }
 
-    return this.spawnGit<GitRefData>(
-      args,
+  private async getHistoryConfigSnapshot(repo: string): Promise<string | null> {
+    const config = await this.spawnGitProcess(
+      ["config", "--null", "--get-regexp", HISTORY_CONFIG_PATTERN],
+      repo
+    );
+    if (config.kind !== "exit" || (config.code !== 0 && config.code !== GIT_CONFIG_NO_MATCH)) {
+      return null;
+    }
+    // A bare log.mailmap has no LF or value. Its presence is part of the raw snapshot below.
+    const settings = new Map<string, string>();
+    for (const entry of splitNullSeparatedFields(config.stdout)) {
+      const separator = entry.indexOf("\n");
+      if (separator !== -1) settings.set(entry.slice(0, separator), entry.slice(separator + 1));
+      else if (entry === "mailmap.file" || entry === "mailmap.blob") return null;
+    }
+    // Let Git expand configured paths, including ~/ and %(prefix)/, only for the file setting.
+    const file = settings.has("mailmap.file")
+      ? await this.spawnGit(
+          ["config", "--null", "--type=path", "--get", "mailmap.file"],
+          repo,
+          (out) => splitNullSeparatedFields(out)[0],
+          null
+        )
+      : "";
+    if (file === null) return null;
+    const blob = settings.get("mailmap.blob");
+    const sources = await Promise.all([
+      this.getMailmapFileHash(repo, ".mailmap", lstat),
+      file ? this.getMailmapFileHash(repo, file, stat) : "",
+      blob
+        ? this.spawnGit(
+            ["rev-parse", "--verify", "--end-of-options", blob],
+            repo,
+            (out) => out.trimEnd(),
+            null
+          )
+        : ""
+    ]);
+    return sources.includes(null) ? null : JSON.stringify([config.stdout, ...sources]);
+  }
+
+  private async getMailmapFileHash(
+    repo: string,
+    file: string,
+    readStat: typeof stat
+  ): Promise<string | null> {
+    const location = path.resolve(repo, file);
+    try {
+      if (!(await readStat(location)).isFile()) return null;
+    } catch (error) {
+      return (error as NodeJS.ErrnoException).code === "ENOENT" ? "" : null;
+    }
+    return this.spawnGit(
+      ["hash-object", "--no-filters", "--", location],
+      repo,
+      (out) => out.trimEnd(),
+      null
+    );
+  }
+
+  private async getHistoryAncestryFiles(repo: string) {
+    const args = HISTORY_ANCESTRY_FILES.flatMap((file) => ["--git-path", file]);
+    const locations = await this.runGitQuery(["rev-parse", ...args], repo);
+    if (locations.kind !== "ok") return null;
+    // rev-parse emits one path per line. A newline in a path makes this result ambiguous.
+    const files = locations.stdout.split("\n");
+    if (
+      files.pop() !== "" ||
+      files.length !== HISTORY_ANCESTRY_FILES.length ||
+      files.includes("")
+    ) {
+      return null;
+    }
+    const contents = await Promise.all(
+      files.map(async (file) => {
+        try {
+          return await readFile(path.resolve(repo, file), "utf8");
+        } catch (error) {
+          return (error as NodeJS.ErrnoException).code === "ENOENT" ? false : null;
+        }
+      })
+    );
+    return contents.includes(null) ? null : contents;
+  }
+
+  private readRefs(repo: string, showRemoteBranches: boolean) {
+    return this.spawnGit<GitRefData & { snapshot: string | null; singleTip?: string }>(
+      ["show-ref", "-d", "--head"],
       repo,
       (stdout) => {
-        let refData: GitRefData = { head: null, refs: [] };
+        const refData: GitRefData = { head: null, refs: [] };
+        const tips = new Set<string>();
+        let pageable = true;
         let lines = stdout.split(eolRegex);
         for (let i = 0; i < lines.length - 1; i++) {
           let line = lines[i].split(" ");
@@ -1264,6 +1428,8 @@ export class DataSource {
 
           let hash = line.shift()!;
           let ref = line.join(" ");
+          // Stashes can insert rows anywhere in the graph. Their reflog is not part of the normal walk.
+          if (ref === "refs/stash") pageable = false;
 
           if (ref.startsWith("refs/heads/")) {
             refData.refs.push({ hash: hash, name: ref.substring(11), type: "head" });
@@ -1273,18 +1439,106 @@ export class DataSource {
               name: ref.endsWith("^{}") ? ref.substring(10, ref.length - 3) : ref.substring(10),
               type: "tag"
             });
-          } else if (ref.startsWith("refs/remotes/")) {
+          } else if (showRemoteBranches && ref.startsWith("refs/remotes/")) {
             const name = ref.substring(13);
+            tips.add(hash);
             if (name.endsWith("/HEAD")) continue;
             refData.refs.push({ hash: hash, name: name, type: "remote" });
           } else if (ref === "HEAD") {
             refData.head = hash;
           }
+          if (ref.startsWith("refs/heads/") || ref.startsWith("refs/tags/")) tips.add(hash);
         }
-        return refData;
+        return {
+          ...refData,
+          snapshot: pageable && refData.head !== null ? stdout : null,
+          singleTip: tips.size === 1 ? tips.values().next().value : undefined
+        };
       },
-      { head: null, refs: [] }
+      { head: null, refs: [], snapshot: null }
     );
+  }
+
+  public async getNextHistoryPage(
+    request: RequestLoadCommits
+  ): Promise<ResponseAppendCommits | undefined> {
+    const page = this.historyPage;
+    const { repo, branches, authors, showRemoteBranches, commitOrdering, maxCommits } = request;
+    if (
+      !page ||
+      page.token !== request.pageToken ||
+      !Number.isSafeInteger(maxCommits) ||
+      maxCommits <= page.loaded ||
+      page.query !== historyQuery(repo, branches, showRemoteBranches, authors, commitOrdering)
+    ) {
+      return undefined;
+    }
+
+    const before = await this.getRefs(repo, showRemoteBranches);
+    if (before.snapshot !== page.refs) return undefined;
+    const size = maxCommits - page.loaded;
+    // A single remaining lineage can restart at its next parent. Multiple tips or an
+    // author filter need Git's original traversal order, including its tie-breaking.
+    const linear = page.linear && page.next.parentHashes.length <= 1;
+    const args = this.gitLogArgs(
+      linear ? page.next.parentHashes : branches,
+      size,
+      showRemoteBranches,
+      authors,
+      commitOrdering
+    );
+    if (!linear) args.splice(1, 0, `--skip=${page.loaded + 1}`);
+    const fresh =
+      linear && page.next.parentHashes.length === 0
+        ? []
+        : await this.spawnGit<GitCommit[] | null>(
+            args,
+            repo,
+            (stdout) => {
+              const rows = parseGitLogCommits(stdout);
+              return rows.length === stdout.split("\n").length - 1 ? rows : null;
+            },
+            null
+          );
+    if (fresh === null) return undefined;
+    const [after, worktrees, dirty] = await Promise.all([
+      this.getRefs(repo, showRemoteBranches),
+      this.getWorktrees(repo),
+      getConfig().showUncommittedChanges() ? this.getGitUnsavedChanges(repo) : null
+    ]);
+    if (
+      after.snapshot !== page.refs ||
+      JSON.stringify(worktrees) !== page.worktrees ||
+      dirty !== null ||
+      this.historyPage !== page
+    ) {
+      return undefined;
+    }
+
+    const rows = [page.next, ...fresh];
+    const next = rows.length > size ? rows.pop() : undefined;
+    this.historyPage = next
+      ? {
+          ...page,
+          next,
+          token: ++this.historySequence,
+          loaded: maxCommits,
+          linear: linear && rows.every((row) => row.parentHashes.length === 1)
+        }
+      : undefined;
+    return {
+      command: "appendCommits",
+      repo,
+      from: page.token,
+      baseCount: page.loaded,
+      commits: rows.map((row) => ({
+        ...row,
+        stash: null,
+        refs: after.refs.filter((ref) => ref.hash === row.hash)
+      })),
+      moreCommitsAvailable: next !== undefined,
+      pageToken: this.historyPage?.token
+    };
   }
 
   private getGitLog(
@@ -1295,13 +1549,29 @@ export class DataSource {
     authors: string[],
     commitOrdering: CommitOrdering
   ) {
+    return this.spawnGit<GitCommit[]>(
+      this.gitLogArgs(branches, num, showRemoteBranches, authors, commitOrdering),
+      repo,
+      parseGitLogCommits,
+      []
+    );
+  }
+
+  private gitLogArgs(
+    branches: string[],
+    num: number,
+    showRemoteBranches: boolean,
+    authors: string[],
+    commitOrdering: CommitOrdering
+  ) {
     const args = [
       "log",
       `--max-count=${num}`,
+      UTF8_OUTPUT_OPTION,
       `--format=${this.gitLogFormat}`,
-      COMMIT_ORDER_FLAGS[commitOrdering]
+      COMMIT_ORDER_FLAGS[commitOrdering],
+      ...authorFilterArgs(authors)
     ];
-    appendAuthorArgs(args, authors);
     if (branches.length > 0) {
       args.push(...branches);
     } else {
@@ -1309,7 +1579,7 @@ export class DataSource {
       if (showRemoteBranches) args.push("--remotes");
     }
 
-    return this.spawnGit<GitCommit[]>(args, repo, parseGitLogCommits, []);
+    return args;
   }
 
   /**
@@ -1320,15 +1590,20 @@ export class DataSource {
   private getPinnedDetachedCommits(repo: string, heads: string[], authors: string[]) {
     if (heads.length === 0) return Promise.resolve<GitCommit[]>([]);
 
-    const args = ["log", NO_WALK_SORTED_OPTION, `--format=${this.gitLogFormat}`];
-    appendAuthorArgs(args, authors);
-    args.push(...heads);
+    const args = [
+      "log",
+      NO_WALK_SORTED_OPTION,
+      UTF8_OUTPUT_OPTION,
+      `--format=${this.gitLogFormat}`,
+      ...authorFilterArgs(authors),
+      ...heads
+    ];
 
     return this.spawnGit<GitCommit[]>(args, repo, parseGitLogCommits, []);
   }
 
   private getGitUnsavedChanges(repo: string) {
-    return this.spawnGit<GitUnsavedChanges | null>(
+    return this.spawnGit<GitUnsavedChanges | null | undefined>(
       ["status", "-s", "--branch", "--untracked-files", "--porcelain"],
       repo,
       (stdout) => {
@@ -1337,13 +1612,13 @@ export class DataSource {
           ? { branch: lines[0].substring(3).split("...")[0], changes: lines.length - 2 }
           : null;
       },
-      null
+      undefined
     );
   }
 
   private getAuthors(repo: string) {
     return this.spawnGit<string[]>(
-      ["shortlog", "-s", "HEAD"],
+      ["shortlog", UTF8_OUTPUT_OPTION, "-s", "HEAD"],
       repo,
       (stdout) => {
         const lines = stdout.split(eolRegex);
@@ -1364,7 +1639,7 @@ export class DataSource {
 
   private getStashes(repo: string) {
     return this.spawnGit<GitStash[]>(
-      ["reflog", `--format=${this.gitStashFormat}`, "refs/stash", "--"],
+      ["reflog", UTF8_OUTPUT_OPTION, `--format=${this.gitStashFormat}`, "refs/stash", "--"],
       repo,
       (stdout) => {
         const lines = stdout.split(eolRegex);

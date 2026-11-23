@@ -427,6 +427,7 @@ export class GitKeizuView {
                 : true;
               this.sendMessage({
                 command: "loadBranches",
+                requestId: msg.requestId,
                 branches: branchData.branches,
                 head: branchData.head,
                 hard: msg.hard,
@@ -440,9 +441,17 @@ export class GitKeizuView {
               }
               break;
             }
-            case "loadCommits":
+            case "loadCommits": {
+              if (msg.pageToken !== undefined) {
+                const page = await this.dataSource.getNextHistoryPage(msg);
+                if (page !== undefined) {
+                  this.sendMessage(page);
+                  break;
+                }
+              }
               this.sendMessage({
                 command: "loadCommits",
+                requestId: msg.requestId,
                 ...(await this.dataSource.getCommits(
                   msg.repo,
                   msg.branches,
@@ -454,6 +463,7 @@ export class GitKeizuView {
                 hard: msg.hard
               });
               break;
+            }
             case "loadRepos":
               if (!msg.check || !(await this.repoManager.checkReposExist())) {
                 // If not required to check repos, or no changes were found when checking, respond with repos

@@ -3,6 +3,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 
 import type { GitCommitNode, GitRef, WorktreeCollection } from "../../src/types";
 import { vscode } from "../../web/utils";
+import { dispatchHostMessage as dispatchMessage } from "./setup";
 
 /*
  * Integration tests for web/main.ts with the real RefOverflowController, the real FindWidget and
@@ -373,10 +374,6 @@ interface LoadOptions {
   readonly worktrees?: WorktreeCollection;
   readonly hard?: boolean;
   readonly flush?: boolean;
-}
-
-function dispatchMessage(data: Record<string, unknown>): void {
-  window.dispatchEvent(new MessageEvent("message", { data }));
 }
 
 function loadCommits(options: LoadOptions = {}): void {
@@ -1712,18 +1709,22 @@ describe("ref list lifecycle on replacement, switching and scrolling (S59)", () 
     // Given: the list open; every posted message records the UI state at that moment
     openList(0);
     const states: string[] = [];
-    vi.mocked(vscode.postMessage).mockImplementation((message: unknown) => {
-      const command = (message as { command: string }).command;
-      states.push(`${command}:${popups().length}:${contentElem().style.minWidth}`);
-    });
+    const postMessage = vi.mocked(vscode.postMessage);
+    const post = postMessage.getMockImplementation()!;
 
     // When: another repository is chosen
-    dropdowns.repoSelect.callback!(OTHER_REPO as never);
+    await postMessage.withImplementation(
+      (message) => {
+        const command = (message as { command: string }).command;
+        states.push(`${command}:${popups().length}:${contentElem().style.minWidth}`);
+        post(message);
+      },
+      () => dropdowns.repoSelect.callback!(OTHER_REPO as never)
+    );
 
     // Then: the load request is sent with no list and no minimum
     expect(states).toContain("loadBranches:0:");
     expect(states.every((state) => state.endsWith(":0:"))).toBe(true);
-    vi.mocked(vscode.postMessage).mockImplementation(() => {});
     dropdowns.repoSelect.callback!(TEST_REPO as never);
     await restoreTestRepo();
   });

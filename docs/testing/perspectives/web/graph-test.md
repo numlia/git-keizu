@@ -452,3 +452,20 @@ fixture:
 - Boundary: TC-087
 - Type: excluded(see the table above)
 - Normal: TC-078 to TC-080, TC-082 to TC-086
+
+## S22: Drawing and extending a window of a placed graph
+
+> Origin: Feature 061-02 (large history browsing)
+> Added: 2026-11-22
+> Status: active
+> Supersedes: -
+> Target Path: `web/graph.ts` (loadCommits and render)
+> Test File: `tests/web/graph.test.ts`
+
+| Case ID | Input / Precondition                                                                                                                            | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                   | Notes                                                      |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| TC-090  | Render a window crossed by a long edge with both endpoints outside, with and without path highlighting.                                         | Boundary - through edge                                                    | The clipped route reaches both viewport edges with the full graph’s color and highlight. Neither endpoint is mounted.                                                             | Include a path entering or leaving at a window edge.       |
+| TC-091  | Render adjacent windows of a graph with multiple lanes.                                                                                         | Normal - full-layout projection                                            | Node centers, radii, lane colors, width and visible line geometry match the same portions of the full placement. Each row at the exclusive end appears only in the next window.   | Compare logical coordinates after translating each window. |
+| TC-092  | Append eight successive 100-commit pages to a merge history with a safe checkpoint.                                                             | Normal - stable prefix reuse                                               | Each safe append reuses the stable prefix. Node positions, lane colors, widths and ordered paths agree with an independent full placement before, across and after each boundary. | Real-history checkpoints start at 100,000 through 100,700. |
+| TC-093  | Extend a checkpoint with a 4,096-row tail through the 8,192-row limit and then one row beyond it.                                               | Boundary - checkpoint renewal                                              | At the limit a safe checkpoint can still be used. Beyond it a full placement establishes a new checkpoint, and the next safe extension agrees with full placement.                | Check windows on both sides of the renewed boundary.       |
+| TC-094  | Append a missing parent of a stable child, change a cross-boundary merge lane, or include reversed parent order, a stash or an uncommitted row. | Validation - unsafe reuse                                                  | Each case uses full placement where the saved prefix cannot be reused. Positions, branch colors, widths and routes match a fresh graph.                                           | Exercise each invalidation independently.                  |

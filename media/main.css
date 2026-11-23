@@ -546,6 +546,14 @@ li.gitFile[tabindex]:focus-visible {
   padding: 2px 0;
 }
 /* Avatar */
+.historyColumnSizing {
+  visibility: hidden;
+}
+
+.historyAuthorWithAvatar {
+  margin-right: 22px; /* Avatar and its trailing gap. */
+}
+
 .commit .avatar > img {
   display: inline-block;
   width: 18px;

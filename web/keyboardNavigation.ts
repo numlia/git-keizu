@@ -14,6 +14,7 @@ export interface RowTarget {
 
 export type FocusKey =
   | { readonly kind: "row"; readonly repo: string; readonly hash: string }
+  | { readonly kind: "counter"; readonly repo: string; readonly hash: string }
   | {
       readonly kind: "ref";
       readonly repo: string;
@@ -373,6 +374,9 @@ export function captureFocusOrigin(element: HTMLElement | null): FocusOrigin | n
   let keys: readonly FocusKey[] = [];
   for (let node: HTMLElement | null = element; node !== null; node = node.parentElement) {
     const key = focusKeys.get(node);
+    if (key?.kind === "row" && element.matches(COUNTER_SELECTOR)) {
+      keys = addKey(keys, { ...key, kind: "counter" });
+    }
     if (key !== undefined) keys = addKey(keys, key);
   }
   const implied = keys.map(impliedRowKey).filter((key): key is FocusKey => key !== null);
@@ -457,6 +461,8 @@ function candidatesForKey(context: FocusContext, key: FocusKey): HTMLElement[] {
   switch (key.kind) {
     case "row":
       return rowElements(context, key.repo, key.hash);
+    case "counter":
+      return counterElements(context, key.repo, key.hash);
     case "ref":
       return [...elementsForKey(key), ...counterElements(context, key.repo, key.hash)];
     case "control":
@@ -508,21 +514,11 @@ function ownsPopupOrigin(root: HTMLElement, origin: FocusOrigin, context: FocusC
   );
 }
 
-// Keys parked while the root showed the loading placeholder survive into the next ticket.
-function withParkedKeys(
-  root: HTMLElement,
-  origin: FocusOrigin,
-  context: FocusContext
-): FocusOrigin {
-  if (
-    parked === null ||
-    parked.root !== root ||
-    parked.epoch !== tracking.epoch ||
-    parked.repo !== context.getRepo()
-  ) {
-    return origin;
-  }
-  return { ...origin, keys: parked.keys.reduce(addKey, origin.keys) };
+/** Focus parked on a container belongs to its former target until the user moves or changes repos. */
+export function getParkedFocusKeys(root: HTMLElement, repo: string | null): readonly FocusKey[] {
+  return parked?.root === root && parked.epoch === tracking.epoch && parked.repo === repo
+    ? parked.keys
+    : [];
 }
 
 /**
@@ -541,7 +537,10 @@ export function beginFocusUpdate(root: HTMLElement): FocusUpdate | null {
   const generation = (generations.get(root) ?? 0) + 1;
   generations.set(root, generation);
   return {
-    origin: withParkedKeys(root, captured, context),
+    origin: {
+      ...captured,
+      keys: getParkedFocusKeys(root, context.getRepo()).reduce(addKey, captured.keys)
+    },
     root,
     generation,
     focusEpoch: tracking.epoch

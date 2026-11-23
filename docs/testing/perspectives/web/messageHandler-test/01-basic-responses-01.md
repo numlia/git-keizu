@@ -143,3 +143,17 @@ A change that classifies the `deleteBranch` failure string by matching fixed fra
 - Type: excluded(the response types are guaranteed at TypeScript compile time)
 
 **Failure/normal ratio (smoke detector)**: 1 normal case (TC-075), 14 failure cases. The ratio is 14, derived from the counterexample inventory for fixed-fragment matching (no normalization, fail-closed, operation boundary). Against the 14 items listed in plan §4 Task 1, the empty-string `status` (TC-078) that satisfies the empty boundary of the test strategy was added from the inventory, for 15 cases in total.
+
+## S23: Dispatching full and incremental history responses
+
+> Origin: Feature 061-02 (large history browsing)
+> Added: 2026-11-22
+> Status: active
+> Supersedes: -
+> Target Path: `web/messageHandler.ts` (handleMessage)
+> Test File: `tests/web/messageHandler.test.ts`
+
+| Case ID | Input / Precondition                                                                              | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                       | Notes                                                   |
+| ------- | ------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| TC-091  | Dispatch a full response with a continuation token and a terminal or legacy response without one. | Boundary - optional token                                                  | Each response reaches the full-history handler once with its history metadata and the corresponding token or absence.                                 | Tokenless responses retain the full-load behavior.      |
+| TC-092  | Dispatch appendCommits for a repository and token.                                                | Normal - incremental delivery                                              | The append handler receives the page with the original repository, token, base count, commits and availability. The full handler receives zero calls. | Preserve the absence of a next token on the final page. |

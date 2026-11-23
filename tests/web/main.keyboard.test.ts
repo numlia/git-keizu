@@ -15,6 +15,7 @@ import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 import { getCommitDate } from "../../web/dates";
 import { captureFocusOrigin, moveFocusPast } from "../../web/keyboardNavigation";
 import { vscode } from "../../web/utils";
+import { dispatchHostMessage as dispatch } from "./setup";
 
 /*
  * Keyboard integration of web/main.ts with the real Dropdown, context menu, dialogs, FindWidget,
@@ -169,10 +170,6 @@ function cleanupRow(branchName: string): BranchCleanupRow {
 /* Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function dispatch(data: Record<string, unknown>): void {
-  window.dispatchEvent(new MessageEvent("message", { data }));
-}
-
 function loadCommits(
   commits: GitCommitNode[],
   options: {
@@ -192,12 +189,12 @@ function loadCommits(
   });
 }
 
-function loadBranches(): void {
+function loadBranches(hard = true): void {
   dispatch({
     command: "loadBranches",
     branches: ["feature", "hotfix"],
     head: "feature",
-    hard: true,
+    hard,
     isRepo: true
   });
 }
@@ -531,6 +528,7 @@ let Graph: GraphClass;
 /* ------------------------------------------------------------------ */
 
 const clientHeightGetter = Object.getOwnPropertyDescriptor(Element.prototype, "clientHeight")!.get!;
+const resizeNotifications = new WeakMap<Element, () => void>();
 
 beforeAll(async () => {
   document.body.innerHTML = [
@@ -580,8 +578,13 @@ beforeAll(async () => {
   vi.stubGlobal(
     "ResizeObserver",
     class {
-      observe(): void {}
-      unobserve(): void {}
+      constructor(private readonly notify: () => void) {}
+      observe(element: Element): void {
+        resizeNotifications.set(element, this.notify);
+      }
+      unobserve(element: Element): void {
+        resizeNotifications.delete(element);
+      }
       disconnect(): void {}
     }
   );
@@ -819,12 +822,578 @@ describe("row target initialisation, maintenance and repository switch (S69)", (
   });
 });
 
+// @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
+describe("viewport coverage and offscreen keyboard targets (S88)", () => {
+  let savedScrollTop: number;
+  beforeEach(() => {
+    savedScrollTop = scrollContainer().scrollTop;
+    scrollContainer().scrollTop = 0;
+  });
+  afterEach(() => {
+    scrollContainer().scrollTop = savedScrollTop;
+  });
+
+  async function scrollAwayFrom(target: HTMLElement): Promise<void> {
+    target.focus();
+    const scroller = scrollContainer();
+    scroller.scrollTop = 100 * ROW_HEIGHT;
+    scroller.dispatchEvent(new Event("scroll"));
+    await new Promise(requestAnimationFrame);
+    expect(target.isConnected).toBe(false);
+    expect(document.activeElement).toBe(table());
+  }
+
+  // Case: TC-799
+  it("fills the larger viewport when Branch Cleanup closes without a window resize (TC-799)", () => {
+    const panel = document.getElementById("branchCleanupPanel")!;
+    const toggle = document.getElementById("branchCleanupBtn")!;
+    const scroller = scrollContainer();
+    const expandedHeight = 672;
+    const readingPosition = 103 * ROW_HEIGHT;
+    vi.spyOn(scroller, "clientHeight", "get").mockImplementation(() =>
+      panel.hidden ? expandedHeight : 386
+    );
+    toggle.click();
+    expect(panel.hidden).toBe(false);
+    scroller.scrollTop = readingPosition;
+    loadCommits(
+      Array.from({ length: 300 }, (_, i) => node(String(i), [])),
+      { head: "0" }
+    );
+    clearPosts();
+
+    toggle.click();
+    expect(panel.hidden).toBe(true);
+    resizeNotifications.get(scroller)?.();
+    const bottomRow = Math.floor(
+      (readingPosition + expandedHeight - HEADER_HEIGHT - 1) / ROW_HEIGHT
+    );
+    expect(table().querySelector(`tr.commit[data-hash="${bottomRow}"]`)).not.toBeNull();
+    expect(document.querySelector(`#commitGraph circle[data-hash="${bottomRow}"]`)).not.toBeNull();
+    expect(scroller.scrollTop).toBe(readingPosition);
+    expect(posts("loadCommits")).toEqual([]);
+  });
+
+  // Case: TC-800
+  it("keeps the reading position for unassigned keys when the target is offscreen (TC-800)", async () => {
+    const scroller = scrollContainer();
+    loadCommits(
+      Array.from({ length: 300 }, (_, i) => node(String(i), [])),
+      { head: "0" }
+    );
+    focusRow("0");
+    const readingPosition = 100 * ROW_HEIGHT;
+    scroller.scrollTop = readingPosition;
+    scroller.dispatchEvent(new Event("scroll"));
+    await new Promise(requestAnimationFrame);
+    table().focus({ preventScroll: true });
+    expect(table().querySelector('tr[data-hash="0"]')).toBeNull();
+
+    for (const [key, modifiers] of [
+      ["Enter", { shiftKey: true }],
+      ["ArrowDown", { altKey: true }]
+    ] as const) {
+      expect(press(table(), key, modifiers).defaultPrevented).toBe(false);
+      expect(scroller.scrollTop).toBe(readingPosition);
+      expect(document.activeElement).toBe(table());
+      expect(table().querySelector('tr[data-hash="0"]')).toBeNull();
+    }
+    press(table(), "ArrowDown");
+    expect(document.activeElement).toBe(row("1"));
+  });
+
+  // Case: TC-802
+  it.each([
+    ["F10", "M"],
+    ["ContextMenu", "M"],
+    ["ContextMenu", STASH_HASH],
+    ["ContextMenu", UNCOMMITTED_CHANGES_HASH]
+  ])("opens the offscreen row's menu with %s for %s (TC-802)", async (key, hash) => {
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    const history = Array.from({ length: 300 }, (_, i) => node(String(i), []));
+    loadCommits([...menuLaunchCommits(), ...history], { head: "N" });
+    const selected = focusRow(hash);
+    fire(selected, "contextmenu");
+    const expectedTitles = menuTitles();
+    fire(document, "click");
+
+    await scrollAwayFrom(selected);
+
+    expect(press(table(), key, { shiftKey: key === "F10" }).defaultPrevented).toBe(true);
+    expect(fire(table(), "contextmenu").defaultPrevented).toBe(true);
+    expect(menuIsActive()).toBe(true);
+    expect(menuTitles()).toEqual(expectedTitles);
+    expect(row(hash).classList.contains("contextMenuActive")).toBe(true);
+    expect(document.activeElement).toBe(contextMenuElem().querySelector("li.contextMenuItem"));
+    if (hash === "M") {
+      menuItem(COPY_HASH_TITLE).focus();
+      press(document.activeElement!, "Enter");
+      expect(posts("copyToClipboard")).toEqual([expect.objectContaining({ data: hash })]);
+    } else {
+      pressEscape(document.activeElement!);
+    }
+    expect(document.activeElement).toBe(row(hash));
+  });
+
+  // Case: TC-803
+  it.each([
+    { key: "F10", part: 0, name: "feature" },
+    { key: "ContextMenu", part: 1, name: "origin/feature" },
+    { key: "Enter", part: 0, name: "feature" },
+    { key: "Enter", part: 1, name: "origin/feature" },
+    { key: " ", part: 0, name: "feature" },
+    { key: " ", part: 1, name: "origin/feature" }
+  ])("opens the offscreen $name label's menu with $key (TC-803)", async ({ key, part, name }) => {
+    vi.spyOn(document, "hasFocus").mockReturnValue(true);
+    const history = Array.from({ length: 300 }, (_, i) => node(String(i), []));
+    loadCommits([...menuLaunchCommits(), ...history]);
+    const label = () => labelsOf("M")[part];
+    const launch = async () => {
+      await scrollAwayFrom(label());
+      expect(press(table(), key, { shiftKey: key === "F10" }).defaultPrevented).toBe(true);
+      if (key === "F10" || key === "ContextMenu") {
+        expect(fire(table(), "contextmenu").defaultPrevented).toBe(true);
+      }
+      expect(menuTitles()).toContain("Copy Branch Name to Clipboard");
+      expect(posts("commitDetails")).toEqual([]);
+      expect(posts("checkoutBranch")).toEqual([]);
+    };
+    await launch();
+    pressEscape(document.activeElement!);
+    expect(document.activeElement).toBe(label());
+
+    await launch();
+    menuItem("Copy Branch Name to Clipboard").focus();
+    press(document.activeElement!, "Enter");
+    expect(posts("copyToClipboard")).toEqual([
+      { command: "copyToClipboard", type: "Branch Name", data: name }
+    ]);
+  });
+
+  // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S90)
+  it.each(["Enter", " "])(
+    "opens an offscreen counter's hidden labels with %j (TC-805)",
+    async (key) => {
+      vi.spyOn(document, "hasFocus").mockReturnValue(true);
+      const style = document.createElement("style");
+      style.className = "keyboardTestExtra";
+      style.textContent = `td { padding: 0; border: 0px solid; }
+      .gitRef, .refOverflowCounter, .commitHeadDot { margin-right: 0; }`;
+      document.head.appendChild(style);
+      vi.spyOn(HTMLElement.prototype, "getBoundingClientRect").mockImplementation(function (
+        this: HTMLElement
+      ) {
+        const width = this.matches("td") ? 80 : 30;
+        return new DOMRect(0, 0, width, ROW_HEIGHT);
+      });
+      const history = Array.from({ length: 300 }, (_, i) => node(String(i), []));
+      loadCommits([...standardCommits(), ...history], { head: "N" });
+      await new Promise(requestAnimationFrame);
+      const counter = () => row("M").querySelector<HTMLButtonElement>(".refOverflowCounter");
+      expect(counter()).not.toBeNull();
+      const firstHidden = row("M").querySelector<HTMLElement>(".refOverflowHidden")!.dataset.name;
+      await scrollAwayFrom(counter()!);
+
+      const event = press(table(), key);
+      // Browsers deliver the scroll event from remounting the row after the keydown.
+      scrollContainer().dispatchEvent(new Event("scroll"));
+      await new Promise(requestAnimationFrame);
+      const popup = document.querySelector("#refOverflowPopup");
+      expect(popup).not.toBeNull();
+      expect(event.defaultPrevented).toBe(true);
+      expect(popup!.querySelector<HTMLElement>(".gitRef")!.dataset.name).toBe(firstHidden);
+      expect(document.activeElement).toBe(popup!.querySelector("button"));
+      expect(posts("commitDetails")).toEqual([]);
+      expect(details()).toBeNull();
+      pressEscape(document.activeElement!);
+      expect(document.querySelector("#refOverflowPopup")).toBeNull();
+      expect(document.activeElement).toBe(counter());
+      press(counter()!, key);
+      expect(document.querySelector("#refOverflowPopup")).not.toBeNull();
+      scrollContainer().scrollTop += ROW_HEIGHT;
+      scrollContainer().dispatchEvent(new Event("scroll"));
+      expect(document.querySelector("#refOverflowPopup")).toBeNull();
+    }
+  );
+
+  it("leaves Space unassigned and opens details on Enter for an offscreen row (TC-803)", async () => {
+    const history = Array.from({ length: 300 }, (_, i) => node(String(i), []));
+    loadCommits([...menuLaunchCommits(), ...history]);
+    await scrollAwayFrom(row("M"));
+
+    expect(press(table(), " ").defaultPrevented).toBe(false);
+    expect(table().querySelector('tr[data-hash="M"]')).toBeNull();
+    expect(menuIsActive()).toBe(false);
+    expect(posts("commitDetails")).toEqual([]);
+
+    expect(press(table(), "Enter").defaultPrevented).toBe(true);
+    expect(posts("commitDetails")).toEqual([expect.objectContaining({ commitHash: "M" })]);
+    expect(detailsOwner()).toBe("M");
+    expect(menuIsActive()).toBe(false);
+  });
+});
+
+// @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
+describe("commit metadata in paged history (S88)", () => {
+  const authorDate = Date.UTC(2000, 0, 1) / 1000;
+  const commitDate = Date.UTC(2021, 0, 1) / 1000;
+  const displayedDate = (hash: string) => row(hash).querySelector("td:nth-child(3)")!.textContent;
+
+  function expectDisplayedCommit(commit: GitCommitNode): void {
+    const element = row(commit.hash);
+    const author = element.querySelector<HTMLTableCellElement>("td:nth-child(4)")!;
+    expect(element.querySelector(".commitMessage")!.textContent).toBe(commit.message);
+    expect(displayedDate(commit.hash)).toBe(getCommitDate(commit.date).value);
+    expect(author.textContent).toBe(commit.author);
+    expect(author.title).toBe(`${commit.author} <${commit.email}>`);
+  }
+
+  // Case: TC-804
+  it.each([
+    ["date", { date: commitDate }],
+    ["subject", { message: "Corrected subject" }],
+    ["author", { author: "Ada" }],
+    ["email", { email: "ada@example.org" }]
+  ] as const)("updates a retained %s on soft refresh and append (TC-804)", (_, change) => {
+    const first = node("M", ["R"], { date: authorDate });
+    const refreshed = { ...first, ...change };
+    const next = node("R", [], { date: commitDate });
+    const full = { command: "loadCommits", head: "M", moreCommitsAvailable: true };
+    dispatch({ ...full, commits: [first], hard: true, pageToken: 1 });
+    expectDisplayedCommit(first);
+
+    dispatch({ command: "refresh" });
+    loadBranches(false);
+    const request = posts("loadCommits").at(-1)!;
+    expect(request.hard).toBe(false);
+    const refreshedToken = 2;
+    dispatch({
+      ...full,
+      commits: [refreshed],
+      hard: false,
+      requestId: request.requestId,
+      pageToken: refreshedToken
+    });
+    expectDisplayedCommit(refreshed);
+
+    document.getElementById("loadMoreCommitsBtn")!.click();
+    expect(posts("loadCommits").at(-1)!.pageToken).toBe(refreshedToken);
+    dispatch({
+      command: "appendCommits",
+      repo: REPO,
+      from: refreshedToken,
+      baseCount: 1,
+      commits: [next],
+      moreCommitsAvailable: false
+    });
+    expectDisplayedCommit(refreshed);
+    expectDisplayedCommit(next);
+  });
+
+  // Case: TC-804
+  it.each([
+    ["timestamp", { date: commitDate }],
+    ["change count", { message: "Uncommitted Changes (2)" }]
+  ] as const)("updates only the working tree row when its %s changes (TC-804)", (_, change) => {
+    const first = node(UNCOMMITTED_CHANGES_HASH, ["M"], {
+      date: authorDate,
+      message: "Uncommitted Changes (1)"
+    });
+    const refreshed = { ...first, ...change };
+    const commit = node("M", []);
+    loadCommits([first, commit]);
+    const mountedCommit = row("M");
+    loadCommits([refreshed, commit], { hard: false });
+    expect(displayedDate(first.hash)).toBe(getCommitDate(refreshed.date).value);
+    expect(row(first.hash).querySelector("td:nth-child(2)")!.textContent).toBe(refreshed.message);
+    expect(row("M")).toBe(mountedCommit);
+  });
+});
+
+// @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S89)
+describe("author choices during history updates", () => {
+  // Case: TC-806
+  it.each([{ newBranches: [] }, { newBranches: ["topic"] }])(
+    "preserves a pending author edit when a soft refresh adds $newBranches (TC-806)",
+    ({ newBranches }) => {
+      const full = {
+        command: "loadCommits",
+        commits: [node("M", [], { author: "Alias" })],
+        head: "M",
+        moreCommitsAvailable: false
+      };
+      const refreshAuthors = (authors: string[], extraBranches: string[] = []) => {
+        clearPosts();
+        dispatch({ command: "refresh" });
+        expect(posts("loadBranches")).toEqual([expect.objectContaining({ hard: false })]);
+        dispatch({
+          command: "loadBranches",
+          branches: ["feature", "hotfix", ...extraBranches],
+          head: "feature",
+          hard: false,
+          isRepo: true
+        });
+        const requests = posts("loadCommits");
+        expect(requests).toHaveLength(1);
+        const [request] = requests;
+        expect(request).toMatchObject({
+          hard: extraBranches.length > 0,
+          requestId: expect.any(String)
+        });
+        const refs = extraBranches.map((name) => ref("M", name, "head"));
+        dispatch({
+          ...full,
+          commits: [{ ...full.commits[0], refs }],
+          hard: request.hard,
+          requestId: request.requestId,
+          authors
+        });
+      };
+
+      dispatch({ ...full, hard: true, authors: ["Alias"] });
+      const mountedRow = row("M");
+      refreshAuthors(["Canonical"]);
+      openDropdown("authorSelect");
+      const menu = document.getElementById("authorSelect")!;
+      const options = () => Array.from(menu.querySelectorAll<HTMLElement>('[role="option"]'));
+      expect(options().map((option) => option.title)).toEqual(["All Authors", "Canonical"]);
+      expect(row("M")).toBe(mountedRow);
+
+      fire(options()[1], "click");
+      refreshAuthors(["Canonical"], newBranches);
+      expect(labelsOf("M").map((label) => label.textContent)).toEqual(newBranches);
+      expect(dropdownIsOpen("authorSelect")).toBe(true);
+      expect(options()[1].getAttribute("aria-selected")).toBe("true");
+      clearPosts();
+      fire(menu.querySelector(".dropdownHint button")!, "click");
+      expect(posts("loadCommits")).toEqual([expect.objectContaining({ authors: ["Canonical"] })]);
+
+      dispatch({ ...full, authors: ["Canonical"], hard: true });
+      openDropdown("authorSelect");
+      fire(options()[0], "click");
+      fire(menu.querySelector(".dropdownHint button")!, "click");
+      loadCommits(standardCommits());
+    }
+  );
+
+  // Case: TC-807
+  it.each(["apply", "cancel"])(
+    "keeps pending author edits by name until %s after another author is renamed (TC-807)",
+    (action) => {
+      const full = {
+        command: "loadCommits",
+        commits: [node("M", [], { author: "Ada" })],
+        authors: ["Ada", "Bob", "Zoe"],
+        head: "M",
+        moreCommitsAvailable: false,
+        hard: true
+      };
+      const menu = document.getElementById("authorSelect")!;
+      const option = (name: string) =>
+        menu.querySelector<HTMLElement>(`[role="option"][title="${name}"]`)!;
+      const apply = () => fire(menu.querySelector(".dropdownHint button")!, "click");
+      dispatch(full);
+      openDropdown("authorSelect");
+      fire(option("Ada"), "click");
+      apply();
+      expect(posts("loadCommits").at(-1)).toMatchObject({ authors: ["Ada"] });
+      dispatch(full);
+      openDropdown("authorSelect");
+      fire(option("Ada"), "click");
+      fire(option("Zoe"), "click");
+
+      clearPosts();
+      dispatch({ command: "refresh" });
+      loadBranches(false);
+      const [request] = posts("loadCommits");
+      expect(request).toMatchObject({
+        authors: ["Ada"],
+        hard: false,
+        requestId: expect.any(String)
+      });
+      dispatch({
+        ...full,
+        authors: ["Ada", "Zoe", "Zora"],
+        hard: request.hard,
+        requestId: request.requestId
+      });
+      expect(dropdownIsOpen("authorSelect")).toBe(true);
+      expect(option("Bob")).toBeNull();
+      expect(option("Zora").getAttribute("aria-selected")).toBe("false");
+      expect(option("Ada").getAttribute("aria-selected")).toBe("false");
+      expect(option("Zoe").getAttribute("aria-selected")).toBe("true");
+
+      clearPosts();
+      if (action === "apply") {
+        apply();
+        expect(posts("loadCommits")).toEqual([expect.objectContaining({ authors: ["Zoe"] })]);
+        dispatch(full);
+      } else {
+        pressEscape();
+        expect(posts("loadCommits")).toEqual([]);
+      }
+      openDropdown("authorSelect");
+      expect(option("Ada").getAttribute("aria-selected")).toBe(
+        action === "cancel" ? "true" : "false"
+      );
+      expect(option("Zoe").getAttribute("aria-selected")).toBe(
+        action === "apply" ? "true" : "false"
+      );
+      fire(option("All Authors"), "click");
+      apply();
+      loadCommits(standardCommits());
+    }
+  );
+
+  // Case: TC-801
+  it.each(["append", "full"])(
+    "keeps a pending author edit when a history request completes (%s) (TC-801)",
+    (kind) => {
+      const menu = document.getElementById("authorSelect")!;
+      const ben = () => menu.querySelector<HTMLElement>('[role="option"][title="Ben"]')!;
+      const first = node("M", ["R"], { author: "Ada" });
+      const next = node("R", [], { author: "Ben" });
+      const full = {
+        command: "loadCommits",
+        commits: [first],
+        authors: ["Ada", "Ben"],
+        head: "M",
+        hard: true,
+        moreCommitsAvailable: true,
+        pageToken: 8
+      };
+      dispatch(full);
+      fire(document.getElementById("loadMoreCommitsBtn")!, "click");
+      const request = posts("loadCommits").at(-1)!;
+      expect(request.pageToken).toBe(8);
+      openDropdown("authorSelect");
+      fire(ben(), "click");
+      clearPosts();
+      if (kind === "append") {
+        dispatch({
+          command: "appendCommits",
+          repo: REPO,
+          from: 8,
+          baseCount: 1,
+          commits: [next],
+          moreCommitsAvailable: false
+        });
+      } else {
+        dispatch({
+          ...full,
+          requestId: request.requestId,
+          commits: [first, next],
+          moreCommitsAvailable: false
+        });
+      }
+      expect(table().querySelectorAll("tr.commit")).toHaveLength(2);
+      expect(dropdownIsOpen("authorSelect")).toBe(true);
+      expect(ben().getAttribute("aria-selected")).toBe("true");
+      expect(posts("loadCommits")).toHaveLength(0);
+      fire(menu.querySelector(".dropdownHint button")!, "click");
+      expect(posts("loadCommits")).toEqual([expect.objectContaining({ authors: ["Ben"] })]);
+
+      dispatch(full);
+      openDropdown("authorSelect");
+      fire(menu.querySelector('[role="option"]')!, "click");
+      fire(menu.querySelector(".dropdownHint button")!, "click");
+      loadCommits(standardCommits());
+    }
+  );
+});
+
 /* ------------------------------------------------------------------ */
 /* S70: row keys per state                                            */
 /* ------------------------------------------------------------------ */
 
 // @see docs/testing/perspectives/web/main-test/13-keyboard-accessibility-01.md
 describe("row keys per state (S70)", () => {
+  // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
+  // Case: TC-795
+  it("mounts a keyboard target beyond the window and preserves it through details (TC-795)", () => {
+    const commits = Array.from({ length: 160 }, (_, i) =>
+      node(String(i), i === 159 ? [] : [String(i + 1)])
+    );
+    vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (
+      this: HTMLElement
+    ) {
+      return this.matches("tr.commit") ? HEADER_HEIGHT + Number(this.dataset.id) * ROW_HEIGHT : 0;
+    });
+    loadCommits(commits, { head: "0" });
+    const mounted = table().querySelectorAll<HTMLElement>("tr.commit");
+    const last = mounted[mounted.length - 1];
+    const next = String(Number(last.dataset.id) + 1);
+    expect(table().querySelector(`tr[data-hash="${next}"]`)).toBeNull();
+    press(focusRow(last.dataset.hash!), "ArrowDown");
+    expect(document.activeElement).toBe(row(next));
+    expect(rowsWithTabStop()).toEqual([next]);
+    press(row(next), "Enter");
+    expect(posts("commitDetails")).toEqual([expect.objectContaining({ commitHash: next })]);
+    respondDetails(next);
+    expect(detailsOwner()).toBe(next);
+    expect(table().querySelectorAll("tr.commit")).toHaveLength(commits.length);
+    expect(table().querySelector("table")!.hasAttribute("aria-rowcount")).toBe(false);
+    expect(table().querySelector("[aria-rowindex]")).toBeNull();
+    pressEscape();
+    expect(details()).toBeNull();
+    expect(rowsWithTabStop()).toEqual([next]);
+    expect(table().querySelectorAll("tr.commit").length).toBeLessThan(commits.length);
+    expect(table().querySelector("#tableColHeaders")?.getAttribute("aria-rowindex")).toBe("1");
+  });
+
+  // @see docs/testing/perspectives/web/main-test/07-load-count-01.md (S88)
+  // Case: TC-796
+  it("keeps the closed author menu intact and opens it with the current selection (TC-796)", () => {
+    const menu = document.getElementById("authorSelect")!;
+    const options = () => Array.from(menu.querySelectorAll<HTMLElement>('[role="option"]'));
+    const first = [node("M", ["R"], { author: "Ada" })];
+    const full = {
+      command: "loadCommits",
+      commits: first,
+      authors: ["Ada", "Ben"],
+      head: "M",
+      hard: true,
+      moreCommitsAvailable: true,
+      pageToken: 8
+    };
+    dispatch(full);
+    openDropdown("authorSelect");
+    fire(
+      options().find((o) => o.title === "Ben")!,
+      "click"
+    );
+    fire(menu.querySelector(".dropdownHint button")!, "click");
+    expect(posts("loadCommits").at(-1)).toMatchObject({ authors: ["Ben"] });
+    dispatch({ ...full, authors: ["Ada", "Ben", "Cora"] });
+    const before = options();
+    const builder = vi.spyOn(Dropdown.prototype, "setOptions");
+    fire(document.getElementById("loadMoreCommitsBtn")!, "click");
+    dispatch({
+      command: "appendCommits",
+      repo: REPO,
+      from: 8,
+      baseCount: 1,
+      commits: [node("R", [], { author: "Ada" })],
+      moreCommitsAvailable: false
+    });
+    expect(table().querySelectorAll("tr.commit")).toHaveLength(2);
+    expect(builder).not.toHaveBeenCalled();
+    expect(options()[0]).toBe(before[0]);
+    openDropdown("authorSelect");
+    expect(options().map((o) => o.title)).toEqual(["All Authors", "Ada", "Ben", "Cora"]);
+    expect(
+      options()
+        .filter((o) => o.getAttribute("aria-selected") === "true")
+        .map((o) => o.title)
+    ).toEqual(["Ben"]);
+    pressEscape();
+    // Restore the shared webview's author filter through the same control.
+    openDropdown("authorSelect");
+    fire(options()[0], "click");
+    fire(menu.querySelector(".dropdownHint button")!, "click");
+    loadCommits(standardCommits());
+  });
+
   it("moves only the target on ArrowDown without details (TC-658)", () => {
     // Case: TC-658 (K07 / A8.1-1 main regression: pre-implementation nothing moved)
     focusRow("M");

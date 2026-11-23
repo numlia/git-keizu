@@ -213,3 +213,17 @@ Passes the request's structured remote target to the DataSource unchanged and ma
 - Type: excluded(belongs to `src/types-test.md` S6)
 
 **Failure/normal ratio (smoke detector)**: 3 normal cases (TC-146, TC-153, TC-155), 9 failure cases (the rest). The ratio is 3.0:1, derived from the result kinds and the existing createBranch branches.
+
+## S45: Relaying history continuations
+
+> Origin: Feature 061-02 (large history browsing)
+> Added: 2026-11-22
+> Status: active
+> Supersedes: -
+> Target Path: `src/gitGraphView.ts` (loadCommits message handler)
+> Test File: `tests/src/gitGraphView.test.ts`
+
+| Case ID | Input / Precondition                                                                          | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                | Notes                                                      |
+| ------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| TC-421  | Send an initial load and a continuation for which the data source returns a full replacement. | Normal - full response                                                     | Both post a loadCommits response with the returned commits, head, availability, authors, worktrees and optional token.                                         | Retain the existing hard-refresh flag.                     |
+| TC-422  | A request with a token produces a 100-commit page.                                            | Normal - append response                                                   | The token and query reach the data source. Exactly one appendCommits response carries its repo, from, baseCount, 100 new commits, availability and next token. | No previous commits or previous hash list in the response. |

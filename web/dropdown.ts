@@ -207,19 +207,32 @@ export class Dropdown {
   }
 
   public setOptions(options: DropdownOption[], selected: string): void;
-  public setOptions(options: DropdownOption[], selected: string[]): void;
-  public setOptions(options: DropdownOption[], selected: string | string[]): void {
+  public setOptions(
+    options: DropdownOption[],
+    selected: string[],
+    preservePendingSelection?: boolean
+  ): void;
+  public setOptions(
+    options: DropdownOption[],
+    selected: string | string[],
+    preservePendingSelection = false
+  ): void {
+    const pendingValues =
+      preservePendingSelection && this.dropdownVisible
+        ? new Set(Array.from(this.selectedIndices, (index) => this.options[index].value))
+        : null;
     this.options = options;
     if (this.multipleAllowed) {
       this.selectedIndices = new Set();
-      const selectedArr = Array.isArray(selected) ? selected : selected ? [selected] : [];
+      const appliedValues = new Set(
+        Array.isArray(selected) ? selected : selected ? [selected] : []
+      );
+      const checkedValues = pendingValues ?? appliedValues;
+      this.selectionOnOpen = new Set();
       for (let i = 1; i < options.length; i++) {
-        if (selectedArr.includes(options[i].value)) {
-          this.selectedIndices.add(i);
-        }
-      }
-      if (this.dropdownVisible) {
-        this.selectionOnOpen = new Set(this.selectedIndices);
+        const value = options[i].value;
+        if (appliedValues.has(value)) this.selectionOnOpen.add(i);
+        if (checkedValues.has(value)) this.selectedIndices.add(i);
       }
     } else {
       let selectedOption = 0;
