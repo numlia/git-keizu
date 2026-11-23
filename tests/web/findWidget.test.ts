@@ -309,6 +309,41 @@ describe("full history find controls", () => {
     );
   });
 
+  // Case: TC-515, TC-519
+  it.each([true, false])(
+    "restores a worktree hit at position 400 after EOF when pinned before scanning is %s (TC-515, TC-519)",
+    (initiallyPinned) => {
+      const ordinary = Array.from({ length: 300 }, (_, index) =>
+        makeCommit({ hash: String(index + 1) })
+      );
+      const pin = makeCommit({ hash: "pin", message: "needle" });
+      setup(initiallyPinned ? [...ordinary, pin] : ordinary);
+      triggerSearch(widget, "needle");
+      button("findStart").click();
+      const owner = widget.history.owner;
+      batch(
+        [
+          ...Array.from({ length: 99 }, (_, index) => makeCommit({ hash: String(301 + index) })),
+          pin
+        ],
+        false
+      );
+      if (!initiallyPinned) {
+        expect(getPositionText()).toBe("0 of 1 (1 unloaded)");
+        loaded = [...ordinary, pin];
+        widget.refresh();
+      }
+      expect(getPositionText()).toBe("1 of 1 (0 unloaded)");
+      loaded = ordinary;
+      widget.refresh();
+      expect(widget.history.status).toBe("complete");
+      expect(getPositionText()).toBe("0 of 1 (1 unloaded)");
+      button("findNext").click();
+      expect(cb.navigateToUnread).toHaveBeenCalledWith({ hash: "pin", position: 400 }, owner);
+      expect(sent().map((message) => message.command)).toEqual(["startHistorySearch"]);
+    }
+  );
+
   // Case: TC-519
   it("navigates loaded hits in row order and hands off unread hits by position, including wraparound (TC-519)", () => {
     const makeHit = (index: number) => makeCommit({ hash: String(index), message: "needle" });

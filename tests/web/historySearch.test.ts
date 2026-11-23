@@ -186,6 +186,39 @@ describe("full history search", () => {
     ]);
   });
 
+  // Case: TC-008, TC-009
+  it("keeps pinned match positions across pause, continue, and EOF without spending the limit twice (TC-008, TC-009)", () => {
+    const { search, loaded, batch, validate } = start();
+    loaded.add("pinned before scanning");
+    search.receive(batch([row("pinned before scanning"), ...rows(1, 999)], 301, true));
+    expect(search.status).toBe("running");
+    loaded.add("1");
+    search.mergeLoaded();
+    search.receive(batch([row("1000"), row("1001")], 1301, false));
+    expect(search.status).toBe("paused");
+    expect(search.unreadCount).toBe(999);
+    loaded.clear();
+    search.mergeLoaded();
+    expect(search.unread.slice(0, 3)).toEqual([
+      { hash: "pinned before scanning", position: 301 },
+      { hash: "1", position: 302 },
+      { hash: "2", position: 303 }
+    ]);
+    expect(search.unreadCount).toBe(1001);
+    expect(search.examined).toBe(1001);
+    search.resume();
+    search.receive(validate({ kind: "ok" }));
+    expect(search.status).toBe("complete");
+    loaded.add("pinned before scanning");
+    search.mergeLoaded();
+    expect(search.unreadCount).toBe(1001);
+    loaded.clear();
+    search.mergeLoaded();
+    expect(search.unreadCount).toBe(1002);
+    expect(search.unread.at(-1)).toEqual({ hash: "1001", position: 1302 });
+    expect(search.examined).toBe(1002);
+  });
+
   // Case: TC-010
   it("retains verified hits on read failure and restarts with a fresh generation (TC-010)", () => {
     const { search, send, batch } = start();

@@ -33,8 +33,9 @@ export class HistorySearch {
   public owner: GG.SearchOwner | null = null;
   public examined = 0;
   public errorMessage = "";
-  private hits: UnreadMatch[] = [];
-  private readonly hitHashes = new Set<string>();
+  private unreadMatches: UnreadMatch[] = [];
+  // A worktree can pin or unpin a scanned commit without changing the ordinary history prefix.
+  private readonly scannedMatches = new Map<string, UnreadMatch>();
   private generation = 0;
   private requestId = 0;
   private waiting: "historySearchBatch" | "historySearchValidation" | null = null;
@@ -50,19 +51,18 @@ export class HistorySearch {
   ) {}
 
   public get unreadCount() {
-    return this.hits.length;
+    return this.unreadMatches.length;
   }
 
   public get unread(): readonly UnreadMatch[] {
-    return this.hits;
+    return this.unreadMatches;
   }
 
   public mergeLoaded() {
-    this.hits = this.hits.filter(({ hash }) => {
-      if (!this.isLoaded(hash)) return true;
-      this.hitHashes.delete(hash);
-      return false;
-    });
+    this.unreadMatches = [];
+    for (const match of this.scannedMatches.values()) {
+      if (!this.isLoaded(match.hash)) this.unreadMatches.push(match);
+    }
   }
 
   public start(query: SearchStart) {
@@ -104,8 +104,8 @@ export class HistorySearch {
     this.waiting = null;
     this.startQuery = null;
     this.tail = null;
-    this.hits = [];
-    this.hitHashes.clear();
+    this.unreadMatches = [];
+    this.scannedMatches.clear();
     this.examined = 0;
     this.added = 0;
     this.errorMessage = "";
@@ -151,10 +151,11 @@ export class HistorySearch {
         this.end("regexError");
         return;
       }
-      if (result !== "match" || this.isLoaded(commit.hash) || this.hitHashes.has(commit.hash))
-        continue;
-      this.hits.push({ hash: commit.hash, position: batch.firstPosition + index });
-      this.hitHashes.add(commit.hash);
+      if (result !== "match" || this.scannedMatches.has(commit.hash)) continue;
+      const match = { hash: commit.hash, position: batch.firstPosition + index };
+      this.scannedMatches.set(commit.hash, match);
+      if (this.isLoaded(commit.hash)) continue;
+      this.unreadMatches.push(match);
       this.added++;
       if (this.added === HISTORY_SEARCH_MATCH_LIMIT) {
         const next = index + 1;
