@@ -5525,6 +5525,107 @@ describe("GitKeizuView retainContextWhenHidden (S35)", () => {
       expect(current.close).toHaveBeenCalledTimes(1);
     });
 
+    // Case: TC-424, TC-425
+    it.each([
+      ["negative skip", { skip: -1 }],
+      ["fractional skip", { skip: 0.5 }],
+      ["skip without a safe next position", { skip: Number.MAX_SAFE_INTEGER }],
+      ["empty snapshot", { snapshot: "" }],
+      ["non-string snapshot", { snapshot: null }],
+      ["non-boolean remote setting", { showRemoteBranches: "false" }],
+      ["unknown ordering", { commitOrdering: "unknown" }],
+      ["inherited ordering name", { commitOrdering: "toString" }],
+      ["non-array branches", { branches: "main" }],
+      ["non-string branch", { branches: ["main", null] }],
+      ["empty branch", { branches: [""] }],
+      ["option-like branch", { branches: ["-main"] }],
+      ["NUL in a branch", { branches: ["ma\0in"] }],
+      ["non-array authors", { authors: "Ada" }],
+      ["non-string author", { authors: ["Ada", null] }],
+      ["NUL in an author", { authors: ["A\0da"] }]
+    ])("returns a keyed error without starting a search for %s", async (_reason, invalid) => {
+      const source = { createHistorySearch: vi.fn() };
+      const panel = await createPanel(source as unknown as DataSource);
+      const key = { viewId: docId(panel), repo: TEST_REPO, generation: 3, requestId: 7 };
+
+      await mocks.messageHandler.current!({
+        command: "startHistorySearch",
+        ...key,
+        ...query,
+        ...invalid
+      });
+
+      expect(source.createHistorySearch).not.toHaveBeenCalled();
+      expect(sentMessages("historySearchBatch")).toEqual([
+        {
+          command: "historySearchBatch",
+          ...key,
+          kind: "error",
+          message: "Invalid history search parameters."
+        }
+      ]);
+    });
+
+    // Case: TC-424
+    it.each([
+      { generation: 0, requestId: 1 },
+      { generation: 1.5, requestId: 1 },
+      { generation: Number.MAX_SAFE_INTEGER + 1, requestId: 1 },
+      { generation: 1, requestId: 0 },
+      { generation: 1, requestId: 1.5 },
+      { generation: 1, requestId: Number.MAX_SAFE_INTEGER + 1 }
+    ])("ignores a start with generation $generation and request ID $requestId", async (ids) => {
+      const scan = { next: vi.fn().mockResolvedValue(batch), close: vi.fn() };
+      const source = { createHistorySearch: vi.fn().mockReturnValue(scan) };
+      const panel = await createPanel(source as unknown as DataSource);
+      const key = { viewId: docId(panel), repo: TEST_REPO, generation: 1, requestId: 1 };
+      const start = { command: "startHistorySearch", ...query, ...key };
+      const send = mocks.messageHandler.current!;
+
+      await send({ ...start, ...ids });
+      expect(source.createHistorySearch).not.toHaveBeenCalled();
+      expect(sentMessages("historySearchBatch")).toEqual([]);
+      await send(start);
+      expect(sentMessages("historySearchBatch")).toEqual([
+        { command: "historySearchBatch", ...key, ...batch }
+      ]);
+    });
+
+    // Case: TC-424, TC-425
+    it.each([
+      ["snapshot", { snapshot: "another snapshot" }],
+      ["remote visibility", { showRemoteBranches: true }]
+    ])("rejects verification when the %s differs from the start", async (_field, changed) => {
+      const scan = { next: vi.fn().mockResolvedValue(batch), close: vi.fn() };
+      const source = {
+        createHistorySearch: vi.fn().mockReturnValue(scan),
+        verifyHistorySearch: vi.fn()
+      };
+      const panel = await createPanel(source as unknown as DataSource);
+      const owner = { viewId: docId(panel), repo: TEST_REPO, generation: 1 };
+      const send = mocks.messageHandler.current!;
+      await send({ command: "startHistorySearch", ...query, ...owner, requestId: 1 });
+      const key = { ...owner, requestId: 2 };
+      await send({
+        command: "verifyHistorySearch",
+        ...key,
+        snapshot: query.snapshot,
+        showRemoteBranches: query.showRemoteBranches,
+        ...changed
+      });
+
+      expect(source.verifyHistorySearch).not.toHaveBeenCalled();
+      expect(sentMessages("historySearchValidation")).toEqual([
+        {
+          command: "historySearchValidation",
+          ...key,
+          kind: "error",
+          message: "Invalid history verification parameters."
+        }
+      ]);
+      expect(scan.close).toHaveBeenCalledTimes(1);
+    });
+
     // Case: TC-424, TC-425, TC-427, TC-429
     it.each([
       { kind: "ok" },
