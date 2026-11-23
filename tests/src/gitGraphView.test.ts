@@ -89,7 +89,8 @@ vi.mock("vscode", () => ({
   }
 }));
 
-vi.mock("node:crypto", () => ({
+vi.mock("node:crypto", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:crypto")>()),
   randomBytes: vi.fn(() => ({ toString: () => "test-nonce" }))
 }));
 
@@ -5339,9 +5340,8 @@ describe("GitKeizuView retainContextWhenHidden (S35)", () => {
   type ViewCallback = (repos: Record<string, unknown>, numRepos: number) => void;
   let capturedViewCallback: ViewCallback | null = null;
 
-  async function createPanel(): Promise<PanelMock> {
+  async function createPanel(mockDataSource = {} as DataSource): Promise<PanelMock> {
     capturedViewCallback = null;
-    const mockDataSource = {} as unknown as DataSource;
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
@@ -5389,6 +5389,165 @@ describe("GitKeizuView retainContextWhenHidden (S35)", () => {
     panelMock.visible = true;
     mocks.panelViewStateHandler?.();
   }
+
+  // @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md (S46)
+  describe("owned history searches", () => {
+    const query = {
+      branches: ["main"],
+      authors: ["Build[bot]"],
+      commitOrdering: "topo",
+      skip: 300,
+      snapshot: "snapshot",
+      showRemoteBranches: false
+    };
+    const batch = { kind: "ok", commits: [], firstPosition: 301, hasMore: true };
+    const docId = (panel: PanelMock): string =>
+      JSON.parse(panel.webview.html.match(/var viewState = (.+?);/)![1]).viewId;
+    function deferredBatch() {
+      let finish!: (result: typeof batch) => void;
+      const promise = new Promise<typeof batch>((resolve) => {
+        finish = resolve;
+      });
+      return { finish, promise };
+    }
+
+    // Case: TC-423, TC-427, TC-428, TC-429
+    it("keeps retained identity and rejects old reads, starts and cancels after HTML replacement and disposal", async () => {
+      const oldRead = deferredBatch();
+      const newRead = deferredBatch();
+      const old = { next: vi.fn(() => oldRead.promise), close: vi.fn() };
+      const current = { next: vi.fn(() => newRead.promise), close: vi.fn() };
+      const source = {
+        createHistorySearch: vi.fn().mockReturnValueOnce(old).mockReturnValueOnce(current)
+      };
+      const panel = await createPanel(source as unknown as DataSource);
+      const owner = { viewId: docId(panel), repo: TEST_REPO, generation: 1 };
+      const start = { command: "startHistorySearch", ...query, ...owner, requestId: 1 };
+      expect(owner.viewId).toMatch(/^[0-9a-f-]{36}$/);
+      const send = mocks.messageHandler.current!;
+      const pending = send(start);
+      hideThenShow(panel);
+      expect(docId(panel)).toBe(owner.viewId);
+      expect(old.close).not.toHaveBeenCalled();
+      changeConfiguration("git-keizu");
+      hideThenShow(panel);
+      expect(old.close).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(docId(panel)).not.toBe(owner.viewId));
+      const newStart = { ...start, viewId: docId(panel) };
+      const newPending = send(newStart);
+      await send(start);
+      await send({ command: "cancelHistorySearch", ...owner });
+      await send({ ...newStart, command: "nextHistorySearch", requestId: 2 });
+      expect(source.createHistorySearch.mock.calls).toEqual([[start], [newStart]]);
+      expect(current.close).not.toHaveBeenCalled();
+      expect(current.next).toHaveBeenCalledTimes(1);
+      oldRead.finish(batch);
+      await pending;
+      expect(sentMessages("historySearchBatch")).toEqual([]);
+      GitKeizuView.currentPanel!.dispose();
+      expect(current.close).toHaveBeenCalledTimes(1);
+      newRead.finish(batch);
+      await newPending;
+      expect(sentMessages("historySearchBatch")).toEqual([]);
+    });
+
+    // Case: TC-427, TC-429
+    it("ignores an old generation's cancel and completed batch after an immediate restart", async () => {
+      const oldRead = deferredBatch();
+      const newRead = deferredBatch();
+      const old = { next: vi.fn(() => oldRead.promise), close: vi.fn() };
+      const current = { next: vi.fn(() => newRead.promise), close: vi.fn() };
+      const source = {
+        createHistorySearch: vi.fn().mockReturnValueOnce(old).mockReturnValueOnce(current)
+      };
+      const panel = await createPanel(source as unknown as DataSource);
+      const owner = { viewId: docId(panel), repo: TEST_REPO, generation: 1 };
+      const send = mocks.messageHandler.current!;
+      const start = { command: "startHistorySearch", ...query, ...owner, requestId: 1 };
+      const pending = send(start);
+      await send({ command: "cancelHistorySearch", ...owner });
+      const newPending = send({ ...start, generation: 2 });
+      await send({ command: "cancelHistorySearch", ...owner });
+      await send(start);
+      expect(source.createHistorySearch).toHaveBeenCalledTimes(2);
+      expect(old.close).toHaveBeenCalledTimes(1);
+      expect(current.close).not.toHaveBeenCalled();
+      oldRead.finish(batch);
+      newRead.finish(batch);
+      await Promise.all([pending, newPending]);
+      expect(sentMessages("historySearchBatch")).toEqual([
+        { command: "historySearchBatch", ...owner, generation: 2, requestId: 1, ...batch }
+      ]);
+      GitKeizuView.currentPanel!.dispose();
+      expect(current.close).toHaveBeenCalledTimes(1);
+    });
+
+    // Case: TC-424, TC-425, TC-427, TC-429
+    it.each([
+      { kind: "ok" },
+      { kind: "historyChanged" },
+      { kind: "error", message: "verification failed" }
+    ])(
+      "checks the active repo, generation and outstanding request for read and verify ($kind)",
+      async (validation) => {
+        const failed =
+          validation.kind === "historyChanged"
+            ? validation
+            : { kind: "error", message: "log failed" };
+        const scan = {
+          next: vi
+            .fn()
+            .mockResolvedValueOnce(batch)
+            .mockResolvedValueOnce({ ...batch, hasMore: false }),
+          close: vi.fn()
+        };
+        const newer = { next: vi.fn().mockResolvedValue(failed), close: vi.fn() };
+        const source = {
+          createHistorySearch: vi.fn().mockReturnValueOnce(scan).mockReturnValueOnce(newer),
+          verifyHistorySearch: vi.fn().mockResolvedValue(validation)
+        };
+        const panel = await createPanel(source as unknown as DataSource);
+        const owner = { viewId: docId(panel), repo: TEST_REPO, generation: 1 };
+        const send = mocks.messageHandler.current!;
+        const start = { command: "startHistorySearch", ...query, ...owner, requestId: 1 };
+        await send(start);
+        const next = { command: "nextHistorySearch", ...owner, requestId: 2 };
+        await send({ ...next, repo: "elsewhere" });
+        await send({ ...next, generation: 2 });
+        await send(next);
+        await send(next);
+        expect(source.createHistorySearch).toHaveBeenCalledWith(start);
+        expect(scan.next).toHaveBeenCalledTimes(2);
+        expect(sentMessages("historySearchBatch")).toEqual([
+          { command: "historySearchBatch", ...owner, requestId: 1, ...batch },
+          { command: "historySearchBatch", ...owner, requestId: 2, ...batch, hasMore: false }
+        ]);
+        await send({
+          ...owner,
+          command: "verifyHistorySearch",
+          requestId: 3,
+          snapshot: query.snapshot,
+          showRemoteBranches: false
+        });
+        expect(source.verifyHistorySearch).toHaveBeenCalledWith(TEST_REPO, false, query.snapshot);
+        expect(sentMessages("historySearchValidation")).toEqual([
+          { command: "historySearchValidation", ...owner, requestId: 3, ...validation }
+        ]);
+        await send({ command: "cancelHistorySearch", ...owner });
+        expect(scan.close).toHaveBeenCalledTimes(1);
+        await send({ ...start, generation: 2 });
+        await send({ command: "cancelHistorySearch", ...owner });
+        expect(sentMessages("historySearchBatch").at(-1)).toEqual({
+          command: "historySearchBatch",
+          ...owner,
+          generation: 2,
+          requestId: 1,
+          ...failed
+        });
+        expect(newer.close).toHaveBeenCalledTimes(1);
+      }
+    );
+  });
 
   it("creates the panel with retainContextWhenHidden enabled by the setting (TC-364)", async () => {
     // Given: the setting is enabled
@@ -5761,6 +5920,7 @@ describe("GitKeizuView host HTML toolbar buttons, list name and status notice (S
     "repos",
     "showCurrentBranchByDefault",
     "showRecentActions",
+    "viewId",
     "worktreePath"
   ];
   let body: HTMLElement;

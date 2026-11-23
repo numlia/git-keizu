@@ -28,6 +28,8 @@ function createMockGitKeizuView(): GitKeizuViewAPI {
     loadBranchCleanup: vi.fn(),
     receiveBranches: vi.fn(),
     receiveCommits: vi.fn(),
+    receiveHistorySearchBatch: vi.fn(),
+    receiveHistorySearchValidation: vi.fn(),
     appendCommits: vi.fn(),
     loadFileHistory: vi.fn(),
     loadRepos: vi.fn(),
@@ -37,6 +39,50 @@ function createMockGitKeizuView(): GitKeizuViewAPI {
     setWorktreePath: vi.fn()
   };
 }
+
+// @see docs/testing/perspectives/web/messageHandler-test/01-basic-responses-01.md (S24)
+describe("dispatching full history search responses", () => {
+  const key = { repo: "/repo", viewId: "graph", generation: 2, requestId: 7 };
+  const row = {
+    hash: "hash",
+    parentHashes: [],
+    refs: [],
+    stash: null,
+    author: "A",
+    email: "a",
+    message: "subject",
+    date: 0
+  };
+  // Case: TC-094, TC-095
+  it.each([
+    { kind: "ok", commits: [row], hasMore: true, firstPosition: 301 },
+    { kind: "ok", commits: [], hasMore: false, firstPosition: 302 },
+    { kind: "historyChanged" },
+    { kind: "error", message: "read failed" }
+  ] as const)("delivers the $kind batch to its original request", (result) => {
+    const view = createMockGitKeizuView();
+    const response = {
+      command: "historySearchBatch" as const,
+      ...key,
+      ...result
+    } as ResponseMessage;
+    handleMessage(response, view);
+    expect(view.receiveHistorySearchBatch).toHaveBeenCalledExactlyOnceWith(response);
+    expect(view.receiveCommits).not.toHaveBeenCalled();
+  });
+  // Case: TC-096
+  it.each([
+    { kind: "ok" },
+    { kind: "historyChanged" },
+    { kind: "error", message: "read failed" }
+  ] as const)("delivers $kind verification without a batch", (result) => {
+    const view = createMockGitKeizuView();
+    const response = { command: "historySearchValidation" as const, ...key, ...result };
+    handleMessage(response, view);
+    expect(view.receiveHistorySearchValidation).toHaveBeenCalledExactlyOnceWith(response);
+    expect(view.receiveHistorySearchBatch).not.toHaveBeenCalled();
+  });
+});
 
 // @see docs/testing/perspectives/web/messageHandler-test/01-basic-responses-01.md (S23)
 describe("dispatching history pages", () => {

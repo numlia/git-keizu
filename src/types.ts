@@ -135,6 +135,7 @@ export interface WorktreePathViewState {
 }
 
 export interface GitKeizuViewState {
+  viewId: string;
   commitOrdering: CommitOrdering;
   dateFormat: DateFormat;
   dialogDefaults: DialogDefaults;
@@ -484,6 +485,59 @@ export type SearchHistoryInfo =
   | { kind: "historyChanged" }
   | { kind: "unavailable" };
 
+export interface SearchOwner {
+  viewId: string;
+  repo: string;
+  generation: number;
+}
+
+export interface SearchRequestKey extends SearchOwner {
+  requestId: number;
+}
+
+export interface RequestStartHistorySearch extends SearchRequestKey {
+  command: "startHistorySearch";
+  branches: string[];
+  authors: string[];
+  showRemoteBranches: boolean;
+  commitOrdering: CommitOrdering;
+  skip: number;
+  snapshot: string;
+}
+
+export interface RequestNextHistorySearch extends SearchRequestKey {
+  command: "nextHistorySearch";
+}
+
+export interface RequestCancelHistorySearch extends SearchOwner {
+  command: "cancelHistorySearch";
+}
+
+export interface RequestVerifyHistorySearch extends SearchRequestKey {
+  command: "verifyHistorySearch";
+  snapshot: string;
+  showRemoteBranches: boolean;
+}
+
+export type HistorySearchValidation =
+  | { kind: "ok" }
+  | { kind: "historyChanged" }
+  | { kind: "error"; message: string };
+
+export type HistorySearchBatch =
+  | { kind: "ok"; commits: GitCommitNode[]; hasMore: boolean; firstPosition: number }
+  | Exclude<HistorySearchValidation, { kind: "ok" }>;
+
+export type ResponseHistorySearchValidation = SearchRequestKey & {
+  command: "historySearchValidation";
+} & HistorySearchValidation;
+
+export type ResponseHistorySearchBatch = SearchRequestKey & {
+  command: "historySearchBatch";
+} & HistorySearchBatch;
+
+export const HISTORY_SEARCH_BATCH_SIZE = 1000;
+
 export interface ResponseLoadCommits {
   command: "loadCommits";
   requestId?: string;
@@ -832,6 +886,10 @@ export interface ResponseCleanUntrackedFiles {
 }
 
 export type RequestMessage =
+  | RequestStartHistorySearch
+  | RequestNextHistorySearch
+  | RequestCancelHistorySearch
+  | RequestVerifyHistorySearch
   | RequestAddTag
   | RequestApplyStash
   | RequestBranchFromStash
@@ -876,6 +934,8 @@ export type RequestMessage =
   | RequestViewDiff;
 
 export type ResponseMessage =
+  | ResponseHistorySearchBatch
+  | ResponseHistorySearchValidation
   | ResponseAddTag
   | ResponseAppendCommits
   | ResponseApplyStash

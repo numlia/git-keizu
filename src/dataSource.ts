@@ -31,6 +31,7 @@ import {
   spliceLineageContinuation
 } from "./fileHistory";
 import { DEFAULT_GIT_PATH, resolveGitExecutable } from "./gitExecutable";
+import { GitHistorySearch, type SearchRefs } from "./gitHistorySearch";
 import { isSafeRemoteName, isValidRefName } from "./refValidation";
 import {
   BranchCleanupAheadBehind,
@@ -48,10 +49,12 @@ import {
   GitResetMode,
   GitStash,
   GitUnsavedChanges,
+  HistorySearchValidation,
   PushPreparation,
   PushTarget,
   RemoteBranchTarget,
   RequestLoadCommits,
+  RequestStartHistorySearch,
   ResponseAppendCommits,
   SearchHistoryInfo,
   UNCOMMITTED_CHANGES_HASH,
@@ -195,31 +198,31 @@ function isRefNameSafe(refName: string): boolean {
 
 const VALID_RESET_MODES = new Set(["soft", "mixed", "hard"]);
 
+function parseGitLogRecord(record: string) {
+  const fields = record.split(gitLogSeparator);
+  if (fields.length !== LOG_FORMAT_FIELD_COUNT) return undefined;
+  const [hash, parents, author, email, timestamp, message] = fields;
+  const parentHashes = parents.split(" ").filter(Boolean);
+  const date = parseInt(timestamp, 10);
+  const valid =
+    FULL_OBJECT_ID.test(hash) &&
+    parentHashes.every((parent) => FULL_OBJECT_ID.test(parent)) &&
+    parentHashes.join(" ") === parents &&
+    Number.isSafeInteger(date) &&
+    String(date) === timestamp;
+  return { commit: { hash, parentHashes, author, email, date, message }, valid };
+}
+
 function parseGitLogCommits(stdout: string) {
   // Git subjects can contain literal carriage returns, including consecutive ones.
   const lines = stdout.split(/\r?\n/);
   const gitCommits: GitCommit[] = [];
   let valid = true;
   for (let i = 0; i < lines.length - 1; i++) {
-    const line = lines[i].split(gitLogSeparator);
-    if (line.length !== LOG_FORMAT_FIELD_COUNT) break;
-    const parentHashes = line[1].split(" ").filter(Boolean);
-    const date = parseInt(line[4], 10);
-    if (
-      !FULL_OBJECT_ID.test(line[0]) ||
-      !parentHashes.every((hash) => FULL_OBJECT_ID.test(hash)) ||
-      !Number.isSafeInteger(date) ||
-      String(date) !== line[4]
-    )
-      valid = false;
-    gitCommits.push({
-      hash: line[0],
-      parentHashes,
-      author: line[2],
-      email: line[3],
-      date,
-      message: line[5]
-    });
+    const row = parseGitLogRecord(lines[i]);
+    if (!row) break;
+    if (!row.valid) valid = false;
+    gitCommits.push(row.commit);
   }
   return {
     commits: gitCommits,
@@ -274,6 +277,7 @@ function orderPinnedParentsFirst(pinnedCommits: GitCommit[]): GitCommit[] {
 }
 
 export class DataSource {
+  private historySearch?: GitHistorySearch;
   private historyPage?: HistoryPage;
   private historySequence = 0;
   private gitPath: string = DEFAULT_GIT_PATH;
@@ -1370,6 +1374,49 @@ export class DataSource {
     return { ...data, snapshot, searchSnapshot };
   }
 
+  private async getSearchRefs(
+    repo: string,
+    showRemoteBranches: boolean,
+    snapshot: string
+  ): Promise<SearchRefs> {
+    const data = await this.getRefs(repo, showRemoteBranches);
+    if (data.searchSnapshot === null) {
+      return { kind: "error", message: "Unable to verify the repository history." };
+    }
+    return data.searchSnapshot === snapshot
+      ? { kind: "ok", refs: data.refs }
+      : { kind: "historyChanged" };
+  }
+
+  public async verifyHistorySearch(
+    repo: string,
+    showRemoteBranches: boolean,
+    snapshot: string
+  ): Promise<HistorySearchValidation> {
+    try {
+      const result = await this.getSearchRefs(repo, showRemoteBranches, snapshot);
+      return result.kind === "ok" ? { kind: "ok" } : result;
+    } catch (error) {
+      return { kind: "error", message: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  public createHistorySearch(request: RequestStartHistorySearch): GitHistorySearch {
+    const { repo, branches, authors, showRemoteBranches, commitOrdering, skip, snapshot } = request;
+    const args = this.gitLogArgs(branches, { skip }, showRemoteBranches, authors, commitOrdering);
+    this.historySearch = new GitHistorySearch(
+      skip,
+      this.historySearch?.close(),
+      () => this.getSearchRefs(repo, showRemoteBranches, snapshot),
+      () => this.spawnGitChild(args, repo),
+      (line) => {
+        const record = parseGitLogRecord(line);
+        return record?.valid ? record.commit : undefined;
+      }
+    );
+    return this.historySearch;
+  }
+
   private async getHistoryConfigSnapshot(repo: string): Promise<string | null> {
     const config = await this.spawnGitProcess(
       ["config", "--null", "--get-regexp", HISTORY_CONFIG_PATTERN],
@@ -1617,14 +1664,14 @@ export class DataSource {
 
   private gitLogArgs(
     branches: string[],
-    num: number,
+    window: number | { skip: number },
     showRemoteBranches: boolean,
     authors: string[],
     commitOrdering: CommitOrdering
   ) {
     const args = [
       "log",
-      `--max-count=${num}`,
+      typeof window === "number" ? `--max-count=${window}` : `--skip=${window.skip}`,
       UTF8_OUTPUT_OPTION,
       `--format=${this.gitLogFormat}`,
       COMMIT_ORDER_FLAGS[commitOrdering],
@@ -1927,6 +1974,10 @@ export class DataSource {
     return result.kind === "exit" && result.code === 0 ? successValue(result.stdout) : errorValue;
   }
 
+  private spawnGitChild(args: string[], repo: string) {
+    return cp.spawn(this.gitPath, args, { cwd: repo, env: { ...process.env, LC_ALL: "C" } });
+  }
+
   private spawnGitProcess(
     args: string[],
     repo: string
@@ -1938,10 +1989,7 @@ export class DataSource {
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];
       let err = false;
-      const cmd = cp.spawn(this.gitPath, args, {
-        cwd: repo,
-        env: { ...process.env, LC_ALL: "C" }
-      });
+      const cmd = this.spawnGitChild(args, repo);
       cmd.stdout.on("data", (d: string | Buffer) => {
         stdoutChunks.push(Buffer.from(d));
       });
