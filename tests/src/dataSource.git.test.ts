@@ -763,6 +763,7 @@ describe("continuing ordinary Git history", () => {
     git(repo, ["update-ref", remote, "HEAD~2"]);
     const first = await hidden();
     expect(first.history.kind).toBe("verified");
+    expect(first.pageToken).toBeTypeOf("number");
     git(repo, ["update-ref", remote, "HEAD~3"]);
     expect(
       await ds.getNextHistoryPage({ ...query(3, first.pageToken), showRemoteBranches: false })
