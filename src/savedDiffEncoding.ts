@@ -49,7 +49,7 @@ function hasStableEncodingApi(): boolean {
   return major > 1 || (major === 1 && minor >= FIRST_STABLE_ENCODING_MINOR);
 }
 
-// VS Code versions before 1.100 ship these codecs but have no public workspace.decode API.
+// Use the editor's codecs when the whole-buffer API is unavailable or would block the host.
 function editorModule<T>(relativePath: string): T {
   const modules = path.join(vscode.env.appRoot, "node_modules");
   const candidates = [path.join(modules, relativePath), path.join(`${modules}.asar`, relativePath)];
@@ -66,11 +66,7 @@ function editorModule<T>(relativePath: string): T {
   return require(filename) as T;
 }
 
-async function decodeLegacy(bytes: Buffer, files: vscode.WorkspaceConfiguration): Promise<Buffer> {
-  const codec = editorModule<{
-    getDecoder(encoding: string): { write(input: Buffer): string; end(): string | undefined };
-    encodingExists(encoding: string): boolean;
-  }>("@vscode/iconv-lite-umd");
+function sourceEncoding(bytes: Buffer, files: vscode.WorkspaceConfiguration): string {
   let encoding = files.get<string>("encoding", UTF8);
   if (files.get("autoGuessEncoding", false)) {
     const detector = editorModule<{
@@ -101,6 +97,15 @@ async function decodeLegacy(bytes: Buffer, files: vscode.WorkspaceConfiguration)
       encoding = guess === "big5" ? "cp950" : guess === "ibm866" ? "cp866" : guess;
     }
   }
+  return encoding;
+}
+
+async function decodeInChunks(bytes: Buffer, encoding: string): Promise<Buffer> {
+  if (encoding === UTF8 || encoding === "utf8bom") return Buffer.concat([UTF8_BOM, bytes]);
+  const codec = editorModule<{
+    getDecoder(encoding: string): { write(input: Buffer): string; end(): string | undefined };
+    encodingExists(encoding: string): boolean;
+  }>("@vscode/iconv-lite-umd");
   const decoder = codec.getDecoder(codec.encodingExists(encoding) ? encoding : UTF8);
   const chunks = [UTF8_BOM];
   let highSurrogate = "";
@@ -161,32 +166,30 @@ export async function savedDiffDisplayBytes(
   )
     return undefined;
 
-  let text: string;
-  if (decode) {
+  if (decode && bytes.length <= DECODE_CHUNK_BYTES) {
     const options = source && !selected ? { uri: source } : { encoding: selected ?? UTF8 };
-    text = await decode(bytes, options);
+    const text = await decode(bytes, options);
     if (text === (await decode(bytes, { uri: snapshot }))) return undefined;
-  } else {
-    const folder = source && workspace.getWorkspaceFolder(source);
-    const settingsDir = folder && vscode.Uri.joinPath(folder.uri, ".vscode");
-    if (
-      !source ||
-      (settingsDir && source.path.startsWith(`${settingsDir.path}/`)) ||
-      source.path.endsWith(".code-workspace")
-    ) {
-      text = bytes.toString("utf8");
-    } else {
-      const languageId =
-        document?.languageId ??
-        (hasLanguageOverrides(files)
-          ? (await workspace.openTextDocument(emptyDiffDocAt(source))).languageId
-          : undefined);
-      return decodeLegacy(
-        bytes,
-        languageId ? workspace.getConfiguration("files", { uri: source, languageId }) : files
-      );
-    }
+    // A BOM makes the display text unambiguous under the virtual resource's own settings.
+    return Buffer.from(`\uFEFF${text}`, "utf8");
   }
-  // The display resource has its own settings. A BOM makes its text unambiguous there as well.
-  return Buffer.from(`\uFEFF${text}`, "utf8");
+
+  if (selected || !source) return decodeInChunks(bytes, selected ?? UTF8);
+  const folder = workspace.getWorkspaceFolder(source);
+  const settingsDir = folder && vscode.Uri.joinPath(folder.uri, ".vscode");
+  if (
+    (settingsDir && source.path.startsWith(`${settingsDir.path}/`)) ||
+    source.path.endsWith(".code-workspace")
+  )
+    return decodeInChunks(bytes, UTF8);
+
+  const languageId =
+    document?.languageId ??
+    (hasLanguageOverrides(files)
+      ? (await workspace.openTextDocument(emptyDiffDocAt(source))).languageId
+      : undefined);
+  const scoped = languageId
+    ? workspace.getConfiguration("files", { uri: source, languageId })
+    : files;
+  return decodeInChunks(bytes, sourceEncoding(bytes, scoped));
 }

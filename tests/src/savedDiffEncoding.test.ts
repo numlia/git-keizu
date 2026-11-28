@@ -11,6 +11,8 @@ import { savedDiffDisplayBytes } from "../../src/savedDiffEncoding";
 
 const host = vi.hoisted(() => ({
   appRoot: "",
+  version: "1.99.3",
+  documents: [] as { uri: Uri; encoding: string }[],
   decode: vi.fn(() => {
     throw new Error("API proposal: textDocumentEncoding");
   }),
@@ -18,13 +20,15 @@ const host = vi.hoisted(() => ({
   open: vi.fn<(uri: Uri) => Promise<{ languageId: string }>>()
 }));
 vi.mock("vscode", () => ({
-  version: "1.99.3",
+  get version() {
+    return host.version;
+  },
   env: host,
   EventEmitter: class {
     dispose() {}
   },
   workspace: {
-    textDocuments: [],
+    textDocuments: host.documents,
     decode: host.decode,
     getConfiguration: host.configuration,
     getWorkspaceFolder: () => undefined,
@@ -85,6 +89,8 @@ afterAll(async () => {
   await fs.rm(host.appRoot, { recursive: true, force: true });
 });
 beforeEach(() => {
+  host.version = "1.99.3";
+  host.documents.length = 0;
   vi.clearAllMocks();
 });
 
@@ -106,18 +112,45 @@ it.each(["cp1125", "iso88598"])(
 );
 
 // Case: TC-433
-it("lets the host process events while decoding a large file across character boundaries", async () => {
+it.each(["1.99.3", "1.107.1"])(
+  "lets VS Code %s process events across character boundaries in a large file",
+  async (version) => {
+    host.version = version;
+    host.configuration.mockImplementation((_section, scope) =>
+      scope === source ? config({ encoding: "shiftjis" }) : config({})
+    );
+    const chunkBytes = 256 * 1024;
+    const padding = Buffer.alloc(chunkBytes - 1, 0x61);
+    const large = Buffer.concat([padding, bytes, Buffer.from([0x93])]);
+    const hostEvent = vi.fn();
+    setImmediate(hostEvent);
+    const display = await savedDiffDisplayBytes(large, source, snapshot);
+    expect(hostEvent).toHaveBeenCalledOnce();
+    expect(display?.toString("utf8")).toBe(`\uFEFF${padding.toString()}日本語\n\uFFFD`);
+  }
+);
+
+// Case: TC-433
+it("retains a modern editor's selected encoding when decoding large saved content", async () => {
+  host.version = "1.107.1";
+  host.documents.push({ uri: source, encoding: "shiftjis" });
+  host.configuration.mockReturnValue(config({ encoding: "utf8" }));
+  const padding = Buffer.alloc(256 * 1024, 0x61);
+  const display = await savedDiffDisplayBytes(Buffer.concat([bytes, padding]), source, snapshot);
+  expect(display?.toString("utf8")).toBe(`\uFEFF日本語\n${padding.toString()}`);
+});
+
+// Case: TC-433
+it("uses a successful encoding guess for large saved content in a modern editor", async () => {
+  host.version = "1.107.1";
   host.configuration.mockImplementation((_section, scope) =>
-    scope === source ? config({ encoding: "shiftjis" }) : config({})
+    scope === source
+      ? config({ encoding: "shiftjis", autoGuessEncoding: true, candidateGuessEncodings: ["utf8"] })
+      : config({})
   );
-  const chunkBytes = 256 * 1024;
-  const padding = Buffer.alloc(chunkBytes - 1, 0x61);
-  const large = Buffer.concat([padding, bytes, Buffer.from([0x93])]);
-  const hostEvent = vi.fn();
-  setImmediate(hostEvent);
-  const display = await savedDiffDisplayBytes(large, source, snapshot);
-  expect(hostEvent).toHaveBeenCalledOnce();
-  expect(display).toEqual(Buffer.from(`\uFEFF${padding.toString()}日本語\n\uFFFD`));
+  const text = `日本語\n${"a".repeat(256 * 1024)}`;
+  const display = await savedDiffDisplayBytes(Buffer.from(text), source, snapshot);
+  expect(display?.toString("utf8")).toBe(`\uFEFF${text}`);
 });
 
 // Case: TC-433
