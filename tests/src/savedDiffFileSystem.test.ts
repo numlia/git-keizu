@@ -8,7 +8,13 @@ import * as vscode from "vscode";
 
 import { SavedDiffFileSystem } from "../../src/savedDiffFileSystem";
 
-const lifetime = vi.hoisted(() => ({ close: vi.fn(), emitter: vi.fn() }));
+const lifetime = vi.hoisted(() => ({
+  close: vi.fn(),
+  emitter: vi.fn(),
+  tabs: vi.fn(),
+  groups: vi.fn(),
+  all: [] as { tabs: { input: unknown }[] }[]
+}));
 
 vi.mock("vscode", () => {
   const error = (code: string) => () => Object.assign(new Error(code), { code });
@@ -26,6 +32,27 @@ vi.mock("vscode", () => {
       FileNotADirectory: error("FileNotADirectory")
     },
     FileType: { File: 1 },
+    TabInputText: class {
+      constructor(readonly uri: vscode.Uri) {}
+    },
+    TabInputTextDiff: class {
+      constructor(
+        readonly original: vscode.Uri,
+        readonly modified: vscode.Uri
+      ) {}
+    },
+    TabInputCustom: class {},
+    TabInputNotebook: class {},
+    TabInputNotebookDiff: class {},
+    window: {
+      tabGroups: {
+        get all() {
+          return lifetime.all;
+        },
+        onDidChangeTabs: vi.fn(() => ({ dispose: lifetime.tabs })),
+        onDidChangeTabGroups: vi.fn(() => ({ dispose: lifetime.groups }))
+      }
+    },
     Disposable: { from: () => ({ dispose() {} }) },
     EventEmitter: class {
       event = vi.fn();
@@ -48,6 +75,7 @@ describe("saved working-tree documents", () => {
 
   beforeEach(async () => {
     vi.clearAllMocks();
+    lifetime.all = [];
     root = await fs.mkdtemp(path.join(tmpdir(), "git-keizu-saved-"));
     repo = path.join(root, "repo");
     await fs.mkdir(repo);
@@ -225,6 +253,37 @@ describe("saved working-tree documents", () => {
     expect(() => provider.stat(second)).toThrow(expect.objectContaining({ code: "FileNotFound" }));
   });
 
+  // Case: TC-006
+  it("releases an unsynchronized snapshot only after its last tab disappears", async () => {
+    const bytes = new TextEncoder().encode("saved");
+    await fs.writeFile(path.join(repo, "file"), bytes);
+    const first = await provider.capture(repo, "file", "M");
+    const next = await provider.capture(repo, "file", "M");
+    const left = vscode.Uri.from({ scheme: "git-keizu", path: "/file" });
+    const [tabsChanged] = vi.mocked(vscode.window.tabGroups.onDidChangeTabs).mock.calls[0];
+    const [groupsChanged] = vi.mocked(vscode.window.tabGroups.onDidChangeTabGroups).mock.calls[0];
+    const tab = { input: new vscode.TabInputTextDiff(left, first) } as vscode.Tab;
+    const split = { ...tab };
+    const other = { input: new vscode.TabInputText(next) } as vscode.Tab;
+
+    const splitGroup = { tabs: [split] };
+    lifetime.all = [{ tabs: [tab] }, splitGroup];
+    tabsChanged({ opened: [tab, split], closed: [], changed: [] });
+    expect(provider.readFile(next)).toEqual(bytes);
+    lifetime.all = [{ tabs: [tab, other] }];
+    groupsChanged({ opened: [], closed: [splitGroup as vscode.TabGroup], changed: [] });
+    expect(provider.readFile(first)).toEqual(bytes);
+    lifetime.all = [{ tabs: [other] }];
+    tabsChanged({ opened: [], closed: [tab], changed: [] });
+    expect(() => provider.stat(first)).toThrow(expect.objectContaining({ code: "FileNotFound" }));
+    expect(provider.readFile(next)).toEqual(bytes);
+    lifetime.all = [];
+    groupsChanged({ opened: [], closed: [{ tabs: [other] } as vscode.TabGroup], changed: [] });
+    expect(() => provider.readFile(next)).toThrow(
+      expect.objectContaining({ code: "FileNotFound" })
+    );
+  });
+
   // Case: TC-007
   it("disposes existing documents and prevents a pending read from issuing a URI", async () => {
     const first = await provider.capture(repo, "deleted", "D");
@@ -243,6 +302,8 @@ describe("saved working-tree documents", () => {
       await entered.promise;
       provider.dispose();
       expect(lifetime.close).toHaveBeenCalledOnce();
+      expect(lifetime.tabs).toHaveBeenCalledOnce();
+      expect(lifetime.groups).toHaveBeenCalledOnce();
       expect(lifetime.emitter).toHaveBeenCalledOnce();
       expect(() => provider.readFile(first)).toThrow(
         expect.objectContaining({ code: "FileNotFound" })

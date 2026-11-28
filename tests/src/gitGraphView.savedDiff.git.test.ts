@@ -60,6 +60,10 @@ vi.mock("vscode", () => ({
     onDidChangeConfiguration: vi.fn()
   },
   window: {
+    tabGroups: {
+      onDidChangeTabs: () => ({ dispose() {} }),
+      onDidChangeTabGroups: () => ({ dispose() {} })
+    },
     createWebviewPanel: () => ({
       webview: {
         onDidReceiveMessage: editor.onMessage,

@@ -106,16 +106,57 @@ function denyWrite(uri: vscode.Uri): never {
   throw vscode.FileSystemError.NoPermissions(uri);
 }
 
+function tabResources({ input }: vscode.Tab): readonly vscode.Uri[] {
+  if (input instanceof vscode.TabInputTextDiff || input instanceof vscode.TabInputNotebookDiff) {
+    return [input.original, input.modified];
+  }
+  if (
+    input instanceof vscode.TabInputText ||
+    input instanceof vscode.TabInputNotebook ||
+    input instanceof vscode.TabInputCustom
+  ) {
+    return [input.uri];
+  }
+  return [];
+}
+
 export class SavedDiffFileSystem implements vscode.FileSystemProvider, vscode.Disposable {
   public static readonly scheme = "git-keizu-saved";
   private readonly documents = new Map<string, { bytes: Uint8Array; created: number }>();
   private readonly changes = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
   public readonly onDidChangeFile = this.changes.event;
-  private readonly closeListener = vscode.workspace.onDidCloseTextDocument((doc) => {
-    // Changing the document language also fires this event while the document is still open.
-    if (doc.isClosed) this.release(doc.uri);
-  });
+  private openTabUris = new Set<string>();
+  private readonly listeners = [
+    vscode.window.tabGroups.onDidChangeTabs(() => this.updateOpenTabs()),
+    vscode.window.tabGroups.onDidChangeTabGroups(() => this.updateOpenTabs()),
+    vscode.workspace.onDidCloseTextDocument((doc) => {
+      // Language changes emit a close event for a live document.
+      if (
+        doc.isClosed &&
+        doc.uri.scheme === SavedDiffFileSystem.scheme &&
+        !this.openTabUris.has(doc.uri.toString())
+      ) {
+        this.release(doc.uri);
+      }
+    })
+  ];
   private disposed = false;
+
+  private updateOpenTabs(): void {
+    if (!this.documents.size) return;
+    const open = new Set<string>();
+    for (const group of vscode.window.tabGroups.all) {
+      for (const uri of group.tabs.flatMap(tabResources)) {
+        if (uri.scheme === SavedDiffFileSystem.scheme) open.add(uri.toString());
+      }
+    }
+    // Large files may never produce a text-document event. Only reap previously displayed
+    // snapshots: a concurrent diff command may still be opening a freshly captured URI.
+    for (const key of this.openTabUris) {
+      if (!open.has(key)) this.documents.delete(key);
+    }
+    this.openTabUris = open;
+  }
 
   public async capture(
     repo: string,
@@ -166,14 +207,18 @@ export class SavedDiffFileSystem implements vscode.FileSystemProvider, vscode.Di
   public readonly watch: vscode.FileSystemProvider["watch"] = () => vscode.Disposable.from();
 
   public release(uri: vscode.Uri): void {
-    if (uri.scheme === SavedDiffFileSystem.scheme) this.documents.delete(uri.toString());
+    if (uri.scheme !== SavedDiffFileSystem.scheme) return;
+    const key = uri.toString();
+    this.documents.delete(key);
+    this.openTabUris.delete(key);
   }
 
   public dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    this.closeListener.dispose();
+    for (const listener of this.listeners) listener.dispose();
     this.changes.dispose();
     this.documents.clear();
+    this.openTabUris.clear();
   }
 }
