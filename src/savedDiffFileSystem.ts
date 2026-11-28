@@ -111,9 +111,10 @@ export class SavedDiffFileSystem implements vscode.FileSystemProvider, vscode.Di
   private readonly documents = new Map<string, { bytes: Uint8Array; created: number }>();
   private readonly changes = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
   public readonly onDidChangeFile = this.changes.event;
-  private readonly closeListener = vscode.workspace.onDidCloseTextDocument((doc) =>
-    this.release(doc.uri)
-  );
+  private readonly closeListener = vscode.workspace.onDidCloseTextDocument((doc) => {
+    // Changing the document language also fires this event while the document is still open.
+    if (doc.isClosed) this.release(doc.uri);
+  });
   private disposed = false;
 
   public async capture(

@@ -199,18 +199,28 @@ describe("saved working-tree documents", () => {
   });
 
   // Case: TC-006
-  it("releases only the closed or explicitly released URI", async () => {
-    await fs.writeFile(path.join(repo, "file"), "saved");
+  it("keeps a snapshot across a language change until disposal or explicit release", async () => {
+    const saved = new TextEncoder().encode("saved");
+    await fs.writeFile(path.join(repo, "file"), saved);
     const first = await provider.capture(repo, "file", "M");
+    const firstStat = provider.stat(first);
     const second = await provider.capture(repo, "file", "M");
     const [close] = vi.mocked(vscode.workspace.onDidCloseTextDocument).mock.calls[0];
-    close({ uri: first } as vscode.TextDocument);
-    provider.release(first);
-    close({ uri: vscode.Uri.from({ scheme: "file", path: second.path }) } as vscode.TextDocument);
+    close({ uri: first, isClosed: false } as vscode.TextDocument);
+    expect(provider.readFile(first)).toEqual(saved);
+    expect(provider.stat(first)).toEqual(firstStat);
+
+    close({ uri: first, isClosed: true } as vscode.TextDocument);
     expect(() => provider.readFile(first)).toThrow(
       expect.objectContaining({ code: "FileNotFound" })
     );
-    expect(provider.readFile(second)).toEqual(new TextEncoder().encode("saved"));
+    expect(() => provider.stat(first)).toThrow(expect.objectContaining({ code: "FileNotFound" }));
+    provider.release(first);
+    close({
+      uri: vscode.Uri.from({ scheme: "file", path: second.path }),
+      isClosed: true
+    } as vscode.TextDocument);
+    expect(provider.readFile(second)).toEqual(saved);
     provider.release(second);
     expect(() => provider.stat(second)).toThrow(expect.objectContaining({ code: "FileNotFound" }));
   });
