@@ -80,6 +80,10 @@ export function encodeEmptyDiffDocUri(repo: string, filePath: string, commit: st
   return uri.with({ query: `${uri.query}&${EMPTY_SIDE_FIELD}` });
 }
 
+export function emptyDiffDocAt(source: vscode.Uri): vscode.Uri {
+  return source.with({ scheme: DiffDocProvider.scheme, query: EMPTY_SIDE_FIELD });
+}
+
 export function decodeDiffDocUri(uri: vscode.Uri) {
   let queryArgs = decodeUriQueryArgs(uri.query);
   return { filePath: uri.path, commit: queryArgs.commit, repo: queryArgs.repo };

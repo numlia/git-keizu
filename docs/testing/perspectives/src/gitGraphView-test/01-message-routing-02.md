@@ -36,12 +36,13 @@ A fix that replaces the mutable `HEAD` reference in uncommitted diffs with `data
 > Supersedes: S24
 > Signature: `private async viewDiff(repo, commitHash, oldFilePath, newFilePath, type, compareWithHash?): Promise<boolean>`
 > Target Path: `src/gitGraphView.ts` (viewDiff and its message handler)
-> Test Files: `tests/src/gitGraphView.test.ts`, `tests/src/gitGraphView.savedDiff.git.test.ts`
+> Test Files: `tests/src/gitGraphView.test.ts`, `tests/src/gitGraphView.savedDiff.git.test.ts`, `tests/src/savedDiffEncoding.test.ts`
 
 S24 TC-089 and TC-091 passed on the pre-fix revision `8997239` with these test names: `resolves HEAD to a fixed hash for the left URI in compare mode (TC-089)` and `falls back to 'HEAD' when resolveRefToHash returns null in compare mode (TC-091)`. Their successors below check the selected revision for both argument orders. The remaining S24 tests keep their IDs and names.
 
 For TC-433, an added file replacing a committed directory also has an empty left side.
 For a staged BOM-less Shift JIS addition in a folder with its own encoding, the right side displays the saved Japanese text and the raw snapshot retains the original bytes.
+On older editors, TC-433 also checks a rejected guess candidate and a closed file whose language depends on its original path. Language detection must work when the full file exceeds the extension host's synchronization limit.
 
 | Case ID | Input / Precondition                                                                                                                                                                                                                                        | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                                                           | Notes                                                                                          |
 | ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |

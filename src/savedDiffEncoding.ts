@@ -2,12 +2,15 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
+import { emptyDiffDocAt } from "./diffDocProvider";
+
 const UTF8 = "utf8";
 const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf]);
 const UTF16_LE_BOM = Buffer.from([0xff, 0xfe]);
 const UTF16_BE_BOM = Buffer.from([0xfe, 0xff]);
 const BINARY_PROBE_BYTES = 512;
 const GUESS_SAMPLE_BYTES = 64 * 1024;
+const FIRST_STABLE_ENCODING_MINOR = 100;
 const GUESSABLE_NAMES = [
   "UTF-8",
   "UTF-16LE",
@@ -39,6 +42,11 @@ type EncodingWorkspace = typeof vscode.workspace & {
   decode?(bytes: Uint8Array, options: DecodeOptions): Thenable<string>;
 };
 
+function hasStableEncodingApi(): boolean {
+  const [major, minor] = vscode.version.split(".").map(Number);
+  return major > 1 || (major === 1 && minor >= FIRST_STABLE_ENCODING_MINOR);
+}
+
 // VS Code versions before 1.100 ship these codecs but have no public workspace.decode API.
 function editorModule<T>(relativePath: string): T {
   const modules = path.join(vscode.env.appRoot, "node_modules");
@@ -69,12 +77,24 @@ function decodeLegacy(bytes: Buffer, files: vscode.WorkspaceConfiguration): stri
     const candidates = files
       .get<string[]>("candidateGuessEncodings", [])
       .flatMap((id) => detectorNames.get(id) ?? []);
-    const guess = detector
-      .detect(
-        bytes.subarray(0, GUESS_SAMPLE_BYTES).toString("latin1"),
-        candidates.length ? { detectEncodings: candidates } : undefined
+    let guess: string | undefined;
+    try {
+      guess = detector
+        .detect(
+          bytes.subarray(0, GUESS_SAMPLE_BYTES).toString("latin1"),
+          candidates.length ? { detectEncodings: candidates } : undefined
+        )
+        .encoding?.toLowerCase();
+    } catch (error) {
+      // Some encodings offered in VS Code settings have no detector in its bundled jschardet.
+      if (
+        !(
+          error instanceof Error &&
+          candidates.some((name) => error.message.startsWith(`Encoding ${name} is not supported.`))
+        )
       )
-      .encoding?.toLowerCase();
+        throw error;
+    }
     if (guess && !["ascii", "utf-16", "utf-32"].includes(guess)) {
       encoding = guess === "big5" ? "cp950" : guess === "ibm866" ? "cp866" : guess;
     }
@@ -116,8 +136,11 @@ export async function savedDiffDisplayBytes(
     source && workspace.textDocuments.find((doc) => doc.uri.toString() === source.toString());
   const files = workspace.getConfiguration("files", document ?? source);
   const virtual = workspace.getConfiguration("files", snapshot);
-  const selected = (document as (vscode.TextDocument & { encoding?: string }) | undefined)
-    ?.encoding;
+  // Some older releases expose the proposed decode function but reject calls from extensions.
+  const decode = hasStableEncodingApi() ? workspace.decode : undefined;
+  const selected = decode
+    ? (document as (vscode.TextDocument & { encoding?: string }) | undefined)?.encoding
+    : undefined;
   if (
     usesDefaultDecoding(virtual) &&
     (!source || (selected ? selected === UTF8 : usesDefaultDecoding(files)))
@@ -125,10 +148,10 @@ export async function savedDiffDisplayBytes(
     return undefined;
 
   let text: string;
-  if (workspace.decode) {
+  if (decode) {
     const options = source && !selected ? { uri: source } : { encoding: selected ?? UTF8 };
-    text = await workspace.decode(bytes, options);
-    if (text === (await workspace.decode(bytes, { uri: snapshot }))) return undefined;
+    text = await decode(bytes, options);
+    if (text === (await decode(bytes, { uri: snapshot }))) return undefined;
   } else {
     const folder = source && workspace.getWorkspaceFolder(source);
     const settingsDir = folder && vscode.Uri.joinPath(folder.uri, ".vscode");
@@ -142,7 +165,7 @@ export async function savedDiffDisplayBytes(
       const languageId =
         document?.languageId ??
         (hasLanguageOverrides(files)
-          ? (await workspace.openTextDocument(snapshot)).languageId
+          ? (await workspace.openTextDocument(emptyDiffDocAt(source))).languageId
           : undefined);
       text = decodeLegacy(
         bytes,

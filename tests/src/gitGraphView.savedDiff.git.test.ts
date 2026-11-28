@@ -33,6 +33,7 @@ const editor = vi.hoisted(() => ({
 }));
 
 vi.mock("vscode", () => ({
+  version: "1.100.0",
   Uri: {
     file: (fsPath: string) => ({ scheme: "file", fsPath, path: fsPath, toString: () => fsPath }),
     from: function from(parts: { scheme: string; path: string; query?: string }) {
