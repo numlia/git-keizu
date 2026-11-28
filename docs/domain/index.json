@@ -1,0 +1,280 @@
+{
+  "edges": [
+    {
+      "from": "rule:RULE-20261128-132817-8d37-history-graft-changes",
+      "relation": "references",
+      "to": "rule:RULE-20261128-132817-b982-history-replacement-mode"
+    },
+    {
+      "from": "rule:RULE-20261128-132817-d217-saved-diff-host-responsiveness",
+      "relation": "references",
+      "to": "rule:RULE-20261128-132817-45ff-large-diff-model-sync"
+    }
+  ],
+  "entries": [
+    {
+      "context": "PR #127 review",
+      "date": "2026-11-28",
+      "depends_on": [],
+      "id": "RULE-20261128-132817-38a0-file-history-path-reuse",
+      "must_review": [],
+      "node_id": "rule:RULE-20261128-132817-38a0-file-history-path-reuse",
+      "path": "docs/domain/rules/RULE-20261128-132817-38a0-file-history-path-reuse.md",
+      "paths": [],
+      "status": "Active",
+      "title": "Preserve file identity across reused paths in history continuations",
+      "type": "rule",
+      "when_changed": [
+        "concept:file-history-rename-continuation",
+        "file:src/dataSource.ts"
+      ]
+    },
+    {
+      "context": "Branch review, refs/remotes/origin/main (89972393550031ea4b9495eb99079482b296be56) to feat/061-07-saved-diff (ad9695a44ed5b2e5e036a9879262997cb499bddb)",
+      "date": "2026-11-28",
+      "depends_on": [],
+      "id": "RULE-20261128-132817-45ff-large-diff-model-sync",
+      "must_review": [],
+      "node_id": "rule:RULE-20261128-132817-45ff-large-diff-model-sync",
+      "path": "docs/domain/rules/RULE-20261128-132817-45ff-large-diff-model-sync.md",
+      "paths": [],
+      "status": "Active",
+      "title": "Allow listed Git text comparisons to open when VS Code cannot synchronize the text model",
+      "type": "rule",
+      "when_changed": [
+        "concept:extension-host-model-synchronization",
+        "file:src/savedDiffEncoding.ts",
+        "file:src/gitGraphView.ts"
+      ]
+    },
+    {
+      "context": "Branch review, refs/remotes/origin/main (89972393550031ea4b9495eb99079482b296be56) to feat/061-07-saved-diff (ceadd227b0705606442d86a0d3f7327a113f5fd5)",
+      "date": "2026-11-28",
+      "depends_on": [],
+      "id": "RULE-20261128-132817-5c76-saved-diff-source-encoding",
+      "must_review": [],
+      "node_id": "rule:RULE-20261128-132817-5c76-saved-diff-source-encoding",
+      "path": "docs/domain/rules/RULE-20261128-132817-5c76-saved-diff-source-encoding.md",
+      "paths": [],
+      "status": "Active",
+      "title": "Preserve the source file’s decoding settings in saved Git comparison previews",
+      "type": "rule",
+      "when_changed": [
+        "concept:saved-diff-source-encoding",
+        "file:src/savedDiffEncoding.ts",
+        "file:src/savedDiffFileSystem.ts"
+      ]
+    },
+    {
+      "context": "Branch review, refs/remotes/origin/main (89972393550031ea4b9495eb99079482b296be56) to feat/061-07-saved-diff (fde3c447a9a5c5a6ac427ee731a3e57786cd2fae)",
+      "date": "2026-11-28",
+      "depends_on": [],
+      "id": "RULE-20261128-132817-6695-saved-diff-tab-lifetime",
+      "must_review": [],
+      "node_id": "rule:RULE-20261128-132817-6695-saved-diff-tab-lifetime",
+      "path": "docs/domain/rules/RULE-20261128-132817-6695-saved-diff-tab-lifetime.md",
+      "paths": [],
+      "status": "Active",
+      "title": "Release saved comparison bytes when the last editor using them closes",
+      "type": "rule",
+      "when_changed": [
+        "concept:saved-diff-tab-ownership",
+        "file:src/savedDiffFileSystem.ts"
+      ]
+    },
+    {
+      "context": "PR #144 review",
+      "date": "2026-11-28",
+      "depends_on": [],
+      "id": "RULE-20261128-132817-7deb-history-reply-ownership",
+      "must_review": [],
+      "node_id": "rule:RULE-20261128-132817-7deb-history-reply-ownership",
+      "path": "docs/domain/rules/RULE-20261128-132817-7deb-history-reply-ownership.md",
+      "paths": [],
+      "status": "Active",
+      "title": "Scope delayed history replies to their originating Webview",
+      "type": "rule",
+      "when_changed": [
+        "concept:webview-history-request-lifetime",
+        "file:src/gitGraphView.ts",
+        "file:web/main.ts"
+      ]
+    },
+    {
+      "context": "PR #144 review",
+      "date": "2026-11-28",
+      "depends_on": [
+        {
+          "id": "rule:RULE-20261128-132817-b982-history-replacement-mode",
+          "relation": "references"
+        }
+      ],
+      "id": "RULE-20261128-132817-8d37-history-graft-changes",
+      "must_review": [],
+      "node_id": "rule:RULE-20261128-132817-8d37-history-graft-changes",
+      "path": "docs/domain/rules/RULE-20261128-132817-8d37-history-graft-changes.md",
+      "paths": [],
+      "status": "Active",
+      "title": "Invalidate paged Git history when effective grafts change",
+      "type": "rule",
+      "when_changed": [
+        "concept:git-history-grafts",
+        "file:src/dataSource.ts"
+      ]
+    },
+    {
+      "context": "PR #144 review",
+      "date": "2026-11-28",
+      "depends_on": [],
+      "id": "RULE-20261128-132817-aa5c-merge-parent-selection",
+      "must_review": [],
+      "node_id": "rule:RULE-20261128-132817-aa5c-merge-parent-selection",
+      "path": "docs/domain/rules/RULE-20261128-132817-aa5c-merge-parent-selection.md",
+      "paths": [],
+      "status": "Active",
+      "title": "Keep merge-parent choices consistent while history pages arrive",
+      "type": "rule",
+      "when_changed": [
+        "concept:merge-mainline-selection",
+        "file:web/commitMenu.ts"
+      ]
+    },
+    {
+      "context": "Branch review, refs/remotes/origin/main (89972393550031ea4b9495eb99079482b296be56) to feat/061-07-saved-diff (fde3c447a9a5c5a6ac427ee731a3e57786cd2fae)",
+      "date": "2026-11-28",
+      "depends_on": [],
+      "id": "RULE-20261128-132817-af57-absent-diff-side",
+      "must_review": [],
+      "node_id": "rule:RULE-20261128-132817-af57-absent-diff-side",
+      "path": "docs/domain/rules/RULE-20261128-132817-af57-absent-diff-side.md",
+      "paths": [],
+      "status": "Active",
+      "title": "Represent the absent side of a Git file change explicitly",
+      "type": "rule",
+      "when_changed": [
+        "concept:git-diff-change-type",
+        "file:src/diffDocProvider.ts",
+        "file:src/gitGraphView.ts"
+      ]
+    },
+    {
+      "context": "PR #144 review",
+      "date": "2026-11-28",
+      "depends_on": [],
+      "id": "RULE-20261128-132817-b982-history-replacement-mode",
+      "must_review": [],
+      "node_id": "rule:RULE-20261128-132817-b982-history-replacement-mode",
+      "path": "docs/domain/rules/RULE-20261128-132817-b982-history-replacement-mode.md",
+      "paths": [],
+      "status": "Active",
+      "title": "Include Git replacement mode when reusing paged history",
+      "type": "rule",
+      "when_changed": [
+        "concept:git-replacement-refs",
+        "file:src/dataSource.ts"
+      ]
+    },
+    {
+      "context": "Branch review, refs/remotes/origin/main (89972393550031ea4b9495eb99079482b296be56) to feat/061-07-saved-diff (a915dd900f670039a598314ce5563dec4a321d48)",
+      "date": "2026-11-28",
+      "depends_on": [
+        {
+          "id": "rule:RULE-20261128-132817-45ff-large-diff-model-sync",
+          "relation": "references"
+        }
+      ],
+      "id": "RULE-20261128-132817-d217-saved-diff-host-responsiveness",
+      "must_review": [],
+      "node_id": "rule:RULE-20261128-132817-d217-saved-diff-host-responsiveness",
+      "path": "docs/domain/rules/RULE-20261128-132817-d217-saved-diff-host-responsiveness.md",
+      "paths": [],
+      "status": "Active",
+      "title": "Keep the extension host responsive while preparing large saved comparisons",
+      "type": "rule",
+      "when_changed": [
+        "concept:extension-host-decoding-responsiveness",
+        "file:src/savedDiffEncoding.ts"
+      ]
+    },
+    {
+      "context": "PR #144 review",
+      "date": "2026-11-28",
+      "depends_on": [],
+      "id": "RULE-20261128-132817-f75b-visible-refs-on-read-failure",
+      "must_review": [],
+      "node_id": "rule:RULE-20261128-132817-f75b-visible-refs-on-read-failure",
+      "path": "docs/domain/rules/RULE-20261128-132817-f75b-visible-refs-on-read-failure.md",
+      "paths": [],
+      "status": "Active",
+      "title": "Preserve visible Git refs when a history snapshot is unavailable",
+      "type": "rule",
+      "when_changed": [
+        "concept:visible-history-refs",
+        "file:src/dataSource.ts"
+      ]
+    }
+  ],
+  "source_manifest": {
+    "files": [
+      {
+        "path": "docs/domain/rules/RULE-20261128-132817-38a0-file-history-path-reuse.md",
+        "sha256": "c518a244b2d30c62c3e2203b0abed29c0c396cf351860df8279ec9e671030d31",
+        "size": 1511
+      },
+      {
+        "path": "docs/domain/rules/RULE-20261128-132817-45ff-large-diff-model-sync.md",
+        "sha256": "6c44ea58c1276e94b0537d638b2d0e1082db0a118bc9580e4e0491e46c4774f7",
+        "size": 1849
+      },
+      {
+        "path": "docs/domain/rules/RULE-20261128-132817-5c76-saved-diff-source-encoding.md",
+        "sha256": "4ccb16e61bdfdf3dcc4e7bb62ded7ec32964cb4cd9273c018f5b5fcf1ea1131c",
+        "size": 1844
+      },
+      {
+        "path": "docs/domain/rules/RULE-20261128-132817-6695-saved-diff-tab-lifetime.md",
+        "sha256": "f65062f1a1d54f9f3ccdb40b2c21b07bb7afce4ed8e10bb28b2d686caa07dcc7",
+        "size": 1614
+      },
+      {
+        "path": "docs/domain/rules/RULE-20261128-132817-7deb-history-reply-ownership.md",
+        "sha256": "a4de8d899e13b6e34d4a21fbe09da8d435b00b6fd83142be14aab29949ac8eb0",
+        "size": 1210
+      },
+      {
+        "path": "docs/domain/rules/RULE-20261128-132817-8d37-history-graft-changes.md",
+        "sha256": "c815747aa4fe4532c3b342c28758b3995a1127aaf583750615f5d1568a60ed75",
+        "size": 1542
+      },
+      {
+        "path": "docs/domain/rules/RULE-20261128-132817-aa5c-merge-parent-selection.md",
+        "sha256": "0761aef8b06fbae1cb8fcc669179ca1938c2c56b08ef7ec8e1d864f07cff6394",
+        "size": 1360
+      },
+      {
+        "path": "docs/domain/rules/RULE-20261128-132817-af57-absent-diff-side.md",
+        "sha256": "334771f791b229a8fe3501e30fa26106d864e948532ec25e1e26e0c25ad38978",
+        "size": 1390
+      },
+      {
+        "path": "docs/domain/rules/RULE-20261128-132817-b982-history-replacement-mode.md",
+        "sha256": "28999286289f5447d11879db4b4a2faebcc6b0220df68fc9564eb61a46a9bf91",
+        "size": 1528
+      },
+      {
+        "path": "docs/domain/rules/RULE-20261128-132817-d217-saved-diff-host-responsiveness.md",
+        "sha256": "da1bfe4cf9001cb295bc170d145c18a2eb6a0d7c1c1c0ae988472369528dc6ce",
+        "size": 1897
+      },
+      {
+        "path": "docs/domain/rules/RULE-20261128-132817-f75b-visible-refs-on-read-failure.md",
+        "sha256": "f89e72d987d51f9f3522e2aaaa26134ccb5687001275ac46592f031dfc2c8ef9",
+        "size": 1279
+      }
+    ],
+    "logical_updated_at": "2026-11-28T00:00:00Z",
+    "manifest_hash": "0f33f9b0a7c2bf796b9ffbada5759c2def6db15b46d44070c64d64496dd991c2"
+  },
+  "updated_at": "2026-11-28T00:00:00Z",
+  "version": 3
+}
