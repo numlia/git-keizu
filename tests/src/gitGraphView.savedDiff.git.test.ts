@@ -33,10 +33,13 @@ const editor = vi.hoisted(() => ({
 vi.mock("vscode", () => ({
   Uri: {
     file: (fsPath: string) => ({ scheme: "file", fsPath, path: fsPath, toString: () => fsPath }),
-    from: (parts: { scheme: string; path: string; query?: string }) => ({
-      ...parts,
-      toString: () => `${parts.scheme}:${parts.path}?${parts.query ?? ""}`
-    })
+    from: function from(parts: { scheme: string; path: string; query?: string }) {
+      return {
+        ...parts,
+        with: (changes: Partial<typeof parts>) => from({ ...parts, ...changes }),
+        toString: () => `${parts.scheme}:${parts.path}?${parts.query ?? ""}`
+      };
+    }
   },
   EventEmitter: class {
     event = vi.fn();
@@ -107,6 +110,8 @@ describe("opening Git comparison rows through the graph", () => {
     await write(OLD_NAME, BEFORE_RENAME);
     await write("deleted.txt", "removed\n");
     await write("binary.bin", Buffer.from([0, 1]));
+    await fs.mkdir(path.join(repo, "entry"));
+    await write("entry/old.txt", "old child\n");
     await fs.symlink(OLD_NAME, path.join(repo, "link"), "file");
     git("add", ".");
     git("commit", "-m", "older");
@@ -117,6 +122,9 @@ describe("opening Git comparison rows through the graph", () => {
     await write(STORY, SAVED);
     await write("added.txt", "index\n");
     git("add", "added.txt");
+    git("rm", "-r", "entry");
+    await write("entry", "replacement file\n");
+    git("add", "entry");
     git("mv", OLD_NAME, NEW_NAME);
     await write(NEW_NAME, AFTER_RENAME);
     await fs.unlink(path.join(repo, "deleted.txt"));
@@ -214,6 +222,7 @@ describe("opening Git comparison rows through the graph", () => {
     const expected = [
       [STORY, STORY, "M", 2, 1, revision === "older" ? "A\n" : "B\n", SAVED],
       ["added.txt", "added.txt", "A", 1, 0, "", "disk\n"],
+      ["entry", "entry", "A", 1, 0, "", "replacement file\n"],
       ["deleted.txt", "deleted.txt", "D", 0, 1, "removed\n", ""],
       [OLD_NAME, NEW_NAME, "R", 1, 1, BEFORE_RENAME, AFTER_RENAME],
       ["link", "link", "M", 1, 1, OLD_NAME, NEW_NAME]

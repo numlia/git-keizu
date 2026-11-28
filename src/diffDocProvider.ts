@@ -3,6 +3,8 @@ import * as vscode from "vscode";
 import { DataSource } from "./dataSource";
 import { getPathFromStr } from "./utils";
 
+const EMPTY_SIDE_FIELD = "empty";
+
 export class DiffDocProvider implements vscode.TextDocumentContentProvider {
   public static scheme = "git-keizu";
   private dataSource: DataSource;
@@ -28,6 +30,7 @@ export class DiffDocProvider implements vscode.TextDocumentContentProvider {
   }
 
   public async provideTextDocumentContent(uri: vscode.Uri): Promise<string> {
+    if (uri.query.split("&").includes(EMPTY_SIDE_FIELD)) return "";
     let existing = this.docs.get(uri.toString());
     if (existing) return existing.value;
 
@@ -70,6 +73,11 @@ export function encodeDiffDocUri(
     path: getPathFromStr(filePath),
     query: queryFields.join("&")
   });
+}
+
+export function encodeEmptyDiffDocUri(repo: string, filePath: string, commit: string): vscode.Uri {
+  const uri = encodeDiffDocUri(repo, filePath, commit);
+  return uri.with({ query: `${uri.query}&${EMPTY_SIDE_FIELD}` });
 }
 
 export function decodeDiffDocUri(uri: vscode.Uri) {

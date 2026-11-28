@@ -7,7 +7,7 @@ import * as vscode from "vscode";
 import { AvatarManager } from "./avatarManager";
 import { getConfig, MIN_COMMIT_LOAD_COUNT, normalizeCommitLoadCount } from "./config";
 import { COMMIT_ORDER_FLAGS, DataSource } from "./dataSource";
-import { encodeDiffDocUri } from "./diffDocProvider";
+import { encodeDiffDocUri, encodeEmptyDiffDocUri } from "./diffDocProvider";
 import { ExtensionState } from "./extensionState";
 import { getLocale, loadWebviewMessages, t as hostT } from "./i18n";
 import { isSafeRemoteName } from "./refValidation";
@@ -1182,7 +1182,10 @@ export class GitKeizuView {
       try {
         const abbrevTo = isWorkingTreeTarget ? hostT("Uncommitted") : abbrevCommit(toHash);
         const title = hostT("{0} ({1} ↔ {2})", fileName, abbrevCommit(fromHash), abbrevTo);
-        const leftUri = encodeDiffDocUri(repo, oldFilePath, fromHash);
+        const leftUri =
+          isWorkingTreeTarget && type === "A"
+            ? encodeEmptyDiffDocUri(repo, oldFilePath, fromHash)
+            : encodeDiffDocUri(repo, oldFilePath, fromHash);
         if (isWorkingTreeTarget) {
           savedUri = await this.savedDiffs.capture(
             repo,
