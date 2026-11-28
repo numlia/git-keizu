@@ -1,4 +1,5 @@
 import * as path from "node:path";
+import { setImmediate as yieldToHost } from "node:timers/promises";
 
 import * as vscode from "vscode";
 
@@ -10,6 +11,7 @@ const UTF16_LE_BOM = Buffer.from([0xff, 0xfe]);
 const UTF16_BE_BOM = Buffer.from([0xfe, 0xff]);
 const BINARY_PROBE_BYTES = 512;
 const GUESS_SAMPLE_BYTES = 64 * 1024;
+const DECODE_CHUNK_BYTES = 256 * 1024;
 const FIRST_STABLE_ENCODING_MINOR = 100;
 const GUESSABLE_NAMES = [
   "UTF-8",
@@ -64,9 +66,9 @@ function editorModule<T>(relativePath: string): T {
   return require(filename) as T;
 }
 
-function decodeLegacy(bytes: Buffer, files: vscode.WorkspaceConfiguration): string {
+async function decodeLegacy(bytes: Buffer, files: vscode.WorkspaceConfiguration): Promise<Buffer> {
   const codec = editorModule<{
-    decode(input: Buffer, encoding: string): string;
+    getDecoder(encoding: string): { write(input: Buffer): string; end(): string | undefined };
     encodingExists(encoding: string): boolean;
   }>("@vscode/iconv-lite-umd");
   let encoding = files.get<string>("encoding", UTF8);
@@ -99,7 +101,19 @@ function decodeLegacy(bytes: Buffer, files: vscode.WorkspaceConfiguration): stri
       encoding = guess === "big5" ? "cp950" : guess === "ibm866" ? "cp866" : guess;
     }
   }
-  return codec.decode(bytes, codec.encodingExists(encoding) ? encoding : UTF8);
+  const decoder = codec.getDecoder(codec.encodingExists(encoding) ? encoding : UTF8);
+  const chunks = [UTF8_BOM];
+  let highSurrogate = "";
+  for (let start = 0; start < bytes.length; start += DECODE_CHUNK_BYTES) {
+    if (start > 0) await yieldToHost();
+    const decoded = decoder.write(bytes.subarray(start, start + DECODE_CHUNK_BYTES));
+    const text = `${highSurrogate}${decoded}`;
+    // A UTF-16 decoder can return the two halves of a character in separate chunks.
+    highSurrogate = text.match(/[\uD800-\uDBFF]$/u)?.[0] ?? "";
+    chunks.push(Buffer.from(text.slice(0, text.length - highSurrogate.length), "utf8"));
+  }
+  chunks.push(Buffer.from(`${highSurrogate}${decoder.end() ?? ""}`, "utf8"));
+  return Buffer.concat(chunks);
 }
 
 function hasLanguageOverrides(files: vscode.WorkspaceConfiguration): boolean {
@@ -167,7 +181,7 @@ export async function savedDiffDisplayBytes(
         (hasLanguageOverrides(files)
           ? (await workspace.openTextDocument(emptyDiffDocAt(source))).languageId
           : undefined);
-      text = decodeLegacy(
+      return decodeLegacy(
         bytes,
         languageId ? workspace.getConfiguration("files", { uri: source, languageId }) : files
       );

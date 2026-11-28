@@ -63,8 +63,12 @@ beforeAll(async () => {
     fs.writeFile(
       path.join(codec, "index.js"),
       `
-      exports.encodingExists = encoding => ["shiftjis", "utf8"].includes(encoding);
-      exports.decode = (bytes, encoding) => new TextDecoder(encoding === "shiftjis" ? "shift_jis" : "utf-8").decode(bytes);`
+      exports.encodingExists = encoding => ["shiftjis", "utf8", "utf16le"].includes(encoding);
+      exports.getDecoder = encoding => {
+        if (encoding === "utf16le") return { write: bytes => bytes.toString("utf16le"), end: () => "" };
+        const decoder = new TextDecoder(encoding === "shiftjis" ? "shift_jis" : "utf-8");
+        return { write: bytes => decoder.decode(bytes, { stream: true }), end: () => decoder.decode() };
+      };`
     ),
     fs.writeFile(
       path.join(detector, "jschardet.min.js"),
@@ -100,6 +104,31 @@ it.each(["cp1125", "iso88598"])(
     expect(host.open).not.toHaveBeenCalled();
   }
 );
+
+// Case: TC-433
+it("lets the host process events while decoding a large file across character boundaries", async () => {
+  host.configuration.mockImplementation((_section, scope) =>
+    scope === source ? config({ encoding: "shiftjis" }) : config({})
+  );
+  const chunkBytes = 256 * 1024;
+  const padding = Buffer.alloc(chunkBytes - 1, 0x61);
+  const large = Buffer.concat([padding, bytes, Buffer.from([0x93])]);
+  const hostEvent = vi.fn();
+  setImmediate(hostEvent);
+  const display = await savedDiffDisplayBytes(large, source, snapshot);
+  expect(hostEvent).toHaveBeenCalledOnce();
+  expect(display).toEqual(Buffer.from(`\uFEFF${padding.toString()}日本語\n\uFFFD`));
+});
+
+// Case: TC-433
+it("preserves a supplementary character split between decoder outputs", async () => {
+  host.configuration.mockImplementation((_section, scope) =>
+    scope === source ? config({ encoding: "utf16le" }) : config({})
+  );
+  const text = `${"䅂".repeat(128 * 1024 - 1)}🙂`;
+  const display = await savedDiffDisplayBytes(Buffer.from(text, "utf16le"), source, snapshot);
+  expect(display).toEqual(Buffer.from(`\uFEFF${text}`));
+});
 
 // Case: TC-433
 it("resolves the closed source's path association without synchronizing the snapshot", async () => {
