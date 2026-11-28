@@ -13,6 +13,7 @@ const BINARY_PROBE_BYTES = 512;
 const GUESS_SAMPLE_BYTES = 64 * 1024;
 const DECODE_CHUNK_BYTES = 256 * 1024;
 const FIRST_STABLE_ENCODING_MINOR = 100;
+const FIRST_CANDIDATE_FALLBACK_MINOR = 140;
 const GUESSABLE_NAMES = [
   "UTF-8",
   "UTF-16LE",
@@ -44,9 +45,9 @@ type EncodingWorkspace = typeof vscode.workspace & {
   decode?(bytes: Uint8Array, options: DecodeOptions): Thenable<string>;
 };
 
-function hasStableEncodingApi(): boolean {
+function editorAtLeast(minorVersion: number): boolean {
   const [major, minor] = vscode.version.split(".").map(Number);
-  return major > 1 || (major === 1 && minor >= FIRST_STABLE_ENCODING_MINOR);
+  return major > 1 || (major === 1 && minor >= minorVersion);
 }
 
 // Use the editor's codecs when the whole-buffer API is unavailable or would block the host.
@@ -66,46 +67,75 @@ function editorModule<T>(relativePath: string): T {
   return require(filename) as T;
 }
 
-function sourceEncoding(bytes: Buffer, files: vscode.WorkspaceConfiguration): string {
-  let encoding = files.get<string>("encoding", UTF8);
-  if (files.get("autoGuessEncoding", false)) {
-    const detector = editorModule<{
-      detect(sample: string, options?: { detectEncodings: string[] }): { encoding: string | null };
-    }>("jschardet/dist/jschardet.min.js");
-    const candidates = files
-      .get<string[]>("candidateGuessEncodings", [])
-      .flatMap((id) => detectorNames.get(id) ?? []);
-    let guess: string | undefined;
-    try {
-      guess = detector
-        .detect(
-          bytes.subarray(0, GUESS_SAMPLE_BYTES).toString("latin1"),
-          candidates.length ? { detectEncodings: candidates } : undefined
-        )
-        .encoding?.toLowerCase();
-    } catch (error) {
-      // Some encodings offered in VS Code settings have no detector in its bundled jschardet.
-      if (
-        !(
-          error instanceof Error &&
-          candidates.some((name) => error.message.startsWith(`Encoding ${name} is not supported.`))
-        )
-      )
-        throw error;
-    }
-    if (guess && !["ascii", "utf-16", "utf-32"].includes(guess)) {
-      encoding = guess === "big5" ? "cp950" : guess === "ibm866" ? "cp866" : guess;
-    }
+type EditorCodec = {
+  decode(input: Buffer, encoding: string): string;
+  encode(text: string, encoding: string): Uint8Array;
+  getDecoder(encoding: string): { write(input: Buffer): string; end(): string | undefined };
+  encodingExists(encoding: string): boolean;
+};
+
+function codecName(detectorName: string): string {
+  const id = detectorName.toLowerCase().replace(/[-_]/g, "");
+  return id === "big5" ? "cp950" : id === "ibm866" ? "cp866" : id;
+}
+
+function uniqueCandidate(sample: Buffer, candidates: string[]): string | undefined {
+  try {
+    // The sample can end partway through a valid UTF-8 character.
+    new TextDecoder("utf-8", { fatal: true }).decode(sample, { stream: true });
+    return undefined;
+  } catch (error) {
+    if (!(error instanceof TypeError)) throw error;
   }
-  return encoding;
+  const codec = editorModule<EditorCodec>("@vscode/iconv-lite-umd");
+  let match: string | undefined;
+  for (const id of new Set(candidates.map(codecName))) {
+    if (id.startsWith("utf")) continue;
+    const encoded = codec.encode(codec.decode(sample, id), id);
+    if (!sample.equals(encoded)) continue;
+    if (match) return undefined;
+    match = id;
+  }
+  return match;
+}
+
+function sourceEncoding(bytes: Buffer, files: vscode.WorkspaceConfiguration): string {
+  const configured = files.get<string>("encoding", UTF8);
+  if (!files.get("autoGuessEncoding", false)) return configured;
+  const detector = editorModule<{
+    detect(sample: string, options?: { detectEncodings: string[] }): { encoding: string | null };
+  }>("jschardet/dist/jschardet.min.js");
+  const sample = bytes.subarray(0, GUESS_SAMPLE_BYTES);
+  const candidates = files
+    .get<string[]>("candidateGuessEncodings", [])
+    .flatMap((id) => detectorNames.get(id) ?? []);
+  let guess: string | undefined;
+  try {
+    guess = detector
+      .detect(
+        sample.toString("latin1"),
+        candidates.length ? { detectEncodings: candidates } : undefined
+      )
+      .encoding?.toLowerCase();
+  } catch (error) {
+    // Some encodings offered in VS Code settings have no detector in its bundled jschardet.
+    if (
+      error instanceof Error &&
+      candidates.some((name) => error.message.startsWith(`Encoding ${name} is not supported.`))
+    )
+      return configured;
+    throw error;
+  }
+  if (!guess && candidates.length && editorAtLeast(FIRST_CANDIDATE_FALLBACK_MINOR)) {
+    return uniqueCandidate(sample, candidates) ?? configured;
+  }
+  if (!guess || ["ascii", "utf-16", "utf-32"].includes(guess)) return configured;
+  return codecName(guess);
 }
 
 async function decodeInChunks(bytes: Buffer, encoding: string): Promise<Buffer> {
   if (encoding === UTF8 || encoding === "utf8bom") return Buffer.concat([UTF8_BOM, bytes]);
-  const codec = editorModule<{
-    getDecoder(encoding: string): { write(input: Buffer): string; end(): string | undefined };
-    encodingExists(encoding: string): boolean;
-  }>("@vscode/iconv-lite-umd");
+  const codec = editorModule<EditorCodec>("@vscode/iconv-lite-umd");
   const decoder = codec.getDecoder(codec.encodingExists(encoding) ? encoding : UTF8);
   const chunks = [UTF8_BOM];
   let highSurrogate = "";
@@ -156,7 +186,7 @@ export async function savedDiffDisplayBytes(
   const files = workspace.getConfiguration("files", document ?? source);
   const virtual = workspace.getConfiguration("files", snapshot);
   // Some older releases expose the proposed decode function but reject calls from extensions.
-  const decode = hasStableEncodingApi() ? workspace.decode : undefined;
+  const decode = editorAtLeast(FIRST_STABLE_ENCODING_MINOR) ? workspace.decode : undefined;
   const selected = decode
     ? (document as (vscode.TextDocument & { encoding?: string }) | undefined)?.encoding
     : undefined;

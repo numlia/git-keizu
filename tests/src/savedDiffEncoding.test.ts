@@ -67,10 +67,13 @@ beforeAll(async () => {
     fs.writeFile(
       path.join(codec, "index.js"),
       `
-      exports.encodingExists = encoding => ["shiftjis", "utf8", "utf16le"].includes(encoding);
+      const labels = { shiftjis: "shift_jis", utf8: "utf-8", euckr: "euc-kr", windows1252: "windows-1252" };
+      exports.encodingExists = encoding => encoding in labels || encoding === "utf16le";
+      exports.decode = (bytes, encoding) => new TextDecoder(labels[encoding]).decode(bytes);
+      exports.encode = (text, encoding) => Buffer.from(encoding === "euckr" ? text.replaceAll("한", "ÇÑ") : text, "latin1");
       exports.getDecoder = encoding => {
         if (encoding === "utf16le") return { write: bytes => bytes.toString("utf16le"), end: () => "" };
-        const decoder = new TextDecoder(encoding === "shiftjis" ? "shift_jis" : "utf-8");
+        const decoder = new TextDecoder(labels[encoding]);
         return { write: bytes => decoder.decode(bytes, { stream: true }), end: () => decoder.decode() };
       };`
     ),
@@ -80,6 +83,7 @@ beforeAll(async () => {
       exports.detect = (_bytes, options) => {
         const name = options.detectEncodings[0];
         if (["IBM1125", "ISO-8859-8"].includes(name)) throw new Error(\`Encoding \${name} is not supported. Supported encodings: UTF-8.\`);
+        if (name === "EUC-KR" || name === "windows-1252") return { encoding: null };
         return { encoding: "UTF-8" };
       };`
     )
@@ -149,6 +153,36 @@ it("uses a successful encoding guess for large saved content in a modern editor"
       : config({})
   );
   const text = `日本語\n${"a".repeat(256 * 1024)}`;
+  const display = await savedDiffDisplayBytes(Buffer.from(text), source, snapshot);
+  expect(display?.toString("utf8")).toBe(`\uFEFF${text}`);
+});
+
+// Case: TC-433
+it.each([
+  { version: "1.139.1", candidates: ["euckr"], expected: "��" },
+  { version: "1.140.0", candidates: ["euckr"], expected: "한" },
+  { version: "1.141.0", candidates: ["euckr", "windows1252"], expected: "��" }
+])(
+  "resolves an inconclusive guess on $version with $candidates",
+  async ({ version, candidates, expected }) => {
+    host.version = version;
+    host.configuration.mockReturnValue(
+      config({ autoGuessEncoding: true, candidateGuessEncodings: candidates })
+    );
+    const padding = Buffer.alloc(300_000, 0x61);
+    const large = Buffer.concat([Buffer.from([0xc7, 0xd1]), padding]);
+    const display = await savedDiffDisplayBytes(large, source, snapshot);
+    expect(display?.toString("utf8")).toBe(`\uFEFF${expected}${padding.toString()}`);
+  }
+);
+
+// Case: TC-433
+it("keeps UTF-8 when the detection sample ends inside a valid character", async () => {
+  host.version = "1.140.0";
+  host.configuration.mockReturnValue(
+    config({ autoGuessEncoding: true, candidateGuessEncodings: ["windows1252"] })
+  );
+  const text = `${"a".repeat(64 * 1024 - 1)}é${"a".repeat(256 * 1024)}`;
   const display = await savedDiffDisplayBytes(Buffer.from(text), source, snapshot);
   expect(display?.toString("utf8")).toBe(`\uFEFF${text}`);
 });
