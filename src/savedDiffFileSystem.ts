@@ -5,11 +5,17 @@ import * as path from "node:path";
 
 import * as vscode from "vscode";
 
+import { savedDiffDisplayBytes } from "./savedDiffEncoding";
 import type { GitFileChangeType } from "./types";
 
 const WINDOWS = process.platform === "win32";
 const READ_FLAGS = constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0);
 const STAT_OPTIONS = { bigint: true } as const;
+const DISPLAY_QUERY = "text";
+
+function snapshotKey(uri: vscode.Uri): string {
+  return (uri.query === DISPLAY_QUERY ? uri.with({ query: "" }) : uri).toString();
+}
 
 function isGitDirectory(name: string): boolean {
   // HFS+ ignores these characters when looking up filenames.
@@ -84,7 +90,7 @@ async function readEntry(filename: string, entry: BigIntStats): Promise<Buffer> 
   }
 }
 
-async function readSavedBytes(repo: string, filePath: string): Promise<Uint8Array> {
+async function readSavedBytes(repo: string, filePath: string) {
   const before = await locateParent(repo, filePath);
   const filename = path.join(before.parent, path.basename(filePath));
   const entry = await fs.lstat(filename, STAT_OPTIONS);
@@ -99,7 +105,7 @@ async function readSavedBytes(repo: string, filePath: string): Promise<Uint8Arra
   ) {
     throw new Error("The repository or parent directory changed while reading the file.");
   }
-  return bytes;
+  return { bytes, isLink: entry.isSymbolicLink() };
 }
 
 function denyWrite(uri: vscode.Uri): never {
@@ -122,7 +128,10 @@ function tabResources({ input }: vscode.Tab): readonly vscode.Uri[] {
 
 export class SavedDiffFileSystem implements vscode.FileSystemProvider, vscode.Disposable {
   public static readonly scheme = "git-keizu-saved";
-  private readonly documents = new Map<string, { bytes: Uint8Array; created: number }>();
+  private readonly documents = new Map<
+    string,
+    { bytes: Buffer; source?: vscode.Uri; display?: Buffer; created: number }
+  >();
   private readonly changes = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
   public readonly onDidChangeFile = this.changes.event;
   private openTabUris = new Set<string>();
@@ -134,7 +143,7 @@ export class SavedDiffFileSystem implements vscode.FileSystemProvider, vscode.Di
       if (
         doc.isClosed &&
         doc.uri.scheme === SavedDiffFileSystem.scheme &&
-        !this.openTabUris.has(doc.uri.toString())
+        !this.openTabUris.has(snapshotKey(doc.uri))
       ) {
         this.release(doc.uri);
       }
@@ -147,7 +156,7 @@ export class SavedDiffFileSystem implements vscode.FileSystemProvider, vscode.Di
     const open = new Set<string>();
     for (const group of vscode.window.tabGroups.all) {
       for (const uri of group.tabs.flatMap(tabResources)) {
-        if (uri.scheme === SavedDiffFileSystem.scheme) open.add(uri.toString());
+        if (uri.scheme === SavedDiffFileSystem.scheme) open.add(snapshotKey(uri));
       }
     }
     // Large files may never produce a text-document event. Only reap previously displayed
@@ -165,14 +174,29 @@ export class SavedDiffFileSystem implements vscode.FileSystemProvider, vscode.Di
   ): Promise<vscode.Uri> {
     this.requireActive();
     validatePath(repo, filePath);
-    const bytes = type === "D" ? new Uint8Array() : await readSavedBytes(repo, filePath);
+    const { bytes, isLink } =
+      type === "D"
+        ? { bytes: Buffer.alloc(0), isLink: false }
+        : await readSavedBytes(repo, filePath);
     this.requireActive();
     const uri = vscode.Uri.from({
       scheme: SavedDiffFileSystem.scheme,
       path: `/${randomUUID()}/${filePath}`
     });
-    this.documents.set(uri.toString(), { bytes, created: Date.now() });
+    const source = isLink ? undefined : vscode.Uri.file(path.join(repo, filePath));
+    this.documents.set(uri.toString(), { bytes, source, created: Date.now() });
     return uri;
+  }
+
+  public async editorUri(uri: vscode.Uri): Promise<vscode.Uri> {
+    const key = uri.toString();
+    const document = this.documents.get(key);
+    if (!document) throw vscode.FileSystemError.FileNotFound(uri);
+    const display = await savedDiffDisplayBytes(document.bytes, document.source, uri);
+    if (this.documents.get(key) !== document) throw vscode.FileSystemError.FileNotFound(uri);
+    if (!display) return uri;
+    this.documents.set(key, { ...document, display });
+    return uri.with({ query: DISPLAY_QUERY });
   }
 
   private requireActive(): void {
@@ -180,9 +204,10 @@ export class SavedDiffFileSystem implements vscode.FileSystemProvider, vscode.Di
   }
 
   private getDocument(uri: vscode.Uri) {
-    const document = this.documents.get(uri.toString());
-    if (!document) throw vscode.FileSystemError.FileNotFound(uri);
-    return document;
+    const document = this.documents.get(snapshotKey(uri));
+    const bytes = uri.query === DISPLAY_QUERY ? document?.display : document?.bytes;
+    if (!document || !bytes) throw vscode.FileSystemError.FileNotFound(uri);
+    return { bytes, created: document.created };
   }
 
   public readFile(uri: vscode.Uri): Uint8Array {
@@ -190,7 +215,7 @@ export class SavedDiffFileSystem implements vscode.FileSystemProvider, vscode.Di
   }
 
   public stat(uri: vscode.Uri): vscode.FileStat {
-    const { bytes, created } = this.getDocument(uri);
+    const { created, bytes } = this.getDocument(uri);
     return { type: vscode.FileType.File, ctime: created, mtime: created, size: bytes.byteLength };
   }
 
@@ -208,7 +233,7 @@ export class SavedDiffFileSystem implements vscode.FileSystemProvider, vscode.Di
 
   public release(uri: vscode.Uri): void {
     if (uri.scheme !== SavedDiffFileSystem.scheme) return;
-    const key = uri.toString();
+    const key = snapshotKey(uri);
     this.documents.delete(key);
     this.openTabUris.delete(key);
   }

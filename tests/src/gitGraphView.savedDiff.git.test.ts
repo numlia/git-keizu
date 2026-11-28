@@ -17,6 +17,8 @@ import type { GitFileChange, RequestMessage, ResponseMessage } from "../../src/t
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 
 const editor = vi.hoisted(() => ({
+  decode: vi.fn<(bytes: Uint8Array, options: { uri: Uri }) => Promise<string>>(),
+  encodingFor: vi.fn((_uri: Uri) => "utf8"),
   onMessage: vi.fn<(handler: (request: RequestMessage) => Promise<void>) => void>(),
   post: vi.fn<(message: ResponseMessage) => void>(),
   diff: vi.fn<
@@ -48,6 +50,7 @@ vi.mock("vscode", () => ({
   FileSystemError: {
     FileNotFound: () => Object.assign(new Error("File not found"), { code: "FileNotFound" })
   },
+  FileType: { File: 1 },
   ViewColumn: { One: 1 },
   env: { language: "en" },
   l10n: {
@@ -55,7 +58,13 @@ vi.mock("vscode", () => ({
   },
   commands: { executeCommand: editor.diff },
   workspace: {
-    getConfiguration: () => ({ get: (_key: string, fallback: unknown) => fallback }),
+    textDocuments: [],
+    decode: editor.decode,
+    getConfiguration: (_section: string, uri: Uri) => ({
+      get: (key: string, fallback: unknown) =>
+        key === "encoding" ? editor.encodingFor(uri) : fallback,
+      inspect: () => undefined
+    }),
     onDidCloseTextDocument: () => ({ dispose() {} }),
     onDidChangeConfiguration: vi.fn()
   },
@@ -246,6 +255,31 @@ describe("opening Git comparison rows through the graph", () => {
     }
     for (const name of ["binary.bin", "untracked.txt"]) {
       expect(rowNamed(rows, name)).toMatchObject({ additions: null, deletions: null });
+    }
+  });
+
+  // Case: TC-433
+  it("shows a staged Shift JIS addition with its source folder encoding", async () => {
+    const file = "japanese.txt";
+    const bytes = Buffer.from("93fa967b8cea0a", "hex");
+    const source = path.join(repo, file);
+    await write(file, bytes);
+    git("add", file);
+    const row = rowNamed(await compare(WORKTREE, tip), file);
+    expect(row).toMatchObject({ type: "A", additions: 1, deletions: 0 });
+    editor.encodingFor.mockImplementation((uri) => (uri.fsPath === source ? "shiftjis" : "utf8"));
+    editor.decode.mockImplementation(async (input, { uri }) =>
+      new TextDecoder(uri.fsPath === source ? "shift_jis" : "utf-8").decode(input)
+    );
+    const { left, right } = await open(row, WORKTREE, tip);
+    expect(await commits.provideTextDocumentContent(left)).toBe("");
+    expect(new TextDecoder().decode(saved.readFile(right))).toBe("日本語\n");
+    const raw = right.with({ query: "" });
+    expect(Buffer.from(saved.readFile(raw))).toEqual(bytes);
+    expect(saved.stat(right).size).toBe(saved.readFile(right).byteLength);
+    saved.release(right);
+    for (const uri of [raw, right]) {
+      expect(() => saved.readFile(uri)).toThrow(expect.objectContaining({ code: "FileNotFound" }));
     }
   });
 

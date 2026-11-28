@@ -1193,7 +1193,9 @@ export class GitKeizuView {
             type
           );
         }
-        const rightUri = savedUri ?? encodeDiffDocUri(repo, newFilePath, toHash);
+        const rightUri = savedUri
+          ? await this.savedDiffs.editorUri(savedUri)
+          : encodeDiffDocUri(repo, newFilePath, toHash);
 
         await vscode.commands.executeCommand("vscode.diff", leftUri, rightUri, title, {
           preview: true

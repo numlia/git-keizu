@@ -188,6 +188,7 @@ import { windowsDriveDirectories } from "../../src/worktreePath";
 const TEST_REPO = "/test/repo";
 const savedDiffs = {
   capture: mocks.captureSavedFile,
+  editorUri: (uri: vscode.Uri) => uri,
   release: mocks.releaseSavedFile
 } as unknown as SavedDiffFileSystem;
 

@@ -20,6 +20,7 @@ vi.mock("vscode", () => {
   const error = (code: string) => () => Object.assign(new Error(code), { code });
   return {
     Uri: {
+      file: (fsPath: string) => ({ fsPath, toString: () => fsPath }),
       from: vi.fn(({ scheme, path }: { scheme: string; path: string }) => ({
         scheme,
         path,
