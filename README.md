@@ -56,7 +56,8 @@ See branches, commits, tags, stash entries, and uncommitted changes together in 
 
 ![Graph with branches, tags, a stash, worktrees, and a +N label list](./resources/screenshots/graph-overview.png)
 
-- Filter the graph by branch or author, and search commit messages with regex and case-sensitive modes.
+- Filter the graph by branch or author. Find searches loaded commits as you type, with case-sensitive and regular expression options.
+- Choose **Search full history** in Find to look for older commits under the same filters. Use **Next** or **Previous** to load a match, then **Return to previous position** to go back to where you were reading.
 - Choose date, topological, or author-date ordering. Merge commits and non-ancestor commits can be visually muted.
 - Scroll through long histories with commit rows and graph lines drawn together as they come into view. Find and keyboard navigation can take you to any loaded commit.
 - Scroll to the bottom with automatic loading enabled, or choose **Load More Commits**, to add the next page and keep your place. The graph also restores your scroll position when you reopen it.

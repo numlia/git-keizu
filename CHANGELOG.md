@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-11-28
+
+### Added
+
+- **Full-history search**: Find searches loaded commits as you type. Choose **Search full history** to include older commits under the current branch, author, and remote settings. Find shows progress and pauses after 1,000 new matches if more history remains. Choose **Continue search** to keep going. Stashes are searchable once loaded.
+- **Jump to a match and return**: Use **Next** or **Previous** to load an older match in the graph. Find asks for confirmation the first time a jump would load more than 20,000 commits in a search. Choose **Return to previous position** to restore your scroll position and reopen the original details or comparison if its commits are still in the graph.
+
+### Changed
+
+- **Commit ordering**: Changing the default commit order in VS Code settings updates an open graph that uses the default. An active full-history search ends when its filters or ordering change, or when a refresh detects that its history has changed.
+- **Regular expression searches**: Find reports a zero-length match even when the matching commit is offscreen or has yet to load, so the result no longer depends on which rows are visible.
+
+### Fixed
+
+- **Commit comparisons**: If you request the same comparison again while it is loading, a late response from the earlier request can no longer replace the current file list or close the comparison.
+
 ## [1.9.0] - 2026-11-23
 
 ### Changed
@@ -735,7 +751,8 @@ This release is a codebase-wide correctness and robustness pass: 32 defects foun
 
 Initial release as Git Keizu — forked from [neo-git-graph](https://github.com/asispts/neo-git-graph) (originally [Git Graph](https://github.com/mhutchie/vscode-git-graph) by mhutchie, MIT).
 
-[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/numlia/git-keizu/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/numlia/git-keizu/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/numlia/git-keizu/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/numlia/git-keizu/compare/v1.7.1...v1.8.0
 [1.7.1]: https://github.com/numlia/git-keizu/compare/v1.7.0...v1.7.1
