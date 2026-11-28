@@ -3361,6 +3361,34 @@ describe("GitKeizuView opens commit and working-tree diffs (S47)", () => {
     expect(mocks.encodeDiffDocUri).toHaveBeenCalledWith(TEST_REPO, "src/old.ts", commitHash);
   });
 
+  // Case: TC-434
+  it("skips the editor on read failure and releases only the URI of a rejected open", async () => {
+    const request = {
+      command: "viewDiff",
+      repo: TEST_REPO,
+      commitHash: UNCOMMITTED_CHANGES_HASH,
+      compareWithHash: selectedHash,
+      type: "M",
+      oldFilePath: "story.txt",
+      newFilePath: "story.txt"
+    };
+    mocks.captureSavedFile.mockRejectedValueOnce(new Error("Cannot read file"));
+    await mocks.messageHandler.current!(request);
+    expect(mocks.postMessage).toHaveBeenLastCalledWith({ command: "viewDiff", success: false });
+    expect(mocks.executeCommand).not.toHaveBeenCalled();
+    expect(mocks.releaseSavedFile).not.toHaveBeenCalled();
+
+    const kept = { scheme: "git-keizu-saved", path: "/kept/story.txt" };
+    const rejected = { scheme: "git-keizu-saved", path: "/rejected/story.txt" };
+    mocks.captureSavedFile.mockResolvedValueOnce(kept).mockResolvedValueOnce(rejected);
+    await mocks.messageHandler.current!(request);
+    expect(mocks.postMessage).toHaveBeenLastCalledWith({ command: "viewDiff", success: true });
+    mocks.executeCommand.mockRejectedValueOnce(new Error("Cannot open diff"));
+    await mocks.messageHandler.current!(request);
+    expect(mocks.postMessage).toHaveBeenLastCalledWith({ command: "viewDiff", success: false });
+    expect(mocks.releaseSavedFile).toHaveBeenCalledExactlyOnceWith(rejected);
+  });
+
   it("resolves HEAD and appends a version query in uncommitted delete mode (TC-092)", async () => {
     // Case: TC-092
     // Given: non-compare uncommitted mode, type "D"; resolveRefToHash returns a fixed hash

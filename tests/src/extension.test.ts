@@ -84,7 +84,10 @@ const mocks = vi.hoisted(() => {
     }),
     { scheme: "git-keizu-saved" }
   );
-  const registerFileSystemProvider = vi.fn(() => savedDiffsRegistration);
+  const registerFileSystemProvider = vi.fn(
+    (_scheme: string, _provider: typeof savedDiffsInstance, _options: object) =>
+      savedDiffsRegistration
+  );
   const createOutputChannel = vi.fn(() => outputChannel);
   const registerCommand = vi.fn(
     (
@@ -766,9 +769,44 @@ describe("extension", () => {
         expect(mocks.diffDocProviderDispose).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.avatarManagerInstance.dispose).toHaveBeenCalledTimes(ONE_CALL);
       });
+
+      // @see docs/testing/perspectives/src/extension-test.md (S12)
+      // Case: TC-041
+      it("registers read-only saved files and disposes both the registration and provider", async () => {
+        const context = await activateExtension();
+        expect(mocks.registerFileSystemProvider).toHaveBeenCalledExactlyOnceWith(
+          "git-keizu-saved",
+          mocks.savedDiffsInstance,
+          { isReadonly: true, isCaseSensitive: true }
+        );
+        const subscriptions = getPushedSubscriptions(context) as vscode.Disposable[];
+        expect(subscriptions).toContain(mocks.savedDiffsInstance);
+        expect(subscriptions).toContain(mocks.savedDiffsRegistration);
+        for (const subscription of subscriptions) subscription.dispose();
+        expect(mocks.savedDiffsInstance.dispose).toHaveBeenCalledOnce();
+        expect(mocks.savedDiffsRegistration.dispose).toHaveBeenCalledOnce();
+      });
     });
 
     describe("git-keizu.view command", () => {
+      // @see docs/testing/perspectives/src/extension-test.md (S12)
+      // Case: TC-042
+      it("shares the registered provider and preserves each original SCM root across launches", async () => {
+        await activateExtension();
+        const rootUri = vscode.Uri.file(DEFAULT_REPO_PATH);
+        const otherRoot = vscode.Uri.file("/other");
+        invokeViewCommand();
+        invokeViewCommand({ rootUri });
+        invokeViewCommand({ rootUri: otherRoot });
+        const [, registered] = mocks.registerFileSystemProvider.mock.calls[0];
+        const launches = mocks.createOrShow.mock.calls;
+        expect(launches).toHaveLength(3);
+        for (const call of launches) expect(call[5]).toBe(registered);
+        expect(launches[0][6]).toBeUndefined();
+        expect(launches[1][6]).toBe(rootUri);
+        expect(launches[2][6]).toBe(otherRoot);
+      });
+
       it("TC-006: forwards a Uri argument as rootUri to GitKeizuView.createOrShow", async () => {
         // Case: TC-006
         // Given: activate registers the view command and the command is invoked with a Uri argument

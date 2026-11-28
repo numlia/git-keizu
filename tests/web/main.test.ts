@@ -363,6 +363,7 @@ import {
 import {
   type FileHistoryActionPredicate,
   generateGitFileListHtml,
+  generateGitFileTree,
   generateGitFileTreeHtml
 } from "../../web/fileTree";
 import { PathHighlightMode } from "../../web/pathHighlight";
@@ -1710,6 +1711,101 @@ describe("GitKeizuView frontend integration", () => {
         hard: true
       });
     }
+
+    // @see docs/testing/perspectives/web/main-test/03-compare-find-01.md (S95)
+    it.each([
+      // Case: TC-837
+      { id: "TC-837", first: COMMIT_HASH_1 },
+      // Case: TC-838
+      { id: "TC-838", first: UNCOMMITTED_CHANGES_HASH }
+    ])("opens the returned rename after selecting $first first ($id)", async ({ first }) => {
+      loadCommitsWithUncommitted();
+      if (first === COMMIT_HASH_1) clickCommit(first);
+      else clickUnsavedChanges();
+      expect(vscode.postMessage).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          command: "commitDetails",
+          commitHash: first
+        })
+      );
+      dispatchMessage({ command: "commitDetails", commitDetails: makeCommitDetails(first) });
+      if (first === COMMIT_HASH_1) clickUnsavedChanges({ ctrlKey: true });
+      else clickCommit(COMMIT_HASH_1, { metaKey: true });
+      const list = vi.mocked(vscode.postMessage).mock.lastCall![0];
+      expect(list).toEqual({
+        command: "compareCommits",
+        requestId: expect.any(String),
+        repo: TEST_REPO,
+        fromHash: UNCOMMITTED_CHANGES_HASH,
+        toHash: COMMIT_HASH_1
+      });
+      if (list.command !== "compareCommits") throw new Error("Expected a comparison request");
+
+      const files: GitFileChange[] = [
+        {
+          oldFilePath: "old/name.ts",
+          newFilePath: "new/name.ts",
+          type: "R",
+          additions: 1,
+          deletions: 1
+        },
+        { oldFilePath: "added", newFilePath: "added", type: "A", additions: 1, deletions: 0 },
+        { oldFilePath: "gone", newFilePath: "gone", type: "D", additions: 0, deletions: 1 },
+        {
+          oldFilePath: "untracked",
+          newFilePath: "untracked",
+          type: "A",
+          additions: null,
+          deletions: null
+        },
+        {
+          oldFilePath: "binary",
+          newFilePath: "binary",
+          type: "M",
+          additions: null,
+          deletions: null
+        }
+      ];
+      const actual =
+        await vi.importActual<typeof import("../../web/fileTree")>("../../web/fileTree");
+      vi.mocked(generateGitFileTree).mockImplementationOnce(actual.generateGitFileTree);
+      vi.mocked(generateGitFileTreeHtml).mockImplementationOnce(actual.generateGitFileTreeHtml);
+      dispatchMessage({
+        command: "compareCommits",
+        requestId: list.requestId,
+        fromHash: list.fromHash,
+        toHash: list.toHash,
+        fileChanges: files
+      });
+
+      for (const { oldFilePath, newFilePath, type, additions } of files) {
+        const row = document.querySelector<HTMLElement>(
+          `.gitFile[data-newfilepath="${encodeURIComponent(newFilePath)}"]`
+        )!;
+        const button = row.querySelector<HTMLButtonElement>(".gitFileDiff")!;
+        vi.mocked(vscode.postMessage).mockClear();
+        if (additions === null) {
+          expect(button.disabled).toBe(true);
+          button.click();
+          row.click();
+          expect(vscode.postMessage).not.toHaveBeenCalled();
+        } else {
+          expect(button.disabled).toBe(false);
+          if (type === "A" || type === "D") expect(row.querySelector(".gitFileAddDel")).toBeNull();
+          button.click();
+          expect(vscode.postMessage).toHaveBeenCalledExactlyOnceWith({
+            command: "viewDiff",
+            repo: TEST_REPO,
+            commitHash: list.fromHash,
+            compareWithHash: list.toHash,
+            oldFilePath,
+            newFilePath,
+            type
+          });
+        }
+      }
+      restoreNormalCommits();
+    });
 
     it("Ctrl+click unsaved changes row enters compare mode with UNCOMMITTED_CHANGES_HASH as fromHash (TC-042)", () => {
       // Given: commits with uncommitted changes loaded, commit 1 is expanded
