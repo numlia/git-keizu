@@ -76,6 +76,15 @@ const mocks = vi.hoisted(() => {
   const diffDocProviderInstance = { current: null as object | null };
   const diffDocProviderConstruct = vi.fn();
   const diffDocProviderDispose = vi.fn();
+  const savedDiffsInstance = createDisposable("saved-files");
+  const savedDiffsRegistration = createDisposable("saved-file-registration");
+  const SavedDiffFileSystemMock = Object.assign(
+    vi.fn(function () {
+      return savedDiffsInstance;
+    }),
+    { scheme: "git-keizu-saved" }
+  );
+  const registerFileSystemProvider = vi.fn(() => savedDiffsRegistration);
   const createOutputChannel = vi.fn(() => outputChannel);
   const registerCommand = vi.fn(
     (
@@ -166,6 +175,7 @@ const mocks = vi.hoisted(() => {
     ExtensionStateMock,
     MockUri,
     RepoManagerMock,
+    SavedDiffFileSystemMock,
     StatusBarItemMock,
     avatarManagerInstance,
     commandDisposables,
@@ -187,8 +197,11 @@ const mocks = vi.hoisted(() => {
     onDidChangeConfiguration,
     outputChannel,
     registerCommand,
+    registerFileSystemProvider,
     registerTextDocumentContentProvider,
     repoManagerInstance,
+    savedDiffsInstance,
+    savedDiffsRegistration,
     statusBarItemInstance,
     textDocumentDisposable
   };
@@ -204,6 +217,7 @@ vi.mock("vscode", () => ({
   },
   workspace: {
     onDidChangeConfiguration: mocks.onDidChangeConfiguration,
+    registerFileSystemProvider: mocks.registerFileSystemProvider,
     registerTextDocumentContentProvider: mocks.registerTextDocumentContentProvider
   }
 }));
@@ -228,6 +242,10 @@ vi.mock("../../src/gitGraphView", () => mocks.gitKeizuViewModule);
 
 vi.mock("../../src/repoManager", () => ({
   RepoManager: mocks.RepoManagerMock
+}));
+
+vi.mock("../../src/savedDiffFileSystem", () => ({
+  SavedDiffFileSystem: mocks.SavedDiffFileSystemMock
 }));
 
 vi.mock("../../src/statusBarItem", () => ({
@@ -259,7 +277,7 @@ const LOG_FAILED_MESSAGE = "log failed";
 const SHOW_FAILED_MESSAGE = "show failed";
 const CLEAR_FAILED_MESSAGE = "clear failed";
 const REFRESH_FAILED_MESSAGE = "refresh failed";
-const DEFAULT_SUBSCRIPTION_PUSH_RESULT = 8;
+const DEFAULT_SUBSCRIPTION_PUSH_RESULT = 10;
 const MICROTASK_FLUSH_ROUNDS = 5;
 const ZERO_CALLS = 0;
 const ONE_CALL = 1;
@@ -545,6 +563,8 @@ describe("extension", () => {
           DIFF_DOC_PROVIDER_SCHEME,
           getDiffDocProviderInstance()
         );
+        expect(mocks.SavedDiffFileSystemMock).toHaveBeenCalledTimes(ONE_CALL);
+        expect(mocks.registerFileSystemProvider).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.onDidChangeConfiguration).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.onDidChangeConfiguration).toHaveBeenCalledWith(expect.any(Function));
         expect(context.subscriptions.push).toHaveBeenCalledTimes(ONE_CALL);
@@ -554,6 +574,8 @@ describe("extension", () => {
           getCommandDisposable(CLEAR_AVATAR_CACHE_COMMAND),
           getDiffDocProviderInstance(),
           getTextDocumentDisposable(),
+          mocks.savedDiffsInstance,
+          mocks.savedDiffsRegistration,
           getConfigurationDisposable(),
           mocks.avatarManagerInstance,
           mocks.repoManagerInstance
@@ -614,6 +636,7 @@ describe("extension", () => {
         // Then: the same Error and message are propagated and the activation log is never written
         expect(mocks.registerCommand).toHaveBeenCalledTimes(TWO_COMMANDS);
         expect(mocks.registerTextDocumentContentProvider).toHaveBeenCalledTimes(ONE_CALL);
+        expect(mocks.registerFileSystemProvider).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.onDidChangeConfiguration).toHaveBeenCalledTimes(ONE_CALL);
         expect(pushMock).toHaveBeenCalledTimes(ONE_CALL);
         expect(mocks.outputChannel.appendLine).not.toHaveBeenCalled();
@@ -763,6 +786,7 @@ describe("extension", () => {
           mocks.extensionStateInstance,
           mocks.avatarManagerInstance,
           mocks.repoManagerInstance,
+          mocks.savedDiffsInstance,
           rootUri
         );
       });
@@ -784,6 +808,7 @@ describe("extension", () => {
           mocks.extensionStateInstance,
           mocks.avatarManagerInstance,
           mocks.repoManagerInstance,
+          mocks.savedDiffsInstance,
           rootUri
         );
       });
@@ -807,6 +832,7 @@ describe("extension", () => {
             mocks.extensionStateInstance,
             mocks.avatarManagerInstance,
             mocks.repoManagerInstance,
+            mocks.savedDiffsInstance,
             undefined
           );
         }
@@ -831,6 +857,7 @@ describe("extension", () => {
             mocks.extensionStateInstance,
             mocks.avatarManagerInstance,
             mocks.repoManagerInstance,
+            mocks.savedDiffsInstance,
             undefined
           );
         }

@@ -6,6 +6,7 @@ import { DiffDocProvider } from "./diffDocProvider";
 import { ExtensionState } from "./extensionState";
 import { GitKeizuView } from "./gitGraphView";
 import { RepoManager } from "./repoManager";
+import { SavedDiffFileSystem } from "./savedDiffFileSystem";
 import { StatusBarItem } from "./statusBarItem";
 
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -18,6 +19,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const statusBarItem = new StatusBarItem(context);
   const repoManager = new RepoManager(dataSource, extensionState, statusBarItem);
   const diffDocProvider = new DiffDocProvider(dataSource);
+  const savedDiffs = new SavedDiffFileSystem();
 
   context.subscriptions.push(
     outputChannel,
@@ -39,6 +41,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         extensionState,
         avatarManager,
         repoManager,
+        savedDiffs,
         rootUri
       );
     }),
@@ -49,6 +52,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     // does not release the provider's internal subscription and event emitter.
     diffDocProvider,
     vscode.workspace.registerTextDocumentContentProvider(DiffDocProvider.scheme, diffDocProvider),
+    savedDiffs,
+    vscode.workspace.registerFileSystemProvider(SavedDiffFileSystem.scheme, savedDiffs, {
+      isReadonly: true,
+      isCaseSensitive: true
+    }),
     vscode.workspace.onDidChangeConfiguration((e) => {
       if (e.affectsConfiguration("git-keizu.showStatusBarItem")) {
         statusBarItem.refresh();

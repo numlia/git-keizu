@@ -13,6 +13,7 @@ import { getLocale, loadWebviewMessages, t as hostT } from "./i18n";
 import { isSafeRemoteName } from "./refValidation";
 import { RepoFileWatcher } from "./repoFileWatcher";
 import { RepoManager } from "./repoManager";
+import type { SavedDiffFileSystem } from "./savedDiffFileSystem";
 import {
   type CheckoutBranchResult,
   type GitCommandStatus,
@@ -32,7 +33,13 @@ import {
   UNCOMMITTED_CHANGES_HASH,
   WorktreePathViewState
 } from "./types";
-import { abbrevCommit, copyToClipboard, getPathFromUri, openFile } from "./utils";
+import {
+  abbrevCommit,
+  copyToClipboard,
+  getPathFromUri,
+  isValidCommitHash,
+  openFile
+} from "./utils";
 import { windowsDriveDirectories } from "./worktreePath";
 
 const CONFIG_SECTION = "git-keizu";
@@ -94,6 +101,7 @@ export class GitKeizuView {
   private readonly extensionState: ExtensionState;
   private readonly repoFileWatcher: RepoFileWatcher;
   private readonly repoManager: RepoManager;
+  private readonly savedDiffs: SavedDiffFileSystem;
   private readonly retainContextWhenHidden: boolean;
   private disposables: vscode.Disposable[] = [];
   private isGraphViewLoaded: boolean = false;
@@ -120,6 +128,7 @@ export class GitKeizuView {
     extensionState: ExtensionState,
     avatarManager: AvatarManager,
     repoManager: RepoManager,
+    savedDiffs: SavedDiffFileSystem,
     rootUri?: vscode.Uri
   ): Promise<void> {
     const previousOpen = GitKeizuView.lastOpen;
@@ -130,6 +139,7 @@ export class GitKeizuView {
       extensionState,
       avatarManager,
       repoManager,
+      savedDiffs,
       rootUri
     );
     GitKeizuView.lastOpen = GitKeizuView.settled(previousOpen, currentOpen);
@@ -158,6 +168,7 @@ export class GitKeizuView {
     extensionState: ExtensionState,
     avatarManager: AvatarManager,
     repoManager: RepoManager,
+    savedDiffs: SavedDiffFileSystem,
     rootUri?: vscode.Uri
   ): Promise<void> {
     const column = vscode.window.activeTextEditor
@@ -211,6 +222,7 @@ export class GitKeizuView {
       extensionState,
       avatarManager,
       repoManager,
+      savedDiffs,
       retainContextWhenHidden
     );
   }
@@ -222,6 +234,7 @@ export class GitKeizuView {
     extensionState: ExtensionState,
     avatarManager: AvatarManager,
     repoManager: RepoManager,
+    savedDiffs: SavedDiffFileSystem,
     retainContextWhenHidden: boolean
   ) {
     this.panel = panel;
@@ -231,6 +244,7 @@ export class GitKeizuView {
     this.dataSource = dataSource;
     this.extensionState = extensionState;
     this.repoManager = repoManager;
+    this.savedDiffs = savedDiffs;
     this.avatarManager.registerView(this);
 
     panel.iconPath =
@@ -1155,29 +1169,35 @@ export class GitKeizuView {
     const fileName = pathComponents[pathComponents.length - 1];
 
     if (compareWithHash !== undefined) {
-      const actualFromHash =
+      const [fromHash, toHash] =
         commitHash === UNCOMMITTED_CHANGES_HASH
-          ? ((await this.dataSource.resolveRefToHash(repo, "HEAD")) ?? "HEAD")
-          : commitHash;
-      const isWorkingTreeTarget = compareWithHash === UNCOMMITTED_CHANGES_HASH;
-      const abbrevFrom =
-        commitHash === UNCOMMITTED_CHANGES_HASH ? hostT("Uncommitted") : abbrevCommit(commitHash);
-      const abbrevTo = isWorkingTreeTarget ? hostT("Uncommitted") : abbrevCommit(compareWithHash);
-      const title = hostT("{0} ({1} ↔ {2})", fileName, abbrevFrom, abbrevTo);
+          ? [compareWithHash, commitHash]
+          : [commitHash, compareWithHash];
+      const isWorkingTreeTarget = toHash === UNCOMMITTED_CHANGES_HASH;
+      if (isWorkingTreeTarget && (typeof fromHash !== "string" || !isValidCommitHash(fromHash))) {
+        return false;
+      }
 
+      let savedUri: vscode.Uri | undefined;
       try {
-        const leftUri = encodeDiffDocUri(repo, oldFilePath, actualFromHash);
-        const rightUri = isWorkingTreeTarget
-          ? type === "D"
-            ? encodeDiffDocUri(repo, oldFilePath, UNCOMMITTED_CHANGES_HASH, Date.now().toString())
-            : vscode.Uri.file(path.join(repo, newFilePath))
-          : encodeDiffDocUri(repo, newFilePath, compareWithHash);
+        const abbrevTo = isWorkingTreeTarget ? hostT("Uncommitted") : abbrevCommit(toHash);
+        const title = hostT("{0} ({1} ↔ {2})", fileName, abbrevCommit(fromHash), abbrevTo);
+        const leftUri = encodeDiffDocUri(repo, oldFilePath, fromHash);
+        if (isWorkingTreeTarget) {
+          savedUri = await this.savedDiffs.capture(
+            repo,
+            type === "D" ? oldFilePath : newFilePath,
+            type
+          );
+        }
+        const rightUri = savedUri ?? encodeDiffDocUri(repo, newFilePath, toHash);
 
         await vscode.commands.executeCommand("vscode.diff", leftUri, rightUri, title, {
           preview: true
         });
         return true;
       } catch {
+        if (savedUri !== undefined) this.savedDiffs.release(savedUri);
         return false;
       }
     }

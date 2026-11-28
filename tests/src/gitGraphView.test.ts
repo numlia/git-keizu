@@ -21,6 +21,8 @@ const mocks = vi.hoisted(() => ({
   getNextHistoryPage: vi.fn(),
   executeCommand: vi.fn(),
   encodeDiffDocUri: vi.fn(),
+  captureSavedFile: vi.fn(),
+  releaseSavedFile: vi.fn(),
   mute: vi.fn(),
   unmute: vi.fn(),
   getRepos: vi.fn(),
@@ -160,7 +162,8 @@ vi.mock("../../src/diffDocProvider", () => ({
   encodeDiffDocUri: mocks.encodeDiffDocUri
 }));
 
-vi.mock("../../src/utils", () => ({
+vi.mock("../../src/utils", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/utils")>()),
   abbrevCommit: vi.fn((h: string) => h.substring(0, 8)),
   copyToClipboard: vi.fn(),
   getPathFromUri: vi.fn((uri: { fsPath: string }) => uri.fsPath)
@@ -178,10 +181,15 @@ import type { DataSource } from "../../src/dataSource";
 import type { ExtensionState } from "../../src/extensionState";
 import { GitKeizuView } from "../../src/gitGraphView";
 import type { RepoManager } from "../../src/repoManager";
+import type { SavedDiffFileSystem } from "../../src/savedDiffFileSystem";
 import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 import { windowsDriveDirectories } from "../../src/worktreePath";
 
 const TEST_REPO = "/test/repo";
+const savedDiffs = {
+  capture: mocks.captureSavedFile,
+  release: mocks.releaseSavedFile
+} as unknown as SavedDiffFileSystem;
 
 /** Pick out the responses of a single command from every message posted to the webview. */
 function sentMessages(command: string): { command: string }[] {
@@ -248,7 +256,8 @@ describe("GitKeizuView stash message routing", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -447,7 +456,8 @@ describe("GitKeizuView compareCommits message routing", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -586,7 +596,8 @@ describe("GitKeizuView viewDiff with compareWithHash", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -710,7 +721,8 @@ describe("GitKeizuView pull message routing", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -785,7 +797,8 @@ describe("GitKeizuView two-phase push orchestration", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -1120,7 +1133,8 @@ describe("GitKeizuView checkoutBranch response mapping", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -1310,6 +1324,7 @@ describe("GitKeizuView createOrShow registration await (S36)", () => {
       deps.mockExtensionState,
       deps.mockAvatarManager,
       deps.mockRepoManager,
+      savedDiffs,
       rootUri
     );
   }
@@ -1869,7 +1884,8 @@ describe("GitKeizuView viewState keybindings and loadMoreCommitsAutomatically (S
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   }
 
@@ -1977,7 +1993,8 @@ describe("GitKeizuView getHtmlForWebview avatar storage init await (S25)", () =>
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
     return { isAvatarStorageAvailable, waitForAvatarStorage };
   }
@@ -2088,7 +2105,8 @@ describe("GitKeizuView deleteRemoteBranch/rebaseBranch message routing (S8)", ()
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -2218,7 +2236,8 @@ describe("GitKeizuView deleteBranch extension (S9)", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -2399,7 +2418,8 @@ describe("GitKeizuView loadCommits authorFilter (S10)", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -2593,7 +2613,8 @@ describe("GitKeizuView createBranch + checkout orchestration", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -2779,7 +2800,7 @@ describe("GitKeizuView loadCommits branches/authors array passthrough (S12)", ()
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitKeizuView.createOrShow("/test/extension", ds, es, am, rm);
+    GitKeizuView.createOrShow("/test/extension", ds, es, am, rm, savedDiffs);
   });
 
   afterEach(() => {
@@ -2884,7 +2905,7 @@ describe("GitKeizuView merge/cherry-pick handler and viewState dialogDefaults (S
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitKeizuView.createOrShow("/test/extension", ds, es, am, rm);
+    GitKeizuView.createOrShow("/test/extension", ds, es, am, rm, savedDiffs);
   }
 
   function getPanelHtml(): string {
@@ -3087,7 +3108,7 @@ describe("GitKeizuView viewState commitOrdering / loadCommits handler (S14)", ()
       checkReposExist: vi.fn()
     } as unknown as RepoManager;
 
-    GitKeizuView.createOrShow("/test/extension", ds, es, am, rm);
+    GitKeizuView.createOrShow("/test/extension", ds, es, am, rm, savedDiffs);
   }
 
   function getPanelHtml(): string {
@@ -3229,11 +3250,10 @@ describe("GitKeizuView viewState commitOrdering / loadCommits handler (S14)", ()
   });
 });
 
-/* ------------------------------------------------------------------ */
-/* S24: viewDiff() HEAD resolveRefToHash 解決と未コミット版数クエリ     */
-/* ------------------------------------------------------------------ */
+// @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-02.md
+describe("GitKeizuView opens commit and working-tree diffs (S47)", () => {
+  const selectedHash = "def4567890abcdef1234567890abcdef12345678";
 
-describe("GitKeizuView viewDiff HEAD resolution and version query (S24)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.messageHandler.current = null;
@@ -3273,7 +3293,8 @@ describe("GitKeizuView viewDiff HEAD resolution and version query (S24)", () => 
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -3282,26 +3303,42 @@ describe("GitKeizuView viewDiff HEAD resolution and version query (S24)", () => 
     GitKeizuView.currentPanel = undefined;
   });
 
-  it("resolves HEAD to a fixed hash for the left URI in compare mode (TC-089)", async () => {
-    // Case: TC-089
-    // Given: compare mode with uncommitted fromHash; resolveRefToHash returns a fixed hash
-    mocks.resolveRefToHash.mockResolvedValue("deadbeef");
+  it.each([
+    // Case: TC-431
+    { id: "TC-431", commitHash: UNCOMMITTED_CHANGES_HASH, compareWithHash: selectedHash },
+    // Case: TC-432
+    { id: "TC-432", commitHash: selectedHash, compareWithHash: UNCOMMITTED_CHANGES_HASH }
+  ])(
+    "opens the selected commit against the saved file ($id)",
+    async ({ commitHash, compareWithHash }) => {
+      const left = { scheme: "git-keizu" };
+      const right = { scheme: "git-keizu-saved" };
+      mocks.encodeDiffDocUri.mockReturnValueOnce(left);
+      mocks.captureSavedFile.mockResolvedValueOnce(right);
 
-    // When: viewDiff compares uncommitted changes against another commit
-    await mocks.messageHandler.current!({
-      command: "viewDiff",
-      repo: TEST_REPO,
-      commitHash: UNCOMMITTED_CHANGES_HASH,
-      oldFilePath: "src/old.ts",
-      newFilePath: "src/new.ts",
-      type: "M",
-      compareWithHash: "def4567890abcdef1234567890abcdef12345678"
-    });
+      await mocks.messageHandler.current!({
+        command: "viewDiff",
+        repo: TEST_REPO,
+        commitHash,
+        oldFilePath: "src/old.ts",
+        newFilePath: "src/new.ts",
+        type: "R",
+        compareWithHash
+      });
 
-    // Then: HEAD is resolved and the resolved hash is used for the left URI
-    expect(mocks.resolveRefToHash).toHaveBeenCalledWith(TEST_REPO, "HEAD");
-    expect(mocks.encodeDiffDocUri).toHaveBeenCalledWith(TEST_REPO, "src/old.ts", "deadbeef");
-  });
+      expect(mocks.resolveRefToHash).not.toHaveBeenCalled();
+      expect(mocks.encodeDiffDocUri).toHaveBeenCalledWith(TEST_REPO, "src/old.ts", selectedHash);
+      expect(mocks.captureSavedFile).toHaveBeenCalledWith(TEST_REPO, "src/new.ts", "R");
+      expect(mocks.executeCommand).toHaveBeenCalledWith(
+        "vscode.diff",
+        left,
+        right,
+        "new.ts (def45678 ↔ Uncommitted)",
+        { preview: true }
+      );
+      expect(mocks.postMessage).toHaveBeenCalledWith({ command: "viewDiff", success: true });
+    }
+  );
 
   it("uses the commit hash directly for a normal commit in compare mode (TC-090)", async () => {
     // Case: TC-090
@@ -3322,26 +3359,6 @@ describe("GitKeizuView viewDiff HEAD resolution and version query (S24)", () => 
     // Then: resolveRefToHash is not consulted and the commit hash is used directly
     expect(mocks.resolveRefToHash).not.toHaveBeenCalled();
     expect(mocks.encodeDiffDocUri).toHaveBeenCalledWith(TEST_REPO, "src/old.ts", commitHash);
-  });
-
-  it("falls back to 'HEAD' when resolveRefToHash returns null in compare mode (TC-091)", async () => {
-    // Case: TC-091
-    // Given: compare mode with uncommitted fromHash; resolveRefToHash returns null
-    mocks.resolveRefToHash.mockResolvedValue(null);
-
-    // When: viewDiff compares uncommitted changes against another commit
-    await mocks.messageHandler.current!({
-      command: "viewDiff",
-      repo: TEST_REPO,
-      commitHash: UNCOMMITTED_CHANGES_HASH,
-      oldFilePath: "src/old.ts",
-      newFilePath: "src/new.ts",
-      type: "M",
-      compareWithHash: "def4567890abcdef1234567890abcdef12345678"
-    });
-
-    // Then: the left URI falls back to the literal "HEAD"
-    expect(mocks.encodeDiffDocUri).toHaveBeenCalledWith(TEST_REPO, "src/old.ts", "HEAD");
   });
 
   it("resolves HEAD and appends a version query in uncommitted delete mode (TC-092)", async () => {
@@ -3485,7 +3502,8 @@ describe("GitKeizuView unregistered repo guard (S17)", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -3601,7 +3619,8 @@ describe("GitKeizuView worktree message handlers", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -3766,7 +3785,8 @@ describe("GitKeizuView removeWorktree branch deletion (S16)", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -3941,7 +3961,8 @@ describe("GitKeizuView CSS_COLOR_VAR_PREFIX constant verification (S17)", () => 
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   }
 
@@ -4051,7 +4072,8 @@ describe("GitKeizuView loadBranches watcher orchestration", () => {
       deps.dataSource,
       deps.extensionState,
       deps.avatarManager,
-      deps.repoManager
+      deps.repoManager,
+      savedDiffs
     );
 
     // When: loadBranches is received for a new repo
@@ -4091,7 +4113,8 @@ describe("GitKeizuView loadBranches watcher orchestration", () => {
       deps.dataSource,
       deps.extensionState,
       deps.avatarManager,
-      deps.repoManager
+      deps.repoManager,
+      savedDiffs
     );
     await mocks.messageHandler.current!({
       command: "loadBranches",
@@ -4142,7 +4165,8 @@ describe("GitKeizuView loadBranches watcher orchestration", () => {
       deps.dataSource,
       deps.extensionState,
       deps.avatarManager,
-      deps.repoManager
+      deps.repoManager,
+      savedDiffs
     );
 
     // When: loadBranches is received for repoB
@@ -4179,7 +4203,8 @@ describe("GitKeizuView loadBranches watcher orchestration", () => {
       deps.dataSource,
       deps.extensionState,
       deps.avatarManager,
-      deps.repoManager
+      deps.repoManager,
+      savedDiffs
     );
     const panelMock = vi.mocked(vscode.window.createWebviewPanel).mock.results[0].value as {
       visible: boolean;
@@ -4233,7 +4258,8 @@ describe("GitKeizuView notifyShowRecentActionsChanged runtime sync", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   }
 
@@ -4361,7 +4387,8 @@ describe("GitKeizuView message handler try/finally unmute (S21)", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -4473,7 +4500,8 @@ describe("GitKeizuView worktree command status responses (S26)", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -4652,7 +4680,8 @@ describe("GitKeizuView script-embedded JSON serializer (S27)", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   }
 
@@ -4825,7 +4854,8 @@ describe("GitKeizuView branch cleanup routing and mount (S33)", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -5165,7 +5195,8 @@ describe("GitKeizuView fileHistory routing (S34)", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -5373,7 +5404,8 @@ describe("GitKeizuView retainContextWhenHidden (S35)", () => {
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
     const panelMock = vi.mocked(vscode.window.createWebviewPanel).mock.results[0]
       .value as PanelMock;
@@ -5889,7 +5921,8 @@ describe("GitKeizuView removeWorktree detached removal and input validation (S41
       mockDataSource,
       mockExtensionState,
       mockAvatarManager,
-      mockRepoManager
+      mockRepoManager,
+      savedDiffs
     );
   });
 
@@ -6089,7 +6122,8 @@ describe("GitKeizuView host HTML toolbar buttons, list name and status notice (S
         deregisterViewCallback: vi.fn(),
         setRepoState: vi.fn(),
         checkReposExist: vi.fn()
-      } as unknown as RepoManager
+      } as unknown as RepoManager,
+      savedDiffs
     );
     // The HTML is assigned after the avatar storage await settles.
     await new Promise((resolve) => setTimeout(resolve, 0));
