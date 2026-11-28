@@ -2,19 +2,19 @@
 
 > Source: `src/gitGraphView.ts`
 > Storage Mode: sharded
-> Generated: 2026-11-23T00:00:00Z
+> Generated: 2026-11-28T01:45:36Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 11
 > Total Sections: 40
-> Total Cases: 193
+> Total Cases: 196
 
 ## Shards
 
 | Shard File                           | Responsibility              | Sections | Cases | Last Updated |
 | ------------------------------------ | --------------------------- | -------- | ----- | ------------ |
 | 01-message-routing-01.md             | message-routing             | 9        | 27    | 2026-05-17   |
-| 01-message-routing-02.md             | message-routing             | 1        | 7     | 2026-07-04   |
+| 01-message-routing-02.md             | message-routing             | 1        | 10    | 2026-11-28   |
 | 01-message-routing-03.md             | message-routing             | 5        | 36    | 2026-11-23   |
 | 02-state-lifecycle-01.md             | state-lifecycle             | 12       | 47    | 2026-09-12   |
 | 02-state-lifecycle-02.md             | state-lifecycle             | 1        | 1     | 2026-09-12   |
@@ -56,8 +56,8 @@
 | Feature 061-02 (full history search)                                           | 01-message-routing-03.md                            |
 | Feature 061-02 (large history browsing)                                        | 01-message-routing-03.md                            |
 | Feature 061-05 (light-spec-plan)                                               | 08-keyboard-accessibility-01.md                     |
+| Feature 061-07 (saved working-tree comparisons)                                | 01-message-routing-02.md                            |
 | Feature 062-01 (PR #114 follow-up)                                             | 03-worktree-actions-01.md                           |
 | test-plan (既存コード網羅)                                                     | 01-message-routing-01.md                            |
 | フェーズ2 修正 M5 (message-handler-try-finally-unmute)                         | 02-state-lifecycle-01.md                            |
-| フェーズ2 修正 M9/M10 (view-diff-resolve-head)                                 | 01-message-routing-02.md                            |
 | フェーズ3 修正 L8 (avatar-storage-init-await)                                  | 02-state-lifecycle-01.md                            |

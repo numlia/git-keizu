@@ -2,12 +2,12 @@
 
 > Source: `web/main.ts`
 > Storage Mode: sharded
-> Generated: 2026-11-23T00:00:00Z
+> Generated: 2026-11-28T01:45:36Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 20
-> Total Sections: 70
-> Total Cases: 503
+> Total Sections: 71
+> Total Cases: 505
 
 ## Shards
 
@@ -18,7 +18,7 @@
 | 01-rendering-03.md              | rendering              | 3        | 40    | 2026-10-17   |
 | 02-context-menu-01.md           | context-menu           | 5        | 40    | 2026-07-04   |
 | 02-context-menu-02.md           | context-menu           | 0        | 0     | 2026-09-25   |
-| 03-compare-find-01.md           | compare-find           | 3        | 25    | 2026-03-01   |
+| 03-compare-find-01.md           | compare-find           | 4        | 27    | 2026-11-28   |
 | 04-keyboard-selection-01.md     | keyboard-selection     | 1        | 8     | 2026-02-27   |
 | 04-keyboard-selection-02.md     | keyboard-selection     | 0        | 0     | 2026-09-28   |
 | 05-state-response-01.md         | state-response         | 10       | 38    | 2026-05-10   |
@@ -70,6 +70,7 @@
 | Feature 061-05 (light-spec-plan) review fix                          | 13-keyboard-accessibility-02.md                                  |
 | Feature 061-05 (light-spec-plan) user follow-up                      | 13-keyboard-accessibility-02.md                                  |
 | Feature 061-06 (light-spec-plan)                                     | 01-rendering-03.md                                               |
+| Feature 061-07 (saved working-tree comparisons)                      | 03-compare-find-01.md                                            |
 | Feature 062-01 (PR #114 follow-up)                                   | 05-state-response-02.md, 09-branch-cleanup-01.md                 |
 | フェーズ2 修正 M12 (author-dropdown-merge-options)                   | 05-state-response-02.md                                          |
 | フェーズ2 修正 M12 (author-dropdown-unconditional-rebuild)           | 05-state-response-02.md                                          |

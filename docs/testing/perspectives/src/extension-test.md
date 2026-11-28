@@ -9,8 +9,9 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S12
 
 **Signature**: `activate(context: vscode.ExtensionContext)`
 **Target path**: `src/extension.ts:11-64`
@@ -27,8 +28,9 @@
 
 > Origin: test-plan (既存コード分析)
 > Added: 2026-03-22
-> Status: active
+> Status: superseded
 > Supersedes: -
+> Superseded By: S12
 
 **Signature**: `(arg?: unknown) => Promise<void>`
 **Target path**: `src/extension.ts:21-41`
@@ -252,3 +254,30 @@ Extends the routing of S4. A change to `git-keizu.worktreePathTemplate` reaches 
 ### Test mapping — S11
 
 `tests/src/extension.test.ts`: TC-040 `TC-040: notifies the open panel when worktreePathTemplate changes`, next to S4's TC-021 to TC-023.
+
+## S12: Register the saved-file provider and pass it to the graph
+
+> Origin: Feature 061-07 (saved working-tree comparisons)
+> Added: 2026-11-28
+> Status: active
+> Supersedes: S1, S2
+> Signature: `activate(context: vscode.ExtensionContext): Promise<void>`
+> Target Path: `src/extension.ts` (activation and the git-keizu.view command)
+> Test File: `tests/src/extension.test.ts`
+
+TC-001 through TC-010 retain their IDs. Their test names combine the case ID, a colon and the title in Notes. S9 TC-034–037 still cover disposal of the Git document provider and avatar manager, and S10 TC-038–039 cover the identity and rejection of the promise returned by the view command.
+
+| Case ID | Input / Precondition                                                | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                                                                                                                         | Notes                                                                             |
+| ------- | ------------------------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| TC-001  | Activate with all dependencies available.                           | Normal - all registrations                                                 | Each dependency is constructed once. Both commands and providers and the configuration listener are registered once. Subscriptions include the output channel, both commands, both providers and their registrations, the configuration listener, avatar manager and repository manager. The success message is logged. | `initializes dependencies, registers disposables, and logs activation success`    |
+| TC-002  | Output channel creation throws.                                     | External - output unavailable                                              | Activation rejects with the original error before constructing dependencies.                                                                                                                                                                                                                                            | `rejects with output channel creation failures before dependency setup starts`    |
+| TC-003  | Repository manager construction throws.                             | External - repository initialization                                       | Activation rejects with the original error after creating the avatar manager and status bar, before registering disposables or logging success.                                                                                                                                                                         | `rejects with RepoManager constructor failures before disposables are registered` |
+| TC-004  | Adding the prepared disposables to subscriptions throws.            | External - subscription failure                                            | Activation rejects with the original error and skips the success log.                                                                                                                                                                                                                                                   | `rejects with subscription push failures after all disposables are prepared`      |
+| TC-005  | Writing the success log throws.                                     | External - output failure                                                  | Activation rejects with the original error after successful registration.                                                                                                                                                                                                                                               | `rejects with activation log failures after successful registration`              |
+| TC-006  | Run the view command with a URI.                                    | Normal - direct URI                                                        | The seventh argument to the graph is the original URI.                                                                                                                                                                                                                                                                  | `forwards a Uri argument as rootUri to GitKeizuView.createOrShow`                 |
+| TC-007  | Run the SCM command with `{ rootUri: uri }`.                        | Normal - SCM URI                                                           | The seventh argument is the URI from the source control object.                                                                                                                                                                                                                                                         | `forwards an object rootUri property when it contains a Uri instance`             |
+| TC-008  | Supply an object whose rootUri is a string, null or a plain object. | Type - invalid root URI                                                    | The seventh argument is `undefined` in every call.                                                                                                                                                                                                                                                                      | `falls back to undefined when rootUri exists but is not a Uri instance`           |
+| TC-009  | Omit the argument or pass null, a string, zero or false.            | Boundary - absent URI                                                      | The seventh argument is `undefined` in every call.                                                                                                                                                                                                                                                                      | `falls back to undefined for nullish and primitive command arguments`             |
+| TC-010  | Opening the graph throws synchronously.                             | External - graph launch failure                                            | The view command propagates the original error.                                                                                                                                                                                                                                                                         | `rethrows createOrShow failures from the view command handler`                    |
+| TC-041  | Activate once and dispose every extension subscription.             | Normal - read-only filesystem registration and disposal                    | The `git-keizu-saved` scheme is registered once with `{ isReadonly: true, isCaseSensitive: true }`. The provider and its registration are separate subscriptions and each is disposed once.                                                                                                                             | The Git document provider keeps its own registration.                             |
+| TC-042  | Invoke the view command more than once through the palette and SCM. | Normal - shared provider and original root                                 | Each graph launch receives the registered provider instance as its sixth argument. The final argument is `undefined` for the palette and the identical root URI for SCM.                                                                                                                                                | Includes repeated launches after one activation.                                  |

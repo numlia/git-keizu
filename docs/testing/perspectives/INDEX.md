@@ -1,10 +1,10 @@
 # Test Perspectives Index
 
-> Auto-generated: 2026-11-23T14:40:48+09:00
-> Total sources: 60
-> Total physical files: 108
-> Total sections: 652
-> Total cases: 3905
+> Auto-generated: 2026-11-28T10:47:47+09:00
+> Total sources: 61
+> Total physical files: 109
+> Total sections: 653
+> Total cases: 3919
 
 ## Source File -> Perspectives (Forward Lookup)
 
@@ -27,16 +27,17 @@
 | `src/dataSource.ts` | single-file | `archive/src/dataSource-test/2026-05-02-pre-sharding-dataSource-test.md` | 1 | 25 | 149 | 2026-04-04 |
 | `src/dataSource.ts` | sharded | `src/dataSource-test/INDEX.md` | 10 | 50 | 353 | 2026-11-23 |
 | `src/diffDocProvider.ts` | single-file | `src/diffDocProvider-test.md` | 1 | 7 | 33 | 2026-07-04 |
-| `src/extension.ts` | single-file | `src/extension-test.md` | 1 | 10 | 33 | 2026-10-27 |
+| `src/extension.ts` | single-file | `src/extension-test.md` | 1 | 9 | 35 | 2026-11-28 |
 | `src/extensionState.ts` | single-file | `src/extensionState-test.md` | 1 | 14 | 42 | 2026-07-04 |
 | `src/fileHistory.ts` | single-file | `src/fileHistory-test.md` | 1 | 9 | 87 | 2026-10-28 |
 | `src/gitExecutable.ts` | single-file | `src/gitExecutable-test.md` | 1 | 1 | 6 | 2026-07-19 |
 | `src/gitGraphView.ts` | single-file | `archive/src/gitGraphView-test/2026-05-02-pre-sharding-gitGraphView-test.md` | 1 | 17 | 60 | 2026-03-20 |
-| `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 11 | 40 | 193 | 2026-11-23 |
+| `src/gitGraphView.ts` | sharded | `src/gitGraphView-test/INDEX.md` | 11 | 40 | 196 | 2026-11-28 |
 | `src/i18n.ts` | single-file | `src/i18n-test.md` | 1 | 2 | 11 | 2026-08-25 |
 | `src/refValidation.ts` | single-file | `src/refValidation-test.md` | 1 | 1 | 19 | 2026-08-03 |
 | `src/repoFileWatcher.ts` | single-file | `src/repoFileWatcher-test.md` | 1 | 10 | 74 | 2026-08-08 |
 | `src/repoManager.ts` | single-file | `src/repoManager-test.md` | 1 | 19 | 108 | 2026-07-19 |
+| `src/savedDiffFileSystem.ts` | single-file | `src/savedDiffFileSystem-test.md` | 1 | 1 | 7 | 2026-11-28 |
 | `src/statusBarItem.ts` | single-file | `src/statusBarItem-test.md` | 1 | 3 | 13 | 2026-03-22 |
 | `src/types.ts` | single-file | `src/types-test.md` | 1 | 8 | 93 | 2026-09-13 |
 | `src/utils.ts` | single-file | `src/utils-test.md` | 1 | 6 | 26 | 2026-08-08 |
@@ -58,7 +59,7 @@
 | `web/i18n.ts` | single-file | `web/i18n-test.md` | 1 | 3 | 11 | 2026-10-03 |
 | `web/keyboardNavigation.ts` | single-file | `web/keyboardNavigation-test.md` | 1 | 4 | 54 | 2026-10-07 |
 | `web/main.ts` | single-file | `archive/web/main-test/2026-03-22-pre-sharding-main-test.md` | 1 | 35 | 201 | 2026-03-12 |
-| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 20 | 70 | 503 | 2026-11-23 |
+| `web/main.ts` | sharded | `web/main-test/INDEX.md` | 20 | 71 | 505 | 2026-11-28 |
 | `web/messageHandler.ts` | single-file | `archive/web/messageHandler-test/2026-08-06-pre-sharding-messageHandler-test.md` | 1 | 12 | 41 | 2026-08-04 |
 | `web/messageHandler.ts` | sharded | `web/messageHandler-test/INDEX.md` | 5 | 20 | 75 | 2026-11-23 |
 | `web/pathHighlight.ts` | single-file | `web/pathHighlight-test.md` | 1 | 3 | 21 | 2026-10-03 |
@@ -157,6 +158,7 @@
 | Feature 061-05 (light-spec-plan) review fix | `web/contextMenu-test.md`, `web/dialogs-test.md`, `web/main-test/INDEX.md` |
 | Feature 061-05 (light-spec-plan) user follow-up | `web/main-test/INDEX.md` |
 | Feature 061-06 (light-spec-plan) | `web/main-test/INDEX.md`, `web/refOverflow-test.md` |
+| Feature 061-07 (saved working-tree comparisons) | `src/extension-test.md`, `src/gitGraphView-test/INDEX.md`, `src/savedDiffFileSystem-test.md`, `web/main-test/INDEX.md` |
 | Feature 062-01 (PR #114 follow-up) | `src/config-test/INDEX.md`, `src/extension-test.md`, `src/gitGraphView-test/INDEX.md`, `src/worktreePath-test.md`, `web/branchCleanupPanel-test.md`, `web/main-test/INDEX.md`, `web/messageHandler-test/INDEX.md`, `web/refMenu-test/INDEX.md` |
 | K2 demo-repository-config (light-spec-plan) | `scripts/readme-media/make-demo-repo-test.md` |
 | light-spec-plan notes/features/042/spec.md | `src/avatarManager-test.md` |
@@ -185,7 +187,6 @@
 | フェーズ2 修正 M8 (rate-limit-headerless-requeue) | `src/avatarManager-test.md` |
 | フェーズ2 修正 M9/M10 (diff-uri-roundtrip-cachekey) | `src/diffDocProvider-test.md` |
 | フェーズ2 修正 M9/M10 (diff-uri-symmetric-encode) | `src/diffDocProvider-test.md` |
-| フェーズ2 修正 M9/M10 (view-diff-resolve-head) | `src/gitGraphView-test/INDEX.md` |
 | フェーズ3 修正 L1 (spawn-stderr-drain) | `src/dataSource-test/INDEX.md` |
 | フェーズ3 修正 L11 (github-remote-url-length-guard) | `src/avatarManager-test.md` |
 | フェーズ3 修正 L12 (path-relative-traversal-guard) | `src/utils-test.md` |

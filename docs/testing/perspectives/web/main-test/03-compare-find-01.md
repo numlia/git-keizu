@@ -66,3 +66,20 @@
 | TC-120  | parent hash click (the commit is loaded)     | Normal - standard                                                          | Scrolls to the commit row and shows the commit details                                         | Calls loadCommitDetails   |
 | TC-121  | parent hash click (the commit is not loaded) | Boundary - not found                                                       | Nothing happens (no error shown)                                                               | Fails silently            |
 | TC-122  | Merge commit (two parents)                   | Normal - multiple                                                          | Both parent hashes are shown as links                                                          | Supports multiple parents |
+
+## S95: Open a comparison row after selecting a commit and the working tree
+
+> Origin: Feature 061-07 (saved working-tree comparisons)
+> Added: 2026-11-28
+> Status: active
+> Supersedes: -
+> Signature: `getCommitOrder(hash1, hash2)`, `bindFileViewListeners()`
+> Target Path: `web/main.ts` (graph selection and comparison file actions)
+> Test File: `tests/web/main.test.ts`
+
+In both cases, wait for the first selection's details, select the second row with the comparison modifier, and return the file list with the matching request ID. Use a row whose old and new paths differ so a swapped or discarded path is observable.
+
+| Case ID | Input / Precondition                                                         | Perspective (Normal / Validation / Exception / External / Boundary / Type) | Expected Result                                                                                                                                                                                                             | Notes                                                                                   |
+| ------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| TC-837  | Select a commit, then the working tree. Open the returned rename row.        | Normal - commit selected first                                             | The list request sends `fromHash: "*"` and the selected commit as `toHash`. The file request sends `commitHash: "*"`, the same commit as `compareWithHash`, and exactly the selected row's old path, new path and `R` type. | Retains the file-button behavior in TC-039.                                             |
+| TC-838  | Select the working tree, then the same commit. Open the returned rename row. | Normal - working tree selected first                                       | Both requests have the same ordered revision pairs as TC-837. The file request preserves the selected row's old path, new path and type.                                                                                    | Row and button ordering is also covered by TC-758 in `tests/web/main.keyboard.test.ts`. |
