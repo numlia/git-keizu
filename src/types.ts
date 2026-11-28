@@ -135,6 +135,7 @@ export interface WorktreePathViewState {
 }
 
 export interface GitKeizuViewState {
+  viewId: string;
   commitOrdering: CommitOrdering;
   dateFormat: DateFormat;
   dialogDefaults: DialogDefaults;
@@ -321,6 +322,7 @@ export interface ResponseCherrypickCommit {
 
 export interface RequestCommitDetails {
   command: "commitDetails";
+  searchKey?: SearchRequestKey;
   repo: string;
   commitHash: string;
   hasParents: boolean;
@@ -328,6 +330,7 @@ export interface RequestCommitDetails {
 }
 export interface ResponseCommitDetails {
   command: "commitDetails";
+  searchKey?: SearchRequestKey;
   commitDetails: GitCommitDetails | null;
 }
 
@@ -478,10 +481,71 @@ export interface RequestLoadCommits {
   authors: string[];
   commitOrdering: CommitOrdering;
 }
+
+export type SearchHistoryInfo =
+  | { kind: "verified"; snapshot: string; hashes: string[]; requestedCount: number }
+  | { kind: "historyChanged" }
+  | { kind: "unavailable" };
+
+export interface SearchOwner {
+  viewId: string;
+  repo: string;
+  generation: number;
+}
+
+export interface SearchRequestKey extends SearchOwner {
+  requestId: number;
+}
+
+export interface RequestStartHistorySearch extends SearchRequestKey {
+  command: "startHistorySearch";
+  branches: string[];
+  authors: string[];
+  showRemoteBranches: boolean;
+  commitOrdering: CommitOrdering;
+  skip: number;
+  snapshot: string;
+}
+
+export interface RequestNextHistorySearch extends SearchRequestKey {
+  command: "nextHistorySearch";
+}
+
+export interface RequestCancelHistorySearch extends SearchOwner {
+  command: "cancelHistorySearch";
+}
+
+export interface RequestVerifyHistorySearch extends SearchRequestKey {
+  command: "verifyHistorySearch";
+  snapshot: string;
+  showRemoteBranches: boolean;
+}
+
+export type HistorySearchValidation =
+  | { kind: "ok" }
+  | { kind: "historyChanged" }
+  | { kind: "error"; message: string };
+
+export type HistorySearchBatch =
+  | { kind: "ok"; commits: GitCommitNode[]; hasMore: boolean; firstPosition: number }
+  | Exclude<HistorySearchValidation, { kind: "ok" }>;
+
+export type ResponseHistorySearchValidation = SearchRequestKey & {
+  command: "historySearchValidation";
+} & HistorySearchValidation;
+
+export type ResponseHistorySearchBatch = SearchRequestKey & {
+  command: "historySearchBatch";
+} & HistorySearchBatch;
+
+// Request-to-match timings across three starting offsets: docs/testing/history-search-calibration.md.
+export const HISTORY_SEARCH_BATCH_SIZE = 26_000;
+
 export interface ResponseLoadCommits {
   command: "loadCommits";
   requestId?: string;
   pageToken?: number;
+  history?: SearchHistoryInfo;
   commits: GitCommitNode[];
   head: string | null;
   moreCommitsAvailable: boolean;
@@ -492,6 +556,7 @@ export interface ResponseLoadCommits {
 
 export interface ResponseAppendCommits {
   command: "appendCommits";
+  requestId?: string;
   repo: string;
   from: number;
   baseCount: number;
@@ -560,6 +625,11 @@ export interface ResponseSetShowRecentActions {
   showRecentActions: boolean;
 }
 
+export interface ResponseSetCommitOrdering {
+  command: "setCommitOrdering";
+  ordering: CommitOrdering;
+}
+
 export interface ResponseSetWorktreePath {
   command: "setWorktreePath";
   worktreePath: WorktreePathViewState;
@@ -607,12 +677,14 @@ export interface RequestSaveRepoState {
 
 export interface RequestCompareCommits {
   command: "compareCommits";
+  requestId: string;
   repo: string;
   fromHash: string;
   toHash: string;
 }
 export interface ResponseCompareCommits {
   command: "compareCommits";
+  requestId: string;
   fileChanges: GitFileChange[] | null;
   fromHash: string;
   toHash: string;
@@ -824,6 +896,10 @@ export interface ResponseCleanUntrackedFiles {
 }
 
 export type RequestMessage =
+  | RequestStartHistorySearch
+  | RequestNextHistorySearch
+  | RequestCancelHistorySearch
+  | RequestVerifyHistorySearch
   | RequestAddTag
   | RequestApplyStash
   | RequestBranchFromStash
@@ -868,6 +944,8 @@ export type RequestMessage =
   | RequestViewDiff;
 
 export type ResponseMessage =
+  | ResponseHistorySearchBatch
+  | ResponseHistorySearchValidation
   | ResponseAddTag
   | ResponseAppendCommits
   | ResponseApplyStash
@@ -906,6 +984,7 @@ export type ResponseMessage =
   | ResponseRefresh
   | ResponseRemoveWorktree
   | ResponseSelectRepo
+  | ResponseSetCommitOrdering
   | ResponseSetShowRecentActions
   | ResponseSetWorktreePath
   | ResponseRenameBranch

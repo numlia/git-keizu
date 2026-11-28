@@ -89,7 +89,8 @@ vi.mock("vscode", () => ({
   }
 }));
 
-vi.mock("node:crypto", () => ({
+vi.mock("node:crypto", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("node:crypto")>()),
   randomBytes: vi.fn(() => ({ toString: () => "test-nonce" }))
 }));
 
@@ -463,6 +464,7 @@ describe("GitKeizuView compareCommits message routing", () => {
     // When: RequestCompareCommits message is received
     await mocks.messageHandler.current!({
       command: "compareCommits",
+      requestId: "compare-args",
       repo: TEST_REPO,
       fromHash,
       toHash
@@ -491,6 +493,7 @@ describe("GitKeizuView compareCommits message routing", () => {
     // When: RequestCompareCommits message is received
     await mocks.messageHandler.current!({
       command: "compareCommits",
+      requestId: "compare-success",
       repo: TEST_REPO,
       fromHash,
       toHash
@@ -499,6 +502,7 @@ describe("GitKeizuView compareCommits message routing", () => {
     // Then: ResponseCompareCommits is sent with correct fileChanges, fromHash, toHash
     expect(mocks.postMessage).toHaveBeenCalledWith({
       command: "compareCommits",
+      requestId: "compare-success",
       fileChanges,
       fromHash,
       toHash
@@ -514,6 +518,7 @@ describe("GitKeizuView compareCommits message routing", () => {
     // When: RequestCompareCommits message is received
     await mocks.messageHandler.current!({
       command: "compareCommits",
+      requestId: "compare-error",
       repo: TEST_REPO,
       fromHash,
       toHash
@@ -522,6 +527,7 @@ describe("GitKeizuView compareCommits message routing", () => {
     // Then: ResponseCompareCommits is sent with null fileChanges
     expect(mocks.postMessage).toHaveBeenCalledWith({
       command: "compareCommits",
+      requestId: "compare-error",
       fileChanges: null,
       fromHash,
       toHash
@@ -2466,6 +2472,24 @@ describe("GitKeizuView loadCommits authorFilter (S10)", () => {
       expect(mocks.getNextHistoryPage).toHaveBeenCalledWith(message);
       expect(mocks.getCommits).not.toHaveBeenCalled();
       expect(mocks.postMessage.mock.calls.map(([response]) => response)).toEqual([page]);
+    });
+
+    // @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md (TC-426)
+    // Case: TC-426
+    it.each([
+      { kind: "verified", hashes: [row.hash], requestedCount: 400, snapshot: "snapshot" },
+      { kind: "historyChanged" },
+      { kind: "unavailable" }
+    ])("relays the $kind ordinary history to the issuing request (TC-426)", async (history) => {
+      const result = { commits: [row], head: row.hash, moreCommitsAvailable: false, history };
+      mocks.getCommits.mockResolvedValue(result);
+      await mocks.messageHandler.current!(request);
+      expect(mocks.postMessage).toHaveBeenCalledWith({
+        command: "loadCommits",
+        requestId: request.requestId,
+        hard: true,
+        ...result
+      });
     });
   });
 
@@ -5322,9 +5346,8 @@ describe("GitKeizuView retainContextWhenHidden (S35)", () => {
   type ViewCallback = (repos: Record<string, unknown>, numRepos: number) => void;
   let capturedViewCallback: ViewCallback | null = null;
 
-  async function createPanel(): Promise<PanelMock> {
+  async function createPanel(mockDataSource = {} as DataSource): Promise<PanelMock> {
     capturedViewCallback = null;
-    const mockDataSource = {} as unknown as DataSource;
     const mockExtensionState = {
       getLastActiveRepo: vi.fn(() => null),
       isAvatarStorageAvailable: vi.fn(() => false),
@@ -5372,6 +5395,303 @@ describe("GitKeizuView retainContextWhenHidden (S35)", () => {
     panelMock.visible = true;
     mocks.panelViewStateHandler?.();
   }
+
+  // @see docs/testing/perspectives/src/gitGraphView-test/01-message-routing-03.md (S46)
+  describe("owned history searches", () => {
+    const query = {
+      branches: ["main"],
+      authors: ["Build[bot]"],
+      commitOrdering: "topo",
+      skip: 300,
+      snapshot: "snapshot",
+      showRemoteBranches: false
+    };
+    const batch = { kind: "ok", commits: [], firstPosition: 301, hasMore: true };
+    const docId = (panel: PanelMock): string =>
+      JSON.parse(panel.webview.html.match(/var viewState = (.+?);/)![1]).viewId;
+    function deferredBatch() {
+      let finish!: (result: typeof batch) => void;
+      const promise = new Promise<typeof batch>((resolve) => {
+        finish = resolve;
+      });
+      return { finish, promise };
+    }
+
+    // Case: TC-819 (docs/testing/perspectives/web/main-test/14-history-search-01.md)
+    it.each(["dateType", "dateFormat"])(
+      "rebuilds the visible graph when %s changes (TC-819)",
+      async (setting) => {
+        const panel = await createPanel();
+        const previous = docId(panel);
+        changeConfiguration(`git-keizu.${setting}`);
+        await vi.waitFor(() => expect(docId(panel)).not.toBe(previous));
+      }
+    );
+
+    // Case: TC-430
+    it("echoes the search key for both detail outcomes and preserves ordinary responses (TC-430)", async () => {
+      const details = { hash: "target", fileChanges: [] };
+      const source = {
+        commitDetails: vi.fn().mockResolvedValueOnce(details).mockResolvedValue(null)
+      };
+      const panel = await createPanel(source as unknown as DataSource);
+      const searchKey = { viewId: docId(panel), repo: TEST_REPO, generation: 2, requestId: 8 };
+      const request = {
+        command: "commitDetails",
+        commitHash: "target",
+        repo: TEST_REPO,
+        hasParents: true,
+        isStash: false
+      };
+      const send = mocks.messageHandler.current!;
+      await send({ ...request, searchKey });
+      await send({ ...request, searchKey });
+      await send(request);
+      expect(sentMessages("commitDetails")).toEqual([
+        { command: "commitDetails", searchKey, commitDetails: details },
+        { command: "commitDetails", searchKey, commitDetails: null },
+        { command: "commitDetails", commitDetails: null }
+      ]);
+    });
+
+    // Case: TC-423, TC-427, TC-428, TC-429
+    it("keeps retained identity and rejects old reads, starts and cancels after HTML replacement and disposal", async () => {
+      const oldRead = deferredBatch();
+      const newRead = deferredBatch();
+      const old = { next: vi.fn(() => oldRead.promise), close: vi.fn() };
+      const current = { next: vi.fn(() => newRead.promise), close: vi.fn() };
+      const source = {
+        createHistorySearch: vi.fn().mockReturnValueOnce(old).mockReturnValueOnce(current)
+      };
+      const panel = await createPanel(source as unknown as DataSource);
+      const owner = { viewId: docId(panel), repo: TEST_REPO, generation: 1 };
+      const start = { command: "startHistorySearch", ...query, ...owner, requestId: 1 };
+      expect(owner.viewId).toMatch(/^[0-9a-f-]{36}$/);
+      const send = mocks.messageHandler.current!;
+      const pending = send(start);
+      hideThenShow(panel);
+      expect(docId(panel)).toBe(owner.viewId);
+      expect(old.close).not.toHaveBeenCalled();
+      changeConfiguration("git-keizu");
+      hideThenShow(panel);
+      expect(old.close).toHaveBeenCalledTimes(1);
+      await vi.waitFor(() => expect(docId(panel)).not.toBe(owner.viewId));
+      const newStart = { ...start, viewId: docId(panel) };
+      const newPending = send(newStart);
+      await send(start);
+      await send({ command: "cancelHistorySearch", ...owner });
+      await send({ ...newStart, command: "nextHistorySearch", requestId: 2 });
+      expect(source.createHistorySearch.mock.calls).toEqual([[start], [newStart]]);
+      expect(current.close).not.toHaveBeenCalled();
+      expect(current.next).toHaveBeenCalledTimes(1);
+      oldRead.finish(batch);
+      await pending;
+      expect(sentMessages("historySearchBatch")).toEqual([]);
+      GitKeizuView.currentPanel!.dispose();
+      expect(current.close).toHaveBeenCalledTimes(1);
+      newRead.finish(batch);
+      await newPending;
+      expect(sentMessages("historySearchBatch")).toEqual([]);
+    });
+
+    // Case: TC-427, TC-429
+    it("ignores an old generation's cancel and completed batch after an immediate restart", async () => {
+      const oldRead = deferredBatch();
+      const newRead = deferredBatch();
+      const old = { next: vi.fn(() => oldRead.promise), close: vi.fn() };
+      const current = { next: vi.fn(() => newRead.promise), close: vi.fn() };
+      const source = {
+        createHistorySearch: vi.fn().mockReturnValueOnce(old).mockReturnValueOnce(current)
+      };
+      const panel = await createPanel(source as unknown as DataSource);
+      const owner = { viewId: docId(panel), repo: TEST_REPO, generation: 1 };
+      const send = mocks.messageHandler.current!;
+      const start = { command: "startHistorySearch", ...query, ...owner, requestId: 1 };
+      const pending = send(start);
+      await send({ command: "cancelHistorySearch", ...owner });
+      const newPending = send({ ...start, generation: 2 });
+      await send({ command: "cancelHistorySearch", ...owner });
+      await send(start);
+      expect(source.createHistorySearch).toHaveBeenCalledTimes(2);
+      expect(old.close).toHaveBeenCalledTimes(1);
+      expect(current.close).not.toHaveBeenCalled();
+      oldRead.finish(batch);
+      newRead.finish(batch);
+      await Promise.all([pending, newPending]);
+      expect(sentMessages("historySearchBatch")).toEqual([
+        { command: "historySearchBatch", ...owner, generation: 2, requestId: 1, ...batch }
+      ]);
+      GitKeizuView.currentPanel!.dispose();
+      expect(current.close).toHaveBeenCalledTimes(1);
+    });
+
+    // Case: TC-424, TC-425
+    it.each([
+      ["negative skip", { skip: -1 }],
+      ["fractional skip", { skip: 0.5 }],
+      ["skip without a safe next position", { skip: Number.MAX_SAFE_INTEGER }],
+      ["empty snapshot", { snapshot: "" }],
+      ["non-string snapshot", { snapshot: null }],
+      ["non-boolean remote setting", { showRemoteBranches: "false" }],
+      ["unknown ordering", { commitOrdering: "unknown" }],
+      ["inherited ordering name", { commitOrdering: "toString" }],
+      ["non-array branches", { branches: "main" }],
+      ["non-string branch", { branches: ["main", null] }],
+      ["empty branch", { branches: [""] }],
+      ["option-like branch", { branches: ["-main"] }],
+      ["NUL in a branch", { branches: ["ma\0in"] }],
+      ["non-array authors", { authors: "Ada" }],
+      ["non-string author", { authors: ["Ada", null] }],
+      ["NUL in an author", { authors: ["A\0da"] }]
+    ])("returns a keyed error without starting a search for %s", async (_reason, invalid) => {
+      const source = { createHistorySearch: vi.fn() };
+      const panel = await createPanel(source as unknown as DataSource);
+      const key = { viewId: docId(panel), repo: TEST_REPO, generation: 3, requestId: 7 };
+
+      await mocks.messageHandler.current!({
+        command: "startHistorySearch",
+        ...key,
+        ...query,
+        ...invalid
+      });
+
+      expect(source.createHistorySearch).not.toHaveBeenCalled();
+      expect(sentMessages("historySearchBatch")).toEqual([
+        {
+          command: "historySearchBatch",
+          ...key,
+          kind: "error",
+          message: "Invalid history search parameters."
+        }
+      ]);
+    });
+
+    // Case: TC-424
+    it.each([
+      { generation: 0, requestId: 1 },
+      { generation: 1.5, requestId: 1 },
+      { generation: Number.MAX_SAFE_INTEGER + 1, requestId: 1 },
+      { generation: 1, requestId: 0 },
+      { generation: 1, requestId: 1.5 },
+      { generation: 1, requestId: Number.MAX_SAFE_INTEGER + 1 }
+    ])("ignores a start with generation $generation and request ID $requestId", async (ids) => {
+      const scan = { next: vi.fn().mockResolvedValue(batch), close: vi.fn() };
+      const source = { createHistorySearch: vi.fn().mockReturnValue(scan) };
+      const panel = await createPanel(source as unknown as DataSource);
+      const key = { viewId: docId(panel), repo: TEST_REPO, generation: 1, requestId: 1 };
+      const start = { command: "startHistorySearch", ...query, ...key };
+      const send = mocks.messageHandler.current!;
+
+      await send({ ...start, ...ids });
+      expect(source.createHistorySearch).not.toHaveBeenCalled();
+      expect(sentMessages("historySearchBatch")).toEqual([]);
+      await send(start);
+      expect(sentMessages("historySearchBatch")).toEqual([
+        { command: "historySearchBatch", ...key, ...batch }
+      ]);
+    });
+
+    // Case: TC-424, TC-425
+    it.each([
+      ["snapshot", { snapshot: "another snapshot" }],
+      ["remote visibility", { showRemoteBranches: true }]
+    ])("rejects verification when the %s differs from the start", async (_field, changed) => {
+      const scan = { next: vi.fn().mockResolvedValue(batch), close: vi.fn() };
+      const source = {
+        createHistorySearch: vi.fn().mockReturnValue(scan),
+        verifyHistorySearch: vi.fn()
+      };
+      const panel = await createPanel(source as unknown as DataSource);
+      const owner = { viewId: docId(panel), repo: TEST_REPO, generation: 1 };
+      const send = mocks.messageHandler.current!;
+      await send({ command: "startHistorySearch", ...query, ...owner, requestId: 1 });
+      const key = { ...owner, requestId: 2 };
+      await send({
+        command: "verifyHistorySearch",
+        ...key,
+        snapshot: query.snapshot,
+        showRemoteBranches: query.showRemoteBranches,
+        ...changed
+      });
+
+      expect(source.verifyHistorySearch).not.toHaveBeenCalled();
+      expect(sentMessages("historySearchValidation")).toEqual([
+        {
+          command: "historySearchValidation",
+          ...key,
+          kind: "error",
+          message: "Invalid history verification parameters."
+        }
+      ]);
+      expect(scan.close).toHaveBeenCalledTimes(1);
+    });
+
+    // Case: TC-424, TC-425, TC-427, TC-429
+    it.each([
+      { kind: "ok" },
+      { kind: "historyChanged" },
+      { kind: "error", message: "verification failed" }
+    ])(
+      "checks the active repo, generation and outstanding request for read and verify ($kind)",
+      async (validation) => {
+        const failed =
+          validation.kind === "historyChanged"
+            ? validation
+            : { kind: "error", message: "log failed" };
+        const scan = {
+          next: vi
+            .fn()
+            .mockResolvedValueOnce(batch)
+            .mockResolvedValueOnce({ ...batch, hasMore: false }),
+          close: vi.fn()
+        };
+        const newer = { next: vi.fn().mockResolvedValue(failed), close: vi.fn() };
+        const source = {
+          createHistorySearch: vi.fn().mockReturnValueOnce(scan).mockReturnValueOnce(newer),
+          verifyHistorySearch: vi.fn().mockResolvedValue(validation)
+        };
+        const panel = await createPanel(source as unknown as DataSource);
+        const owner = { viewId: docId(panel), repo: TEST_REPO, generation: 1 };
+        const send = mocks.messageHandler.current!;
+        const start = { command: "startHistorySearch", ...query, ...owner, requestId: 1 };
+        await send(start);
+        const next = { command: "nextHistorySearch", ...owner, requestId: 2 };
+        await send({ ...next, repo: "elsewhere" });
+        await send({ ...next, generation: 2 });
+        await send(next);
+        await send(next);
+        expect(source.createHistorySearch).toHaveBeenCalledWith(start);
+        expect(scan.next).toHaveBeenCalledTimes(2);
+        expect(sentMessages("historySearchBatch")).toEqual([
+          { command: "historySearchBatch", ...owner, requestId: 1, ...batch },
+          { command: "historySearchBatch", ...owner, requestId: 2, ...batch, hasMore: false }
+        ]);
+        await send({
+          ...owner,
+          command: "verifyHistorySearch",
+          requestId: 3,
+          snapshot: query.snapshot,
+          showRemoteBranches: false
+        });
+        expect(source.verifyHistorySearch).toHaveBeenCalledWith(TEST_REPO, false, query.snapshot);
+        expect(sentMessages("historySearchValidation")).toEqual([
+          { command: "historySearchValidation", ...owner, requestId: 3, ...validation }
+        ]);
+        await send({ command: "cancelHistorySearch", ...owner });
+        expect(scan.close).toHaveBeenCalledTimes(1);
+        await send({ ...start, generation: 2 });
+        await send({ command: "cancelHistorySearch", ...owner });
+        expect(sentMessages("historySearchBatch").at(-1)).toEqual({
+          command: "historySearchBatch",
+          ...owner,
+          generation: 2,
+          requestId: 1,
+          ...failed
+        });
+        expect(newer.close).toHaveBeenCalledTimes(1);
+      }
+    );
+  });
 
   it("creates the panel with retainContextWhenHidden enabled by the setting (TC-364)", async () => {
     // Given: the setting is enabled
@@ -5744,6 +6064,7 @@ describe("GitKeizuView host HTML toolbar buttons, list name and status notice (S
     "repos",
     "showCurrentBranchByDefault",
     "showRecentActions",
+    "viewId",
     "worktreePath"
   ];
   let body: HTMLElement;

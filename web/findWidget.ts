@@ -1,6 +1,13 @@
-import * as GG from "../src/types";
+import type * as GG from "../src/types";
 import { getBranchLabels } from "./branchLabels";
 import { getCommitDate } from "./dates";
+import {
+  type CommitMatch,
+  HistorySearch,
+  type SearchEnd,
+  type SearchStart,
+  type UnreadMatch
+} from "./historySearch";
 import { t } from "./i18n";
 import {
   captureFocusOrigin,
@@ -10,7 +17,13 @@ import {
   restoreFocus
 } from "./keyboardNavigation";
 import { REF_OVERFLOW_IGNORE_ATTRIBUTE } from "./refOverflow";
-import { buildStashSelectorDisplay, svgIcons, UNCOMMITTED_CHANGES_HASH } from "./utils";
+import {
+  abbrevCommit,
+  buildStashSelectorDisplay,
+  sendMessage,
+  svgIcons,
+  UNCOMMITTED_CHANGES_HASH
+} from "./utils";
 
 /* === Constants === */
 
@@ -30,13 +43,19 @@ const KEY_ENTER = "Enter";
 const TAB_INDEX_STOP = 0;
 const TAB_INDEX_PROGRAMMATIC = -1;
 const REASON_KEYBOARD: FocusCloseReason = "keyboard";
-const ABBREV_COMMIT_LENGTH = 8;
 const ZERO_LENGTH_MATCH_ERROR = "find.zeroLengthRegex";
 
 /* === DOM Helpers === */
 
 export function getCommitElems(): HTMLCollectionOf<HTMLElement> {
   return document.getElementsByClassName("commit") as HTMLCollectionOf<HTMLElement>;
+}
+
+function countLoadedCommits(commits: GG.GitCommitNode[]): number {
+  return commits.reduce(
+    (count, commit) => count + Number(commit.hash !== UNCOMMITTED_CHANGES_HASH),
+    0
+  );
 }
 
 // The ref overflow counter, list and measuring clones repeat or summarise row text, so their
@@ -83,17 +102,14 @@ export function findCommitElemWithId(
   return null;
 }
 
-function abbrevCommit(commitHash: string): string {
-  return commitHash.substring(0, ABBREV_COMMIT_LENGTH);
-}
-
 /* === Interfaces === */
 
-function matchesCommit(
+export function matchesCommit(
   commit: GG.GitCommitNode,
   pattern: RegExp,
-  globalRegex: RegExp | null
-): boolean | null {
+  globalRegex: RegExp | null,
+  loaded: boolean
+): CommitMatch {
   const labels = getBranchLabels(commit.refs);
   const fields = [
     commit.message,
@@ -104,23 +120,29 @@ function matchesCommit(
     ...labels.remotes.map((remote) => remote.name),
     ...labels.tags.map((tag) => tag.name)
   ];
-  if (commit.stash !== null) fields.push(buildStashSelectorDisplay(commit.stash.selector));
+  if (loaded && commit.stash !== null)
+    fields.push(buildStashSelectorDisplay(commit.stash.selector));
   const hashMatch = pattern.exec(commit.hash);
   let matched = hashMatch?.index === 0;
-  if (globalRegex === null) return matched || fields.some((field) => pattern.test(field));
+  if (globalRegex === null)
+    return matched || fields.some((field) => pattern.test(field)) ? "match" : "miss";
   // A zero-width match in an unmounted row must give the same error as one on screen.
-  if (matched && hashMatch?.[0] === "") return null;
+  if (matched && hashMatch?.[0] === "") return "regexError";
   for (const field of fields) {
-    if (!field) continue;
     for (const match of field.matchAll(globalRegex)) {
-      if (!match[0].length) return null;
+      if (!match[0].length) return "regexError";
       matched = true;
     }
   }
-  return matched;
+  return matched ? "match" : "miss";
 }
 
 export interface FindWidgetCallbacks {
+  getSearchStart(): SearchStart | undefined;
+  navigateToUnread?(match: UnreadMatch, owner: GG.SearchOwner): void;
+  onSearchEnd?(reason: SearchEnd): void;
+  onClose?(): void;
+  returnFromSearch?(): void;
   getCommits(): GG.GitCommitNode[];
   scrollToCommit(hash: string, alwaysCenterCommit: boolean): void;
   saveState(): void;
@@ -133,11 +155,13 @@ export interface FindWidgetCallbacks {
 /* === FindWidget === */
 
 export class FindWidget {
+  public readonly history: HistorySearch;
+  private loadedCount = 0;
   private readonly callbacks: FindWidgetCallbacks;
   private text: string = "";
   private matches: string[] = [];
   private readonly matchHashes = new Set<string>();
-  private readonly mounted = new Map<string, HTMLElement>();
+  private mounted = new Map<string, HTMLElement>();
   private patterns: { single: RegExp; global: RegExp } | null = null;
   private position: number = -1;
   private visible: boolean = false;
@@ -155,13 +179,35 @@ export class FindWidget {
   private readonly prevElem: HTMLButtonElement;
   private readonly nextElem: HTMLButtonElement;
   private readonly openCdvElem: HTMLButtonElement;
+  private readonly scopeElem: HTMLElement;
+  private readonly statusElem: HTMLElement;
+  private readonly startElem: HTMLButtonElement;
+  private readonly continueElem: HTMLButtonElement;
+  private readonly cancelElem: HTMLButtonElement;
+  private readonly returnElem: HTMLButtonElement;
+  private navigating = false;
 
   constructor(callbacks: FindWidgetCallbacks) {
     this.callbacks = callbacks;
+    this.history = new HistorySearch(
+      sendMessage,
+      (row) =>
+        this.patterns
+          ? matchesCommit(
+              row,
+              this.patterns.single,
+              this.regex ? this.patterns.global : null,
+              false
+            )
+          : "miss",
+      (hash) => this.callbacks.getCommitId(hash) !== null,
+      (reason) => this.callbacks.onSearchEnd?.(reason)
+    );
 
     this.widgetElem = document.createElement("div");
     this.widgetElem.className = "findWidget";
     this.widgetElem.innerHTML = [
+      '<div class="findRow">',
       `<input id="findInput" type="text" placeholder="${t("find.placeholder")}" aria-label="${t("find.placeholder")}" disabled/>`,
       FindWidget.buttonHtml("findCaseSensitive", t("find.matchCase"), "findModifier", "Aa"),
       FindWidget.buttonHtml("findRegex", t("find.useRegex"), "findModifier", ".*"),
@@ -169,11 +215,47 @@ export class FindWidget {
       FindWidget.buttonHtml("findPrev", t("find.previous"), "", svgIcons.arrowUp),
       FindWidget.buttonHtml("findNext", t("find.next"), "", svgIcons.arrowDown),
       FindWidget.buttonHtml("findOpenCdv", t("find.openCommitDetails"), "", svgIcons.cdv),
-      FindWidget.buttonHtml("findClose", t("find.close"), "", svgIcons.close)
+      FindWidget.buttonHtml("findClose", t("find.close"), "", svgIcons.close),
+      '</div><div class="findRow findScopeRow"><span id="findScope"></span>',
+      FindWidget.buttonHtml("findStart", t("find.start"), "findAction", t("find.start")),
+      FindWidget.buttonHtml("findContinue", t("find.continue"), "findAction", t("find.continue")),
+      FindWidget.buttonHtml("findCancel", t("find.cancel"), "findAction", t("find.cancel")),
+      FindWidget.buttonHtml("findReturn", t("find.return"), "findAction", t("find.return")),
+      '</div><div id="findStatus" role="status"></div>'
     ].join("");
     document.body.appendChild(this.widgetElem);
 
     this.inputElem = document.getElementById("findInput") as HTMLInputElement;
+    this.scopeElem = document.getElementById("findScope")!;
+    this.statusElem = document.getElementById("findStatus")!;
+    this.startElem = document.getElementById("findStart") as HTMLButtonElement;
+    this.continueElem = document.getElementById("findContinue") as HTMLButtonElement;
+    this.cancelElem = document.getElementById("findCancel") as HTMLButtonElement;
+    this.returnElem = document.getElementById("findReturn") as HTMLButtonElement;
+    this.returnElem.hidden = true;
+    this.returnElem.addEventListener("click", () => {
+      this.callbacks.returnFromSearch?.();
+      this.inputElem.focus({ preventScroll: true });
+    });
+    this.startElem.addEventListener("click", () => {
+      const query = this.callbacks.getSearchStart();
+      if (
+        !query ||
+        this.startElem.disabled ||
+        this.startElem.hidden ||
+        !this.patterns ||
+        this.inputElem.value !== this.text
+      )
+        return;
+      this.history.start(query);
+      this.renderStatus();
+      this.callbacks.saveState();
+    });
+    this.continueElem.addEventListener("click", () => {
+      this.history.resume();
+      this.renderStatus();
+    });
+    this.cancelElem.addEventListener("click", () => this.endHistorySearch("cancelled"));
     // Enter runs on keydown behind the shared guard, so composition, repeat and keyup never move.
     this.inputElem.addEventListener("keydown", (e) => {
       if (e.key !== KEY_ENTER || isKeyboardActionBlocked(e) || this.text === "") return;
@@ -185,27 +267,30 @@ export class FindWidget {
       e.stopPropagation();
     });
     let keyupTimeout: ReturnType<typeof setTimeout> | null = null;
-    this.inputElem.addEventListener("keyup", () => {
+    const scheduleSearch = () => {
+      if (this.inputElem.value !== this.text && this.history.owner) {
+        this.endHistorySearch("idle");
+      }
+      this.startElem.disabled = this.startElem.disabled || this.inputElem.value !== this.text;
       if (keyupTimeout !== null) clearTimeout(keyupTimeout);
       keyupTimeout = setTimeout(() => {
         keyupTimeout = null;
         if (this.text !== this.inputElem.value) {
           this.text = this.inputElem.value;
-          this.clearMatches();
-          this.findMatches(this.getCurrentHash(), true);
-          this.openCommitDetailsViewForCurrentMatchIfEnabled();
+          this.onQueryChanged();
         }
+        this.renderStatus();
       }, SEARCH_DEBOUNCE_MS);
-    });
+    };
+    this.inputElem.addEventListener("input", scheduleSearch);
+    this.inputElem.addEventListener("keyup", scheduleSearch);
 
     this.caseSensitiveElem = document.getElementById("findCaseSensitive") as HTMLButtonElement;
     this.setPressed(this.caseSensitiveElem, this.caseSensitive);
     this.caseSensitiveElem.addEventListener("click", () => {
       this.caseSensitive = !this.caseSensitive;
       this.setPressed(this.caseSensitiveElem, this.caseSensitive);
-      this.clearMatches();
-      this.findMatches(this.getCurrentHash(), true);
-      this.openCommitDetailsViewForCurrentMatchIfEnabled();
+      this.onQueryChanged();
     });
 
     this.regexElem = document.getElementById("findRegex") as HTMLButtonElement;
@@ -213,9 +298,7 @@ export class FindWidget {
     this.regexElem.addEventListener("click", () => {
       this.regex = !this.regex;
       this.setPressed(this.regexElem, this.regex);
-      this.clearMatches();
-      this.findMatches(this.getCurrentHash(), true);
-      this.openCommitDetailsViewForCurrentMatchIfEnabled();
+      this.onQueryChanged();
     });
 
     this.positionElem = document.getElementById("findPosition")!;
@@ -247,6 +330,7 @@ export class FindWidget {
     this.rememberOrigin();
     if (!this.visible) {
       this.visible = true;
+      this.loadedCount = countLoadedCommits(this.callbacks.getCommits());
       this.inputElem.value = this.text;
       this.inputElem.disabled = false;
       this.setControlsReachable(true);
@@ -262,6 +346,8 @@ export class FindWidget {
   public close(reason?: FocusCloseReason) {
     if (!this.visible) return;
     this.visible = false;
+    this.history.end("idle");
+    this.callbacks.onClose?.();
     this.widgetElem.classList.add(CLASS_TRANSITION);
     this.widgetElem.classList.remove(CLASS_ACTIVE);
     this.clearMatches();
@@ -283,8 +369,49 @@ export class FindWidget {
 
   public refresh() {
     if (this.visible) {
+      this.history.mergeLoaded();
+      this.clearMatches();
       this.findMatches(this.getCurrentHash(), false);
     }
+  }
+
+  public receiveHistorySearch(
+    response: GG.ResponseHistorySearchBatch | GG.ResponseHistorySearchValidation
+  ) {
+    if (!this.history.receive(response)) return;
+    if (this.history.status === "regexError") {
+      this.setRegexError(t(ZERO_LENGTH_MATCH_ERROR));
+      this.callbacks.onHighlightsChanged?.();
+      this.callbacks.saveState();
+    }
+    if (this.history.status === "historyChanged") this.refresh();
+    this.renderStatus();
+  }
+
+  public endHistorySearch(reason: SearchEnd) {
+    this.history.end(reason);
+    this.renderStatus();
+  }
+
+  public setNavigationPending(pending: boolean) {
+    const focus = document.activeElement;
+    if (pending && (focus === this.prevElem || focus === this.nextElem))
+      this.inputElem.focus({ preventScroll: true });
+    this.navigating = pending;
+    this.returnElem.disabled = pending;
+    this.syncNavigationState();
+  }
+
+  public showReturn(available: boolean) {
+    this.returnElem.hidden = !available;
+  }
+
+  public selectLoadedMatch(hash: string): boolean {
+    const position = this.matches.indexOf(hash);
+    if (position < 0) return false;
+    this.updatePosition(position, true);
+    this.openCommitDetailsViewForCurrentMatchIfEnabled();
+    return true;
   }
 
   public isVisible() {
@@ -294,7 +421,7 @@ export class FindWidget {
   public setInputEnabled(enabled: boolean) {
     if (!this.visible) return;
     this.inputElem.disabled = !enabled;
-    this.syncNavigationState();
+    this.renderStatus();
   }
 
   /* === State === */
@@ -302,7 +429,7 @@ export class FindWidget {
   public getState(): FindWidgetState {
     return {
       text: this.text,
-      currentHash: this.getCurrentHash(),
+      currentHash: this.history.owner ? null : this.getCurrentHash(),
       visible: this.visible,
       caseSensitive: this.caseSensitive,
       regex: this.regex,
@@ -329,14 +456,35 @@ export class FindWidget {
 
   /* === Matching === */
 
+  private onQueryChanged() {
+    this.history.end("idle");
+    this.widgetElem.removeAttribute(ATTR_ERROR);
+    this.clearMatches();
+    this.findMatches(this.getCurrentHash(), true);
+    this.openCommitDetailsViewForCurrentMatchIfEnabled();
+  }
+
+  private setRegexError(message: string) {
+    if (this.history.status !== "regexError") this.history.end("regexError");
+    this.clearMatches();
+    this.matches = [];
+    this.matchHashes.clear();
+    this.mounted.clear();
+    this.patterns = null;
+    this.position = -1;
+    this.widgetElem.setAttribute(ATTR_ERROR, message);
+  }
+
   private findMatches(goToCommitHash: string | null, scrollToCommit: boolean) {
+    const commits = this.callbacks.getCommits();
+    this.loadedCount = countLoadedCommits(commits);
     this.matches = [];
     this.matchHashes.clear();
     this.mounted.clear();
     this.patterns = null;
     this.position = -1;
 
-    if (this.text !== "") {
+    if (this.text !== "" && this.history.status !== "regexError") {
       const regexText = this.regex ? this.text : this.text.replace(REGEX_META_CHARS, "\\$&");
       const flags = `u${this.caseSensitive ? "" : "i"}`;
 
@@ -349,35 +497,35 @@ export class FindWidget {
       } catch (e) {
         findPattern = null;
         findGlobalPattern = null;
-        this.widgetElem.setAttribute(ATTR_ERROR, e instanceof Error ? e.message : String(e));
+        this.setRegexError(e instanceof Error ? e.message : String(e));
       }
 
       if (findPattern !== null && findGlobalPattern !== null) {
         this.patterns = { single: findPattern, global: findGlobalPattern };
 
-        const commits = this.callbacks.getCommits();
         for (let i = 0; i < commits.length; i++) {
           const commit = commits[i];
           if (commit.hash === UNCOMMITTED_CHANGES_HASH) continue;
-          const matched = matchesCommit(commit, findPattern, this.regex ? findGlobalPattern : null);
-          if (matched === null) {
-            this.widgetElem.setAttribute(ATTR_ERROR, t(ZERO_LENGTH_MATCH_ERROR));
-            this.matches = [];
-            this.matchHashes.clear();
+          const matched = matchesCommit(
+            commit,
+            findPattern,
+            this.regex ? findGlobalPattern : null,
+            true
+          );
+          if (matched === "regexError") {
+            this.setRegexError(t(ZERO_LENGTH_MATCH_ERROR));
             break;
           }
-          if (matched) {
+          if (matched === "match") {
             this.matches.push(commit.hash);
             this.matchHashes.add(commit.hash);
           }
         }
         this.repaintMountedMatches(commits);
       }
-    } else {
+    } else if (this.text === "") {
       this.widgetElem.removeAttribute(ATTR_ERROR);
     }
-
-    this.syncNavigationState();
 
     let newPos = -1;
     if (this.matches.length > 0) {
@@ -394,41 +542,28 @@ export class FindWidget {
   }
 
   public repaintMountedMatches(commits = this.callbacks.getCommits()) {
-    this.mounted.clear();
+    const previous = this.mounted;
+    this.mounted = new Map();
     if (!this.visible || !this.patterns || !this.matchHashes.size) return;
     for (const row of Array.from(getCommitElems())) {
       const hash = commits[Number(row.dataset.id)]?.hash;
       if (!hash || !this.matchHashes.has(hash)) continue;
       this.mounted.set(hash, row);
-      if (this.markRow(row, hash, this.patterns.single, this.patterns.global)) {
-        this.widgetElem.setAttribute(ATTR_ERROR, t(ZERO_LENGTH_MATCH_ERROR));
-        this.clearMatches();
-        this.matches = [];
-        this.matchHashes.clear();
-        this.position = -1;
-        this.syncNavigationState();
-        this.updatePosition(-1, false);
-        return;
-      }
+      if (previous.get(hash) !== row)
+        this.markRow(row, hash, this.patterns.single, this.patterns.global);
       row.classList.toggle(CLASS_FIND_CURRENT_COMMIT, hash === this.getCurrentHash());
     }
   }
 
   private markRow(row: HTMLElement, hash: string, findPattern: RegExp, findGlobalPattern: RegExp) {
-    let zeroLengthMatch = false;
     const textElems = getChildNodesWithTextContent(row);
     for (let k = 0; k < textElems.length; k++) {
       const textElem = textElems[k];
       let matchStart = 0;
       let matchEnd = 0;
       const text = textElem.textContent!;
-      findGlobalPattern.lastIndex = 0;
-      let match: RegExpExecArray | null;
-      while ((match = findGlobalPattern.exec(text)) !== null) {
-        if (match[0].length === 0) {
-          zeroLengthMatch = true;
-          break;
-        }
+      for (const match of text.matchAll(findGlobalPattern)) {
+        if (match[0].length === 0 || match.index === undefined) continue;
         if (matchEnd !== match.index) {
           if (matchStart !== matchEnd) {
             textElem.parentNode!.insertBefore(
@@ -442,7 +577,7 @@ export class FindWidget {
           );
           matchStart = match.index;
         }
-        matchEnd = findGlobalPattern.lastIndex;
+        matchEnd = match.index + match[0].length;
       }
       if (matchEnd > 0) {
         if (matchStart !== matchEnd) {
@@ -457,7 +592,6 @@ export class FindWidget {
           textElem.parentNode!.removeChild(textElem);
         }
       }
-      if (zeroLengthMatch) break;
     }
 
     if (
@@ -471,8 +605,6 @@ export class FindWidget {
         commitNode
       );
     }
-
-    return zeroLengthMatch;
   }
 
   private clearMatches() {
@@ -486,7 +618,7 @@ export class FindWidget {
         let node = matchElem.previousSibling;
         const prevElementSibling = matchElem.previousElementSibling;
         while (node !== null && node !== prevElementSibling && node.textContent !== null) {
-          text = node.textContent + text;
+          text = `${node.textContent}${text}`;
           matchElem.parentNode!.removeChild(node);
           node = matchElem.previousSibling;
         }
@@ -494,7 +626,7 @@ export class FindWidget {
         node = matchElem.nextSibling;
         const nextElementSibling = matchElem.nextElementSibling;
         while (node !== null && node !== nextElementSibling && node.textContent !== null) {
-          text = text + node.textContent;
+          text = `${text}${node.textContent}`;
           matchElem.parentNode!.removeChild(node);
           node = matchElem.nextSibling;
         }
@@ -515,23 +647,30 @@ export class FindWidget {
         this.callbacks.scrollToCommit(this.matches[position], false);
       }
     }
-    this.positionElem.textContent =
-      this.matches.length > 0
-        ? t("find.position", this.position + 1, this.matches.length)
-        : t("find.noResults");
+    this.renderStatus();
     this.callbacks.saveState();
   }
 
   private prev() {
-    if (this.matches.length === 0) return;
-    this.updatePosition(this.position > 0 ? this.position - 1 : this.matches.length - 1, true);
-    this.openCommitDetailsViewForCurrentMatchIfEnabled();
+    this.navigate(
+      this.position > 0 ? this.position - 1 : this.matches.length + this.history.unreadCount - 1
+    );
   }
 
   private next() {
-    if (this.matches.length === 0) return;
-    this.updatePosition(this.position < this.matches.length - 1 ? this.position + 1 : 0, true);
-    this.openCommitDetailsViewForCurrentMatchIfEnabled();
+    this.navigate(
+      this.position < this.matches.length + this.history.unreadCount - 1 ? this.position + 1 : 0
+    );
+  }
+
+  private navigate(index: number) {
+    if (this.navigating || this.inputElem.disabled || index < 0) return;
+    if (index < this.matches.length) {
+      this.selectLoadedMatch(this.matches[index]);
+      return;
+    }
+    const match = this.history.unread[index - this.matches.length];
+    if (match && this.history.owner) this.callbacks.navigateToUnread?.(match, this.history.owner);
   }
 
   private openCommitDetailsViewForCurrentMatchIfEnabled() {
@@ -557,6 +696,40 @@ export class FindWidget {
 
   /* === Helpers === */
 
+  private renderStatus() {
+    const { status, unreadCount, owner } = this.history;
+    const total = this.matches.length + unreadCount;
+    const suffix = status === "paused" ? "+" : "";
+    this.scopeElem.textContent = owner
+      ? t("find.fullScope")
+      : t("find.loadedScope", this.loadedCount);
+    this.positionElem.textContent =
+      total === 0
+        ? t("find.noResults")
+        : owner
+          ? t(
+              "find.fullPosition",
+              this.position + 1,
+              `${total}${suffix}`,
+              `${unreadCount}${suffix}`
+            )
+          : t("find.position", this.position + 1, total);
+    const canStart = this.callbacks.getSearchStart() !== undefined;
+    let message = "";
+    if (status === "regexError") message = this.widgetElem.getAttribute(ATTR_ERROR) ?? "";
+    else if (status === "running") message = t("find.running", this.history.examined);
+    else if (status === "readError") message = t("find.readError", this.history.errorMessage);
+    else if (status !== "idle") message = t(`find.${status}`);
+    else if (!canStart) message = t("find.reloadFirst");
+    this.statusElem.textContent = owner ? `${message} ${t("find.excludeStashes")}` : message;
+    this.startElem.hidden = !!owner && status !== "readError";
+    this.startElem.disabled =
+      !canStart || !this.patterns || this.inputElem.disabled || this.inputElem.value !== this.text;
+    this.continueElem.hidden = status !== "paused";
+    this.cancelElem.hidden = !owner;
+    this.syncNavigationState();
+  }
+
   private static buttonHtml(id: string, name: string, className: string, content: string): string {
     const classAttr = className === "" ? "" : ` class="${className}"`;
     return `<button type="button" id="${id}"${classAttr} title="${name}" aria-label="${name}">${content}</button>`;
@@ -577,7 +750,10 @@ export class FindWidget {
 
   // Previous / next need results and an enabled input (results are stale while the list reloads).
   private syncNavigationState() {
-    const disabled = this.inputElem.disabled || this.matches.length === 0;
+    const disabled =
+      this.navigating ||
+      this.inputElem.disabled ||
+      (this.matches.length === 0 && this.history.unreadCount === 0);
     for (const elem of [this.prevElem, this.nextElem]) {
       this.toggleClass(elem, CLASS_DISABLED, disabled);
       elem.disabled = disabled;

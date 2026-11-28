@@ -51,6 +51,7 @@ const DISPLAY_NONE = "none";
 // One session per shown dialog: closures compare their session with the active one so a
 // dialog that was replaced later neither closes the newer dialog nor moves focus.
 interface DialogSession {
+  readonly onClose?: () => void;
   readonly origin: FocusOrigin | null;
   readonly source: HTMLElement | null;
 }
@@ -68,18 +69,24 @@ function isDialogSubmittable(): boolean {
 export function showConfirmationDialog(
   message: string,
   confirmed: () => void,
-  sourceElem: HTMLElement | null
+  sourceElem: HTMLElement | null,
+  dismissed?: () => void
 ) {
-  showDialog(
+  let accepted = false;
+  return showDialog(
     message,
     "",
     t("dialog.yes"),
     t("dialog.no"),
     () => {
+      accepted = true;
       hideDialog(REASON_KEYBOARD);
       confirmed();
     },
-    sourceElem
+    sourceElem,
+    () => {
+      if (!accepted) dismissed?.();
+    }
   );
 }
 
@@ -429,9 +436,11 @@ function showDialog(
   actionName: string | null,
   dismissName: string,
   actioned: (() => void) | null,
-  sourceElem: HTMLElement | null
+  sourceElem: HTMLElement | null,
+  onClose?: () => void
 ) {
-  const session = captureSession(sourceElem);
+  const session = { ...captureSession(sourceElem), onClose };
+  activeSession?.onClose?.();
   activeSession = session;
   lastDialogFocus = null;
   dialogBacking.className = CLASS_ACTIVE;
@@ -460,6 +469,7 @@ function showDialog(
   dialog.addEventListener(EVENT_KEYDOWN, handleDialogKeydown);
   document.addEventListener(EVENT_FOCUS_IN, handleDocumentFocusIn, CAPTURE);
   focusInDialog(dismissBtn);
+  return () => closeSession(session, "replace");
 }
 
 /**
@@ -484,6 +494,7 @@ export function hideDialog(reason?: FocusCloseReason) {
     dialogMenuSource = null;
   }
   restoreBackground();
+  session?.onClose?.();
   if (reason === REASON_KEYBOARD && session !== null) focusOrigin(session);
 }
 

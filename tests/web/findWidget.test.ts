@@ -2,6 +2,8 @@
 import type { Mock } from "vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import english from "../../l10n/web/web.l10n.en.json";
+import japanese from "../../l10n/web/web.l10n.ja.json";
 import type * as GG from "../../src/types";
 import type { FindWidgetCallbacks } from "../../web/findWidget";
 import {
@@ -11,6 +13,7 @@ import {
   SEARCH_DEBOUNCE_MS
 } from "../../web/findWidget";
 import { configureFocusContext, markFocusTarget } from "../../web/keyboardNavigation";
+import { vscode } from "../../web/utils";
 
 /* === Mocks === */
 
@@ -31,6 +34,7 @@ const ABBREV_LENGTH = 8;
 
 function createMockCallbacks(): FindWidgetCallbacks {
   return {
+    getSearchStart: vi.fn(() => undefined),
     getCommits: vi.fn(() => []),
     scrollToCommit: vi.fn(),
     saveState: vi.fn(),
@@ -95,6 +99,347 @@ function getMatchSpans(): Element[] {
 function getHighlightedRows(): Element[] {
   return Array.from(document.getElementsByClassName(CLASS_FIND_CURRENT_COMMIT));
 }
+
+// @see docs/testing/perspectives/web/findWidget-test.md (S14, S15)
+describe("full history find controls", () => {
+  const start = {
+    repo: "/repo",
+    viewId: "this-graph",
+    skip: 300,
+    snapshot: "current",
+    branches: ["main"],
+    authors: ["Ada"],
+    showRemoteBranches: true,
+    commitOrdering: "date"
+  } as const;
+  const hash = "12345678a1234567890123456789012345678901";
+  const priorMessages = globalThis.webviewMessages;
+  const priorLocale = globalThis.webviewLocale;
+  const source = makeCommit({
+    hash,
+    message: "Fix Issue",
+    author: "Ada",
+    email: "hidden@example.com",
+    refs: [
+      { type: "head", name: "feature", hash },
+      { type: "remote", name: "origin/feature", hash },
+      { type: "remote", name: "fork/topic", hash },
+      { type: "tag", name: "v7", hash }
+    ],
+    stash: { selector: "stash@{3}", baseHash: hash, untrackedFilesHash: null }
+  });
+  let widget: FindWidget;
+  let cb: FindWidgetCallbacks;
+  let loaded: GG.GitCommitNode[];
+  const button = (id: string) => document.getElementById(id) as HTMLButtonElement;
+  const status = () => document.getElementById("findStatus")!.textContent;
+  const scope = () => document.getElementById("findScope")!.textContent;
+  const sent = () => vi.mocked(vscode.postMessage).mock.calls.map(([message]) => message);
+  function setup(rows: GG.GitCommitNode[]) {
+    document.body.innerHTML = "";
+    loaded = rows;
+    cb = {
+      ...createMockCallbacks(),
+      getSearchStart: () => ({
+        ...start,
+        branches: [...start.branches],
+        authors: [...start.authors]
+      }),
+      getCommits: () => loaded,
+      getCommitId: (target) => {
+        const index = loaded.findIndex((commit) => commit.hash === target);
+        return index === -1 ? null : index;
+      },
+      navigateToUnread: vi.fn()
+    };
+    widget = new FindWidget(cb);
+  }
+  function batch(commits: GG.GitCommitNode[], hasMore: boolean, firstPosition = 301) {
+    const request = sent().at(-1);
+    if (
+      !request ||
+      (request.command !== "startHistorySearch" && request.command !== "nextHistorySearch")
+    )
+      throw new Error("Expected a batch request");
+    widget.receiveHistorySearch({
+      ...request,
+      command: "historySearchBatch",
+      kind: "ok",
+      commits,
+      firstPosition,
+      hasMore
+    });
+  }
+  function input(value: string) {
+    const field = document.getElementById("findInput") as HTMLInputElement;
+    field.value = value;
+    field.dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(SEARCH_DEBOUNCE_MS);
+  }
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("webviewMessages", english);
+    vi.mocked(vscode.postMessage).mockClear();
+    vi.mocked(getBranchLabels).mockImplementation(
+      (await vi.importActual<typeof import("../../web/branchLabels")>("../../web/branchLabels"))
+        .getBranchLabels
+    );
+  });
+  afterEach(() => {
+    document.body.innerHTML = "";
+    vi.stubGlobal("webviewMessages", priorMessages);
+    vi.stubGlobal("webviewLocale", priorLocale);
+    vi.mocked(getBranchLabels).mockImplementation(() => ({ heads: [], remotes: [], tags: [] }));
+    vi.useRealTimers();
+  });
+
+  // Case: TC-509, TC-510, TC-512, TC-513
+  it.each([
+    ["fix issue", false, false, 1, 1],
+    ["fix issue", true, false, 0, 0],
+    ["^Ada$", false, true, 1, 1],
+    ["^feature$", false, true, 1, 1],
+    ["^origin$", false, true, 1, 1],
+    ["fork/topic", false, false, 1, 1],
+    ["v7", false, false, 1, 1],
+    ["24 Feb 2026", false, false, 1, 1],
+    ["@{3}", false, false, 1, 0],
+    ["hidden@example.com", false, false, 0, 0],
+    ["^12345678(?=a)", false, true, 1, 1],
+    ["8901$", false, true, 0, 0],
+    ["34567", false, false, 1, 1],
+    ["Ada|(?=wt8)", false, true, 1, 1]
+  ] as const)(
+    "checks %s with the same model on screen, off screen and unread (TC-509, TC-510, TC-512, TC-513)",
+    (term, caseSensitive, regex, loadedHits, unreadHits) => {
+      setup([source]);
+      const row = createCommitRow(0, [source.message, source.author, "wt8", hash.slice(0, 8)]);
+      triggerSearch(widget, term, { caseSensitive, regex });
+      expect(widget.getCurrentHash()).toBe(loadedHits ? hash : null);
+      expect(row.classList.contains(CLASS_FIND_CURRENT_COMMIT)).toBe(!!loadedHits);
+      row.remove();
+      widget.refresh();
+      expect(widget.getCurrentHash()).toBe(loadedHits ? hash : null);
+      loaded = [];
+      widget.refresh();
+      button("findStart").click();
+      batch([source], false);
+      expect(widget.history.unreadCount).toBe(unreadHits);
+      expect(document.querySelectorAll("tr")).toHaveLength(0);
+    }
+  );
+
+  // Case: TC-511, TC-513
+  it.each([
+    ["^$", ""],
+    ["Ada|(?=Fix)", "Fix Issue"],
+    ["Fix|(?=Issue)", "Fix Issue"],
+    ["^(?=12345678a)", "plain"]
+  ])(
+    "prioritizes zero-width errors for %s at any model location (TC-511, TC-513)",
+    (term, message) => {
+      for (const where of ["mounted", "unmounted", "unread"]) {
+        const commit = { ...source, message };
+        setup(where === "unread" ? [] : [commit]);
+        if (where === "mounted") createCommitRow(0, [message, source.author, hash.slice(0, 8)]);
+        triggerSearch(widget, term, { regex: true });
+        if (where === "unread") {
+          button("findStart").click();
+          batch([commit], false);
+        }
+        expect(status()).toBe(english["find.zeroLengthRegex"]);
+        expect(getPositionText()).toBe("No Results");
+        expect(widget.getCurrentHash()).toBeNull();
+        expect(button("findStart").disabled).toBe(true);
+      }
+    }
+  );
+
+  // Case: TC-514, TC-516
+  it("clears every match on late regex failure until the text or options change (TC-514, TC-516)", () => {
+    setup([{ ...source, message: "ok" }]);
+    createCommitRow(0, ["ok", source.author, hash.slice(0, 8)]);
+    widget.show(false);
+    expect(button("findStart").disabled).toBe(true);
+    button("findRegex").click();
+    input("[");
+    expect(button("findStart").disabled).toBe(true);
+    expect(sent()).toEqual([]);
+    input("ok|(?=fix)");
+    button("findStart").click();
+    batch([{ ...source, hash: "earlier", message: "ok" }], true);
+    expect(getPositionText()).toBe("1 of 2 (1 unloaded)");
+    batch([{ ...source, hash: "later", message: "fix issue" }], false);
+    expect(getMatchSpans()).toEqual([]);
+    expect(widget.getCurrentHash()).toBeNull();
+    widget.refresh();
+    widget.repaintMountedMatches();
+    expect(button("findStart").disabled).toBe(true);
+    expect(widget.history.unreadCount).toBe(0);
+    expect(status()).toBe(english["find.zeroLengthRegex"]);
+    button("findCaseSensitive").click();
+    expect(button("findStart").disabled).toBe(false);
+    expect(getPositionText()).toBe("1 of 1");
+    widget.close();
+    expect(widget.getState().text).toBe("");
+  });
+
+  // Case: TC-515
+  it("starts only on request and reports the filtered hit at position 400 (TC-515)", () => {
+    setup(Array.from({ length: 300 }, (_, index) => makeCommit({ hash: String(index) })));
+    widget.show(false);
+    input("needle");
+    expect(scope()).toBe("Searching loaded commits (300)");
+    expect(sent()).toEqual([]);
+    button("findStart").click();
+    expect(sent()).toEqual([
+      { ...start, command: "startHistorySearch", generation: 1, requestId: 1 }
+    ]);
+    batch(
+      Array.from({ length: 100 }, (_, index) =>
+        makeCommit({ hash: String(301 + index), message: index === 99 ? "needle" : "miss" })
+      ),
+      false
+    );
+    expect(getPositionText()).toBe("0 of 1 (1 unloaded)");
+    button("findNext").click();
+    expect(cb.navigateToUnread).toHaveBeenCalledWith(
+      { hash: "400", position: 400 },
+      widget.history.owner
+    );
+  });
+
+  // Case: TC-515, TC-519
+  it.each([true, false])(
+    "restores a worktree hit at position 400 after EOF when pinned before scanning is %s (TC-515, TC-519)",
+    (initiallyPinned) => {
+      const ordinary = Array.from({ length: 300 }, (_, index) =>
+        makeCommit({ hash: String(index + 1) })
+      );
+      const pin = makeCommit({ hash: "pin", message: "needle" });
+      setup(initiallyPinned ? [...ordinary, pin] : ordinary);
+      triggerSearch(widget, "needle");
+      button("findStart").click();
+      const owner = widget.history.owner;
+      batch(
+        [
+          ...Array.from({ length: 99 }, (_, index) => makeCommit({ hash: String(301 + index) })),
+          pin
+        ],
+        false
+      );
+      if (!initiallyPinned) {
+        expect(getPositionText()).toBe("0 of 1 (1 unloaded)");
+        loaded = [...ordinary, pin];
+        widget.refresh();
+      }
+      expect(getPositionText()).toBe("1 of 1 (0 unloaded)");
+      loaded = ordinary;
+      widget.refresh();
+      expect(widget.history.status).toBe("complete");
+      expect(getPositionText()).toBe("0 of 1 (1 unloaded)");
+      button("findNext").click();
+      expect(cb.navigateToUnread).toHaveBeenCalledWith({ hash: "pin", position: 400 }, owner);
+      expect(sent().map((message) => message.command)).toEqual(["startHistorySearch"]);
+    }
+  );
+
+  // Case: TC-519
+  it("navigates loaded hits in row order and hands off unread hits by position, including wraparound (TC-519)", () => {
+    const makeHit = (index: number) => makeCommit({ hash: String(index), message: "needle" });
+    setup([makeHit(1), makeHit(2), makeHit(3)]);
+    triggerSearch(widget, "needle");
+    button("findStart").click();
+    batch(
+      Array.from({ length: 9 }, (_, index) => makeHit(301 + index)),
+      false
+    );
+    button("findNext").click();
+    expect(widget.getCurrentHash()).toBe("2");
+    button("findNext").click();
+    expect(getPositionText()).toBe("3 of 12 (9 unloaded)");
+    button("findNext").click();
+    expect(cb.navigateToUnread).toHaveBeenLastCalledWith(
+      { hash: "301", position: 301 },
+      widget.history.owner
+    );
+    loaded = [...loaded, makeHit(301)];
+    widget.refresh();
+    expect(widget.selectLoadedMatch("301")).toBe(true);
+    expect(getPositionText()).toBe("4 of 12 (8 unloaded)");
+    button("findNext").click();
+    expect(cb.navigateToUnread).toHaveBeenLastCalledWith(
+      { hash: "302", position: 302 },
+      widget.history.owner
+    );
+    widget.selectLoadedMatch("1");
+    button("findPrev").click();
+    expect(cb.navigateToUnread).toHaveBeenLastCalledWith(
+      { hash: "309", position: 309 },
+      widget.history.owner
+    );
+    loaded = [...loaded, ...Array.from({ length: 8 }, (_, index) => makeHit(302 + index))];
+    widget.refresh();
+    widget.selectLoadedMatch("309");
+    button("findNext").click();
+    expect(getPositionText()).toBe("1 of 12 (0 unloaded)");
+  });
+
+  // Case: TC-517, TC-518
+  it.each([
+    [english, "en"],
+    [japanese, "ja"]
+  ] as const)("renders search states and controls in $1 (TC-517, TC-518)", (messages, locale) => {
+    vi.stubGlobal("webviewMessages", messages);
+    vi.stubGlobal("webviewLocale", locale);
+    setup([source]);
+    triggerSearch(widget, "Ada");
+    button("findStart").click();
+    expect(scope()).toBe(messages["find.fullScope"]);
+    expect(status()).toContain(messages["find.running"].replace("{0}", "0"));
+    expect(status()).toContain(messages["find.excludeStashes"]);
+    const hits = Array.from({ length: 1000 }, (_, i) => ({ ...source, hash: String(i) }));
+    batch(hits, true);
+    expect(button("findContinue").hidden).toBe(false);
+    expect(getPositionText()).toBe(
+      messages["find.fullPosition"]
+        .replace("{0}", "1")
+        .replace("{1}", "1001+")
+        .replace("{2}", "1000+")
+    );
+    button("findContinue").click();
+    expect(button("findContinue").hidden).toBe(true);
+    expect(status()).toContain(messages["find.running"].replace("{0}", "1000"));
+    batch([], false);
+    expect(status()).toContain(messages["find.complete"]);
+    button("findCancel").click();
+    expect(status()).toBe(messages["find.cancelled"]);
+    expect(widget.getCurrentHash()).toBe(hash);
+    button("findStart").click();
+    batch([hits[0]], true);
+    widget.receiveHistorySearch({
+      ...widget.history.owner!,
+      requestId: 2,
+      command: "historySearchBatch",
+      kind: "error",
+      message: "read failed"
+    });
+    expect(status()).toContain("read failed");
+    expect(widget.history.unreadCount).toBe(1);
+    expect(button("findStart").hidden).toBe(false);
+    expect(button("findContinue").hidden).toBe(true);
+    button("findPrev").click();
+    expect(cb.navigateToUnread).toHaveBeenCalledWith(
+      { hash: "0", position: 301 },
+      widget.history.owner
+    );
+    input("absent");
+    button("findStart").click();
+    batch([], false);
+    expect(scope()).toBe(messages["find.fullScope"]);
+    expect(getPositionText()).toBe(messages["find.noResults"]);
+  });
+});
 
 /* === Tests === */
 

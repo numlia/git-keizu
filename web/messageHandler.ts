@@ -1,13 +1,17 @@
 import type {
+  CommitOrdering,
   GitCommitDetails,
-  GitFileChange,
   GitRepoSet,
   ResponseAppendCommits,
+  ResponseCompareCommits,
   ResponseFileHistory,
+  ResponseHistorySearchBatch,
+  ResponseHistorySearchValidation,
   ResponseLoadBranchCleanup,
   ResponseLoadBranches,
   ResponseLoadCommits,
   ResponseMessage,
+  SearchRequestKey,
   WorktreePathViewState
 } from "../src/types";
 import { hideDialog, showErrorDialog } from "./dialogs";
@@ -19,9 +23,13 @@ import { refreshGraphOrDisplayError } from "./utils";
 export type RefreshMode = "soft" | "forceRender" | "hard";
 
 export interface GitKeizuViewAPI {
+  setCommitOrdering(ordering: CommitOrdering): void;
+  acceptCommitDetails(key: SearchRequestKey | undefined, hash?: string): boolean;
+  receiveHistorySearchBatch(response: ResponseHistorySearchBatch): void;
+  receiveHistorySearchValidation(response: ResponseHistorySearchValidation): void;
   hideCommitDetails(): void;
   showCommitDetails(commitDetails: GitCommitDetails, fileTree: GitFolder): void;
-  showCompareResult(fileChanges: GitFileChange[], fromHash: string, toHash: string): void;
+  showCompareResult(response: ResponseCompareCommits): void;
   loadAvatar(email: string, image: string): void;
   loadBranchCleanup(response: ResponseLoadBranchCleanup): void;
   receiveBranches(response: ResponseLoadBranches): void;
@@ -37,6 +45,15 @@ export interface GitKeizuViewAPI {
 
 export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): void {
   switch (msg.command) {
+    case "setCommitOrdering":
+      gitKeizu.setCommitOrdering(msg.ordering);
+      break;
+    case "historySearchBatch":
+      gitKeizu.receiveHistorySearchBatch(msg);
+      break;
+    case "historySearchValidation":
+      gitKeizu.receiveHistorySearchValidation(msg);
+      break;
     case "addTag":
       refreshOrError(gitKeizu, msg.status, t("error.addTag"));
       break;
@@ -81,6 +98,7 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       refreshOrError(gitKeizu, msg.status, t("error.cleanUntrackedFiles"));
       break;
     case "commitDetails":
+      if (!gitKeizu.acceptCommitDetails(msg.searchKey, msg.commitDetails?.hash)) break;
       if (msg.commitDetails === null) {
         gitKeizu.hideCommitDetails();
         showErrorDialog(t("error.commitDetails"), null, null);
@@ -99,11 +117,7 @@ export function handleMessage(msg: ResponseMessage, gitKeizu: GitKeizuViewAPI): 
       }
       break;
     case "compareCommits":
-      if (msg.fileChanges === null) {
-        showErrorDialog(t("error.compareCommits"), null, null);
-      } else {
-        gitKeizu.showCompareResult(msg.fileChanges, msg.fromHash, msg.toHash);
-      }
+      gitKeizu.showCompareResult(msg);
       break;
     case "copyToClipboard":
       if (msg.success === false) showErrorDialog(t("error.copyToClipboard", msg.type), null, null);

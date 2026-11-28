@@ -8,10 +8,11 @@ import type {
   BranchCleanupRow,
   GitCommitNode,
   GitFileChange,
+  GitKeizuViewState,
   GitRef,
   WorktreeCollection
 } from "../../src/types";
-import { UNCOMMITTED_CHANGES_HASH } from "../../src/types";
+import { HISTORY_SEARCH_BATCH_SIZE, UNCOMMITTED_CHANGES_HASH } from "../../src/types";
 import { getCommitDate } from "../../web/dates";
 import { captureFocusOrigin, moveFocusPast } from "../../web/keyboardNavigation";
 import { vscode } from "../../web/utils";
@@ -522,6 +523,7 @@ let Dropdown: DropdownClass;
 let FileHistoryController: FileHistoryClass;
 let FindWidget: FindWidgetClass;
 let Graph: GraphClass;
+let confirmationDepth: number;
 
 /* ------------------------------------------------------------------ */
 /* Boot                                                               */
@@ -530,7 +532,7 @@ let Graph: GraphClass;
 const clientHeightGetter = Object.getOwnPropertyDescriptor(Element.prototype, "clientHeight")!.get!;
 const resizeNotifications = new WeakMap<Element, () => void>();
 
-beforeAll(async () => {
+async function bootGraph(options: Partial<GitKeizuViewState> = {}, locale: "en" | "ja" = "en") {
   document.body.innerHTML = [
     '<div id="controls">',
     '<span id="repoControl"><div id="repoSelect" class="dropdown"></div></span>',
@@ -549,6 +551,7 @@ beforeAll(async () => {
     '<ul id="contextMenu"></ul><div id="dialogBacking"></div><div id="dialog"></div>'
   ].join("");
   (globalThis as Record<string, unknown>).viewState = {
+    viewId: "keyboard-test-view",
     repos: {
       [REPO]: { columnWidths: null, recentActions: [] },
       [OTHER_REPO]: { columnWidths: null, recentActions: [] }
@@ -572,9 +575,14 @@ beforeAll(async () => {
       stashUncommittedChanges: { includeUntracked: false },
       createWorktree: { openTerminal: true },
       removeWorktree: { deleteBranch: true }
-    }
+    },
+    ...options
   };
-  globalThis.webviewMessages = ENGLISH_MESSAGES;
+  globalThis.webviewLocale = locale;
+  globalThis.webviewMessages =
+    locale === "en"
+      ? ENGLISH_MESSAGES
+      : JSON.parse(readFileSync(resolve(process.cwd(), "l10n/web/web.l10n.ja.json"), "utf-8"));
   vi.stubGlobal(
     "ResizeObserver",
     class {
@@ -598,13 +606,15 @@ beforeAll(async () => {
     return clientHeightGetter.call(this);
   });
 
-  await import("../../web/main");
+  confirmationDepth = (await import("../../web/main")).SEARCH_CONFIRMATION_DEPTH;
   Dropdown = (await import("../../web/dropdown")).Dropdown;
   FileHistoryController = (await import("../../web/fileHistory")).FileHistoryController;
   FindWidget = (await import("../../web/findWidget")).FindWidget;
   Graph = (await import("../../web/graph")).Graph;
   loadBranches();
-});
+}
+
+beforeAll(() => bootGraph());
 
 afterAll(() => {
   vi.restoreAllMocks();
@@ -624,6 +634,253 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+});
+
+// @see docs/testing/perspectives/web/main-test/14-history-search-01.md (TC-835)
+// @see docs/testing/perspectives/web/historySearch-test.md (TC-015)
+describe("full-history calibration", () => {
+  const paint = { metric: "paint", sizes: [1000, 5000, 10000, 20000], budgetMs: 2000, fallback: 0 };
+  const batch = {
+    metric: "batch",
+    sizes: Array.from({ length: 100 }, (_, i) => (i + 1) * 1000),
+    budgetMs: 500,
+    fallback: 1
+  };
+
+  function selectLimit(maxima: Map<number, number>, budgetMs: number, fallback: number) {
+    const eligible = [...maxima].filter(([, worst]) => worst <= budgetMs);
+    return Math.max(fallback, ...eligible.map(([size]) => size));
+  }
+
+  // Case: TC-015, TC-835
+  it.each([paint, batch])(
+    "selects the largest passing $metric size at the inclusive time boundary",
+    ({ sizes, budgetMs, fallback }) => {
+      const maxima = new Map(sizes.map((size) => [size, budgetMs]));
+      expect(selectLimit(maxima, budgetMs, fallback)).toBe(sizes.at(-1));
+      for (const size of sizes.slice(2)) maxima.set(size, budgetMs + 0.1);
+      expect(selectLimit(maxima, budgetMs, fallback)).toBe(sizes[1]);
+      for (const size of sizes.slice(0, 2)) maxima.set(size, budgetMs + 0.1);
+      expect(selectLimit(maxima, budgetMs, fallback)).toBe(fallback);
+    }
+  );
+
+  // Case: TC-015, TC-835
+  it.each([paint, batch])(
+    "reproduces the product $metric limit from every full-size measured condition",
+    ({ metric, sizes, budgetMs, fallback }) => {
+      const raw = readFileSync(
+        resolve(process.cwd(), "docs/testing/history-search-calibration.csv"),
+        "utf8"
+      );
+      const maxima = new Map<number, number>();
+      const expected = new Set(
+        sizes.flatMap((size) =>
+          (metric === "paint" ? [0] : [0, 50000, 90000]).flatMap((skip) =>
+            ["history-search-benchmark", "not-present-in-history"].map((query) =>
+              [size, skip, query].join(",")
+            )
+          )
+        )
+      );
+      for (const record of raw.trim().split(/\r?\n/).slice(1)) {
+        const [kind, size, skip, query, count, warmup, ...trials] = record.split(",");
+        if (kind !== metric) continue;
+        expect(expected.delete([size, skip, query].join(","))).toBe(true);
+        expect(Number(warmup)).toBeGreaterThan(0);
+        const received = Math.min(Number(size), 100000 - Number(skip));
+        expect(Number(count)).toBe(received);
+        expect(trials).toHaveLength(5);
+        if (received < Number(size)) {
+          expect(trials).toEqual(["", "", "", "", ""]);
+          continue;
+        }
+        const scored = trials.map(Number);
+        expect(scored.every((time) => Number.isFinite(time) && time > 0)).toBe(true);
+        maxima.set(Number(size), Math.max(maxima.get(Number(size)) ?? 0, ...scored));
+      }
+      expect(expected.size).toBe(0);
+      expect(selectLimit(maxima, budgetMs, fallback)).toBe(
+        metric === "paint" ? confirmationDepth : HISTORY_SEARCH_BATCH_SIZE
+      );
+    }
+  );
+});
+
+// @see docs/testing/perspectives/web/main-test/14-history-search-01.md (S91)
+describe("full history search on the displayed graph", () => {
+  const control = (id: string) => document.getElementById(id) as HTMLButtonElement;
+  const info = (hashes: string[], snapshot = "verified") => ({
+    kind: "verified",
+    hashes,
+    snapshot,
+    requestedCount: posts("loadCommits").at(-1)!.maxCommits
+  });
+  function request() {
+    dispatch({ command: "refresh" });
+    loadBranches(false);
+    return posts("loadCommits").at(-1)!;
+  }
+  function respond(commits: GitCommitNode[], history: unknown, more = false) {
+    dispatch({
+      command: "loadCommits",
+      requestId: posts("loadCommits").at(-1)!.requestId,
+      commits,
+      history,
+      head: commits[0]?.hash,
+      moreCommitsAvailable: more,
+      hard: false
+    });
+  }
+  function find(term: string) {
+    if (!findWidgetIsVisible()) control("searchBtn").click();
+    const input = document.getElementById("findInput") as HTMLInputElement;
+    input.value = term;
+    input.dispatchEvent(new Event("input"));
+    vi.runOnlyPendingTimers();
+  }
+  function hit(hasMore: boolean) {
+    const start = posts("startHistorySearch").at(-1)!;
+    dispatch({
+      ...start,
+      command: "historySearchBatch",
+      kind: "ok",
+      firstPosition: 301,
+      commits: [node("result", [], { message: "needle" })],
+      hasMore
+    });
+  }
+  beforeEach(() => {
+    loadCommits(standardCommits());
+    clearPosts();
+    vi.useFakeTimers();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  // Case: TC-809, TC-810
+  it("takes the verified ordinary depth while a larger unpaged request is in flight (TC-809, TC-810)", () => {
+    find("needle");
+    expect(control("findStart").disabled).toBe(true);
+    expect(control("findStatus").textContent).toBe(ENGLISH_MESSAGES["find.reloadFirst"]);
+    expect(posts("loadCommits")).toEqual([]);
+    const initial = request();
+    const ordinary = Array.from({ length: 300 }, (_, index) => node(String(index), []));
+    const inserted = [
+      node(UNCOMMITTED_CHANGES_HASH, ["0"]),
+      node("pinned", []),
+      ...["s0", "s1"].map((hash, index) =>
+        node(hash, [], {
+          stash: { selector: `stash@{${index}}`, baseHash: "0", untrackedFilesHash: null }
+        })
+      )
+    ];
+    respond([...inserted, ...ordinary], info(ordinary.map((commit) => commit.hash)), true);
+    expect(control("findScope").textContent).toBe("Searching loaded commits (303)");
+    control("loadMoreCommitsBtn").click();
+    expect(posts("loadCommits").at(-1)!.maxCommits).toBe(400);
+    control("findStart").click();
+    expect(posts("startHistorySearch")).toEqual([
+      {
+        command: "startHistorySearch",
+        repo: REPO,
+        viewId: "keyboard-test-view",
+        generation: expect.any(Number),
+        requestId: 1,
+        branches: initial.branches,
+        authors: initial.authors,
+        commitOrdering: "date",
+        showRemoteBranches: true,
+        skip: 300,
+        snapshot: "verified"
+      }
+    ]);
+    respond(ordinary, info(ordinary.map((commit) => commit.hash)));
+  });
+
+  // Case: TC-811
+  it("searches a verified terminal graph with no page token (TC-811)", () => {
+    const commits = [node("loaded", [], { message: "needle" })];
+    request();
+    respond(commits, info(["loaded"]));
+    find("needle");
+    control("findStart").click();
+    const start = posts("startHistorySearch").at(-1)!;
+    dispatch({
+      ...start,
+      command: "historySearchBatch",
+      kind: "ok",
+      commits: [],
+      firstPosition: 301,
+      hasMore: false
+    });
+    expect(control("findPosition").textContent).toBe("1 of 1 (0 unloaded)");
+    expect(control("findStatus").textContent).toContain(ENGLISH_MESSAGES["find.complete"]);
+    expect(control("findNext").disabled).toBe(false);
+  });
+
+  // Case: TC-812, TC-813
+  it.each(["snapshot", "prefix", "reported", "unavailable", "legacy"])(
+    "ends the live search on %s with identical graph rows (TC-812, TC-813)",
+    (change) => {
+      const commits = [node("A", [], { message: "needle" }), node("B", [])];
+      request();
+      respond(commits, info(["A", "B"]));
+      find("needle");
+      control("findStart").click();
+      hit(false);
+      expect(control("findPosition").textContent).toBe("1 of 2 (1 unloaded)");
+      const previous = row("A");
+      request();
+      const changed = {
+        snapshot: info(["A", "B"], "changed"),
+        prefix: info(["B", "A"]),
+        reported: { kind: "historyChanged" },
+        unavailable: { kind: "unavailable" },
+        legacy: undefined
+      }[change];
+      respond(commits, changed);
+      expect(row("A")).toBe(previous);
+      expect(control("findPosition").textContent).toBe("1 of 1");
+      expect(control("findStatus").textContent).toBe(
+        ENGLISH_MESSAGES[
+          change === "unavailable" || change === "legacy"
+            ? "find.unavailable"
+            : "find.historyChanged"
+        ]
+      );
+      expect(control("findStart").disabled).toBe(
+        ["unavailable", "legacy", "reported"].includes(change)
+      );
+    }
+  );
+
+  // Case: TC-814, TC-817
+  it("recognizes a changed stash selector on a retained hash and merges matches loaded by hash (TC-814, TC-817)", () => {
+    const ordinary = node("ordinary", []);
+    const stash = node("stash", [], {
+      stash: { selector: "stash@{1}", baseHash: ordinary.hash, untrackedFilesHash: null }
+    });
+    request();
+    respond([stash, ordinary], info(["ordinary"]));
+    find("@{1}");
+    control("findStart").click();
+    hit(false);
+    request();
+    const moved = { ...stash, stash: { ...stash.stash!, selector: "stash@{0}" } };
+    respond([moved, ordinary], info(["ordinary"]));
+    expect(control("findPosition").textContent).toBe("No Results");
+    expect(row("stash").textContent).toContain("@{0}");
+    find("needle");
+    control("findStart").click();
+    hit(false);
+    expect(control("findPosition").textContent).toBe("0 of 1 (1 unloaded)");
+    request();
+    respond(
+      [moved, ordinary, node("result", [], { message: "needle" })],
+      info(["ordinary", "result"])
+    );
+    expect(control("findPosition").textContent).toBe("1 of 1 (0 unloaded)");
+  });
 });
 
 /* ------------------------------------------------------------------ */
@@ -1549,7 +1806,8 @@ describe("row keys per state (S70)", () => {
     openDetails("N");
     clearPosts();
     fire(row("M"), "click", { ctrlKey: true });
-    expect(posts()).toEqual(keyboardPosts);
+    expect(posts()).toEqual([{ ...keyboardPosts[0], requestId: expect.any(String) }]);
+    expect(posts()[0].requestId).not.toBe(keyboardPosts[0].requestId);
   });
 
   it("cancels the comparison on a modified Enter at the compare target (TC-668)", () => {
@@ -3955,4 +4213,801 @@ describe("Shift + arrows move only the target (S84)", () => {
     expect(posts()).toEqual([]);
     expect(event.defaultPrevented).toBe(false);
   });
+});
+
+// @see docs/testing/perspectives/web/main-test/14-history-search-01.md (S91–S93)
+describe("full history navigation and return on the displayed graph", () => {
+  const button = (id: string) => document.getElementById(id) as HTMLButtonElement;
+  const input = () => document.getElementById("findInput") as HTMLInputElement;
+  const target = node("result", [], { message: "needle" });
+  const origin = node("origin", []);
+  const hashes = (rows: GitCommitNode[]) => rows.map((commit) => commit.hash);
+
+  async function recreate(
+    options: Partial<GitKeizuViewState> = {},
+    state: WebViewState | null = null,
+    locale: "en" | "ja" = "en"
+  ) {
+    vi.resetModules();
+    vi.mocked(acquireVsCodeApi).mockReturnValue(vscode);
+    vi.mocked(vscode.getState).mockReturnValueOnce(state);
+    await bootGraph(options, locale);
+  }
+  function reply(
+    rows: GitCommitNode[],
+    ordinary = hashes(rows),
+    extra: Record<string, unknown> = {}
+  ) {
+    const request = posts("loadCommits").at(-1)!;
+    dispatch({
+      command: "loadCommits",
+      requestId: request.requestId,
+      hard: true,
+      commits: rows,
+      head: rows[0]?.hash,
+      moreCommitsAvailable: true,
+      history: {
+        kind: "verified",
+        requestedCount: request.maxCommits,
+        hashes: ordinary,
+        snapshot: "fixed"
+      },
+      ...extra
+    });
+  }
+  function refresh() {
+    dispatch({ command: "refresh" });
+    loadBranches(false);
+  }
+  function search(term: string) {
+    if (!findWidgetIsVisible()) button("searchBtn").click();
+    input().value = term;
+    input().dispatchEvent(new Event("input"));
+    vi.advanceTimersByTime(201);
+  }
+  function batch(commits: GitCommitNode[], firstPosition: number, hasMore = false) {
+    const request = posts("nextHistorySearch").at(-1) ?? posts("startHistorySearch").at(-1)!;
+    dispatch({
+      ...request,
+      command: "historySearchBatch",
+      kind: "ok",
+      commits,
+      firstPosition,
+      hasMore
+    });
+  }
+  function start(rows: GitCommitNode[] = [origin], term = "needle") {
+    reply(rows);
+    search(term);
+    button("findStart").click();
+  }
+  function approveIfAsked() {
+    document.getElementById("dialogAction")?.click();
+  }
+  function next() {
+    press(input(), "Enter");
+    approveIfAsked();
+  }
+  function saved(): WebViewState {
+    return vi.mocked(vscode.setState).mock.lastCall![0];
+  }
+  function detailReply(key: unknown, hash: string | null, body = "current details") {
+    dispatch({
+      command: "commitDetails",
+      searchKey: key,
+      commitDetails:
+        hash === null
+          ? null
+          : {
+              hash,
+              author: "A",
+              email: "",
+              committer: "C",
+              committerEmail: "",
+              date: 0,
+              parents: [],
+              body,
+              fileChanges: [FILE_CHANGE]
+            }
+    });
+  }
+
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    await recreate();
+  });
+  afterEach(() => vi.useRealTimers());
+
+  // Case: TC-815
+  it("merges a scroll-triggered page exactly once before any manual load (TC-815)", async () => {
+    await recreate({ loadMoreCommitsAutomatically: true });
+    reply([origin], [origin.hash], { pageToken: 71 });
+    search("needle");
+    button("findStart").click();
+    batch([target], 301);
+    clearPosts();
+    const scroller = scrollContainer();
+    Object.defineProperties(scroller, {
+      clientHeight: { value: 120 },
+      scrollHeight: { value: 900 }
+    });
+    scroller.scrollTop = 790;
+    scroller.dispatchEvent(new Event("scroll"));
+    expect(posts("loadCommits")).toEqual([
+      expect.objectContaining({ pageToken: 71, maxCommits: 400 })
+    ]);
+    const append = {
+      command: "appendCommits",
+      repo: REPO,
+      from: 71,
+      baseCount: 1,
+      requestId: posts("loadCommits")[0].requestId,
+      commits: [target],
+      moreCommitsAvailable: false
+    };
+    dispatch(append);
+    dispatch(append);
+    expect(saved().commits.map((commit) => commit.hash)).toEqual([origin.hash, target.hash]);
+    expect(saved().maxCommits).toBe(400);
+    expect(button("findPosition").textContent).toBe("1 of 1 (0 unloaded)");
+    expect(posts("cancelHistorySearch")).toEqual([]);
+  });
+
+  // Case: TC-817
+  it.each(["message", "author", "date", "refs"] as const)(
+    "rechecks a retained row when its %s changes (TC-817)",
+    (field) => {
+      const old = {
+        ...origin,
+        message: "old subject",
+        author: "old author",
+        date: 1000,
+        refs: [ref("origin", "old tag", "tag")]
+      };
+      const [changed, oldTerm, newTerm] = {
+        message: [{ ...old, message: "new subject" }, old.message, "new subject"],
+        author: [{ ...old, author: "new author" }, old.author, "new author"],
+        date: [
+          { ...old, date: 100000 },
+          getCommitDate(old.date).value,
+          getCommitDate(100000).value
+        ],
+        refs: [{ ...old, refs: [ref("origin", "new tag", "tag")] }, "old tag", "new tag"]
+      }[field] as [GitCommitNode, string, string];
+      start([old], oldTerm);
+      batch([], 301);
+      expect(button("findPosition").textContent).toBe("1 of 1 (0 unloaded)");
+      refresh();
+      reply([changed], [old.hash], { hard: false });
+      expect(button("findPosition").textContent).toBe("No Results");
+      search(newTerm);
+      expect(row(old.hash).classList.contains("findCurrentCommit")).toBe(true);
+    }
+  );
+
+  // Case: TC-818
+  it.each(["author", "branch", "remote", "ordering"])(
+    "keeps an unapplied author edit and expires the applied %s change (TC-818)",
+    (scope) => {
+      start([{ ...origin, author: "Ada" }]);
+      batch([target], 301);
+      const owner = posts("startHistorySearch").at(-1)!;
+      openDropdown("authorSelect");
+      fire(document.querySelector('#authorSelect [role="option"][title="Ada"]')!, "click");
+      refresh();
+      reply([{ ...origin, author: "Ada" }], [origin.hash], {
+        authors: ["Ada", "Bea"],
+        hard: false
+      });
+      pressEscape();
+      expect(button("findPosition").textContent).toBe("0 of 1 (1 unloaded)");
+      expect(posts("cancelHistorySearch")).toEqual([]);
+      if (scope === "author" || scope === "branch") {
+        const id = scope === "author" ? "authorSelect" : "branchSelect";
+        openDropdown(id);
+        fire(document.querySelectorAll(`#${id} [role="option"]`)[1], "click");
+        fire(document.querySelector(`#${id} .dropdownHint button`)!, "click");
+      } else if (scope === "remote") {
+        (document.getElementById("showRemoteBranchesCheckbox") as HTMLInputElement).click();
+      } else {
+        dispatch({ command: "setCommitOrdering", ordering: "topo" });
+      }
+      expect(posts("cancelHistorySearch")).toEqual([
+        expect.objectContaining({ generation: owner.generation })
+      ]);
+      expect(button("findPosition").textContent).toBe("No Results");
+    }
+  );
+
+  // Case: TC-819, TC-832
+  it.each(["running", "paused", "complete", "readError"])(
+    "drops the %s search and its return point on repo change (TC-819, TC-832)",
+    (status) => {
+      start();
+      const many = Array.from({ length: 1000 }, (_, i) => ({ ...target, hash: String(i) }));
+      batch(status === "paused" ? many : [target], 301, status !== "complete");
+      if (status === "readError")
+        dispatch({
+          ...posts("nextHistorySearch").at(-1),
+          command: "historySearchBatch",
+          kind: "error",
+          message: "log failed"
+        });
+      next();
+      const hit = status === "paused" ? many[0] : target;
+      reply([origin, hit]);
+      expect(button("findReturn").hidden).toBe(false);
+      dispatch({ command: "selectRepo", repo: OTHER_REPO });
+      loadBranches();
+      reply([origin]);
+      expect(button("findReturn").hidden).toBe(true);
+      expect(button("findScope").textContent).toBe("Searching loaded commits (1)");
+      expect(button("findPosition").textContent).toBe("No Results");
+    }
+  );
+
+  // Case: TC-825
+  it.each(["cancel", "close", "repo", "webview"])(
+    "ignores late approval and extension after %s (TC-825)",
+    async (action) => {
+      async function expire() {
+        if (action === "cancel") button("findCancel").click();
+        else if (action === "close") button("findClose").click();
+        else if (action === "repo") dispatch({ command: "selectRepo", repo: OTHER_REPO });
+        else await recreate({ viewId: "replacement" });
+      }
+      for (const pending of ["approval", "load"]) {
+        await recreate({ viewId: `old-${pending}` });
+        start();
+        batch([target], Math.max(confirmationDepth, 1000) + 1);
+        press(input(), "Enter");
+        const approval = button("dialogAction");
+        expect(approval).not.toBeNull();
+        if (pending === "load") approval.click();
+        const request = posts("loadCommits").at(-1)!;
+        await expire();
+        const sent = posts("loadCommits").length;
+        scrollContainer().scrollTop = 79;
+        approval.click();
+        if (pending === "load")
+          dispatch({
+            ...request,
+            command: "loadCommits",
+            head: target.hash,
+            commits: [target],
+            history: {
+              kind: "verified",
+              requestedCount: request.maxCommits,
+              hashes: [target.hash],
+              snapshot: "fixed"
+            },
+            hard: true,
+            moreCommitsAvailable: false
+          });
+        expect(posts("loadCommits")).toHaveLength(sent);
+        expect(scrollContainer().scrollTop).toBe(79);
+        expect(details()).toBeNull();
+        expect(table().querySelector(".findCurrentCommit")).toBeNull();
+        expect(document.getElementById("dialog")!.classList.contains("active")).toBe(false);
+      }
+    }
+  );
+
+  // Case: TC-829
+  it("rejects old details on both outcomes after redraw, switching matches, and recreating the graph (TC-829)", async () => {
+    function navigateWithDetails() {
+      start();
+      button("findOpenCdv").click();
+      batch([target, { ...target, hash: "second" }], 400);
+      next();
+      reply([origin, target, { ...target, hash: "second" }]);
+      return posts("commitDetails").at(-1)!.searchKey;
+    }
+    const old = navigateWithDetails();
+    await recreate({ viewId: "new-document" });
+    const initial = navigateWithDetails();
+    expect(initial).toEqual({ ...(old as object), viewId: "new-document" });
+    refresh();
+    reply([origin, target, { ...target, hash: "second" }]);
+    const redrawn = posts("commitDetails").at(-1)!.searchKey;
+    expect(redrawn).not.toEqual(initial);
+    scrollContainer().scrollTop = 198;
+    for (const key of [old, initial]) {
+      detailReply(key, target.hash, "stale");
+      detailReply(key, null);
+      expect(document.getElementById("cdvLoading")).not.toBeNull();
+      expect(scrollContainer().scrollTop).toBe(198);
+      expect(button("dialog").classList.contains("active")).toBe(false);
+    }
+    detailReply(redrawn, target.hash);
+    expect(details()?.textContent).toContain("current details");
+    next();
+    const current = posts("commitDetails").at(-1)!.searchKey;
+    expect(detailsOwner()).toBe("second");
+    detailReply(redrawn, target.hash);
+    detailReply(redrawn, null);
+    expect(button("dialog").classList.contains("active")).toBe(false);
+    expect(detailsOwner()).toBe("second");
+    detailReply(current, null);
+    expect(details()).toBeNull();
+    expect(button("dialog").textContent).toContain(ENGLISH_MESSAGES["error.commitDetails"]);
+  });
+
+  // Case: TC-833
+  it.each([false, true])(
+    "opening search exits file history (displayed %s) and ignores expired search replies (TC-833)",
+    (displayed) => {
+      const commits = standardCommits();
+      start(commits);
+      button("findOpenCdv").click();
+      batch([target], 301, true);
+      next();
+      reply([...commits, target]);
+      const oldKey = posts("commitDetails").at(-1)!.searchKey;
+      openDetails("M");
+      const previous = posts().length;
+      fire(document.querySelector("#commitDetails .highlightFileHistory")!, "click");
+      expect(
+        posts()
+          .slice(previous)
+          .map((message) => message.command)
+      ).toEqual(["cancelHistorySearch", "fileHistory"]);
+      const request = posts("fileHistory").at(-1)!;
+      const response = { ...request, entries: [{ hash: "M", historicalPath: FILE_PATH }] };
+      expect(findWidgetIsVisible()).toBe(false);
+      if (displayed) dispatch(response);
+      expect(historyIsActive()).toBe(true);
+      expect(row("M").classList.contains("fileHistoryCurrent")).toBe(displayed);
+      const before = detailsOwner();
+      const scrollBefore = scrollContainer().scrollTop;
+      detailReply(oldKey, null);
+      detailReply(oldKey, target.hash);
+      batch([target], 400);
+      expect(scrollContainer().scrollTop).toBe(scrollBefore);
+      expect(findWidgetIsVisible()).toBe(false);
+      expect(row("M").classList.contains("fileHistoryCurrent")).toBe(displayed);
+      expect(detailsOwner()).toBe(before);
+      expect(button("dialog").classList.contains("active")).toBe(false);
+      button("searchBtn").click();
+      expect(findWidgetIsVisible()).toBe(true);
+      expect(button("findReturn").hidden).toBe(true);
+      dispatch(response);
+      expect(historyIsActive()).toBe(false);
+      expect(detailsOwner()).toBe("M");
+    }
+  );
+
+  // Case: TC-819, TC-834
+  it("restores only the saved find preferences after a paused graph is recreated in another language (TC-819, TC-834)", async () => {
+    start();
+    button("findCaseSensitive").click();
+    button("findRegex").click();
+    button("findStart").click();
+    const many = Array.from({ length: 1000 }, (_, i) => ({ ...target, hash: String(i) }));
+    batch(many, 301, true);
+    next();
+    reply([origin, many[0]]);
+    expect(button("findContinue").hidden).toBe(false);
+    expect(button("findReturn").hidden).toBe(false);
+    const previous = saved();
+    clearPosts();
+    await recreate({ viewId: "new-language" }, previous, "ja");
+    expect(input().value).toBe("needle");
+    expect(button("findCaseSensitive").getAttribute("aria-pressed")).toBe("true");
+    expect(button("findRegex").getAttribute("aria-pressed")).toBe("true");
+    expect(button("findReturn").textContent).toBe("移動前に戻る");
+    expect(button("findReturn").hidden).toBe(true);
+    expect(button("findContinue").hidden).toBe(true);
+    expect(button("findScope").textContent).toBe(
+      globalThis.webviewMessages["find.loadedScope"].replace("{0}", "2")
+    );
+    expect(posts("startHistorySearch")).toEqual([]);
+  });
+
+  // Case: TC-820
+  it.each([false, true])(
+    "mounts the only hit at position 400, with details %s, and accepts the next key (TC-820)",
+    (showDetails) => {
+      const commits = Array.from({ length: 500 }, (_, i) =>
+        node(String(i), [], { message: i === 399 ? "needle" : "ordinary subject" })
+      );
+      Object.defineProperty(scrollContainer(), "clientHeight", { configurable: true, value: 480 });
+      vi.spyOn(HTMLElement.prototype, "offsetTop", "get").mockImplementation(function (
+        this: HTMLElement
+      ) {
+        if (this.id === "commitDetails" && this.previousElementSibling instanceof HTMLElement)
+          return this.previousElementSibling.offsetTop + ROW_HEIGHT;
+        return this.matches("tr.commit") ? HEADER_HEIGHT + Number(this.dataset.id) * ROW_HEIGHT : 0;
+      });
+      start(commits.slice(0, 300));
+      if (showDetails) button("findOpenCdv").click();
+      batch(commits.slice(300), 301);
+      expect(button("findPosition").textContent).toBe("0 of 1 (1 unloaded)");
+      expect(table().querySelector('[data-hash="399"]')).toBeNull();
+      clearPosts();
+      button("findNext").focus();
+      button("findNext").click();
+      approveIfAsked();
+      expect(posts("loadCommits")).toEqual([expect.objectContaining({ maxCommits: 500 })]);
+      reply(commits);
+      expect(button("findPosition").textContent).toBe("1 of 1 (0 unloaded)");
+      expect(row("399").classList.contains("findCurrentCommit")).toBe(true);
+      expect(row("399").querySelector(".findMatch")?.textContent).toBe("needle");
+      expect(scrollContainer().scrollTop).toBeGreaterThanOrEqual(row("399").offsetTop - 480);
+      expect(posts("commitDetails").map((message) => message.commitHash)).toEqual(
+        showDetails ? ["399"] : []
+      );
+      const select = vi.spyOn(FindWidget.prototype, "selectLoadedMatch");
+      expect(document.activeElement).toBe(input());
+      press(document.activeElement!, "Enter", { shiftKey: true });
+      expect(select).toHaveBeenCalledExactlyOnceWith("399");
+      expect(posts("loadCommits")).toHaveLength(1);
+    }
+  );
+
+  // Case: TC-829
+  it("isolates loaded-only details across redraw, full search, cancellation and same-hash reuse (TC-829)", () => {
+    const a = { ...origin, message: "needle" };
+    reply([a]);
+    search("needle");
+    button("findOpenCdv").click();
+    const loaded = posts("commitDetails").at(-1)!.searchKey;
+    expect(loaded).toMatchObject({
+      viewId: viewState.viewId,
+      repo: REPO,
+      requestId: expect.any(Number)
+    });
+    refresh();
+    reply([a]);
+    const redrawn = posts("commitDetails").at(-1)!.searchKey;
+    expect(redrawn).not.toEqual(loaded);
+    button("findStart").click();
+    batch([target], 400);
+    next();
+    reply([a, target]);
+    const b = posts("commitDetails").at(-1)!.searchKey;
+    expect(detailsOwner()).toBe(target.hash);
+    for (const stale of [loaded, redrawn, undefined]) detailReply(stale, null);
+    expect(button("dialog").classList.contains("active")).toBe(false);
+    expect(document.getElementById("cdvLoading")).not.toBeNull();
+    detailReply(b, target.hash, "B details");
+    next();
+    const aAgain = posts("commitDetails").at(-1)!.searchKey;
+    expect(detailsOwner()).toBe(a.hash);
+    for (const stale of [loaded, redrawn, undefined]) detailReply(stale, a.hash, "old A details");
+    expect(document.getElementById("cdvLoading")).not.toBeNull();
+    detailReply(aAgain, a.hash, "current A details");
+    button("findCancel").click();
+    button("findStart").click();
+    detailReply(loaded, null);
+    detailReply(aAgain, a.hash, "old A details");
+    expect(details()?.textContent).toContain("current A details");
+    expect(button("dialog").classList.contains("active")).toBe(false);
+  });
+
+  // Case: TC-830
+  it.each(["base", "previous comparison", "completed comparison"])(
+    "returns to the selected comparison when the cached files belong to %s (TC-830)",
+    (cache) => {
+      const a = node("A", ["B"]);
+      const b = node("B", ["C"]);
+      const c = node("C", []);
+      const file = (path: string) => [{ ...FILE_CHANGE, oldFilePath: path, newFilePath: path }];
+      const compare = (other: string, changes: GitFileChange[] | null) =>
+        dispatch({
+          command: "compareCommits",
+          fromHash: other,
+          toHash: a.hash,
+          fileChanges: changes
+        });
+      start([a, b, c]);
+      openDetails(a.hash);
+      if (cache === "previous comparison") {
+        fire(row(c.hash), "click", { ctrlKey: true });
+        compare(c.hash, file("a-c.txt"));
+        expect(details()?.textContent).toContain("a-c.txt");
+      }
+      fire(row(b.hash), "click", { ctrlKey: true });
+      if (cache === "completed comparison") compare(b.hash, file("a-b.txt"));
+      scrollContainer().scrollTop = 137;
+      batch([target], 400);
+      next();
+      reply([a, b, c, target]);
+      // The original comparison may finish while the search destination is displayed.
+      compare(b.hash, file("a-b.txt"));
+      clearPosts();
+      button("findReturn").click();
+      expect(detailsOwner()).toBe(a.hash);
+      expect(compareTargetRows()).toEqual([b.hash]);
+      expect(posts("loadCommits")).toEqual([]);
+      expect(posts("loadBranches")).toEqual([]);
+      expect(posts("commitDetails")).toEqual([]);
+      if (cache === "completed comparison") {
+        expect(posts("compareCommits")).toEqual([]);
+      } else {
+        expect(posts("compareCommits")).toEqual([
+          {
+            command: "compareCommits",
+            requestId: expect.any(String),
+            repo: REPO,
+            fromHash: b.hash,
+            toHash: a.hash
+          }
+        ]);
+        respondDetails(a.hash);
+        compare(c.hash, file("a-c.txt"));
+        compare(c.hash, null);
+        expect(button("dialog").classList.contains("active")).toBe(false);
+        expect(document.getElementById("cdvLoading")).not.toBeNull();
+        expect(details()?.textContent).not.toContain(FILE_PATH);
+        expect(details()?.textContent).not.toContain("a-c.txt");
+        expect(scrollContainer().scrollTop).toBe(137);
+        compare(b.hash, file("a-b.txt"));
+      }
+      expect(details()?.textContent).toContain("a-b.txt");
+      expect(scrollContainer().scrollTop).toBe(137);
+      compare(b.hash, file("replayed.txt"));
+      expect(details()?.textContent).not.toContain("replayed.txt");
+      expect(scrollContainer().scrollTop).toBe(137);
+    }
+  );
+
+  // Case: TC-830
+  it.each(["return", "redraw", "recreate"])(
+    "ignores both obsolete outcomes of the same working-tree comparison after %s (TC-830)",
+    async (change) => {
+      const working = node(UNCOMMITTED_CHANGES_HASH, [origin.hash]);
+      const commits = [working, origin];
+      reply(commits, [origin.hash]);
+      search("needle");
+      button("findStart").click();
+      openDetails(origin.hash);
+      fire(row(working.hash), "click", { ctrlKey: true });
+      const before = posts("compareCommits").at(-1)!;
+      scrollContainer().scrollTop = 137;
+      if (change === "return") {
+        batch([target], 400);
+        next();
+        reply([...commits, target], [origin.hash, target.hash]);
+        clearPosts();
+        button("findReturn").click();
+        expect(posts("loadCommits")).toEqual([]);
+      } else if (change === "redraw") {
+        refresh();
+        reply(commits, [origin.hash]);
+      } else {
+        await recreate({ viewId: "replacement-comparison-view" }, saved());
+        reply(commits, [origin.hash]);
+      }
+      const current = posts("compareCommits").at(-1)!;
+      const top = scrollContainer().scrollTop;
+      const respond = (request: Record<string, unknown>, path: string | null) =>
+        dispatch({
+          command: "compareCommits",
+          fromHash: request.fromHash,
+          toHash: request.toHash,
+          requestId: request.requestId,
+          fileChanges:
+            path === null ? null : [{ ...FILE_CHANGE, oldFilePath: path, newFilePath: path }]
+        });
+      expect(current).toMatchObject({ fromHash: working.hash, toHash: origin.hash });
+      respond({ ...current, requestId: undefined }, null);
+      expect(button("dialog").classList.contains("active")).toBe(false);
+      const previousFile = "obsolete-worktree.txt";
+      const outcomes = change === "redraw" ? [previousFile, null] : [null, previousFile];
+      for (const outcome of outcomes) {
+        respond(before, outcome);
+        expect(button("dialog").classList.contains("active")).toBe(false);
+        expect(document.getElementById("cdvLoading")).not.toBeNull();
+        expect(details()?.textContent).not.toContain(previousFile);
+        expect(scrollContainer().scrollTop).toBe(top);
+      }
+      expect(before.requestId).toEqual(expect.any(String));
+      expect(current.requestId).toEqual(expect.any(String));
+      expect(before.requestId).not.toBe(current.requestId);
+      respond(current, "current-worktree.txt");
+      expect(details()?.textContent).toContain("current-worktree.txt");
+      if (change === "return") expect(scrollContainer().scrollTop).toBe(137);
+      respond(before, null);
+      respond(before, "replayed-worktree.txt");
+      expect(button("dialog").classList.contains("active")).toBe(false);
+      expect(details()?.textContent).toContain("current-worktree.txt");
+    }
+  );
+
+  // Case: TC-830
+  it("keeps the saved scroll when the prior details were still loading (TC-830)", () => {
+    start();
+    fire(row(origin.hash), "click");
+    scrollContainer().scrollTop = 137;
+    batch([target], 301);
+    next();
+    reply([origin, target]);
+    clearPosts();
+    button("findReturn").click();
+    expect(posts("commitDetails")).toEqual([expect.objectContaining({ commitHash: origin.hash })]);
+    respondDetails(origin.hash);
+    expect(detailsOwner()).toBe(origin.hash);
+    expect(scrollContainer().scrollTop).toBe(137);
+    expect(posts("loadCommits")).toEqual([]);
+  });
+
+  // Case: TC-821
+  it("selects a now-loaded pinned match without growing the graph (TC-821)", () => {
+    start();
+    batch([target], Math.max(confirmationDepth, 500) + 1);
+    refresh();
+    next();
+    expect(button("findNext").disabled).toBe(true);
+    const count = posts("loadCommits").length;
+    reply([origin, target], [origin.hash], {
+      worktrees: { branches: {}, detached: [{ head: target.hash, path: "/pin", isMain: false }] }
+    });
+    expect(posts("loadCommits")).toHaveLength(count);
+    expect(row(target.hash).classList.contains("findCurrentCommit")).toBe(true);
+    expect(button("findReturn").hidden).toBe(true);
+  });
+
+  // Case: TC-822, TC-823
+  it("confirms only above the boundary and preserves the current selection on dismissal (TC-822, TC-823)", () => {
+    const loaded = { ...origin, message: "needle" };
+    start([loaded]);
+    const above = Math.max(confirmationDepth + 1, 401);
+    const position = above - 100;
+    batch([target, { ...target, hash: "second" }], position, false);
+    const count = posts("loadCommits").length;
+    press(input(), "Enter");
+    expect(button("dialogMessage").textContent).toContain(position.toLocaleString());
+    expect(button("dialogMessage").textContent).toContain(above.toLocaleString());
+    button("dialogDismiss").click();
+    expect(button("findReturn").hidden).toBe(true);
+    expect(row(origin.hash).classList.contains("findCurrentCommit")).toBe(true);
+    expect(posts("loadCommits")).toHaveLength(count);
+    press(input(), "Enter");
+    expect(button("dialogAction")).not.toBeNull();
+    button("dialogAction").click();
+    expect(posts("loadCommits").at(-1)?.maxCommits).toBe(above);
+    reply([loaded, target]);
+    press(input(), "Enter");
+    expect(document.getElementById("dialogAction")).toBeNull();
+    expect(posts("loadCommits").at(-1)?.maxCommits).toBe(above + 1);
+    reply([loaded, target, { ...target, hash: "second" }]);
+  });
+
+  // Case: TC-822
+  it("accepts a depth equal to the calibrated boundary without confirmation (TC-822)", () => {
+    if (!confirmationDepth) {
+      start();
+      batch([target], 301);
+      press(input(), "Enter");
+      expect(button("dialogAction")).not.toBeNull();
+      return;
+    }
+    start();
+    batch([target], confirmationDepth - 100);
+    press(input(), "Enter");
+    expect(document.getElementById("dialogAction")).toBeNull();
+    expect(posts("loadCommits").at(-1)?.maxCommits).toBe(confirmationDepth);
+    reply([origin, target]);
+  });
+
+  // Case: TC-824
+  it("uses the latest ordinary depth and accepts only one move during confirmation and load (TC-824)", async () => {
+    const increment = Math.max(confirmationDepth, 1000);
+    await recreate({ loadMoreCommits: increment });
+    start();
+    batch([target], 301);
+    press(input(), "Enter");
+    expect(button("dialogAction")).not.toBeNull();
+    press(input(), "Enter", { shiftKey: true });
+    button("loadMoreCommitsBtn").click();
+    const manualDepth = Number(posts("loadCommits").at(-1)?.maxCommits);
+    reply([origin]);
+    button("loadMoreCommitsBtn").click();
+    const pendingDepth = Number(posts("loadCommits").at(-1)?.maxCommits);
+    expect(pendingDepth).toBeGreaterThan(manualDepth);
+    const count = posts("loadCommits").length;
+    button("dialogAction").click();
+    expect(posts("loadCommits")).toHaveLength(count);
+    reply([origin]);
+    expect(posts("loadCommits")).toHaveLength(count + 1);
+    expect(posts("loadCommits").at(-1)?.maxCommits).toBe(pendingDepth);
+    press(input(), "Enter");
+    reply([origin, target]);
+    expect(posts("loadCommits")).toHaveLength(count + 1);
+    expect(row(target.hash).classList.contains("findCurrentCommit")).toBe(true);
+  });
+
+  // Case: TC-826
+  it.each(["historyChanged", "unavailable", "targetMissing"] as const)(
+    "reports %s before trying to select a missing target (TC-826)",
+    (reason) => {
+      start();
+      batch([target], 400);
+      next();
+      reply(
+        [origin],
+        [origin.hash],
+        reason === "targetMissing" ? {} : { history: { kind: reason } }
+      );
+      expect(button("findStatus").textContent).toBe(ENGLISH_MESSAGES[`find.${reason}`]);
+      expect(button("findPosition").textContent).toBe("No Results");
+    }
+  );
+
+  // Case: TC-827
+  it.each([true, false])(
+    "rechecks displayed fields after extension, with a regex error %s (TC-827)",
+    async (regexError) => {
+      await recreate({ dateFormat: "Relative" });
+      vi.setSystemTime(new Date(2_000_000 * 1000));
+      reply([origin]);
+      search(regexError ? "needle|(?=changed)" : "1 minute ago");
+      if (regexError) button("findRegex").click();
+      button("findStart").click();
+      const hit = { ...target, date: 2_000_000 - 60 };
+      batch([hit], 400);
+      next();
+      vi.advanceTimersByTime(60_000);
+      reply([origin, { ...hit, message: "changed" }]);
+      expect(button("findStatus").textContent).toBe(
+        ENGLISH_MESSAGES[regexError ? "find.zeroLengthRegex" : "find.targetChanged"]
+      );
+      expect(button("findPosition").textContent).toBe("No Results");
+      expect(row(target.hash).classList.contains("findCurrentCommit")).toBe(false);
+      expect(posts("commitDetails")).toEqual([]);
+    }
+  );
+
+  // Case: TC-828
+  it("resumes path highlighting when the search loads its target at EOF (TC-828)", () => {
+    reply([origin, target]);
+    highlightThroughMenu(target.hash);
+    refresh();
+    reply([origin]);
+    expect(button("pathHighlightStatus").textContent).toBe(
+      ENGLISH_MESSAGES["pathHighlight.targetOutside"]
+    );
+    search("needle");
+    button("findStart").click();
+    batch([target], 400);
+    next();
+    reply([origin, target], [origin.hash, target.hash], { moreCommitsAvailable: false });
+    expect(button("pathHighlightStatus").textContent).toBe("");
+    expect(document.getElementById("loadMoreCommitsBtn")).toBeNull();
+    expect(row(target.hash).classList.contains("findCurrentCommit")).toBe(true);
+  });
+
+  // Case: TC-830, TC-831, TC-832
+  it.each([true, false])(
+    "restores the scroll after two moves, with the saved details still present %s (TC-830, TC-831, TC-832)",
+    (present) => {
+      const pin = node("pin", []);
+      reply([origin, pin], [origin.hash]);
+      search("needle");
+      button("findStart").click();
+      openDetails(pin.hash);
+      scrollContainer().scrollTop = 137;
+      batch([target, { ...target, hash: "second" }], 400);
+      next();
+      const rows = present ? [origin, target, pin] : [origin, target];
+      reply(rows, [origin.hash, target.hash]);
+      scrollContainer().scrollTop = 249;
+      next();
+      const second = { ...target, hash: "second" };
+      reply([...rows, second], [origin.hash, target.hash, second.hash]);
+      const depth = saved().maxCommits;
+      search("changed query");
+      button("findRegex").click();
+      expect(button("findReturn").hidden).toBe(false);
+      clearPosts();
+      button("findReturn").click();
+      expect(scrollContainer().scrollTop).toBe(137);
+      expect(detailsOwner()).toBe(present ? pin.hash : null);
+      expect(saved().maxCommits).toBe(depth);
+      expect(posts("loadCommits")).toEqual([]);
+      expect(posts("loadBranches")).toEqual([]);
+      expect(button("findReturn").hidden).toBe(true);
+    }
+  );
 });

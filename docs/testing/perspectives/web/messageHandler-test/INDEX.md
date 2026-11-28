@@ -2,18 +2,18 @@
 
 > Source: `web/messageHandler.ts`
 > Storage Mode: sharded
-> Generated: 2026-11-22T00:00:00Z
+> Generated: 2026-11-23T00:00:00Z
 > Language: TypeScript
 > Test Framework: Vitest
 > Total Shards: 5
-> Total Sections: 19
-> Total Cases: 70
+> Total Sections: 20
+> Total Cases: 75
 
 ## Shards
 
 | Shard File                       | Responsibility          | Sections | Cases | Last Updated |
 | -------------------------------- | ----------------------- | -------- | ----- | ------------ |
-| 01-basic-responses-01.md         | basic-responses         | 5        | 25    | 2026-11-22   |
+| 01-basic-responses-01.md         | basic-responses         | 6        | 30    | 2026-11-23   |
 | 02-worktree-and-details-01.md    | worktree-and-details    | 9        | 26    | 2026-10-27   |
 | 03-git-operation-responses-01.md | git-operation-responses | 3        | 13    | 2026-09-29   |
 | 04-branch-cleanup-01.md          | branch-cleanup          | 1        | 3     | 2026-08-25   |
@@ -38,6 +38,7 @@
 | Feature 055-03 (light-spec-plan)                                       | 04-branch-cleanup-01.md                                         |
 | Feature 055-07 (light-spec-plan)                                       | 05-file-history-01.md                                           |
 | Feature 060-03 addendum (light-spec-plan)                              | 02-worktree-and-details-01.md, 03-git-operation-responses-01.md |
+| Feature 061-02 (full history search)                                   | 01-basic-responses-01.md                                        |
 | Feature 061-02 (large history browsing)                                | 01-basic-responses-01.md                                        |
 | Feature 062-01 (PR #114 follow-up)                                     | 02-worktree-and-details-01.md                                   |
 | フェーズ2 修正 M13 (commit-details-file-tree-guard)                    | 02-worktree-and-details-01.md                                   |

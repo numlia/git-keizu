@@ -13,7 +13,7 @@ vi.mock("../../web/refMenu", () => ({
   showPushRemoteDialog: vi.fn()
 }));
 
-import type { GitCommitDetails, ResponseMessage } from "../../src/types";
+import type { GitCommitDetails, ResponseLoadCommits, ResponseMessage } from "../../src/types";
 import { showErrorDialog } from "../../web/dialogs";
 import { generateGitFileTree } from "../../web/fileTree";
 import { type GitKeizuViewAPI, handleMessage } from "../../web/messageHandler";
@@ -21,6 +21,8 @@ import { showPushRemoteDialog } from "../../web/refMenu";
 
 function createMockGitKeizuView(): GitKeizuViewAPI {
   return {
+    setCommitOrdering: vi.fn(),
+    acceptCommitDetails: vi.fn(() => true),
     hideCommitDetails: vi.fn(),
     showCommitDetails: vi.fn(),
     showCompareResult: vi.fn(),
@@ -28,6 +30,8 @@ function createMockGitKeizuView(): GitKeizuViewAPI {
     loadBranchCleanup: vi.fn(),
     receiveBranches: vi.fn(),
     receiveCommits: vi.fn(),
+    receiveHistorySearchBatch: vi.fn(),
+    receiveHistorySearchValidation: vi.fn(),
     appendCommits: vi.fn(),
     loadFileHistory: vi.fn(),
     loadRepos: vi.fn(),
@@ -37,6 +41,65 @@ function createMockGitKeizuView(): GitKeizuViewAPI {
     setWorktreePath: vi.fn()
   };
 }
+
+// @see docs/testing/perspectives/web/messageHandler-test/01-basic-responses-01.md (S24)
+describe("dispatching full history search responses", () => {
+  const key = { repo: "/repo", viewId: "graph", generation: 2, requestId: 7 };
+  const row = {
+    hash: "hash",
+    parentHashes: [],
+    refs: [],
+    stash: null,
+    author: "A",
+    email: "a",
+    message: "subject",
+    date: 0
+  };
+  // Case: TC-097
+  it.each([true, false])(
+    "checks keyed detail success and failure before touching the graph (TC-097, accepted %s)",
+    (accepted) => {
+      const view = createMockGitKeizuView();
+      vi.mocked(view.acceptCommitDetails).mockReturnValue(accepted);
+      const details = makeCommitDetails();
+      for (const commitDetails of [details, null])
+        handleMessage({ command: "commitDetails", searchKey: key, commitDetails }, view);
+      expect(view.acceptCommitDetails).toHaveBeenNthCalledWith(1, key, details.hash);
+      expect(view.acceptCommitDetails).toHaveBeenNthCalledWith(2, key, undefined);
+      expect(view.showCommitDetails).toHaveBeenCalledTimes(Number(accepted));
+      expect(view.hideCommitDetails).toHaveBeenCalledTimes(Number(accepted));
+    }
+  );
+  // Case: TC-094, TC-095
+  it.each([
+    { kind: "ok", commits: [row], hasMore: true, firstPosition: 301 },
+    { kind: "ok", commits: [], hasMore: false, firstPosition: 302 },
+    { kind: "historyChanged" },
+    { kind: "error", message: "read failed" }
+  ] as const)("delivers the $kind batch to its original request", (result) => {
+    const view = createMockGitKeizuView();
+    const response = {
+      command: "historySearchBatch" as const,
+      ...key,
+      ...result
+    } as ResponseMessage;
+    handleMessage(response, view);
+    expect(view.receiveHistorySearchBatch).toHaveBeenCalledExactlyOnceWith(response);
+    expect(view.receiveCommits).not.toHaveBeenCalled();
+  });
+  // Case: TC-096
+  it.each([
+    { kind: "ok" },
+    { kind: "historyChanged" },
+    { kind: "error", message: "read failed" }
+  ] as const)("delivers $kind verification without a batch", (result) => {
+    const view = createMockGitKeizuView();
+    const response = { command: "historySearchValidation" as const, ...key, ...result };
+    handleMessage(response, view);
+    expect(view.receiveHistorySearchValidation).toHaveBeenCalledExactlyOnceWith(response);
+    expect(view.receiveHistorySearchBatch).not.toHaveBeenCalled();
+  });
+});
 
 // @see docs/testing/perspectives/web/messageHandler-test/01-basic-responses-01.md (S23)
 describe("dispatching history pages", () => {
@@ -74,6 +137,31 @@ describe("dispatching history pages", () => {
     expect(vi.mocked(view.appendCommits).mock.calls).toEqual([[response]]);
     expect(view.receiveCommits).not.toHaveBeenCalled();
   });
+
+  // @see docs/testing/perspectives/web/messageHandler-test/01-basic-responses-01.md (TC-093)
+  // Case: TC-093
+  it.each([
+    {},
+    { history: { kind: "verified", hashes: ["a"], requestedCount: 300, snapshot: "snapshot" } },
+    { history: { kind: "unavailable" } },
+    { history: { kind: "historyChanged" } }
+  ] satisfies Pick<ResponseLoadCommits, "history">[])(
+    "delivers the full history verification metadata (TC-093)",
+    (fields) => {
+      const view = createMockGitKeizuView();
+      const response = {
+        command: "loadCommits" as const,
+        requestId: "normal",
+        head: null,
+        commits: [],
+        moreCommitsAvailable: false,
+        hard: false,
+        ...fields
+      };
+      handleMessage(response, view);
+      expect(view.receiveCommits).toHaveBeenCalledWith(response);
+    }
+  );
 });
 
 // S13: pull レスポンス処理の維持

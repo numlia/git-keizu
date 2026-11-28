@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import * as fs from "node:fs/promises";
 import * as os from "node:os";
 import * as path from "node:path";
+import { PassThrough } from "node:stream";
 import { pathToFileURL } from "node:url";
 
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
@@ -39,13 +40,20 @@ vi.mock("../../src/worktree", async (importOriginal) => {
   return { ...actual, parseWorktreeList: vi.fn(actual.parseWorktreeList) };
 });
 
+// Exercise several boundaries in a small repository regardless of the calibrated production size.
+vi.mock("../../src/types", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/types")>()),
+  HISTORY_SEARCH_BATCH_SIZE: 3
+}));
+
 import { getConfig } from "../../src/config";
 import { DataSource } from "../../src/dataSource";
 import type {
   BranchCleanupResult,
   CommitOrdering,
   FileHistoryEntry,
-  RequestLoadCommits
+  RequestLoadCommits,
+  RequestStartHistorySearch
 } from "../../src/types";
 import { parseWorktreeList } from "../../src/worktree";
 
@@ -124,6 +132,648 @@ describe("continuing ordinary Git history", () => {
   function full(count: number, order: CommitOrdering = "date", authors: string[] = []) {
     return ds.getCommits(fixture.repo, [], count, true, authors, order);
   }
+
+  function addLinearCommits(count: number) {
+    const base = git(fixture.repo, ["rev-parse", "HEAD"]);
+    const commits = Array.from({ length: count }, (_, i) => {
+      const message = `row ${i}`;
+      return [
+        `commit refs/heads/${MAIN_BRANCH}`,
+        "committer Test User <test@example.com> now",
+        `data ${message.length}`,
+        message,
+        ...(i === 0 ? [`from ${base}`] : [])
+      ].join("\n");
+    });
+    cp.execFileSync("git", ["fast-import", "--quiet", "--date-format=now"], {
+      cwd: fixture.repo,
+      input: `${commits.join("\n")}\n`
+    });
+  }
+
+  // @see docs/testing/perspectives/src/dataSource-test/01-history-diff-02.md (S56)
+  // Case: TC-390, TC-391
+  it("keeps the ordinary 300 positions while displaying pins, stashes and the working tree (TC-390, TC-391)", async () => {
+    const { repo, root } = fixture;
+    addLinearCommits(300);
+    const pinned = path.join(root, "pinned");
+    git(repo, ["worktree", "add", "--detach", pinned, "HEAD"]);
+    git(pinned, ["commit", "--allow-empty", "-m", "pin"]);
+    for (const message of ["one", "two"]) {
+      await fs.writeFile(path.join(repo, "work"), message);
+      git(repo, ["stash", "push", "--include-untracked", "-m", message]);
+    }
+    await fs.writeFile(path.join(repo, "work"), "uncommitted");
+    const config = getConfig();
+    vi.mocked(getConfig).mockReturnValue({ ...config, showUncommittedChanges: () => true });
+    try {
+      const hashes = git(repo, ["log", "--date-order", "--branches", "--format=%H"]).split("\n");
+      for (const count of [300, 400]) {
+        const result = await full(count);
+        expect(result.history).toEqual({
+          kind: "verified",
+          snapshot: expect.any(String),
+          hashes: hashes.slice(0, count),
+          requestedCount: count
+        });
+        expect(result.commits.map((row) => row.hash)).toContain(git(pinned, ["rev-parse", "HEAD"]));
+        expect(result.commits.filter((row) => row.stash !== null)).toHaveLength(2);
+        expect(result.commits).toHaveLength(Math.min(hashes.length, count) + 4);
+        expect(result.moreCommitsAvailable).toBe(count < hashes.length);
+        expect(result.pageToken).toBeUndefined();
+      }
+    } finally {
+      vi.mocked(getConfig).mockReturnValue(config);
+    }
+  });
+
+  function interceptGit(intercept: (args: string[]) => cp.ChildProcess | void) {
+    const spawn = actualSpawnRef.current as typeof cp.spawn;
+    vi.mocked(cp.spawn).mockImplementation(
+      ((command: string, args: string[], options: cp.SpawnOptions) =>
+        intercept(args) ?? spawn(command, args, options)) as typeof cp.spawn
+    );
+  }
+
+  // @see docs/testing/perspectives/src/dataSource-test/01-history-diff-02.md (S57)
+  describe("streaming search", () => {
+    afterEach(() => {
+      vi.mocked(cp.spawn).mockImplementation(actualSpawnRef.current as typeof cp.spawn);
+    });
+
+    async function searchRequest(
+      fields: Partial<RequestStartHistorySearch> = {}
+    ): Promise<RequestStartHistorySearch> {
+      const request = {
+        command: "startHistorySearch" as const,
+        viewId: "graph",
+        generation: 1,
+        requestId: 1,
+        repo: fixture.repo,
+        skip: 2,
+        branches: [],
+        authors: [],
+        commitOrdering: "date" as const,
+        showRemoteBranches: true,
+        ...fields
+      };
+      const { history } = await ds.getCommits(
+        request.repo,
+        request.branches,
+        request.skip,
+        request.showRemoteBranches,
+        request.authors,
+        request.commitOrdering
+      );
+      if (history.kind !== "verified") throw new Error("Unverified fixture");
+      return { ...request, snapshot: history.snapshot };
+    }
+
+    function controlledLog(started = true) {
+      const events = new EventEmitter();
+      const child = Object.assign(events, {
+        pid: started ? 123 : undefined,
+        exitCode: null as number | null,
+        signalCode: null as string | null,
+        stdin: new PassThrough(),
+        stdout: new PassThrough(),
+        stderr: new PassThrough(),
+        kill: vi.fn(() => true)
+      });
+      const finish = (code: number) => {
+        child.exitCode = code;
+        child.emit("exit", code, null);
+        child.emit("close", code, null);
+      };
+      return { child, finish, proc: child as unknown as cp.ChildProcess };
+    }
+
+    // Case: TC-395, TC-396, TC-399
+    it("joins the graph prefix to one ordered multi-tip walk with the same parents and refs", async () => {
+      const { repo } = fixture;
+      git(repo, ["switch", "-c", "topic", "HEAD~3"]);
+      git(repo, ["commit", "--allow-empty", "--author=Other <other@example.com>", "-m", "side"]);
+      git(repo, ["switch", MAIN_BRANCH]);
+      git(repo, ["merge", "--no-ff", "topic", "-m", "joined"]);
+      git(repo, ["switch", "topic"]);
+      git(repo, ["commit", "--allow-empty", "-m", "another tip"]);
+      git(repo, ["tag", "v1", "main~2"]);
+      git(repo, ["branch", "sibling", "main~2"]);
+      git(repo, ["update-ref", "refs/remotes/origin/sibling", "main~2"]);
+      const sharedRefHash = git(repo, ["rev-parse", "main~2"]);
+      const topicOnly = git(repo, ["rev-parse", "topic"]);
+      git(repo, ["switch", MAIN_BRANCH]);
+      addLinearCommits(300);
+      for (const order of ["date", "topo", "author-date"] as const) {
+        for (const [branches, authors, remotes] of [
+          [[], [], true],
+          [["main"], ["Test User"], false]
+        ] as const) {
+          const request = await searchRequest({
+            skip: 300,
+            commitOrdering: order,
+            branches: [...branches],
+            authors: [...authors],
+            showRemoteBranches: remotes
+          });
+          const ordinary = await ds.getCommits(
+            repo,
+            request.branches,
+            400,
+            remotes,
+            request.authors,
+            order
+          );
+          vi.mocked(cp.spawn).mockClear();
+          const scan = ds.createHistorySearch(request);
+          let pos = request.skip;
+          const suffix: string[] = [];
+          for (;;) {
+            const batch = await scan.next();
+            if (batch.kind !== "ok") throw new Error(JSON.stringify(batch));
+            expect(batch.firstPosition).toBe(pos + 1);
+            expect(batch.commits).toEqual(ordinary.commits.slice(pos, pos + 3));
+            for (const commit of batch.commits) {
+              suffix.push(commit.hash);
+              if (commit.hash === sharedRefHash) {
+                expect(commit.refs.map((ref) => [ref.type, ref.name])).toEqual([
+                  ["head", "sibling"],
+                  ...(remotes ? [["remote", "origin/sibling"]] : []),
+                  ["tag", "v1"]
+                ]);
+              }
+            }
+            pos += batch.commits.length;
+            if (!batch.hasMore) break;
+          }
+          expect(pos).toBe(ordinary.commits.length);
+          expect(suffix).toContain(sharedRefHash);
+          expect(ordinary.commits.some((commit) => commit.hash === topicOnly)).toBe(
+            branches.length === 0
+          );
+          const logs = vi.mocked(cp.spawn).mock.calls.filter(([, args]) => args?.[0] === "log");
+          expect(logs).toHaveLength(1);
+          expect(logs[0][1]).toContain("--skip=300");
+          expect(logs[0][1]).not.toEqual(
+            expect.arrayContaining([expect.stringContaining("--max-count")])
+          );
+          const selected = await ds.getCommits(
+            repo,
+            request.branches,
+            302,
+            remotes,
+            request.authors,
+            order
+          );
+          expect(selected.commits[301].hash).toBe(ordinary.commits[301].hash);
+        }
+      }
+    });
+
+    // Case: TC-397, TC-398
+    it("matches Git's literal author filtering and decodes byte-split UTF-8, separators and CRs", async () => {
+      const { repo } = fixture;
+      for (const [author, subject] of [
+        ["Build[bot]", "更新\r一"],
+        ["Buildb", "other"],
+        ["numlia 作者", "更新\r\r二"]
+      ]) {
+        git(repo, [
+          "commit",
+          "--allow-empty",
+          "--cleanup=verbatim",
+          `--author=${author} <a@example.com>`,
+          "-m",
+          subject
+        ]);
+      }
+      git(repo, ["config", "i18n.logOutputEncoding", "EUC-JP"]);
+      for (const [filter, subject] of [
+        ["Build[bot]", "更新\r一"],
+        ["numli", "更新\r\r二"]
+      ]) {
+        const request = await searchRequest({ skip: 0, authors: [filter] });
+        const ordinary = await full(20, "date", [filter]);
+        const log = controlledLog();
+        interceptGit((args) => {
+          if (!args.includes("--skip=0")) return;
+          const bytes = cp.execFileSync("git", args, { cwd: repo });
+          // setEncoding must carry incomplete code units between writes.
+          setImmediate(async () => {
+            for (const byte of bytes) {
+              log.child.stdout.write(Buffer.from([byte]));
+              await new Promise<void>((resolve) => setImmediate(resolve));
+            }
+            log.child.stdout.end();
+            log.finish(0);
+          });
+          return log.proc;
+        });
+        expect(await ds.createHistorySearch(request).next()).toEqual({
+          kind: "ok",
+          commits: ordinary.commits,
+          firstPosition: 1,
+          hasMore: false
+        });
+        expect(ordinary.commits.map((row) => row.message)).toEqual([subject]);
+      }
+    });
+
+    // Case: TC-400, TC-408
+    it("leaves bytes after the lookahead on the paused stream and waits for cancellation cleanup before replacement", async () => {
+      const request = await searchRequest({ skip: 0 });
+      const first = controlledLog();
+      const replacement = controlledLog();
+      const logs = [first, replacement];
+      const starts: number[] = [];
+      interceptGit((args) => {
+        if (!args.includes("--skip=0")) return;
+        const index = starts.length;
+        starts.push(index);
+        const log = logs[index];
+        if (index === 0) {
+          const output = cp.execFileSync("git", args, { cwd: fixture.repo });
+          setImmediate(() => log.child.stdout.write(output));
+        }
+        return log.proc;
+      });
+      const old = ds.createHistorySearch(request);
+      expect(await old.next()).toMatchObject({ kind: "ok", firstPosition: 1, hasMore: true });
+      expect(first.child.stdout.readableFlowing).toBe(false);
+      expect(first.child.stdout.readableLength).toBeGreaterThan(0);
+      const pending = ds.createHistorySearch(request).next();
+      expect(first.child.kill).toHaveBeenCalledTimes(1);
+      expect(first.child.stdout.destroyed).toBe(true);
+      expect((await full(2)).commits).toHaveLength(2);
+      expect(starts).toEqual([0]);
+      first.finish(143);
+      await vi.waitFor(() => expect(starts).toEqual([0, 1]));
+      const newest = ds.createHistorySearch(request);
+      expect(replacement.child.kill).toHaveBeenCalledTimes(1);
+      expect(replacement.child.stdout.destroyed).toBe(true);
+      replacement.finish(143);
+      expect(await pending).toEqual({ kind: "error", message: expect.any(String) });
+      await newest.close();
+      expect(starts).toEqual([0, 1]);
+    });
+
+    // Case: TC-408
+    it("reaps the real Git child when a search is cancelled with its pipe paused", async () => {
+      addLinearCommits(3000);
+      const request = await searchRequest({ skip: 0 });
+      const scan = ds.createHistorySearch(request);
+      const batch = await scan.next();
+      expect(batch).toMatchObject({ kind: "ok", hasMore: true });
+      const spawned = vi.mocked(cp.spawn);
+      const index = spawned.mock.calls.findLastIndex(
+        ([, args]) => Array.isArray(args) && args.includes("--skip=0")
+      );
+      expect(index).toBeGreaterThanOrEqual(0);
+      const child = spawned.mock.results[index].value as cp.ChildProcessWithoutNullStreams;
+      expect(child.exitCode).toBeNull();
+      await scan.close();
+      expect(child.signalCode).toBe("SIGTERM");
+      expect(child.stdout.destroyed).toBe(true);
+      expect((await full(2)).commits).toHaveLength(2);
+    });
+
+    // Case: TC-401, TC-406
+    it.each(["empty", "valid", "exit", "malformed", "incomplete"])(
+      "waits for Git close and discards an invalid batch (%s)",
+      async (mode) => {
+        const request = await searchRequest();
+        const log = controlledLog();
+        let ended!: () => void;
+        const delivered = new Promise<void>((resolve) => {
+          ended = resolve;
+        });
+        interceptGit((args) => {
+          if (!args.includes("--skip=2")) return;
+          const row = cp.execFileSync("git", [...args, "--max-count=1"], {
+            cwd: fixture.repo,
+            encoding: "utf8"
+          });
+          setImmediate(() => {
+            log.child.stdout.end(
+              mode === "empty"
+                ? ""
+                : `${row}${mode === "incomplete" ? "partial" : mode === "malformed" ? "bad\n" : ""}`
+            );
+            log.child.stderr.end(mode === "exit" ? "read failure" : "");
+            ended();
+          });
+          return log.proc;
+        });
+        const report = vi.fn();
+        const read = async () => {
+          const result = await ds.createHistorySearch(request).next();
+          report(result);
+          return result;
+        };
+        const pending = read();
+        await delivered;
+        await new Promise<void>((resolve) => setImmediate(resolve));
+        expect(report).not.toHaveBeenCalled();
+        log.finish(mode === "exit" ? 128 : 0);
+        const result = await pending;
+        if (mode === "valid" || mode === "empty") {
+          expect(result).toMatchObject({ kind: "ok", hasMore: false, firstPosition: 3 });
+          if (result.kind === "ok") expect(result.commits).toHaveLength(mode === "valid" ? 1 : 0);
+        } else {
+          expect(result).toEqual({
+            kind: "error",
+            message: mode === "exit" ? "read failure" : "Git returned an invalid history record."
+          });
+        }
+        expect(log.child.stdout.destroyed).toBe(true);
+      }
+    );
+
+    // Case: TC-406, TC-408
+    it.each([
+      ["spawn", "spawn git ENOENT"],
+      ["stdout", "history stdout read failed"],
+      ["stderr", "history stderr read failed"],
+      ["early stdout close", "Git history output closed unexpectedly."]
+    ])(
+      "reports a %s failure and waits for child close before replacement",
+      async (source, message) => {
+        const request = await searchRequest();
+        const started = source !== "spawn";
+        const log = controlledLog(started);
+        const launches: string[][] = [];
+        interceptGit((args) => {
+          if (!args.includes(`--skip=${request.skip}`)) return;
+          launches.push(args);
+          if (launches.length === 1) return log.proc;
+        });
+        const report = vi.fn();
+        const read = async () => {
+          report(await ds.createHistorySearch(request).next());
+        };
+        const pending = read();
+        await vi.waitFor(() => expect(launches).toHaveLength(1));
+        if (started) {
+          const row = cp.execFileSync("git", [...launches[0], "--max-count=1"], {
+            cwd: fixture.repo
+          });
+          log.child.stdout.write(row);
+          await vi.waitFor(() => expect(log.child.stdout.readableLength).toBe(0));
+        }
+
+        if (source === "spawn") log.child.emit("error", new Error(message));
+        else if (source === "early stdout close") log.child.stdout.destroy();
+        else if (source === "stdout") log.child.stdout.destroy(new Error(message));
+        else log.child.stderr.destroy(new Error(message));
+
+        await vi.waitFor(() => expect(log.child.stdin.destroyed).toBe(true));
+        expect(log.child.stdout.destroyed).toBe(true);
+        expect(log.child.stderr.destroyed).toBe(true);
+        expect(log.child.kill).toHaveBeenCalledTimes(started ? 1 : 0);
+        const exitCode = started ? null : -2; // ENOENT when no child was spawned.
+        const signal = started ? "SIGTERM" : null;
+        if (started) log.child.emit("exit", exitCode, signal);
+        const replacement = ds.createHistorySearch(request);
+        const next = replacement.next();
+        // An independent ordinary read can finish while the replacement waits for close.
+        await full(request.skip);
+        expect(launches).toHaveLength(1);
+        expect(report).not.toHaveBeenCalled();
+
+        log.child.emit("close", exitCode, signal);
+        await pending;
+        expect(report.mock.calls).toEqual([[{ kind: "error", message }]]);
+        expect(await next).toMatchObject({ kind: "ok", firstPosition: request.skip + 1 });
+        expect(launches).toHaveLength(2);
+        await replacement.close();
+      }
+    );
+
+    // Case: TC-406
+    it("discards a nonterminal batch if Git exits abnormally during postvalidation", async () => {
+      const request = await searchRequest({ skip: 0 });
+      const log = controlledLog();
+      let checks = 0;
+      interceptGit((args) => {
+        if (args.includes("--skip=0")) {
+          const bytes = cp.execFileSync("git", args, { cwd: fixture.repo });
+          setImmediate(() => log.child.stdout.write(bytes));
+          return log.proc;
+        }
+        if (args[0] === "show-ref" && ++checks === 2) {
+          log.child.stderr.end("walk failed");
+          log.finish(128);
+        }
+      });
+      expect(await ds.createHistorySearch(request).next()).toEqual({
+        kind: "error",
+        message: "walk failed"
+      });
+      expect(log.child.stdout.destroyed).toBe(true);
+    });
+
+    // Case: TC-402, TC-404, TC-405, TC-407
+    it("verifies before and after every batch and after EOF without starting another walk", async () => {
+      const { repo } = fixture;
+      const graft = path.join(fixture.root, "search-grafts");
+      vi.stubEnv("GIT_GRAFT_FILE", graft);
+      const request = await searchRequest({ skip: 5, showRemoteBranches: false });
+      const verify = () => ds.verifyHistorySearch(repo, false, request.snapshot);
+      git(repo, ["update-ref", "refs/remotes/origin/topic", "HEAD~2"]);
+      expect(await ds.createHistorySearch(request).next()).toMatchObject({
+        kind: "ok",
+        hasMore: false
+      });
+      vi.mocked(cp.spawn).mockClear();
+      expect(await verify()).toEqual({ kind: "ok" });
+      await fs.writeFile(graft, `${git(repo, ["rev-parse", "HEAD~2"])}\n`);
+      expect(await verify()).toEqual({ kind: "historyChanged" });
+      await fs.unlink(graft);
+      expect(await verify()).toEqual({ kind: "ok" });
+      expect(vi.mocked(cp.spawn).mock.calls.filter(([, args]) => args?.[0] === "log")).toHaveLength(
+        0
+      );
+      git(repo, ["tag", "incoming"]);
+      expect(await verify()).toEqual({ kind: "historyChanged" });
+      for (const phase of ["before", "after", "change"]) {
+        git(repo, ["tag", "-d", "incoming"]);
+        let checks = 0;
+        interceptGit((args) => {
+          if (args[0] === "show-ref" && ++checks === (phase === "before" ? 1 : 2)) {
+            if (phase === "change") git(repo, ["tag", "incoming"]);
+            else return createGitProcess({ stderr: "unavailable", exitCode: 128 });
+          }
+        });
+        const result = await ds.createHistorySearch(request).next();
+        expect(result).toEqual(
+          phase === "change"
+            ? { kind: "historyChanged" }
+            : { kind: "error", message: expect.any(String) }
+        );
+        if (phase === "before")
+          expect(
+            vi.mocked(cp.spawn).mock.calls.filter(([, args]) => args?.[0] === "log")
+          ).toHaveLength(0);
+        if (phase !== "change") git(repo, ["tag", "incoming"]);
+      }
+      vi.mocked(cp.spawn).mockClear();
+      await fs.writeFile(path.join(repo, ".git/refs/remotes/origin/topic"), `${"f".repeat(40)}\n`);
+      expect(await verify()).toEqual({ kind: "error", message: expect.any(String) });
+      expect(vi.mocked(cp.spawn).mock.calls.filter(([, args]) => args?.[0] === "log")).toHaveLength(
+        0
+      );
+    });
+
+    // Case: TC-403
+    it.each([
+      "shallow",
+      "graft",
+      "replacement",
+      "core.useReplaceRefs",
+      "worktree map",
+      "mailmap.file",
+      "file contents",
+      "mailmap.blob",
+      "blob contents",
+      "log.mailmap"
+    ])("discards the next batch if %s changes without moving a displayed ref", async (input) => {
+      const { repo, root } = fixture;
+      const mapFile = path.join(root, "authors");
+      const indexMap = path.join(repo, "authors.map");
+      await fs.writeFile(mapFile, "");
+      await fs.writeFile(indexMap, "");
+      git(repo, ["add", "authors.map"]);
+      if (input === "file contents") git(repo, ["config", "mailmap.file", mapFile]);
+      if (input === "blob contents") git(repo, ["config", "mailmap.blob", ":authors.map"]);
+      const graft = path.join(root, "effective-grafts");
+      vi.stubEnv("GIT_GRAFT_FILE", graft);
+      const request = await searchRequest({ skip: 0 });
+      const scan = ds.createHistorySearch(request);
+      expect(await scan.next()).toMatchObject({ kind: "ok", hasMore: true });
+      const hash = git(repo, ["rev-parse", "HEAD~4"]);
+      const mapping = "Canonical <test@example.com>\n";
+      switch (input) {
+        case "shallow":
+          await fs.writeFile(path.join(repo, ".git/shallow"), `${hash}\n`);
+          break;
+        case "graft":
+          await fs.writeFile(graft, `${hash}\n`);
+          break;
+        case "replacement":
+          git(repo, ["replace", "--graft", hash]);
+          break;
+        case "worktree map":
+          await fs.writeFile(path.join(repo, ".mailmap"), mapping);
+          break;
+        case "mailmap.file":
+          git(repo, ["config", input, mapFile]);
+          break;
+        case "mailmap.blob":
+          git(repo, ["config", input, ":authors.map"]);
+          break;
+        case "file contents":
+          await fs.writeFile(mapFile, mapping);
+          break;
+        case "blob contents":
+          await fs.writeFile(indexMap, mapping);
+          git(repo, ["add", "authors.map"]);
+          break;
+        default:
+          git(repo, ["config", input, "false"]);
+      }
+      expect(await scan.next()).toEqual({ kind: "historyChanged" });
+    });
+  });
+
+  // Case: TC-392, TC-393
+  it("distinguishes a visible ref change around a tokenless load from an unreadable input (TC-392, TC-393)", async () => {
+    const { repo } = fixture;
+    const original = await full(100);
+    let reads = 0;
+    interceptGit((args) => {
+      if (args[0] === "show-ref" && ++reads === 2) git(repo, ["tag", "appeared"]);
+    });
+    try {
+      const changed = await full(100);
+      expect(changed.commits).toEqual(original.commits);
+      expect(changed.history).toEqual({ kind: "historyChanged" });
+      expect(reads).toBe(2);
+      for (const phase of ["before", "after", "log"]) {
+        reads = 0;
+        interceptGit((args) => {
+          if (
+            (args[0] === "show-ref" &&
+              ++reads === (phase === "before" ? 1 : 2) &&
+              phase !== "log") ||
+            (phase === "log" && args[0] === "log")
+          ) {
+            return createGitProcess({ stderr: "unreadable", exitCode: 128 });
+          }
+        });
+        const failure = await full(100);
+        expect(failure.history).toEqual({ kind: "unavailable" });
+        expect(failure.commits.map((row) => row.hash)).toEqual(
+          phase === "log" ? [] : original.commits.map((row) => row.hash)
+        );
+      }
+    } finally {
+      vi.mocked(cp.spawn).mockImplementation(actualSpawnRef.current as typeof cp.spawn);
+    }
+  });
+
+  // Case: TC-394
+  it("normalizes ref order and observes independently changed HEADs, names, kinds and targets (TC-394)", async () => {
+    const { repo } = fixture;
+    git(repo, ["tag", "named"]);
+    git(repo, ["update-ref", "refs/remotes/origin/topic", "HEAD~2"]);
+    const initial = await full(2);
+    const listed = git(repo, ["show-ref", "-d", "--head"]).split("\n");
+    const fullRead = async (lines: string[]) => {
+      interceptGit((args) => {
+        if (args[0] === "show-ref") return createGitProcess({ stdout: `${lines.join("\n")}\n` });
+      });
+      return (await full(2)).history;
+    };
+    try {
+      expect(initial.history.kind).toBe("verified");
+      expect(await fullRead([...listed].reverse())).toEqual(initial.history);
+      const target = git(repo, ["rev-parse", "HEAD~3"]);
+      for (const modified of [
+        listed.map((line) => (line.endsWith(" HEAD") ? `${target} HEAD` : line)),
+        listed.map((line) => line.replace("refs/tags/named", "refs/tags/renamed")),
+        listed.map((line) => line.replace("refs/tags/named", "refs/heads/named")),
+        listed.map((line) =>
+          line.endsWith(" refs/tags/named") ? `${target} refs/tags/named` : line
+        )
+      ]) {
+        const info = await fullRead(modified);
+        expect(info.kind).toBe("verified");
+        expect(info).not.toEqual(initial.history);
+      }
+    } finally {
+      vi.mocked(cp.spawn).mockImplementation(actualSpawnRef.current as typeof cp.spawn);
+    }
+  });
+
+  // Case: TC-393, TC-394
+  it("ignores only a successfully enumerated hidden remote for search (TC-393, TC-394)", async () => {
+    const { repo } = fixture;
+    const hidden = () => ds.getCommits(repo, [], 2, false, [], "date");
+    const remote = "refs/remotes/origin/topic";
+    git(repo, ["update-ref", remote, "HEAD~2"]);
+    const first = await hidden();
+    expect(first.history.kind).toBe("verified");
+    expect(first.pageToken).toBeTypeOf("number");
+    git(repo, ["update-ref", remote, "HEAD~3"]);
+    expect(
+      await ds.getNextHistoryPage({ ...query(3, first.pageToken), showRemoteBranches: false })
+    ).toBeUndefined();
+    expect((await hidden()).history).toEqual(first.history);
+    await fs.writeFile(path.join(repo, ".git", remote), `${"f".repeat(40)}\n`);
+    const broken = await hidden();
+    expect(broken.history).toEqual({ kind: "unavailable" });
+    expect(broken.commits.map((row) => row.hash)).toEqual(first.commits.map((row) => row.hash));
+  });
 
   // Case: TC-381
   it("preserves single and consecutive carriage returns and reads the following records (TC-381)", async () => {
@@ -333,21 +983,7 @@ describe("continuing ordinary Git history", () => {
 
   // Case: TC-383
   it("resumes a linear walk from its saved parent and sends only the next 100 commits (TC-383)", async () => {
-    const base = git(fixture.repo, ["rev-parse", "HEAD"]);
-    const commits = Array.from({ length: 100 }, (_, i) => {
-      const message = `row ${i}`;
-      return [
-        `commit refs/heads/${MAIN_BRANCH}`,
-        "committer Test User <test@example.com> now",
-        `data ${message.length}`,
-        message,
-        ...(i === 0 ? [`from ${base}`] : [])
-      ].join("\n");
-    });
-    cp.execFileSync("git", ["fast-import", "--quiet", "--date-format=now"], {
-      cwd: fixture.repo,
-      input: `${commits.join("\n")}\n`
-    });
+    addLinearCommits(100);
     const refs = git(fixture.repo, ["log", "--date-order", "--format=%H"]).split("\n");
     const first = await full(3);
     vi.mocked(cp.spawn).mockClear();

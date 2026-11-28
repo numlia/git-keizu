@@ -6,7 +6,7 @@ import * as vscode from "vscode";
 
 import { AvatarManager } from "./avatarManager";
 import { getConfig, MIN_COMMIT_LOAD_COUNT, normalizeCommitLoadCount } from "./config";
-import { DataSource } from "./dataSource";
+import { COMMIT_ORDER_FLAGS, DataSource } from "./dataSource";
 import { encodeDiffDocUri } from "./diffDocProvider";
 import { ExtensionState } from "./extensionState";
 import { getLocale, loadWebviewMessages, t as hostT } from "./i18n";
@@ -19,11 +19,16 @@ import {
   GitFileChangeType,
   GitKeizuViewState,
   GitRepoSet,
+  type RequestCancelHistorySearch,
   RequestMessage,
+  type RequestNextHistorySearch,
   type RequestPush,
+  type RequestStartHistorySearch,
+  type RequestVerifyHistorySearch,
   type ResponseCheckoutBranch,
   ResponseMessage,
   type ResponsePush,
+  type SearchOwner,
   UNCOMMITTED_CHANGES_HASH,
   WorktreePathViewState
 } from "./types";
@@ -39,6 +44,28 @@ const BRANCH_ALREADY_EXISTS_MESSAGE = "A branch with this name already exists.";
 const INVALID_REMOTE_NAME_MESSAGE = "Invalid remote name.";
 const REMOTE_LOOKUP_FAILED_MESSAGE = "Unable to read the remotes of this repository.";
 const UNREGISTERED_REMOTE_MESSAGE = "The selected remote is not registered in this repository.";
+
+function validSearchStart(request: RequestStartHistorySearch): boolean {
+  return (
+    Number.isSafeInteger(request.skip) &&
+    request.skip >= 0 &&
+    request.skip < Number.MAX_SAFE_INTEGER &&
+    typeof request.snapshot === "string" &&
+    request.snapshot !== "" &&
+    typeof request.showRemoteBranches === "boolean" &&
+    Object.prototype.hasOwnProperty.call(COMMIT_ORDER_FLAGS, request.commitOrdering) &&
+    Array.isArray(request.branches) &&
+    request.branches.every(
+      (branch) =>
+        typeof branch === "string" &&
+        branch !== "" &&
+        !branch.startsWith("-") &&
+        !branch.includes("\0")
+    ) &&
+    Array.isArray(request.authors) &&
+    request.authors.every((author) => typeof author === "string" && !author.includes("\0"))
+  );
+}
 
 function currentWorktreePathViewState(): WorktreePathViewState {
   return {
@@ -76,6 +103,16 @@ export class GitKeizuView {
   private configChangedSinceRender: boolean = false;
   private reposChangedWhileHidden: boolean = false;
   private currentRepo: string | null = null;
+  private viewId?: string;
+  private searchGeneration = 0;
+  private search?: {
+    owner: SearchOwner;
+    scan: ReturnType<DataSource["createHistorySearch"]>;
+    snapshot: string;
+    showRemoteBranches: boolean;
+    lastRequest: number;
+    pending: boolean;
+  };
 
   public static createOrShow(
     extensionPath: string,
@@ -216,6 +253,7 @@ export class GitKeizuView {
               this.update();
             }
           } else {
+            if (!this.retainContextWhenHidden) this.invalidateSearchView();
             this.currentRepo = null;
             this.repoFileWatcher.stop();
           }
@@ -228,8 +266,25 @@ export class GitKeizuView {
 
     vscode.workspace.onDidChangeConfiguration(
       (event) => {
+        if (
+          this.panel.visible &&
+          (event.affectsConfiguration("git-keizu.dateType") ||
+            event.affectsConfiguration("git-keizu.dateFormat"))
+        ) {
+          void this.update();
+          return;
+        }
         if (event.affectsConfiguration(CONFIG_SECTION)) {
           this.configChangedSinceRender = true;
+        }
+        if (
+          this.panel.visible &&
+          event.affectsConfiguration("git-keizu.repository.commits.order")
+        ) {
+          this.sendMessage({
+            command: "setCommitOrdering",
+            ordering: getConfig().commitOrdering()
+          });
         }
       },
       null,
@@ -242,6 +297,9 @@ export class GitKeizuView {
       }
     });
     this.repoManager.registerViewCallback((repos: GitRepoSet, numRepos: number) => {
+      if (this.search && !Object.prototype.hasOwnProperty.call(repos, this.search.owner.repo)) {
+        this.cancelSearch();
+      }
       if (!this.panel.visible) {
         this.reposChangedWhileHidden = true;
         return;
@@ -256,6 +314,14 @@ export class GitKeizuView {
     this.panel.webview.onDidReceiveMessage(
       async (msg: RequestMessage) => {
         if (this.dataSource === null) return;
+        switch (msg.command) {
+          case "startHistorySearch":
+          case "nextHistorySearch":
+          case "verifyHistorySearch":
+          case "cancelHistorySearch":
+            await this.handleHistorySearch(msg);
+            return;
+        }
         if (
           msg.command !== "copyToClipboard" &&
           msg.command !== "loadRepos" &&
@@ -328,6 +394,7 @@ export class GitKeizuView {
             case "commitDetails":
               this.sendMessage({
                 command: "commitDetails",
+                ...(msg.searchKey ? { searchKey: msg.searchKey } : {}),
                 commitDetails:
                   msg.commitHash === UNCOMMITTED_CHANGES_HASH
                     ? await this.dataSource.getUncommittedDetails(msg.repo)
@@ -342,6 +409,7 @@ export class GitKeizuView {
             case "compareCommits":
               this.sendMessage({
                 command: "compareCommits",
+                requestId: msg.requestId,
                 fileChanges: await this.dataSource.getCommitComparison(
                   msg.repo,
                   msg.fromHash,
@@ -717,6 +785,99 @@ export class GitKeizuView {
     this.panel.webview.postMessage(msg);
   }
 
+  private cancelSearch() {
+    void this.search?.scan.close();
+    this.search = undefined;
+  }
+
+  private invalidateSearchView() {
+    this.viewId = undefined;
+    this.searchGeneration = 0;
+    this.cancelSearch();
+  }
+
+  private async handleHistorySearch(
+    msg:
+      | RequestStartHistorySearch
+      | RequestNextHistorySearch
+      | RequestVerifyHistorySearch
+      | RequestCancelHistorySearch
+  ) {
+    const { viewId, repo, generation } = msg;
+    if (
+      !this.viewId ||
+      viewId !== this.viewId ||
+      !Number.isSafeInteger(generation) ||
+      generation < 1
+    )
+      return;
+    const owner = { viewId, repo, generation };
+    if (msg.command === "cancelHistorySearch") {
+      if (this.search?.owner.generation === generation && this.search.owner.repo === repo)
+        this.cancelSearch();
+      return;
+    }
+    const requestId = msg.requestId;
+    if (
+      !Number.isSafeInteger(requestId) ||
+      requestId < 1 ||
+      !Object.prototype.hasOwnProperty.call(this.repoManager.getRepos(), repo)
+    )
+      return;
+    const key = { ...owner, requestId };
+    if (msg.command === "startHistorySearch") {
+      if (generation <= this.searchGeneration) return;
+      this.cancelSearch();
+      this.searchGeneration = generation;
+      if (!validSearchStart(msg)) {
+        this.sendMessage({
+          command: "historySearchBatch",
+          ...key,
+          kind: "error",
+          message: "Invalid history search parameters."
+        });
+        return;
+      }
+      this.search = {
+        owner,
+        scan: this.dataSource.createHistorySearch(msg),
+        snapshot: msg.snapshot,
+        showRemoteBranches: msg.showRemoteBranches,
+        lastRequest: 0,
+        pending: false
+      };
+    }
+    const search = this.search;
+    if (
+      !search ||
+      search.owner.repo !== repo ||
+      search.owner.generation !== generation ||
+      search.pending ||
+      requestId <= search.lastRequest
+    )
+      return;
+    search.lastRequest = requestId;
+    search.pending = true;
+    try {
+      let response: ResponseMessage;
+      if (msg.command === "verifyHistorySearch") {
+        const result =
+          search.snapshot === msg.snapshot && search.showRemoteBranches === msg.showRemoteBranches
+            ? await this.dataSource.verifyHistorySearch(repo, msg.showRemoteBranches, msg.snapshot)
+            : { kind: "error" as const, message: "Invalid history verification parameters." };
+        response = { command: "historySearchValidation", ...key, ...result };
+      } else {
+        const result = await search.scan.next();
+        response = { command: "historySearchBatch", ...key, ...result };
+      }
+      if (this.search !== search) return;
+      if (response.kind !== "ok") this.cancelSearch();
+      this.sendMessage(response);
+    } finally {
+      search.pending = false;
+    }
+  }
+
   public notifyShowRecentActionsChanged() {
     this.sendMessage({
       command: "setShowRecentActions",
@@ -741,6 +902,7 @@ export class GitKeizuView {
   }
 
   public dispose() {
+    this.invalidateSearchView();
     GitKeizuView.currentPanel = undefined;
     GitKeizuView.panelCloseCount += 1;
     this.panel.dispose();
@@ -754,9 +916,13 @@ export class GitKeizuView {
   }
 
   private async update() {
+    this.invalidateSearchView();
+    const viewId = crypto.randomUUID();
+    this.viewId = viewId;
     this.configChangedSinceRender = false;
     this.reposChangedWhileHidden = false;
-    this.panel.webview.html = await this.getHtmlForWebview();
+    const html = await this.getHtmlForWebview(viewId);
+    if (this.viewId === viewId) this.panel.webview.html = html;
   }
 
   // The graph page and the "unable to load" page are different HTML, so crossing the zero-repo
@@ -782,13 +948,14 @@ export class GitKeizuView {
     this.sendMessage({ command: "refresh" });
   }
 
-  private async getHtmlForWebview() {
+  private async getHtmlForWebview(viewId: string) {
     const config = getConfig(),
       nonce = getNonce();
     const locale = getLocale();
     const webviewMessages = await loadWebviewMessages(this.extensionPath);
     await this.extensionState.waitForAvatarStorage();
     const viewState: GitKeizuViewState = {
+      viewId,
       commitOrdering: config.commitOrdering(),
       dateFormat: config.dateFormat(),
       dialogDefaults: config.dialogDefaults(),
@@ -860,7 +1027,7 @@ export class GitKeizuView {
 			<p>${hostT('If you are using a portable Git installation, make sure you have set the Visual Studio Code Setting "git.path" to the path of your portable installation (e.g. "C:\\\\Program Files\\\\Git\\\\bin\\\\git.exe" on Windows).')}</p>
 			</body>`;
     }
-    this.isGraphViewLoaded = numRepos > 0;
+    if (this.viewId === viewId) this.isGraphViewLoaded = numRepos > 0;
 
     // CSP: font-src is required for codicon.ttf loaded by codicon.css
     return `<!DOCTYPE html>

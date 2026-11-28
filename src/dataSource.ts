@@ -1,4 +1,5 @@
 import * as cp from "node:child_process";
+import { createHash } from "node:crypto";
 import { lstat, readFile, stat } from "node:fs/promises";
 import * as path from "node:path";
 
@@ -30,6 +31,7 @@ import {
   spliceLineageContinuation
 } from "./fileHistory";
 import { DEFAULT_GIT_PATH, resolveGitExecutable } from "./gitExecutable";
+import { GitHistorySearch, type SearchRefs } from "./gitHistorySearch";
 import { isSafeRemoteName, isValidRefName } from "./refValidation";
 import {
   BranchCleanupAheadBehind,
@@ -47,11 +49,14 @@ import {
   GitResetMode,
   GitStash,
   GitUnsavedChanges,
+  HistorySearchValidation,
   PushPreparation,
   PushTarget,
   RemoteBranchTarget,
   RequestLoadCommits,
+  RequestStartHistorySearch,
   ResponseAppendCommits,
+  SearchHistoryInfo,
   UNCOMMITTED_CHANGES_HASH,
   VALID_UNCOMMITTED_RESET_MODES,
   WorktreeCollection
@@ -82,6 +87,7 @@ const FILE_HISTORY_ANCESTRY_MIN_ENTRIES = 2;
 const HISTORY_ANCESTRY_FILES = ["shallow", "info/grafts"];
 const HISTORY_CONFIG_PATTERN = "^(core\\.usereplacerefs|mailmap\\.(file|blob)|log\\.mailmap)$";
 const GIT_CONFIG_NO_MATCH = 1;
+const FULL_OBJECT_ID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 
 export const COMMIT_ORDER_FLAGS: Readonly<Record<CommitOrdering, string>> = {
   date: "--date-order",
@@ -192,23 +198,36 @@ function isRefNameSafe(refName: string): boolean {
 
 const VALID_RESET_MODES = new Set(["soft", "mixed", "hard"]);
 
-function parseGitLogCommits(stdout: string): GitCommit[] {
+function parseGitLogRecord(record: string) {
+  const fields = record.split(gitLogSeparator);
+  if (fields.length !== LOG_FORMAT_FIELD_COUNT) return undefined;
+  const [hash, parents, author, email, timestamp, message] = fields;
+  const parentHashes = parents.split(" ").filter(Boolean);
+  const date = parseInt(timestamp, 10);
+  const valid =
+    FULL_OBJECT_ID.test(hash) &&
+    parentHashes.every((parent) => FULL_OBJECT_ID.test(parent)) &&
+    parentHashes.join(" ") === parents &&
+    Number.isSafeInteger(date) &&
+    String(date) === timestamp;
+  return { commit: { hash, parentHashes, author, email, date, message }, valid };
+}
+
+function parseGitLogCommits(stdout: string) {
   // Git subjects can contain literal carriage returns, including consecutive ones.
   const lines = stdout.split(/\r?\n/);
   const gitCommits: GitCommit[] = [];
+  let valid = true;
   for (let i = 0; i < lines.length - 1; i++) {
-    const line = lines[i].split(gitLogSeparator);
-    if (line.length !== LOG_FORMAT_FIELD_COUNT) break;
-    gitCommits.push({
-      hash: line[0],
-      parentHashes: line[1].split(" ").filter(Boolean),
-      author: line[2],
-      email: line[3],
-      date: parseInt(line[4], 10),
-      message: line[5]
-    });
+    const row = parseGitLogRecord(lines[i]);
+    if (!row) break;
+    if (!row.valid) valid = false;
+    gitCommits.push(row.commit);
   }
-  return gitCommits;
+  return {
+    commits: gitCommits,
+    complete: valid && lines[lines.length - 1] === "" && gitCommits.length === lines.length - 1
+  };
 }
 
 /**
@@ -258,6 +277,7 @@ function orderPinnedParentsFirst(pinnedCommits: GitCommit[]): GitCommit[] {
 }
 
 export class DataSource {
+  private historySearch?: GitHistorySearch;
   private historyPage?: HistoryPage;
   private historySequence = 0;
   private gitPath: string = DEFAULT_GIT_PATH;
@@ -327,17 +347,19 @@ export class DataSource {
       this.getRefs(repo, showRemoteBranches)
     ]);
 
-    const [commits, stashes, authorList, pinnedCommits] = await Promise.all([
+    const [log, stashes, authorList, pinnedCommits] = await Promise.all([
       this.getGitLog(repo, branches, maxCommits + 1, showRemoteBranches, authors, commitOrdering),
       this.getStashes(repo),
       this.getAuthors(repo),
       this.getPinnedDetachedCommits(repo, collectDetachedHeads(worktrees), authors)
     ]);
 
+    const commits = log.commits;
     const moreCommitsAvailable = commits.length === maxCommits + 1;
     const next = moreCommitsAvailable ? commits.pop() : undefined;
 
-    const knownHashes = new Set(commits.map((commit) => commit.hash));
+    const hashes = commits.map((commit) => commit.hash);
+    const knownHashes = new Set(hashes);
     const pendingPinnedCommits = pinnedCommits.filter((pinnedCommit) => {
       if (knownHashes.has(pinnedCommit.hash)) return false;
       knownHashes.add(pinnedCommit.hash);
@@ -424,6 +446,24 @@ export class DataSource {
       }
     }
 
+    const after = await this.getRefs(repo, showRemoteBranches);
+    let history: SearchHistoryInfo;
+    if (
+      refData.searchSnapshot !== null &&
+      after.searchSnapshot !== null &&
+      refData.searchSnapshot !== after.searchSnapshot
+    ) {
+      history = { kind: "historyChanged" };
+    } else if (!log.complete || refData.searchSnapshot === null || after.searchSnapshot === null) {
+      history = { kind: "unavailable" };
+    } else {
+      history = {
+        kind: "verified",
+        snapshot: after.searchSnapshot,
+        hashes,
+        requestedCount: maxCommits
+      };
+    }
     if (
       next &&
       refData.snapshot !== null &&
@@ -435,7 +475,6 @@ export class DataSource {
         refData.refs.some((ref) => ref.name === branch || `remotes/${ref.name}` === branch)
       )
     ) {
-      const after = await this.getRefs(repo, showRemoteBranches);
       if (token === this.historySequence && after.snapshot === refData.snapshot) {
         this.historyPage = {
           token,
@@ -457,6 +496,7 @@ export class DataSource {
     }
     return {
       commits: commitNodes,
+      history,
       pageToken: this.historyPage?.token === token ? token : undefined,
       head: refData.head,
       moreCommitsAvailable: moreCommitsAvailable,
@@ -1325,7 +1365,56 @@ export class DataSource {
       data.snapshot !== null && ancestryFiles !== null && historyConfig !== null
         ? JSON.stringify([data.snapshot, ancestryFiles, historyConfig])
         : null;
-    return { ...data, snapshot };
+    const searchSnapshot =
+      data.searchRefs !== null && ancestryFiles !== null && historyConfig !== null
+        ? createHash("sha256")
+            .update(JSON.stringify([data.searchRefs, ancestryFiles, historyConfig]))
+            .digest("hex")
+        : null;
+    return { ...data, snapshot, searchSnapshot };
+  }
+
+  private async getSearchRefs(
+    repo: string,
+    showRemoteBranches: boolean,
+    snapshot: string
+  ): Promise<SearchRefs> {
+    const data = await this.getRefs(repo, showRemoteBranches);
+    if (data.searchSnapshot === null) {
+      return { kind: "error", message: "Unable to verify the repository history." };
+    }
+    return data.searchSnapshot === snapshot
+      ? { kind: "ok", refs: data.refs }
+      : { kind: "historyChanged" };
+  }
+
+  public async verifyHistorySearch(
+    repo: string,
+    showRemoteBranches: boolean,
+    snapshot: string
+  ): Promise<HistorySearchValidation> {
+    try {
+      const result = await this.getSearchRefs(repo, showRemoteBranches, snapshot);
+      return result.kind === "ok" ? { kind: "ok" } : result;
+    } catch (error) {
+      return { kind: "error", message: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  public createHistorySearch(request: RequestStartHistorySearch): GitHistorySearch {
+    const { repo, branches, authors, showRemoteBranches, commitOrdering, skip, snapshot } = request;
+    const args = this.gitLogArgs(branches, { skip }, showRemoteBranches, authors, commitOrdering);
+    this.historySearch = new GitHistorySearch(
+      skip,
+      this.historySearch?.close(),
+      () => this.getSearchRefs(repo, showRemoteBranches, snapshot),
+      () => this.spawnGitChild(args, repo),
+      (line) => {
+        const record = parseGitLogRecord(line);
+        return record?.valid ? record.commit : undefined;
+      }
+    );
+    return this.historySearch;
   }
 
   private async getHistoryConfigSnapshot(repo: string): Promise<string | null> {
@@ -1414,20 +1503,27 @@ export class DataSource {
   }
 
   private readRefs(repo: string, showRemoteBranches: boolean) {
-    return this.spawnGit<GitRefData & { snapshot: string | null; singleTip?: string }>(
+    return this.spawnGit<
+      GitRefData & { snapshot: string | null; searchRefs: string[] | null; singleTip?: string }
+    >(
       ["show-ref", "-d", "--head"],
       repo,
       (stdout) => {
         const refData: GitRefData = { head: null, refs: [] };
         const tips = new Set<string>();
+        const replacements: string[] = [];
+        const replaceBase = process.env.GIT_REPLACE_REF_BASE || "refs/replace/";
+        let valid = true;
         let pageable = true;
         let lines = stdout.split(eolRegex);
         for (let i = 0; i < lines.length - 1; i++) {
           let line = lines[i].split(" ");
+          if (line.length !== 2 || !FULL_OBJECT_ID.test(line[0]) || !line[1]) valid = false;
           if (line.length < 2) continue;
 
           let hash = line.shift()!;
           let ref = line.join(" ");
+          if (ref.startsWith(replaceBase)) replacements.push(`${ref}\0${hash}`);
           // Stashes can insert rows anywhere in the graph. Their reflog is not part of the normal walk.
           if (ref === "refs/stash") pageable = false;
 
@@ -1452,10 +1548,18 @@ export class DataSource {
         return {
           ...refData,
           snapshot: pageable && refData.head !== null ? stdout : null,
+          searchRefs:
+            valid && refData.head !== null && lines[lines.length - 1] === ""
+              ? [
+                  refData.head,
+                  ...refData.refs.map(({ type, name, hash }) => `${type}\0${name}\0${hash}`).sort(),
+                  ...replacements.sort()
+                ]
+              : null,
           singleTip: tips.size === 1 ? tips.values().next().value : undefined
         };
       },
-      { head: null, refs: [], snapshot: null }
+      { head: null, refs: [], snapshot: null, searchRefs: null }
     );
   }
 
@@ -1495,8 +1599,8 @@ export class DataSource {
             args,
             repo,
             (stdout) => {
-              const rows = parseGitLogCommits(stdout);
-              return rows.length === stdout.split("\n").length - 1 ? rows : null;
+              const log = parseGitLogCommits(stdout);
+              return log.complete ? log.commits : null;
             },
             null
           );
@@ -1528,6 +1632,7 @@ export class DataSource {
       : undefined;
     return {
       command: "appendCommits",
+      requestId: request.requestId,
       repo,
       from: page.token,
       baseCount: page.loaded,
@@ -1549,24 +1654,24 @@ export class DataSource {
     authors: string[],
     commitOrdering: CommitOrdering
   ) {
-    return this.spawnGit<GitCommit[]>(
+    return this.spawnGit(
       this.gitLogArgs(branches, num, showRemoteBranches, authors, commitOrdering),
       repo,
       parseGitLogCommits,
-      []
+      { commits: [], complete: false }
     );
   }
 
   private gitLogArgs(
     branches: string[],
-    num: number,
+    window: number | { skip: number },
     showRemoteBranches: boolean,
     authors: string[],
     commitOrdering: CommitOrdering
   ) {
     const args = [
       "log",
-      `--max-count=${num}`,
+      typeof window === "number" ? `--max-count=${window}` : `--skip=${window.skip}`,
       UTF8_OUTPUT_OPTION,
       `--format=${this.gitLogFormat}`,
       COMMIT_ORDER_FLAGS[commitOrdering],
@@ -1599,7 +1704,12 @@ export class DataSource {
       ...heads
     ];
 
-    return this.spawnGit<GitCommit[]>(args, repo, parseGitLogCommits, []);
+    return this.spawnGit<GitCommit[]>(
+      args,
+      repo,
+      (stdout) => parseGitLogCommits(stdout).commits,
+      []
+    );
   }
 
   private getGitUnsavedChanges(repo: string) {
@@ -1864,6 +1974,10 @@ export class DataSource {
     return result.kind === "exit" && result.code === 0 ? successValue(result.stdout) : errorValue;
   }
 
+  private spawnGitChild(args: string[], repo: string) {
+    return cp.spawn(this.gitPath, args, { cwd: repo, env: { ...process.env, LC_ALL: "C" } });
+  }
+
   private spawnGitProcess(
     args: string[],
     repo: string
@@ -1875,10 +1989,7 @@ export class DataSource {
       const stdoutChunks: Buffer[] = [];
       const stderrChunks: Buffer[] = [];
       let err = false;
-      const cmd = cp.spawn(this.gitPath, args, {
-        cwd: repo,
-        env: { ...process.env, LC_ALL: "C" }
-      });
+      const cmd = this.spawnGitChild(args, repo);
       cmd.stdout.on("data", (d: string | Buffer) => {
         stdoutChunks.push(Buffer.from(d));
       });
